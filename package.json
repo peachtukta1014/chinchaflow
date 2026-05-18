@@ -1,0 +1,18 @@
+{
+  "name": "chincha-business-os",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:seafood": "npm run dev --workspace=seafood-pos",
+    "dev:tea": "npm run dev --workspace=chincha-tea",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
