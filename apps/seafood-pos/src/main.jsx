@@ -237,6 +237,9 @@ function LoginScreen({ onLogin }) {
 
     setLoading(true); setError('');
     try {
+      // Must auth anonymously first — Firestore rules require request.auth != null
+      if (auth) await signInAnonymously(auth).catch(() => {});
+
       const memberRef = doc(db, 'members', p);
       const snap = await getDoc(memberRef);
 
