@@ -5,7 +5,8 @@
   "targets": {
     "chincha-eeed6": {
       "hosting": {
-        "shrimp": ["chincha-eeed6"]
+        "tea": ["chincha-tea"],
+        "shrimp": ["chincha-shrimp"]
       }
     }
   }
