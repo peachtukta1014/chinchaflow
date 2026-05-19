@@ -6,23 +6,7 @@ on:
       - main
 
 jobs:
-  # ── 1. Deploy Firestore rules + indexes ──────────────────────────────────────
-  deploy_firestore:
-    name: Deploy Firestore Rules & Indexes
-    runs-on: ubuntu-latest
-    continue-on-error: true   # SA missing serviceusage.services.get — don't block app deploys
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy Firestore rules & indexes
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json \
-            npx firebase-tools@12 deploy --only firestore \
-            --project chincha-eeed6 --non-interactive
-          rm -f /tmp/sa.json
-
-  # ── 2. Build & deploy Shrimp POS ─────────────────────────────────────────────
+  # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
   deploy_shrimp:
     name: Deploy Shrimp POS
     runs-on: ubuntu-latest
@@ -56,7 +40,7 @@ jobs:
           target:                 shrimp
           channelId:              live
 
-  # ── 3. Build & deploy Chincha Tea ────────────────────────────────────────────
+  # ── 2. Build & deploy Chincha Tea ────────────────────────────────────────────
   deploy_tea:
     name: Deploy Chincha Tea
     runs-on: ubuntu-latest
@@ -81,7 +65,6 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET:     ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID:             ${{ secrets.VITE_FIREBASE_APP_ID_TEA }}
-        continue-on-error: true
 
       - name: Deploy to Firebase Hosting (tea)
         uses: FirebaseExtended/action-hosting-deploy@v0
