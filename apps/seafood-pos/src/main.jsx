@@ -80,7 +80,7 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-white text-center">
-          <div className="text-4xl font-black text-blue-400 mb-2">KOSEAFOOD</div>
+          <img src="/logo.jpg" alt="โกอ้วน คลังซีฟู้ด" className="w-32 h-32 object-contain mx-auto mb-3 rounded-2xl shadow-2xl" />
           <p className="text-slate-400 text-sm">กำลังโหลด...</p>
         </div>
       </div>
@@ -95,7 +95,7 @@ function App() {
         <div className="absolute top-[20%] right-[-10%] w-64 h-64 bg-cyan-400 rounded-full filter blur-3xl opacity-40" />
 
         <div className="relative z-10 w-full text-center mb-12">
-          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 tracking-tighter mb-2">KOSEAFOOD</h1>
+          <img src="/logo.jpg" alt="โกอ้วน คลังซีฟู้ด" className="w-44 h-44 object-contain mx-auto mb-4 rounded-3xl shadow-2xl drop-shadow-[0_0_30px_rgba(96,165,250,0.3)]" />
           <p className="text-slate-400 text-sm font-medium tracking-wide">ระบบจัดการสต๊อกและจุดขาย</p>
         </div>
 
@@ -132,14 +132,16 @@ function App() {
 
   return (
     <div className="bg-slate-50 min-h-screen pb-24 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
+      {/* Background watermark */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+        <img src="/logo.jpg" alt="" className="w-72 h-72 object-contain opacity-[0.04]" />
+      </div>
+
       <div className="bg-slate-900 text-white p-4 pt-6 rounded-b-3xl shadow-lg flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-3">
-          {user.photoURL && (
-            <img src={user.photoURL} alt="" className="w-9 h-9 rounded-full border-2 border-blue-500" />
-          )}
+          <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
           <div>
-            <h1 className="text-xl font-black tracking-tight text-blue-400 leading-none">KO<span className="text-white">SEAFOOD</span></h1>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[180px]">{user.displayName || user.email}</p>
+            <p className="text-[11px] text-slate-400 truncate max-w-[160px]">{user.displayName || user.email}</p>
           </div>
         </div>
         <button

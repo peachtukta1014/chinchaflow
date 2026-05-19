@@ -1,0 +1,22 @@
+{
+  "name": "โกอ้วน คลังซีฟู้ด",
+  "short_name": "KOSEAFOOD",
+  "description": "ระบบจัดการสต๊อกและจุดขาย KOSEAFOOD",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
