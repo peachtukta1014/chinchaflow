@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "chincha-eeed6"
+  },
+  "targets": {
+    "chincha-eeed6": {
+      "hosting": {
+        "shrimp": ["chincha-eeed6"]
+      }
+    }
+  }
+}
