@@ -1,13 +1,11 @@
-# ChinCha Business OS
+# chincha-business-os
 
-Private production repository for Peach business apps.
+Monorepo สำหรับระบบธุรกิจ Chincha
 
-Apps:
-- Seafood POS
-- ChinCha Tea
-- Webhook Core
+## Apps
+- `apps/seafood-pos` — POS กุ้ง
+- `apps/chincha-tea` — ร้านชา
+- `apps/webhook-core` — LINE Webhook
 
-Rules:
-- Do not commit real tokens or secrets.
-- Firebase is the production data backend.
-- Vercel handles frontend auto deploy.
+## Deploy
+Auto deploy ไป Firebase Hosting เมื่อ push to main
