@@ -125,8 +125,8 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [inputMode, setInputMode] = useState('weight');
   const [saving, setSaving] = useState(false);
 
-  const activeProduct  = PRODUCTS.find(p => p.id === selectedProduct);
-  const isDeadShrimp   = activeProduct?.type === 'dead';
+  const activeProduct    = PRODUCTS.find(p => p.id === selectedProduct);
+  const isDeadShrimp     = activeProduct?.type === 'dead';
   const currentItemTotal = isDeadShrimp
     ? (parseFloat(customPrice) || 0)
     : (parseFloat(weight) || 0) * (parseFloat(customPrice) || 0);
@@ -353,18 +353,27 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
 
 const InventoryScreen = ({ stock, updateMainStock }) => {
   const [tab, setTab] = useState('receive');
-  const [rcvType, setRcvType] = useState('live');
-  const [rcvWeight, setRcvWeight] = useState('');
-  const [rcvCost, setRcvCost] = useState('');
+  const [rcvLive, setRcvLive]       = useState('');
+  const [rcvDead, setRcvDead]       = useState('');
+  const [rcvCost, setRcvCost]       = useState('');
+  const [rcvTransport, setRcvTransport] = useState('');
+  const [rcvNote, setRcvNote]       = useState('');
   const [deadWeight, setDeadWeight] = useState('');
 
+  const liveKg    = parseFloat(rcvLive)     || 0;
+  const deadKg    = parseFloat(rcvDead)     || 0;
+  const costPerKg = parseFloat(rcvCost)     || 0;
+  const transport = parseFloat(rcvTransport) || 0;
+  const totalKg   = liveKg + deadKg;
+  const shrimpCost = totalKg * costPerKg;
+  const grandTotal = shrimpCost + transport;
+
   const handleReceive = () => {
-    if (!rcvWeight || !rcvCost) return alert('ใส่น้ำหนักและต้นทุนด้วยครับ');
-    const w = parseFloat(rcvWeight);
-    if (rcvType === 'live') updateMainStock(stock.live + w, stock.dead);
-    else updateMainStock(stock.live, stock.dead + w);
-    alert('รับกุ้งเข้าสำเร็จ!');
-    setRcvWeight(''); setRcvCost('');
+    if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักกุ้งสดหรือกุ้งตายอย่างใดอย่างหนึ่งครับ');
+    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+    alert(`รับกุ้งเข้าสำเร็จ! ต้นทุนทั้งหมด: ฿${grandTotal.toLocaleString()}`);
+    setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
   };
 
   const handleDead = () => {
@@ -390,22 +399,64 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
       </div>
 
       {tab === 'receive' && (
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm">
-          <h2 className="font-black text-slate-800 text-xl mb-4">บันทึกรับกุ้งเข้าบ่อ</h2>
-          <div className="space-y-4">
-            <select value={rcvType} onChange={e => setRcvType(e.target.value)}
-              className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-              <option value="live">🦐 กุ้งแม่น้ำ (ตัวเป็น)</option>
-              <option value="dead">🦐 กุ้งตาย (รับตรง)</option>
-            </select>
-            <input type="number" inputMode="decimal" value={rcvWeight} onChange={e => setRcvWeight(e.target.value)}
-              placeholder="น้ำหนัก (กก.)" className="w-full p-4 bg-slate-50 rounded-2xl outline-none" />
-            <input type="number" inputMode="decimal" value={rcvCost} onChange={e => setRcvCost(e.target.value)}
-              placeholder="ต้นทุน (บาท/กก.)" className="w-full p-4 bg-slate-50 rounded-2xl outline-none" />
-            <button onClick={handleReceive} className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl">
-              บันทึกเข้าสต๊อก
-            </button>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
+          <h2 className="font-black text-slate-800 text-xl">บันทึกรับกุ้งเข้าบ่อ</h2>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งสด (กก.)</label>
+              <input type="number" inputMode="decimal" value={rcvLive} onChange={e => setRcvLive(e.target.value)}
+                placeholder="0.000" className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งตาย (กก.)</label>
+              <input type="number" inputMode="decimal" value={rcvDead} onChange={e => setRcvDead(e.target.value)}
+                placeholder="0.000" className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
+            </div>
           </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
+            <input type="number" inputMode="decimal" value={rcvCost} onChange={e => setRcvCost(e.target.value)}
+              placeholder="0" className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">ค่ารถ (฿)</label>
+            <input type="number" inputMode="decimal" value={rcvTransport} onChange={e => setRcvTransport(e.target.value)}
+              placeholder="0" className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">หมายเหตุ</label>
+            <input type="text" value={rcvNote} onChange={e => setRcvNote(e.target.value)}
+              placeholder="เช่น รถทะเบียน กข-1234"
+              className="w-full p-3 bg-slate-50 rounded-2xl outline-none" />
+          </div>
+
+          {/* Cost summary */}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>น้ำหนักรวม</span>
+              <span className="font-bold">{totalKg.toFixed(3)} กก.</span>
+            </div>
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>ค่ากุ้ง</span>
+              <span className="font-bold">฿{shrimpCost.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>ค่ารถ</span>
+              <span className="font-bold">฿{transport.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-black text-slate-800 text-base border-t border-slate-200 pt-2 mt-1">
+              <span>ต้นทุนทั้งหมด</span>
+              <span className="text-blue-600">฿{grandTotal.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <button onClick={handleReceive} className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl">
+            บันทึกเข้าสต๊อก
+          </button>
         </div>
       )}
 
