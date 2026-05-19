@@ -5,7 +5,10 @@ import {
   onSnapshot, orderBy, query, serverTimestamp, setDoc, where,
 } from 'firebase/firestore';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import {
+  GoogleAuthProvider, getRedirectResult, onAuthStateChanged,
+  signInWithPopup, signInWithRedirect, signOut,
+} from 'firebase/auth';
 import {
   Camera, CheckCircle, ChevronRight, Delete, Edit3,
   Home, LogOut, MapPin, Mic, MicOff, Package, PlusCircle,
@@ -103,9 +106,11 @@ function App() {
   const [stock, setStock]       = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
 
-  // Auth listener
+  // Auth listener + handle redirect result (mobile Google login)
   useEffect(() => {
     if (!auth) { setUser(null); return; }
+    // Capture redirect result first (mobile login returns here after redirect)
+    getRedirectResult(auth).catch(() => {});
     return onAuthStateChanged(auth, (u) => setUser(u ?? null));
   }, []);
 
@@ -120,8 +125,22 @@ function App() {
   const handleGoogleLogin = async () => {
     if (!auth) return;
     setAuthError('');
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch { setAuthError('เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง'); }
+    const provider = new GoogleAuthProvider();
+    try {
+      // Mobile browsers block popups — use redirect instead
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
+    } catch (err) {
+      // popup-blocked fallback: try redirect
+      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-cancelled-by-user') {
+        try { await signInWithRedirect(auth, provider); return; } catch {}
+      }
+      setAuthError('เข้าสู่ระบบไม่สำเร็จ (' + (err?.code || 'unknown') + ')');
+    }
   };
 
   const handleLogout = async () => {

@@ -1,0 +1,14 @@
+{
+  "name": "ชินชา คาเฟ่",
+  "short_name": "CHINCHA",
+  "description": "ระบบรับออเดอร์ ชินชา คาเฟ่",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#3d1f0f",
+  "theme_color": "#3d1f0f",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/chincha-logo.jpg", "sizes": "192x192", "type": "image/jpeg" },
+    { "src": "/chincha-logo.jpg", "sizes": "512x512", "type": "image/jpeg" }
+  ]
+}
