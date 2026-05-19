@@ -10,6 +10,7 @@ jobs:
   deploy_firestore:
     name: Deploy Firestore Rules & Indexes
     runs-on: ubuntu-latest
+    continue-on-error: true   # SA missing serviceusage.services.get — don't block app deploys
     steps:
       - uses: actions/checkout@v4
 
@@ -17,7 +18,7 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json \
-            npx firebase-tools@latest deploy --only firestore \
+            npx firebase-tools@12 deploy --only firestore \
             --project chincha-eeed6 --non-interactive
           rm -f /tmp/sa.json
 
@@ -25,7 +26,6 @@ jobs:
   deploy_shrimp:
     name: Deploy Shrimp POS
     runs-on: ubuntu-latest
-    needs: deploy_firestore
     steps:
       - uses: actions/checkout@v4
 
