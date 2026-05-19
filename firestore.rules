@@ -32,5 +32,10 @@ service cloud.firestore {
     match /teaOrders/{orderId} {
       allow read, write: if isAuth();
     }
+
+    // ── Member registry (login/register uses anonymous auth) ─────────────────
+    match /members/{phone} {
+      allow read, write: if isAuth();
+    }
   }
 }

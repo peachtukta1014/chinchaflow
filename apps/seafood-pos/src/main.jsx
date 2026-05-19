@@ -1,18 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  addDoc, collection, doc, increment, limit,
+  addDoc, collection, doc, getDoc, getDocs, increment, limit,
   onSnapshot, orderBy, query, serverTimestamp, setDoc, where,
 } from 'firebase/firestore';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import {
-  GoogleAuthProvider, getRedirectResult, onAuthStateChanged,
-  signInWithPopup, signInWithRedirect, signOut,
-} from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
 import {
   Camera, CheckCircle, ChevronRight, Delete, Edit3,
   Home, LogOut, MapPin, Mic, MicOff, Package, PlusCircle,
-  ShoppingCart, X,
+  ShoppingCart, Users, X,
 } from 'lucide-react';
 import { auth, db, storage, isFirebaseReady } from './firebase';
 
@@ -97,58 +94,72 @@ function useVoice(onNumber) {
   return { listening, toggle };
 }
 
+// ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
+
+const SESSION_KEY = 'koseafood-session';
+const SESSION_DAYS = 30;
+
+function getSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!s?.phone || !s?.loginAt) return null;
+    if (Date.now() - s.loginAt > SESSION_DAYS * 86400000) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+function saveSession(m) { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...m, loginAt: Date.now() })); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
 
 function App() {
-  const [user, setUser]         = useState(undefined);
-  const [authError, setAuthError] = useState('');
+  const [member, setMember]     = useState(undefined); // undefined=loading, null=logged out, obj=logged in
   const [activeTab, setActiveTab] = useState('pos');
   const [stock, setStock]       = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
 
-  // Auth listener + handle redirect result (mobile Google login)
+  // On mount: restore session → sign in anonymously (satisfies Firestore auth rules)
   useEffect(() => {
-    if (!auth) { setUser(null); return; }
-    // Capture redirect result first (mobile login returns here after redirect)
-    getRedirectResult(auth).catch(() => {});
-    return onAuthStateChanged(auth, (u) => setUser(u ?? null));
+    const session = getSession();
+    if (!session) { setMember(null); return; }
+    if (!auth) { setMember(session); return; }
+    signInAnonymously(auth)
+      .then(() => setMember(session))
+      .catch(() => setMember(session));
   }, []);
 
-  // Real-time shared stock from Firestore — syncs across all family devices
+  // Real-time shared stock from Firestore
   useEffect(() => {
-    if (!db) return;
+    if (!db || !member) return;
     return onSnapshot(doc(db, 'config', 'stock'), (snap) => {
       if (snap.exists()) setStock(snap.data());
     }, () => {});
-  }, []);
+  }, [member]);
 
-  const handleGoogleLogin = async () => {
-    if (!auth) return;
-    setAuthError('');
-    const provider = new GoogleAuthProvider();
-    try {
-      // Mobile browsers block popups — use redirect instead
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (isMobile) {
-        await signInWithRedirect(auth, provider);
-      } else {
-        await signInWithPopup(auth, provider);
-      }
-    } catch (err) {
-      // popup-blocked fallback: try redirect
-      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-cancelled-by-user') {
-        try { await signInWithRedirect(auth, provider); return; } catch {}
-      }
-      setAuthError('เข้าสู่ระบบไม่สำเร็จ (' + (err?.code || 'unknown') + ')');
-    }
+  const handleLogin = (memberData) => {
+    saveSession(memberData);
+    setMember(memberData);
+    if (auth) signInAnonymously(auth).catch(() => {});
   };
 
   const handleLogout = async () => {
     if (!window.confirm('ออกจากระบบ?')) return;
-    if (auth) await signOut(auth); else setUser(null);
+    clearSession();
+    setMember(null);
+    if (auth) await signOut(auth).catch(() => {});
   };
 
-  if (user === undefined) {
+  const updateMainStock = (live, dead) => {
+    const val = {
+      live: Math.max(0, parseFloat(live.toFixed(3))),
+      dead: Math.max(0, parseFloat(dead.toFixed(3))),
+    };
+    setStock(val);
+    if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
+  };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (member === undefined) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-white text-center">
@@ -159,48 +170,10 @@ function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-6 text-white max-w-md mx-auto relative overflow-hidden">
-        <div className="absolute top-[-10%] left-[-20%] w-64 h-64 bg-blue-600 rounded-full filter blur-3xl opacity-40" />
-        <div className="absolute top-[20%] right-[-10%] w-64 h-64 bg-cyan-400 rounded-full filter blur-3xl opacity-40" />
-        <div className="relative z-10 w-full text-center mb-10">
-          <img src="/logo.jpg" alt="โกอ้วน คลังซีฟู้ด" className="w-44 h-44 object-contain mx-auto mb-4 rounded-3xl shadow-2xl drop-shadow-[0_0_30px_rgba(96,165,250,0.3)]" />
-          <h1 className="text-2xl font-black text-white mb-1">โกอ้วน คลังซีฟู้ด</h1>
-          <p className="text-slate-400 text-sm font-medium tracking-wide">ระบบจัดการสต๊อกและจุดขาย</p>
-        </div>
-        <div className="relative z-10 w-full space-y-4">
-          <button onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white text-slate-800 font-bold p-4 rounded-2xl shadow-lg active:scale-95 transition-all">
-            <svg width="22" height="22" viewBox="0 0 48 48">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-            </svg>
-            เข้าสู่ระบบด้วย Google
-          </button>
-          {authError && <p className="text-red-400 text-sm text-center">{authError}</p>}
-          {!isFirebaseReady && (
-            <p className="text-yellow-400 text-xs text-center mt-4">
-              ⚠️ Firebase config ยังไม่ครบ — กรุณาตั้ง VITE_FIREBASE_* secrets ใน GitHub
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // ── Login / Register ──────────────────────────────────────────────────────
+  if (!member) return <LoginScreen onLogin={handleLogin} />;
 
-  // Write stock to Firestore → all family devices update instantly via onSnapshot
-  const updateMainStock = (live, dead) => {
-    const val = {
-      live: Math.max(0, parseFloat(live.toFixed(3))),
-      dead: Math.max(0, parseFloat(dead.toFixed(3))),
-    };
-    setStock(val); // optimistic local update
-    if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
-  };
-
+  // ── Main App ──────────────────────────────────────────────────────────────
   return (
     <div className="bg-slate-50 min-h-screen pb-24 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
@@ -212,7 +185,7 @@ function App() {
           <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
           <div>
             <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
-            <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">{user.displayName || user.email}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">{member.name}</p>
           </div>
         </div>
         <button onClick={handleLogout}
@@ -222,25 +195,216 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'  && <Dashboard stock={stock} />}
-        {activeTab === 'pos'   && (
-          <POSMobile user={user} stock={stock} updateMainStock={updateMainStock}
+        {activeTab === 'home'    && <Dashboard stock={stock} />}
+        {activeTab === 'pos'     && (
+          <POSMobile user={member} stock={stock} updateMainStock={updateMainStock}
             onSaveBill={(bill) => setTransactions([bill, ...transactions])} />
         )}
-        {activeTab === 'stock' && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
+        {activeTab === 'stock'   && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
+        {activeTab === 'members' && <MembersScreen />}
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-        <NavButton icon={<ShoppingCart />} label="ขายของ"    isActive={activeTab === 'pos'}   onClick={() => setActiveTab('pos')} />
-        <NavButton icon={<Home />}         label="ภาพรวม"    isActive={activeTab === 'home'}  onClick={() => setActiveTab('home')} />
-        <NavButton icon={<Package />}      label="รับสต๊อก" isActive={activeTab === 'stock'} onClick={() => setActiveTab('stock')} />
+        <NavButton icon={<ShoppingCart />} label="ขายของ"    isActive={activeTab === 'pos'}     onClick={() => setActiveTab('pos')} />
+        <NavButton icon={<Home />}         label="ภาพรวม"    isActive={activeTab === 'home'}    onClick={() => setActiveTab('home')} />
+        <NavButton icon={<Package />}      label="รับสต๊อก" isActive={activeTab === 'stock'}   onClick={() => setActiveTab('stock')} />
+        <NavButton icon={<Users />}        label="สมาชิก"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
       </div>
 
       <style>{`
         select optgroup { font-weight: 700; color: #475569; background: #f8fafc; }
         select option   { font-weight: 500; color: #0f172a; }
       `}</style>
+    </div>
+  );
+}
+
+// ─── Login / Register Screen ──────────────────────────────────────────────────
+
+function LoginScreen({ onLogin }) {
+  const [phone, setPhone]   = useState('');
+  const [name, setName]     = useState('');
+  const [mode, setMode]     = useState('login');   // 'login' | 'register' | 'pending'
+  const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    const p = phone.trim().replace(/\D/g, '');
+    if (p.length < 9) { setError('กรุณากรอกเบอร์โทรให้ถูกต้อง'); return; }
+    if (mode === 'register' && !name.trim()) { setError('กรุณากรอกชื่อ'); return; }
+    if (!db) { setError('ไม่สามารถเชื่อมต่อ Firebase ได้'); return; }
+
+    setLoading(true); setError('');
+    try {
+      const memberRef = doc(db, 'members', p);
+      const snap = await getDoc(memberRef);
+
+      if (!snap.exists()) {
+        // New member — create pending request
+        const n = name.trim() || 'ไม่ระบุชื่อ';
+        // First member ever → auto-approve as admin
+        const allSnap = await getDocs(collection(db, 'members'));
+        const isFirst = allSnap.empty;
+        await setDoc(memberRef, { name: n, phone: p, approved: isFirst, createdAt: serverTimestamp() });
+        if (isFirst) {
+          onLogin({ name: n, phone: p, approved: true });
+        } else {
+          setMode('pending');
+        }
+        return;
+      }
+
+      const data = snap.data();
+      if (!data.approved) { setMode('pending'); return; }
+
+      // Approved — login
+      await setDoc(memberRef, { lastLogin: serverTimestamp() }, { merge: true });
+      onLogin({ name: data.name, phone: p, approved: true });
+    } catch (e) {
+      setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white max-w-md mx-auto">
+        <img src="/logo.jpg" alt="" className="w-28 h-28 rounded-3xl mb-6 shadow-2xl" />
+        <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-2xl p-6 text-center w-full">
+          <p className="text-4xl mb-3">⏳</p>
+          <p className="text-yellow-300 font-bold text-lg">รอการอนุมัติ</p>
+          <p className="text-slate-400 text-sm mt-2">เจ้าของร้านจะอนุมัติให้เร็วๆ นี้ครับ</p>
+          <p className="text-slate-500 text-xs mt-1">เบอร์: {phone.replace(/\D/g,'')}</p>
+        </div>
+        <button onClick={() => { setMode('login'); setPhone(''); setName(''); }}
+          className="mt-6 text-slate-400 text-sm underline">ย้อนกลับ</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-6 text-white max-w-md mx-auto relative overflow-hidden">
+      <div className="absolute top-[-10%] left-[-20%] w-64 h-64 bg-blue-600 rounded-full filter blur-3xl opacity-40" />
+      <div className="absolute top-[20%] right-[-10%] w-64 h-64 bg-cyan-400 rounded-full filter blur-3xl opacity-40" />
+
+      <div className="relative z-10 w-full text-center mb-10">
+        <img src="/logo.jpg" alt="โกอ้วน คลังซีฟู้ด" className="w-44 h-44 object-contain mx-auto mb-4 rounded-3xl shadow-2xl drop-shadow-[0_0_30px_rgba(96,165,250,0.3)]" />
+        <h1 className="text-2xl font-black text-white mb-1">โกอ้วน คลังซีฟู้ด</h1>
+        <p className="text-slate-400 text-sm font-medium tracking-wide">ระบบจัดการสต๊อกและจุดขาย</p>
+      </div>
+
+      <div className="relative z-10 w-full space-y-3">
+        {mode === 'register' && (
+          <input value={name} onChange={e => setName(e.target.value)}
+            placeholder="ชื่อ-นามสกุล"
+            className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-2xl px-4 py-4 text-base focus:outline-none focus:border-blue-500" />
+        )}
+        <input value={phone} onChange={e => setPhone(e.target.value)}
+          placeholder="เบอร์โทร"
+          type="tel" inputMode="numeric"
+          className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-2xl px-4 py-4 text-base focus:outline-none focus:border-blue-500" />
+
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+        <button onClick={handleSubmit} disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50">
+          {loading ? 'กำลังตรวจสอบ...' : mode === 'register' ? 'ขอเข้าใช้งาน' : 'เข้าสู่ระบบ'}
+        </button>
+
+        <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+          className="w-full text-slate-400 text-sm py-2">
+          {mode === 'login' ? 'ยังไม่มีบัญชี? ขอสมัครสมาชิก' : 'มีบัญชีแล้ว? เข้าสู่ระบบ'}
+        </button>
+
+        {!isFirebaseReady && (
+          <p className="text-yellow-400 text-xs text-center">
+            ⚠️ Firebase config ยังไม่ครบ
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Members Screen (approve/reject pending members) ─────────────────────────
+
+function MembersScreen() {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, snap => {
+      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, []);
+
+  const setApproved = async (phone, val) => {
+    await setDoc(doc(db, 'members', phone), { approved: val }, { merge: true });
+  };
+
+  const pending  = members.filter(m => !m.approved);
+  const approved = members.filter(m => m.approved);
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="text-lg font-black text-slate-800">จัดการสมาชิก</h2>
+
+      {loading && <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>}
+
+      {pending.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">รออนุมัติ ({pending.length})</p>
+          <div className="space-y-2">
+            {pending.map(m => (
+              <div key={m.id} className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-orange-100">
+                <div>
+                  <p className="font-bold text-slate-800">{m.name}</p>
+                  <p className="text-xs text-slate-400">{m.phone}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setApproved(m.phone, true)}
+                    className="bg-emerald-500 text-white text-sm font-bold px-4 py-2 rounded-xl active:scale-95">
+                    อนุมัติ
+                  </button>
+                  <button onClick={() => setApproved(m.phone, false)}
+                    className="bg-red-100 text-red-500 text-sm font-bold px-3 py-2 rounded-xl active:scale-95">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {approved.length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิกที่อนุมัติแล้ว ({approved.length})</p>
+          <div className="space-y-2">
+            {approved.map(m => (
+              <div key={m.id} className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-slate-100">
+                <div>
+                  <p className="font-bold text-slate-800">{m.name}</p>
+                  <p className="text-xs text-slate-400">{m.phone}</p>
+                </div>
+                <button onClick={() => setApproved(m.phone, false)}
+                  className="text-xs text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg">
+                  ยกเลิก
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && members.length === 0 && (
+        <p className="text-slate-400 text-sm text-center py-12">ยังไม่มีสมาชิก</p>
+      )}
     </div>
   );
 }
@@ -335,7 +499,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
       paymentType, paidAmount: paidAmt, remainingAmount: remaining,
       photoUrl: photoUrl || null,
       timestamp: new Date().toLocaleTimeString('th-TH'),
-      recordedBy: user.email,
+      recordedBy: user.name,
     };
     if (isFirebaseReady && db) {
       try {
