@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   addDoc, collection, doc, increment, limit,
-  onSnapshot, orderBy, query, serverTimestamp, setDoc,
+  onSnapshot, orderBy, query, serverTimestamp, setDoc, where,
 } from 'firebase/firestore';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
@@ -103,9 +103,18 @@ function App() {
   const [stock, setStock]       = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
 
+  // Auth listener
   useEffect(() => {
     if (!auth) { setUser(null); return; }
     return onAuthStateChanged(auth, (u) => setUser(u ?? null));
+  }, []);
+
+  // Real-time shared stock from Firestore — syncs across all family devices
+  useEffect(() => {
+    if (!db) return;
+    return onSnapshot(doc(db, 'config', 'stock'), (snap) => {
+      if (snap.exists()) setStock(snap.data());
+    }, () => {});
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -163,7 +172,15 @@ function App() {
     );
   }
 
-  const updateMainStock = (live, dead) => setStock({ live, dead });
+  // Write stock to Firestore → all family devices update instantly via onSnapshot
+  const updateMainStock = (live, dead) => {
+    const val = {
+      live: Math.max(0, parseFloat(live.toFixed(3))),
+      dead: Math.max(0, parseFloat(dead.toFixed(3))),
+    };
+    setStock(val); // optimistic local update
+    if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
+  };
 
   return (
     <div className="bg-slate-50 min-h-screen pb-24 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
@@ -304,8 +321,10 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     if (isFirebaseReady && db) {
       try {
         setSaving(true);
+        const dateKey = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD" partition key
         await addDoc(collection(db, 'sales'), {
           ...billData,
+          dateKey,
           items: cart.map(i => ({
             productId: i.productId, productName: i.productName, type: i.type,
             weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
@@ -652,26 +671,42 @@ const Dashboard = ({ stock }) => {
   useEffect(() => {
     if (!db) { setLoading(false); return; }
     const unsubs = [];
-    const salesQ = query(collection(db, 'sales'), orderBy('createdAt', 'desc'), limit(200));
+    const todayKey = new Date().toISOString().split('T')[0];
+
+    // Query today's sales by dateKey partition (composite index: dateKey ASC + createdAt DESC)
+    const salesQ = query(
+      collection(db, 'sales'),
+      where('dateKey', '==', todayKey),
+      orderBy('createdAt', 'desc'),
+    );
     unsubs.push(onSnapshot(salesQ, snap => {
       setFirestoreSales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false)));
+    }, () => {
+      // Fallback: load without dateKey filter if index not ready yet
+      const fallbackQ = query(collection(db, 'sales'), orderBy('createdAt', 'desc'), limit(100));
+      const unsub2 = onSnapshot(fallbackQ, snap => {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        setFirestoreSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(s => s.createdAt?.toDate?.() >= today));
+        setLoading(false);
+      }, () => setLoading(false));
+      unsubs.push(unsub2);
+    }));
+
     unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
       setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
     }, () => {}));
+
     const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
     unsubs.push(onSnapshot(batchQ, snap => {
       setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, () => {}));
+
     return () => unsubs.forEach(u => u());
   }, []);
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todaySales = firestoreSales.filter(s => {
-    const t = s.createdAt?.toDate?.();
-    return t && t >= today;
-  });
+  const todaySales = firestoreSales; // already filtered by dateKey in query
 
   const todayTotal  = todaySales.reduce((s, t) => s + (t.total || 0), 0);
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);

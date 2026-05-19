@@ -1,0 +1,27 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateKey",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stockBatches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "purchaseDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "customerDebts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "totalDebt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
