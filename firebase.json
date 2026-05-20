@@ -19,7 +19,7 @@
   ],
   "functions": {
     "source": "apps/webhook-core",
-    "runtime": "nodejs18"
+    "runtime": "nodejs20"
   },
   "firestore": {
     "rules": "firestore.rules",
