@@ -7,7 +7,7 @@ import {
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
 import {
-  Camera, CheckCircle, ChevronRight, Delete, Edit3,
+  Bell, Camera, CheckCircle, ChevronRight, Delete, Edit3,
   Home, LogOut, MapPin, Mic, MicOff, Package, PlusCircle,
   ShoppingCart, Users, X,
 } from 'lucide-react';
@@ -117,6 +117,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('pos');
   const [stock, setStock]       = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
+  const [pendingOrders, setPendingOrders] = useState(0);
 
   // On mount: restore session → sign in anonymously (satisfies Firestore auth rules)
   useEffect(() => {
@@ -134,6 +135,18 @@ function App() {
     return onSnapshot(doc(db, 'config', 'stock'), (snap) => {
       if (snap.exists()) setStock(snap.data());
     }, () => {});
+  }, [member]);
+
+  // Badge: count pending LINE orders
+  useEffect(() => {
+    if (!db || !member) return;
+    const today = new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+    const q = query(
+      collection(db, 'lineOrders'),
+      where('deliveryDate', '>=', today),
+      where('status', '==', 'pending'),
+    );
+    return onSnapshot(q, snap => setPendingOrders(snap.size), () => {});
   }, [member]);
 
   const handleLogin = async (memberData) => {
@@ -202,6 +215,7 @@ function App() {
         )}
         {activeTab === 'stock'   && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members' && <MembersScreen />}
+        {activeTab === 'orders'  && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
@@ -209,6 +223,7 @@ function App() {
         <NavButton icon={<ShoppingCart />} label="ขายของ"    isActive={activeTab === 'pos'}     onClick={() => setActiveTab('pos')} />
         <NavButton icon={<Home />}         label="ภาพรวม"    isActive={activeTab === 'home'}    onClick={() => setActiveTab('home')} />
         <NavButton icon={<Package />}      label="รับสต๊อก" isActive={activeTab === 'stock'}   onClick={() => setActiveTab('stock')} />
+        <NavButton icon={<Bell />}         label="ออเดอร์"   isActive={activeTab === 'orders'}  onClick={() => setActiveTab('orders')} badge={pendingOrders} />
         <NavButton icon={<Users />}        label="สมาชิก"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
       </div>
 
@@ -1134,12 +1149,111 @@ const Dashboard = ({ stock }) => {
   );
 };
 
-// ─── Nav Button ───────────────────────────────────────────────────────────────
+// ─── LINE Orders Screen ───────────────────────────────────────────────────────
 
-const NavButton = ({ icon, label, isActive, onClick }) => (
+function LineOrdersScreen() {
+  const [orders,  setOrders]  = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const todayBKK = () => new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (!db) { setLoading(false); return; }
+    const q = query(collection(db, 'lineOrders'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(q, snap => {
+      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
+  const markDone = (id) => {
+    if (!db) return;
+    setDoc(doc(db, 'lineOrders', id), { status: 'done' }, { merge: true });
+  };
+
+  const today    = todayBKK();
+  const tomorrow = new Date(Date.now() + 7 * 3600000 + 86400000).toISOString().split('T')[0];
+  const dateLabel = (k) => k === today ? 'วันนี้' : k === tomorrow ? 'พรุ่งนี้' : k;
+
+  // Group by deliveryDate, show today + future only
+  const upcoming = orders.filter(o => (o.deliveryDate || '') >= today);
+  const grouped  = upcoming.reduce((acc, o) => {
+    const k = o.deliveryDate || 'ไม่ระบุ';
+    (acc[k] = acc[k] || []).push(o);
+    return acc;
+  }, {});
+
+  if (loading) return <div className="flex items-center justify-center h-40 text-slate-400 text-sm">กำลังโหลด...</div>;
+
+  if (upcoming.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-60 text-slate-300">
+      <Bell size={48} strokeWidth={1} className="mb-3" />
+      <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
+      <p className="text-xs mt-1">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
+    </div>
+  );
+
+  return (
+    <div className="px-4 pt-4 pb-6 space-y-5">
+      {Object.entries(grouped).sort().map(([date, items]) => (
+        <div key={date}>
+          <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+            📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
+            {items.filter(o => o.status !== 'done').length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {items.filter(o => o.status !== 'done').length} รอ
+              </span>
+            )}
+          </p>
+          <div className="space-y-2">
+            {items.map(o => (
+              <div key={o.id}
+                className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
+                  </div>
+                  {o.status === 'done'
+                    ? <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">✓ เสร็จ</span>
+                    : <button onClick={() => markDone(o.id)}
+                        className="text-xs bg-green-500 text-white font-bold px-3 py-1 rounded-xl active:scale-95 shrink-0">
+                        ✓ เสร็จ
+                      </button>
+                  }
+                </div>
+                <div className="space-y-1">
+                  {(o.items || []).map((item, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                      <p className="text-sm font-bold text-slate-700">{item.product}</p>
+                      <p className="text-sm text-slate-500 ml-auto">{item.qty} {item.unit}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Nav Button (with optional badge) ────────────────────────────────────────
+
+const NavButton = ({ icon, label, isActive, onClick, badge }) => (
   <button onClick={onClick}
-    className={`flex flex-col items-center justify-center w-full p-3 transition-all ${isActive ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
-    {React.cloneElement(icon, { size: 24, strokeWidth: isActive ? 2.5 : 2, className: 'mb-1' })}
+    className={`flex flex-col items-center justify-center w-full p-3 transition-all relative ${isActive ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
+    <div className="relative">
+      {React.cloneElement(icon, { size: 22, strokeWidth: isActive ? 2.5 : 2, className: 'mb-1' })}
+      {badge > 0 && (
+        <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+    </div>
     <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>{label}</span>
   </button>
 );
