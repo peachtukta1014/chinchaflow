@@ -263,7 +263,7 @@ function LoginScreen({ onLogin }) {
       await setDoc(memberRef, { lastLogin: serverTimestamp() }, { merge: true });
       onLogin({ name: data.name, phone: p, approved: true });
     } catch (e) {
-      setError('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
+      setError((e?.code || e?.message || 'unknown error'));
     } finally {
       setLoading(false);
     }
