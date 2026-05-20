@@ -475,13 +475,55 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !storage) return;
+    if (!file) return;
     setPhotoUploading(true);
     try {
-      const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
-      await uploadBytes(r, file);
-      setPhotoUrl(await getDownloadURL(r));
-    } catch { /* storage may not be available */ }
+      // Upload to Storage
+      if (storage) {
+        const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
+        await uploadBytes(r, file);
+        setPhotoUrl(await getDownloadURL(r));
+      }
+
+      // Gemini OCR: read bill → auto-fill weight & price
+      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (geminiKey) {
+        const toBase64 = (f) => new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(',')[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(f);
+        });
+        const b64 = await toBase64(file);
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: 'ดูรูปบิลนี้ บอกน้ำหนักกุ้ง (กก.) และราคาต่อกิโล (บาท/กก.) ตอบเฉพาะ JSON เท่านั้น ไม่ต้องอธิบาย รูปแบบ: {"weight":number|null,"pricePerKg":number|null}' },
+                  { inlineData: { mimeType: file.type || 'image/jpeg', data: b64 } },
+                ],
+              }],
+            }),
+          }
+        );
+        if (geminiRes.ok) {
+          const geminiJson = await geminiRes.json();
+          const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const match = text.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              const { weight: w, pricePerKg: p } = JSON.parse(match[0]);
+              if (w != null && !isNaN(w)) setWeight(String(w));
+              if (p != null && !isNaN(p)) setCustomPrice(String(p));
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+    } catch { /* storage or Gemini may not be available */ }
     finally { setPhotoUploading(false); }
   };
 
