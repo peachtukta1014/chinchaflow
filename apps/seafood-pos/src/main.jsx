@@ -348,8 +348,10 @@ function LoginScreen({ onLogin }) {
 // ─── Members Screen (approve/reject pending members) ─────────────────────────
 
 function MembersScreen() {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [members, setMembers]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [editId, setEditId]     = useState(null);
+  const [editName, setEditName] = useState('');
 
   useEffect(() => {
     if (!db) return;
@@ -360,62 +362,72 @@ function MembersScreen() {
     }, () => setLoading(false));
   }, []);
 
-  const setApproved = async (phone, val) => {
-    await setDoc(doc(db, 'members', phone), { approved: val }, { merge: true });
+  const setApproved = (phone, val) =>
+    setDoc(doc(db, 'members', phone), { approved: val }, { merge: true });
+
+  const saveName = async (phone) => {
+    if (!editName.trim()) return;
+    await setDoc(doc(db, 'members', phone), { name: editName.trim() }, { merge: true });
+    setEditId(null);
   };
 
+  const MemberCard = ({ m, showApprove }) => (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          {editId === m.id ? (
+            <input value={editName} onChange={e => setEditName(e.target.value)}
+              className="w-full border border-blue-400 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 mb-1"
+              autoFocus onKeyDown={e => e.key === 'Enter' && saveName(m.phone)} />
+          ) : (
+            <p className="font-bold text-slate-800 truncate">{m.name}</p>
+          )}
+          <p className="text-xs text-slate-400">{m.phone}</p>
+        </div>
+        <div className="flex gap-2 ml-2 shrink-0">
+          {editId === m.id ? (
+            <>
+              <button onClick={() => saveName(m.phone)}
+                className="bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">บันทึก</button>
+              <button onClick={() => setEditId(null)}
+                className="text-slate-400 text-xs border border-slate-200 px-2 py-1.5 rounded-lg">ยกเลิก</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setEditId(m.id); setEditName(m.name); }}
+                className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg">แก้ไข</button>
+              {showApprove
+                ? <button onClick={() => setApproved(m.phone, true)}
+                    className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">อนุมัติ</button>
+                : <button onClick={() => setApproved(m.phone, false)}
+                    className="text-xs text-red-400 border border-red-100 px-2 py-1.5 rounded-lg">ลบ</button>
+              }
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const pending  = members.filter(m => !m.approved);
-  const approved = members.filter(m => m.approved);
+  const approved = members.filter(m =>  m.approved);
 
   return (
     <div className="p-4 space-y-4">
       <h2 className="text-lg font-black text-slate-800">จัดการสมาชิก</h2>
-
       {loading && <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>}
 
       {pending.length > 0 && (
         <div>
           <p className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">รออนุมัติ ({pending.length})</p>
-          <div className="space-y-2">
-            {pending.map(m => (
-              <div key={m.id} className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-orange-100">
-                <div>
-                  <p className="font-bold text-slate-800">{m.name}</p>
-                  <p className="text-xs text-slate-400">{m.phone}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setApproved(m.phone, true)}
-                    className="bg-emerald-500 text-white text-sm font-bold px-4 py-2 rounded-xl active:scale-95">
-                    อนุมัติ
-                  </button>
-                  <button onClick={() => setApproved(m.phone, false)}
-                    className="bg-red-100 text-red-500 text-sm font-bold px-3 py-2 rounded-xl active:scale-95">
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="space-y-2">{pending.map(m => <MemberCard key={m.id} m={m} showApprove={true} />)}</div>
         </div>
       )}
 
       {approved.length > 0 && (
         <div>
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิกที่อนุมัติแล้ว ({approved.length})</p>
-          <div className="space-y-2">
-            {approved.map(m => (
-              <div key={m.id} className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm border border-slate-100">
-                <div>
-                  <p className="font-bold text-slate-800">{m.name}</p>
-                  <p className="text-xs text-slate-400">{m.phone}</p>
-                </div>
-                <button onClick={() => setApproved(m.phone, false)}
-                  className="text-xs text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg">
-                  ยกเลิก
-                </button>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิก ({approved.length})</p>
+          <div className="space-y-2">{approved.map(m => <MemberCard key={m.id} m={m} showApprove={false} />)}</div>
         </div>
       )}
 
@@ -637,7 +649,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
                   ? <img src={photoUrl} className="w-full h-full object-cover rounded-xl" alt="bill" />
                   : <Camera size={20} className="text-slate-400" />}
             </button>
-            <input ref={photoInputRef} type="file" accept="image/*" capture="environment"
+            <input ref={photoInputRef} type="file" accept="image/*"
               onChange={handlePhotoChange} className="hidden" />
             {cart.length > 0 && (
               <button onClick={handleSaveBill} disabled={saving}
