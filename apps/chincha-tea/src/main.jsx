@@ -45,7 +45,7 @@ function clearSession() { localStorage.removeItem(SESSION_KEY); }
 const T = {
   th: {
     appName:'ชินชา', tagline:'คาเฟ่และเครื่องดื่ม',
-    orderTab:'รับออเดอร์', historyTab:'ประวัติ', summaryTab:'สรุป',
+    orderTab:'รับออเดอร์', historyTab:'ประวัติ', summaryTab:'สรุป', restockTab:'สั่งของ',
     loginTitle:'เข้าสู่ระบบ', phonePlaceholder:'เบอร์โทรศัพท์', namePlaceholder:'ชื่อของคุณ',
     loginBtn:'เข้าระบบ', registerBtn:'สมัครสมาชิก',
     pendingTitle:'รอการอนุมัติ', pendingMsg:'บัญชีของคุณรอการอนุมัติจากเจ้าของร้านครับ',
@@ -62,7 +62,7 @@ const T = {
   },
   my: {
     appName:'ချင်ချာ', tagline:'ကော်ဖီဆိုင်',
-    orderTab:'အော်ဒါ', historyTab:'မှတ်တမ်း', summaryTab:'အကျဉ်း',
+    orderTab:'အော်ဒါ', historyTab:'မှတ်တမ်း', summaryTab:'အကျဉ်း', restockTab:'မှာမည်',
     loginTitle:'ဝင်ရောက်မည်', phonePlaceholder:'ဖုန်းနံပါတ်', namePlaceholder:'နာမည်',
     loginBtn:'ဝင်မည်', registerBtn:'မှတ်ပုံတင်မည်',
     pendingTitle:'ခွင့်ပြုချက်စောင့်ဆိုင်းနေသည်', pendingMsg:'ဆိုင်ရှင်၏ ခွင့်ပြုချက်ကို စောင့်ဆိုင်းပါ',
@@ -79,7 +79,7 @@ const T = {
   },
   en: {
     appName:'CHINCHA', tagline:'Café & Drinks',
-    orderTab:'Order', historyTab:'History', summaryTab:'Summary',
+    orderTab:'Order', historyTab:'History', summaryTab:'Summary', restockTab:'Restock',
     loginTitle:'Sign In', phonePlaceholder:'Phone number', namePlaceholder:'Your name',
     loginBtn:'Sign In', registerBtn:'Register',
     pendingTitle:'Waiting for Approval', pendingMsg:'Your account is pending approval from the owner.',
@@ -113,6 +113,33 @@ const MENU = [
 
 const SIZES = ['S', 'M', 'L'];
 const ICES  = ['noice', 'lessice', 'normalice', 'fullice'];
+
+// ─── Restock Static Data ──────────────────────────────────────────────────────
+
+const RESTOCK_ITEMS = [
+  {
+    category: 'เครื่องปรุง & วัตถุดิบ',
+    emoji: '🧂',
+    items: [
+      { id: 'thai-tea-powder',    name: 'ชาไทย (ผง)',    emoji: '🧡' },
+      { id: 'fresh-milk',         name: 'นมสด (กล่อง)', emoji: '🥛' },
+      { id: 'lemon-powder',       name: 'มะนาวผง',       emoji: '🍋' },
+      { id: 'green-tea-powder',   name: 'ผงชาเขียว',     emoji: '🍵' },
+      { id: 'matcha-powder',      name: 'ผงมัทฉะ',       emoji: '🍃' },
+      { id: 'cocoa-powder',       name: 'โกโก้ (ผง)',    emoji: '🍫' },
+      { id: 'ground-coffee',      name: 'กาแฟคั่วบด',    emoji: '☕' },
+    ],
+  },
+  {
+    category: 'อุปกรณ์บรรจุภัณฑ์',
+    emoji: '📦',
+    items: [
+      { id: 'cup-22oz-95mm',      name: 'แก้ว (22oz) ปาก 95mm',     emoji: '🥤' },
+      { id: 'lid-95mm-semidome',  name: 'ฝากึ่งโดมตัดเรียบ 95mm',   emoji: '🫙' },
+      { id: 'bubble-straw',       name: 'หลอดไข่มุก',               emoji: '🫧' },
+    ],
+  },
+];
 
 // ─── useLang hook ─────────────────────────────────────────────────────────────
 
@@ -365,10 +392,10 @@ function App() {
       </div>
 
       {/* Tab bar */}
-      <div className="z-10 shrink-0 flex px-4 pt-3 pb-1 gap-2" style={{ background:'#fdf6f0' }}>
-        {[['order',t('orderTab')],['history',t('historyTab')],['summary',t('summaryTab')]].map(([id,label]) => (
+      <div className="z-10 shrink-0 flex px-4 pt-3 pb-1 gap-1.5" style={{ background:'#fdf6f0' }}>
+        {[['order',t('orderTab')],['history',t('historyTab')],['summary',t('summaryTab')],['restock',t('restockTab')]].map(([id,label]) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex-1 py-2.5 rounded-2xl font-bold text-xs transition-all ${tab===id ? 'text-white' : 'text-stone-500 bg-stone-200'}`}
+            className={`flex-1 py-2.5 rounded-2xl font-bold text-[11px] transition-all ${tab===id ? 'text-white' : 'text-stone-500 bg-stone-200'}`}
             style={tab===id ? { background:'#3d1f0f' } : {}}>
             {label}
           </button>
@@ -464,6 +491,9 @@ function App() {
 
         {/* ── SUMMARY TAB ───────────────────────────────────────────── */}
         {tab === 'summary' && <SummaryTab orders={orders} t={t} />}
+
+        {/* ── RESTOCK TAB ───────────────────────────────────────────── */}
+        {tab === 'restock' && <RestockTab member={member} />}
       </div>
 
       {/* Customize Modal */}
@@ -575,37 +605,51 @@ function CustomizeModal({ item, t, onAdd, onClose }) {
 // ─── Summary Tab ──────────────────────────────────────────────────────────────
 
 function SummaryTab({ orders, t }) {
-  const total    = orders.reduce((s, o) => s + (o.total||0), 0);
-  const allItems = orders.flatMap(o => o.items||[]);
-  const countMap = {};
+  const total     = orders.reduce((s, o) => s + (o.total||0), 0);
+  const allItems  = orders.flatMap(o => o.items||[]);
+  const totalCups = allItems.reduce((s, i) => s + (i.qty||1), 0);
+  const countMap  = {};
   allItems.forEach(i => { countMap[i.key] = (countMap[i.key]||0) + (i.qty||1); });
-  const topItems = Object.entries(countMap).sort((a,b) => b[1]-a[1]).slice(0,6);
-  const maxCount = topItems[0]?.[1] || 1;
+  const topItems  = Object.entries(countMap).sort((a,b) => b[1]-a[1]).slice(0,3);
+  const maxCount  = topItems[0]?.[1] || 1;
 
   return (
-    <div className="px-4 pt-3 pb-6 space-y-4">
-      <div className="rounded-3xl p-6 text-white shadow-lg" style={{ background:'#3d1f0f' }}>
-        <p className="text-amber-500 text-xs font-bold mb-1 uppercase tracking-wide">{t('todaySales')}</p>
-        <p className="text-5xl font-black text-amber-200">฿{total.toLocaleString()}</p>
-        <p className="text-amber-700 text-sm mt-2">{orders.length} {t('orders')}</p>
+    <div className="px-4 pt-3 pb-6 space-y-3">
+      {/* Hero stats */}
+      <div className="rounded-3xl p-5 text-white shadow-lg" style={{ background:'#3d1f0f' }}>
+        <p className="text-amber-600 text-[10px] font-bold mb-3 uppercase tracking-widest">{t('todaySales')}</p>
+        <div className="flex items-end gap-4">
+          <div>
+            <p className="text-[11px] text-amber-600 font-bold uppercase tracking-wide mb-0.5">ยอดรวม</p>
+            <p className="text-5xl font-black text-amber-200 leading-none">฿{total.toLocaleString()}</p>
+          </div>
+          <div className="pb-1">
+            <p className="text-[11px] text-amber-600 font-bold uppercase tracking-wide mb-0.5">แก้วทั้งหมด</p>
+            <p className="text-4xl font-black text-amber-300 leading-none">{totalCups}<span className="text-lg font-bold text-amber-600 ml-1">แก้ว</span></p>
+          </div>
+        </div>
+        <p className="text-amber-700 text-xs mt-3">{orders.length} {t('orders')}</p>
       </div>
 
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-stone-200">
-        <p className="font-bold text-stone-700 mb-4 text-sm uppercase tracking-wide">{t('topItems')}</p>
+      {/* Top 3 mini chart */}
+      <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200">
+        <p className="font-bold text-stone-500 text-[10px] uppercase tracking-widest mb-3">{t('topItems')} · Top 3</p>
         {topItems.length === 0
-          ? <p className="text-stone-400 text-sm text-center py-4">{t('noOrders')}</p>
-          : topItems.map(([key, count]) => {
+          ? <p className="text-stone-300 text-sm text-center py-3">{t('noOrders')}</p>
+          : topItems.map(([key, count], idx) => {
               const m = MENU.find(x => x.key === key);
+              const medals = ['🥇','🥈','🥉'];
               return (
-                <div key={key} className="flex items-center gap-3 mb-3 last:mb-0">
-                  <span className="text-2xl">{m?.emoji || '☕'}</span>
-                  <div className="flex-1">
-                    <div className="flex justify-between mb-1">
-                      <p className="font-bold text-stone-800 text-sm">{t(key)}</p>
-                      <p className="font-black text-sm" style={{ color:'#6b3a2a' }}>{count}</p>
+                <div key={key} className="flex items-center gap-2 mb-2.5 last:mb-0">
+                  <span className="text-base w-6 text-center">{medals[idx]}</span>
+                  <span className="text-xl">{m?.emoji || '☕'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="font-bold text-stone-700 text-xs truncate">{t(key)}</p>
+                      <p className="font-black text-xs ml-2 shrink-0" style={{ color:'#6b3a2a' }}>{count} แก้ว</p>
                     </div>
-                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ background:'#c87941', width:`${(count/maxCount*100).toFixed(0)}%` }} />
+                    <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ background:'#c87941', width:`${(count/maxCount*100).toFixed(0)}%` }} />
                     </div>
                   </div>
                 </div>
@@ -613,6 +657,119 @@ function SummaryTab({ orders, t }) {
             })
         }
       </div>
+    </div>
+  );
+}
+
+// ─── Restock Tab ─────────────────────────────────────────────────────────────
+
+function buildInitialRestockState() {
+  const s = {};
+  RESTOCK_ITEMS.forEach(cat => cat.items.forEach(item => {
+    s[item.id] = { status: 'normal', qty: 1 };
+  }));
+  return s;
+}
+
+function RestockTab({ member }) {
+  const [items,   setItems]   = useState(buildInitialRestockState);
+  const [saving,  setSaving]  = useState(false);
+  const [flash,   setFlash]   = useState('');
+
+  const setStatus = (id, status) =>
+    setItems(prev => ({ ...prev, [id]: { ...prev[id], status } }));
+
+  const adjQty = (id, delta) =>
+    setItems(prev => ({ ...prev, [id]: { ...prev[id], qty: Math.max(1, (prev[id].qty||1) + delta) } }));
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    const payload = [];
+    RESTOCK_ITEMS.forEach(cat => cat.items.forEach(item => {
+      payload.push({
+        id: item.id, name: item.name, category: cat.category,
+        status: items[item.id]?.status || 'normal',
+        qty:    items[item.id]?.qty    || 1,
+      });
+    }));
+    if (db) {
+      try {
+        await addDoc(collection(db, 'restock_requests'), {
+          uid: member?.phone || 'unknown',
+          createdBy: member?.name || 'ชินชา',
+          items: payload,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) { console.error(e); }
+    }
+    setItems(buildInitialRestockState());
+    setSaving(false);
+    setFlash('✅ ส่งรายการแล้ว!');
+    setTimeout(() => setFlash(''), 3000);
+  };
+
+  const STATUS_CFG = [
+    { key: 'normal', label: 'ปกติ',      active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    { key: 'low',    label: 'เหลือน้อย', active: 'bg-amber-100 text-amber-700 border-amber-300'     },
+    { key: 'out',    label: 'หมดแล้ว',   active: 'bg-red-100 text-red-600 border-red-300'            },
+  ];
+
+  return (
+    <div className="px-4 pt-3 pb-8">
+      {flash && (
+        <div className="mb-4 py-3 rounded-2xl text-center font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 text-sm">
+          {flash}
+        </div>
+      )}
+
+      {RESTOCK_ITEMS.map(cat => (
+        <div key={cat.category} className="mb-5">
+          <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-2">
+            {cat.emoji} {cat.category}
+          </p>
+          <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-stone-200 divide-y divide-stone-100">
+            {cat.items.map(item => {
+              const st  = items[item.id]?.status || 'normal';
+              const qty = items[item.id]?.qty    || 1;
+              return (
+                <div key={item.id} className="p-4">
+                  {/* Name + qty */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">{item.emoji}</span>
+                    <p className="flex-1 font-bold text-stone-800 text-sm leading-snug">{item.name}</p>
+                    {/* Qty adjuster */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => adjQty(item.id, -1)}
+                        className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
+                      <span className="w-5 text-center font-black text-stone-800 text-sm">{qty}</span>
+                      <button onClick={() => adjQty(item.id, +1)}
+                        className="w-7 h-7 rounded-full text-white font-bold text-sm flex items-center justify-center active:scale-90"
+                        style={{ background:'#6b3a2a' }}>+</button>
+                    </div>
+                  </div>
+                  {/* Status pills */}
+                  <div className="flex gap-1.5">
+                    {STATUS_CFG.map(s => (
+                      <button key={s.key} onClick={() => setStatus(item.id, s.key)}
+                        className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] border-2 transition-all ${
+                          st === s.key ? s.active : 'border-stone-200 text-stone-400 bg-white'
+                        }`}>
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <button onClick={handleSubmit} disabled={saving}
+        className="w-full py-4 rounded-2xl font-black text-white text-base shadow-lg active:scale-95 disabled:opacity-60 transition-all"
+        style={{ background:'#3d1f0f' }}>
+        {saving ? '⏳ กำลังส่ง...' : '📋 ส่งรายการสั่งของ'}
+      </button>
     </div>
   );
 }
