@@ -233,38 +233,53 @@ function LoginScreen({ onLogin }) {
     const p = phone.trim().replace(/\D/g, '');
     if (p.length < 9) { setError('กรุณากรอกเบอร์โทรให้ถูกต้อง'); return; }
     if (mode === 'register' && !name.trim()) { setError('กรุณากรอกชื่อ'); return; }
-    if (!db) { setError('ไม่สามารถเชื่อมต่อ Firebase ได้'); return; }
+
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    if (!projectId) { setError('Firebase config ไม่ครบ'); return; }
 
     setLoading(true); setError('');
-    try {
-      // members = if true → no auth needed. Separate timeout per operation.
-      const mkT = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
-      const memberRef = doc(db, 'members', p);
-      const snap = await Promise.race([getDoc(memberRef), mkT(12000)]);
+    // Use Firestore REST API directly — bypasses SDK auth token issues entirely
+    const BASE = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/chincha/documents`;
+    const mkT = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
 
-      if (!snap.exists()) {
-        // New member — create pending request
+    try {
+      const resp = await Promise.race([fetch(`${BASE}/members/${p}`), mkT(12000)]);
+
+      if (resp.status === 403) { throw new Error('permission-denied — เพิ่ม members rule ใน Firestore'); }
+      if (resp.status !== 200 && resp.status !== 404) { throw new Error(`HTTP ${resp.status}`); }
+
+      if (resp.status === 404) {
+        // New member
         const n = name.trim() || 'ไม่ระบุชื่อ';
-        // First member ever → auto-approve as admin
-        const allSnap = await getDocs(collection(db, 'members'));
-        const isFirst = allSnap.empty;
-        await setDoc(memberRef, { name: n, phone: p, approved: isFirst, createdAt: serverTimestamp() });
-        if (isFirst) {
-          onLogin({ name: n, phone: p, approved: true });
-        } else {
-          setMode('pending');
-        }
+        const listResp = await Promise.race([fetch(`${BASE}/members?pageSize=1`), mkT(8000)]);
+        const listJson = await listResp.json();
+        const isFirst  = !listJson.documents?.length;
+
+        await fetch(`${BASE}/members/${p}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: {
+            name:     { stringValue: n },
+            phone:    { stringValue: p },
+            approved: { booleanValue: isFirst },
+          }}),
+        });
+
+        if (isFirst) { onLogin({ name: n, phone: p }); }
+        else         { setMode('pending'); }
         return;
       }
 
-      const data = snap.data();
-      if (!data.approved) { setMode('pending'); return; }
+      const json = await resp.json();
+      const f    = json.fields || {};
+      const memberName = f.name?.stringValue || 'สมาชิก';
+      const approved   = f.approved?.booleanValue || false;
 
-      // Approved — login
-      await setDoc(memberRef, { lastLogin: serverTimestamp() }, { merge: true });
-      onLogin({ name: data.name, phone: p, approved: true });
+      if (!approved) { setMode('pending'); return; }
+      onLogin({ name: memberName, phone: p });
+
     } catch (e) {
-      setError((e?.code || e?.message || 'unknown error'));
+      setError(e?.message || 'เชื่อมต่อไม่ได้');
     } finally {
       setLoading(false);
     }
