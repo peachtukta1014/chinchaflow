@@ -1,4 +1,4 @@
-const { onRequest } = require('firebase-functions/v2/https');
+const functions = require('firebase-functions');
 const admin     = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const crypto    = require('crypto');
@@ -40,17 +40,19 @@ function tomorrowBKK() {
 async function lineReply(replyToken, text) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token || !replyToken) return;
-  await fetch('https://api.line.me/v2/bot/message/reply', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] }),
-  });
+  try {
+    await fetch('https://api.line.me/v2/bot/message/reply', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] }),
+    });
+  } catch { /* reply is best-effort */ }
 }
 
-// ── LINE Webhook (v2 function, Singapore region) ──────────────────────────────
-exports.lineWebhook = onRequest(
-  { region: 'asia-southeast1' },
-  async (req, res) => {
+// ── LINE Webhook (v1, works on Spark plan) ────────────────────────────────────
+exports.lineWebhook = functions
+  .region('asia-southeast1')
+  .https.onRequest(async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
     const rawBody   = JSON.stringify(req.body);
@@ -87,5 +89,4 @@ exports.lineWebhook = onRequest(
     }
 
     res.status(200).json({ status: 'ok' });
-  }
-);
+  });
