@@ -236,13 +236,11 @@ function LoginScreen({ onLogin }) {
     if (!db) { setError('ไม่สามารถเชื่อมต่อ Firebase ได้'); return; }
 
     setLoading(true); setError('');
-    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     try {
-      // Warm up Firebase connection first
-      if (auth) await Promise.race([signInAnonymously(auth), timeout]).catch(() => {});
-
+      // members = if true → no auth needed. Separate timeout per operation.
+      const mkT = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
       const memberRef = doc(db, 'members', p);
-      const snap = await Promise.race([getDoc(memberRef), timeout]);
+      const snap = await Promise.race([getDoc(memberRef), mkT(12000)]);
 
       if (!snap.exists()) {
         // New member — create pending request
