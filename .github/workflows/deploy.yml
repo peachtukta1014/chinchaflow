@@ -6,6 +6,37 @@ on:
       - main
 
 jobs:
+  # ── 0. Deploy Cloud Functions (LINE webhook) ──────────────────────────────────
+  deploy_functions:
+    name: Deploy Cloud Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools
+
+      - name: Install function dependencies
+        run: npm install
+        working-directory: apps/webhook-core
+
+      - name: Write LINE env vars for functions
+        run: |
+          {
+            echo "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}"
+            echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}"
+          } > apps/webhook-core/.env
+
+      - name: Deploy functions
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          firebase deploy --only functions --project chincha-eeed6 --non-interactive
+
   # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
   deploy_shrimp:
     name: Deploy Shrimp POS
