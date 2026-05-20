@@ -136,10 +136,10 @@ function App() {
     }, () => {});
   }, [member]);
 
-  const handleLogin = (memberData) => {
+  const handleLogin = async (memberData) => {
     saveSession(memberData);
+    if (auth) { try { await signInAnonymously(auth); } catch {} }
     setMember(memberData);
-    if (auth) signInAnonymously(auth).catch(() => {});
   };
 
   const handleLogout = async () => {

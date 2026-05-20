@@ -252,8 +252,11 @@ function App() {
   useEffect(() => {
     const s = getSession();
     if (s) {
-      setMember(s);
-      if (auth) signInAnonymously(auth).catch(() => {});
+      if (auth) {
+        signInAnonymously(auth).catch(() => {}).finally(() => setMember(s));
+      } else {
+        setMember(s);
+      }
     } else {
       setMember(null);
     }
@@ -272,10 +275,10 @@ function App() {
     return unsub;
   }, [member]);
 
-  const handleLogin = (memberData) => {
+  const handleLogin = async (memberData) => {
     saveSession(memberData);
+    if (auth) { try { await signInAnonymously(auth); } catch {} }
     setMember(memberData);
-    if (auth) signInAnonymously(auth).catch(() => {});
   };
 
   const handleLogout = () => {
