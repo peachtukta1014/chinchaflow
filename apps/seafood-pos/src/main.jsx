@@ -62,8 +62,9 @@ const PAY = [
 
 // ─── Voice Hook ───────────────────────────────────────────────────────────────
 
-function useVoice(onNumber) {
+function useVoice(onText) {
   const [listening, setListening] = useState(false);
+  const [liveText, setLiveText]   = useState('');
   const recRef = useRef(null);
 
   const toggle = () => {
@@ -73,25 +74,63 @@ function useVoice(onNumber) {
     const rec = new SR();
     rec.lang = 'th-TH';
     rec.continuous = false;
+    rec.interimResults = true;
     recRef.current = rec;
     rec.onresult = (e) => {
-      const t = e.results[0][0].transcript.trim();
-      const m = t.match(/[\d.]+/);
-      if (m) { onNumber(m[0]); return; }
-      // simple Thai digit map
-      const map = { ศูนย์:'0',หนึ่ง:'1',สอง:'2',สาม:'3',สี่:'4',ห้า:'5',หก:'6',เจ็ด:'7',แปด:'8',เก้า:'9' };
-      let s = t;
-      Object.entries(map).forEach(([k,v]) => { s = s.replaceAll(k, v); });
-      const m2 = s.match(/[\d.]+/);
-      if (m2) onNumber(m2[0]);
+      const interim = Array.from(e.results).map(r => r[0].transcript).join('');
+      setLiveText(interim);
+      const last = e.results[e.results.length - 1];
+      if (last.isFinal) onText(last[0].transcript.trim());
     };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onerror = () => { setListening(false); setLiveText(''); };
+    rec.onend   = () => { setListening(false); setLiveText(''); };
     rec.start();
     setListening(true);
   };
 
-  return { listening, toggle };
+  return { listening, toggle, liveText };
+}
+
+// ─── Voice command parser (regex fallback) ───────────────────────────────────
+// "ตาจุ้ย 1 กุ้งเล็ก 3 โล" → { customerId:'c2', productId:'small', weight:'3' }
+function parseVoice(text) {
+  const THAI_NUM = { ศูนย์:'0',หนึ่ง:'1',สอง:'2',สาม:'3',สี่:'4',ห้า:'5',หก:'6',เจ็ด:'7',แปด:'8',เก้า:'9',ครึ่ง:'0.5' };
+  let t = text;
+  Object.entries(THAI_NUM).forEach(([k,v]) => { t = t.replaceAll(k, v); });
+  const result = { customerId: null, productId: null, weight: null };
+  const sorted = [...CUSTOMERS].sort((a,b) => b.name.length - a.name.length);
+  for (const c of sorted) {
+    let cn = c.name;
+    Object.entries(THAI_NUM).forEach(([k,v]) => { cn = cn.replaceAll(k, v); });
+    if (t.includes(cn)) { result.customerId = c.id; t = t.replace(cn, ' '); break; }
+    if (text.includes(c.name)) { result.customerId = c.id; t = t.replace(c.name, ' '); break; }
+  }
+  if (/ใหญ่/.test(text))            result.productId = 'large';
+  else if (/กลาง/.test(text))       result.productId = 'medium';
+  else if (/เล็ก|จิ๋ว/.test(text))  result.productId = 'small';
+  else if (/ตาย/.test(text))        result.productId = 'dead';
+  const nums = t.match(/\d+(?:\.\d+)?/g) || [];
+  const withUnit = nums.find(n => { const i = t.indexOf(n); return /โล|กก|กิโล/.test(t.slice(i + n.length, i + n.length + 6)); });
+  if (withUnit) result.weight = withUnit;
+  else if (nums.length) result.weight = nums[nums.length - 1];
+  return result;
+}
+
+// ─── Gemini voice parser (calls backend, falls back to regex) ────────────────
+async function parseVoiceWithGemini(text) {
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch('/api/gemini-voice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({ text, customers: CUSTOMERS }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.success ? data.result : null;
+  } catch { return null; }
 }
 
 // ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
@@ -363,18 +402,35 @@ function LoginScreen({ onLogin }) {
 // ─── Members Screen (approve/reject pending members) ─────────────────────────
 
 function MembersScreen() {
-  const [members, setMembers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [editId, setEditId]     = useState(null);
-  const [editName, setEditName] = useState('');
+  const [tab, setTab]             = useState('staff');
+  const [members, setMembers]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [editId, setEditId]       = useState(null);
+  const [editName, setEditName]   = useState('');
+  const [fsCustomers, setFsCustomers] = useState({});
+  const [cusLoading, setCusLoading]   = useState(true);
+  const [cusEditId, setCusEditId]     = useState(null);
+  const [cusEditData, setCusEditData] = useState({ name: '', zone: '', phone: '' });
+  const [showAdd, setShowAdd]         = useState(false);
+  const [newCus, setNewCus]           = useState({ name: '', zone: '', phone: '' });
 
   useEffect(() => {
-    if (!db) return;
+    if (!db) { setLoading(false); return; }
     const q = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, snap => {
       setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, () => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!db) { setCusLoading(false); return; }
+    return onSnapshot(collection(db, 'customers'), snap => {
+      const map = {};
+      snap.docs.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
+      setFsCustomers(map);
+      setCusLoading(false);
+    }, () => setCusLoading(false));
   }, []);
 
   const setApproved = (phone, val) =>
@@ -384,6 +440,29 @@ function MembersScreen() {
     if (!editName.trim()) return;
     await setDoc(doc(db, 'members', phone), { name: editName.trim() }, { merge: true });
     setEditId(null);
+  };
+
+  const allCustomers = [
+    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
+    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
+  ];
+
+  const saveCusEdit = async (id) => {
+    if (!cusEditData.name.trim()) return;
+    await setDoc(doc(db, 'customers', id), {
+      name: cusEditData.name.trim(), zone: cusEditData.zone.trim(), phone: cusEditData.phone.trim(),
+    }, { merge: true });
+    setCusEditId(null);
+  };
+
+  const addCustomer = async () => {
+    if (!newCus.name.trim()) return;
+    await setDoc(doc(db, 'customers', `cx_${Date.now()}`), {
+      name: newCus.name.trim(), zone: newCus.zone.trim(), phone: newCus.phone.trim(),
+      createdAt: serverTimestamp(),
+    });
+    setNewCus({ name: '', zone: '', phone: '' });
+    setShowAdd(false);
   };
 
   const MemberCard = ({ m, showApprove }) => (
@@ -429,25 +508,111 @@ function MembersScreen() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="text-lg font-black text-slate-800">จัดการสมาชิก</h2>
-      {loading && <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>}
+      <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
+        <button onClick={() => setTab('staff')}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${tab === 'staff' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>
+          สมาชิก
+        </button>
+        <button onClick={() => setTab('customers')}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${tab === 'customers' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>
+          ลูกค้า ({allCustomers.length})
+        </button>
+      </div>
 
-      {pending.length > 0 && (
-        <div>
-          <p className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">รออนุมัติ ({pending.length})</p>
-          <div className="space-y-2">{pending.map(m => <MemberCard key={m.id} m={m} showApprove={true} />)}</div>
-        </div>
+      {tab === 'staff' && (
+        <>
+          <h2 className="text-base font-black text-slate-800">จัดการสมาชิก</h2>
+          {loading && <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>}
+          {pending.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">รออนุมัติ ({pending.length})</p>
+              <div className="space-y-2">{pending.map(m => <MemberCard key={m.id} m={m} showApprove={true} />)}</div>
+            </div>
+          )}
+          {approved.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิก ({approved.length})</p>
+              <div className="space-y-2">{approved.map(m => <MemberCard key={m.id} m={m} showApprove={false} />)}</div>
+            </div>
+          )}
+          {!loading && members.length === 0 && (
+            <p className="text-slate-400 text-sm text-center py-12">ยังไม่มีสมาชิก</p>
+          )}
+        </>
       )}
 
-      {approved.length > 0 && (
-        <div>
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิก ({approved.length})</p>
-          <div className="space-y-2">{approved.map(m => <MemberCard key={m.id} m={m} showApprove={false} />)}</div>
-        </div>
-      )}
-
-      {!loading && members.length === 0 && (
-        <p className="text-slate-400 text-sm text-center py-12">ยังไม่มีสมาชิก</p>
+      {tab === 'customers' && (
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
+            <button onClick={() => setShowAdd(v => !v)}
+              className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95">
+              <PlusCircle size={14} /> เพิ่มลูกค้า
+            </button>
+          </div>
+          {showAdd && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-2">
+              <p className="text-xs font-bold text-blue-600 mb-1">เพิ่มลูกค้าใหม่</p>
+              <input value={newCus.name} onChange={e => setNewCus(p => ({ ...p, name: e.target.value }))}
+                placeholder="ชื่อลูกค้า *" autoFocus
+                className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+              <input value={newCus.zone} onChange={e => setNewCus(p => ({ ...p, zone: e.target.value }))}
+                placeholder="โซน (เช่น ป่าตอง)"
+                className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm outline-none" />
+              <input value={newCus.phone} onChange={e => setNewCus(p => ({ ...p, phone: e.target.value }))}
+                placeholder="เบอร์โทร (ถ้ามี)" type="tel"
+                className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm outline-none" />
+              <div className="flex gap-2 pt-1">
+                <button onClick={addCustomer}
+                  className="flex-1 bg-blue-600 text-white text-sm font-bold py-2 rounded-xl active:scale-95">บันทึก</button>
+                <button onClick={() => { setShowAdd(false); setNewCus({ name: '', zone: '', phone: '' }); }}
+                  className="flex-1 bg-white border border-slate-200 text-slate-500 text-sm font-bold py-2 rounded-xl">ยกเลิก</button>
+              </div>
+            </div>
+          )}
+          {cusLoading
+            ? <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>
+            : (
+              <div className="space-y-2">
+                {allCustomers.map(c => (
+                  <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                    {cusEditId === c.id ? (
+                      <div className="space-y-2">
+                        <input value={cusEditData.name} onChange={e => setCusEditData(p => ({ ...p, name: e.target.value }))}
+                          placeholder="ชื่อลูกค้า" autoFocus
+                          className="w-full border border-blue-400 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                        <input value={cusEditData.zone} onChange={e => setCusEditData(p => ({ ...p, zone: e.target.value }))}
+                          placeholder="โซน"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" />
+                        <input value={cusEditData.phone} onChange={e => setCusEditData(p => ({ ...p, phone: e.target.value }))}
+                          placeholder="เบอร์โทร" type="tel"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none" />
+                        <div className="flex gap-2">
+                          <button onClick={() => saveCusEdit(c.id)}
+                            className="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-xl active:scale-95">บันทึก</button>
+                          <button onClick={() => setCusEditId(null)}
+                            className="flex-1 border border-slate-200 text-slate-400 text-xs font-bold py-2 rounded-xl">ยกเลิก</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 truncate">{c.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {c.zone && <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{c.zone}</span>}
+                            {c.phone && <span className="text-[10px] text-slate-400">{c.phone}</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => { setCusEditId(c.id); setCusEditData({ name: c.name, zone: c.zone || '', phone: c.phone || '' }); }}
+                          className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg ml-2 shrink-0">แก้ไข</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          }
+        </>
       )}
     </div>
   );
@@ -483,9 +648,27 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     : paymentType === 'credit' ? 0 : (parseFloat(paidAmount) || 0);
   const remaining = cartTotal - paidAmt;
 
-  const { listening: voiceListen, toggle: toggleVoice } = useVoice((num) => {
-    if (inputMode === 'weight') setWeight(num);
-    else setCustomPrice(num);
+  const [voiceResult, setVoiceResult] = useState('');
+  const voiceTimerRef = useRef(null);
+
+  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice(async (text) => {
+    setVoiceResult(text);
+    clearTimeout(voiceTimerRef.current);
+    voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 4000);
+
+    let p = await parseVoiceWithGemini(text);
+    if (!p) p = parseVoice(text);
+
+    if (p.customerId) setSelectedCustomer(p.customerId);
+    if (p.productId)  handleProductChange(p.productId);
+    if (p.weight) {
+      if (!p.productId && inputMode === 'price') setCustomPrice(p.weight);
+      else setWeight(p.weight);
+    }
+    if (!p.customerId && !p.productId && !p.weight) {
+      const m = text.match(/\d+(?:\.\d+)?/);
+      if (m) { if (inputMode === 'weight') setWeight(m[0]); else setCustomPrice(m[0]); }
+    }
   });
 
   const handlePhotoChange = async (e) => {
@@ -500,44 +683,30 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
         setPhotoUrl(await getDownloadURL(r));
       }
 
-      // Gemini OCR: read bill → auto-fill weight & price
-      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (geminiKey) {
+      // Gemini OCR via backend: read bill → auto-fill weight & price
+      try {
         const toBase64 = (f) => new Promise((res, rej) => {
           const reader = new FileReader();
           reader.onload = () => res(reader.result.split(',')[1]);
           reader.onerror = rej;
           reader.readAsDataURL(f);
         });
-        const b64 = await toBase64(file);
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: 'ดูรูปบิลนี้ บอกน้ำหนักกุ้ง (กก.) และราคาต่อกิโล (บาท/กก.) ตอบเฉพาะ JSON เท่านั้น ไม่ต้องอธิบาย รูปแบบ: {"weight":number|null,"pricePerKg":number|null}' },
-                  { inlineData: { mimeType: file.type || 'image/jpeg', data: b64 } },
-                ],
-              }],
-            }),
-          }
-        );
-        if (geminiRes.ok) {
-          const geminiJson = await geminiRes.json();
-          const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const match = text.match(/\{[\s\S]*\}/);
+        const b64     = await toBase64(file);
+        const ocrResp = await fetch('/api/gemini-ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: b64, mimeType: file.type || 'image/jpeg' }),
+        });
+        if (ocrResp.ok) {
+          const ocrData = await ocrResp.json();
+          const match   = (ocrData.text || '').match(/\{[\s\S]*\}/);
           if (match) {
-            try {
-              const { weight: w, pricePerKg: p } = JSON.parse(match[0]);
-              if (w != null && !isNaN(w)) setWeight(String(w));
-              if (p != null && !isNaN(p)) setCustomPrice(String(p));
-            } catch { /* ignore parse errors */ }
+            const { weight: w, pricePerKg: p } = JSON.parse(match[0]);
+            if (w != null && !isNaN(w)) setWeight(String(w));
+            if (p != null && !isNaN(p)) setCustomPrice(String(p));
           }
         }
-      }
+      } catch { /* OCR is best-effort */ }
     } catch { /* storage or Gemini may not be available */ }
     finally { setPhotoUploading(false); }
   };
@@ -749,6 +918,25 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
             {voiceListen ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
         </div>
+
+        {/* Voice transcript bar */}
+        {(voiceListen || liveText || voiceResult) && (
+          <div className={`mb-3 px-4 py-3 rounded-2xl flex items-center gap-3 transition-all ${
+            voiceListen ? 'bg-red-50 border border-red-200' : 'bg-slate-50 border border-slate-200'
+          }`}>
+            {voiceListen && (
+              <div className="flex gap-0.5 items-end shrink-0 h-5">
+                {[6,10,8,12,7].map((h, i) => (
+                  <div key={i} className="w-1 rounded-full bg-red-400 animate-bounce"
+                    style={{ height: `${h}px`, animationDelay: `${i * 0.1}s` }} />
+                ))}
+              </div>
+            )}
+            <p className={`flex-1 text-sm font-medium truncate ${voiceListen ? 'text-red-600' : 'text-slate-500'}`}>
+              {liveText || voiceResult || 'กำลังฟัง...'}
+            </p>
+          </div>
+        )}
 
         <div className="relative mb-3">
           <Edit3 className="absolute left-4 top-3 text-slate-400" size={16} />
