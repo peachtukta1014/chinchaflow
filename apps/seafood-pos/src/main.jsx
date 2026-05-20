@@ -175,7 +175,7 @@ function App() {
 
   // ── Main App ──────────────────────────────────────────────────────────────
   return (
-    <div className="bg-slate-50 min-h-screen pb-24 font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
+    <div className="bg-slate-50 h-screen font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
         <img src="/logo.jpg" alt="" className="w-72 h-72 object-contain opacity-[0.04]" />
       </div>
@@ -194,7 +194,7 @@ function App() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'home'    && <Dashboard stock={stock} />}
         {activeTab === 'pos'     && (
           <POSMobile user={member} stock={stock} updateMainStock={updateMainStock}

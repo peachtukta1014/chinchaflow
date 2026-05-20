@@ -5,7 +5,7 @@ import {
   getFirestore, addDoc, collection, onSnapshot,
   orderBy, query, serverTimestamp, where,
 } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 
 // ─── Firebase (chincha-tea app) ───────────────────────────────────────────────
 
@@ -20,8 +20,25 @@ const fbConfig = {
 };
 const fbReady = Object.values(fbConfig).every(Boolean);
 const fbApp   = fbReady ? initializeApp(fbConfig, 'chincha-tea') : null;
-const db      = fbApp ? getFirestore(fbApp) : null;
+const db      = fbApp ? getFirestore(fbApp, 'chincha') : null;
 const auth    = fbApp ? getAuth(fbApp) : null;
+
+// ─── Session management ───────────────────────────────────────────────────────
+
+const SESSION_KEY  = 'chincha-tea-session';
+const SESSION_DAYS = 30;
+
+function getSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (Date.now() - s.loginAt > SESSION_DAYS * 86400000) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+function saveSession(m) { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...m, loginAt: Date.now() })); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 
@@ -29,7 +46,9 @@ const T = {
   th: {
     appName:'ชินชา', tagline:'คาเฟ่และเครื่องดื่ม',
     orderTab:'รับออเดอร์', historyTab:'ประวัติ', summaryTab:'สรุป',
-    loginBtn:'เข้าสู่ระบบด้วย Google',
+    loginTitle:'เข้าสู่ระบบ', phonePlaceholder:'เบอร์โทรศัพท์', namePlaceholder:'ชื่อของคุณ',
+    loginBtn:'เข้าระบบ', registerBtn:'สมัครสมาชิก',
+    pendingTitle:'รอการอนุมัติ', pendingMsg:'บัญชีของคุณรอการอนุมัติจากเจ้าของร้านครับ',
     menu:'เมนู', total:'ยอดรวม', save:'บันทึก', cancel:'ยกเลิก',
     qty:'จำนวน', size:'ขนาด', sweet:'ความหวาน', ice:'น้ำแข็ง', note:'หมายเหตุ',
     addToOrder:'เพิ่มออเดอร์', items:'รายการ',
@@ -44,7 +63,9 @@ const T = {
   my: {
     appName:'ချင်ချာ', tagline:'ကော်ဖီဆိုင်',
     orderTab:'အော်ဒါ', historyTab:'မှတ်တမ်း', summaryTab:'အကျဉ်း',
-    loginBtn:'Google ဖြင့် ဝင်ရောက်မည်',
+    loginTitle:'ဝင်ရောက်မည်', phonePlaceholder:'ဖုန်းနံပါတ်', namePlaceholder:'နာမည်',
+    loginBtn:'ဝင်မည်', registerBtn:'မှတ်ပုံတင်မည်',
+    pendingTitle:'ခွင့်ပြုချက်စောင့်ဆိုင်းနေသည်', pendingMsg:'ဆိုင်ရှင်၏ ခွင့်ပြုချက်ကို စောင့်ဆိုင်းပါ',
     menu:'မီနူး', total:'စုစုပေါင်း', save:'သိမ်းမည်', cancel:'ပယ်ဖျက်',
     qty:'အရေ', size:'အရွယ်', sweet:'ချိုမှု', ice:'ရေခဲ', note:'မှတ်ချက်',
     addToOrder:'ထည့်မည်', items:'ပစ္စည်း',
@@ -59,7 +80,9 @@ const T = {
   en: {
     appName:'CHINCHA', tagline:'Café & Drinks',
     orderTab:'Order', historyTab:'History', summaryTab:'Summary',
-    loginBtn:'Sign in with Google',
+    loginTitle:'Sign In', phonePlaceholder:'Phone number', namePlaceholder:'Your name',
+    loginBtn:'Sign In', registerBtn:'Register',
+    pendingTitle:'Waiting for Approval', pendingMsg:'Your account is pending approval from the owner.',
     menu:'Menu', total:'Total', save:'Save', cancel:'Cancel',
     qty:'Qty', size:'Size', sweet:'Sweet', ice:'Ice', note:'Note',
     addToOrder:'Add to Order', items:'items',
@@ -100,11 +123,126 @@ function useLang() {
   return { lang, setLang, t };
 }
 
+// ─── LoginScreen ──────────────────────────────────────────────────────────────
+
+function LoginScreen({ onLogin, lang, setLang }) {
+  const t = (key) => T[lang]?.[key] ?? T.th?.[key] ?? key;
+  const [mode,    setMode]    = useState('login');
+  const [phone,   setPhone]   = useState('');
+  const [name,    setName]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const handleSubmit = async () => {
+    const p = phone.trim().replace(/\D/g, '');
+    if (p.length < 9) { setError('กรุณากรอกเบอร์โทรให้ถูกต้อง'); return; }
+    if (mode === 'register' && !name.trim()) { setError('กรุณากรอกชื่อ'); return; }
+    const projectId = env.VITE_FIREBASE_PROJECT_ID;
+    if (!projectId) { setError('Firebase config ไม่ครบ'); return; }
+    setLoading(true); setError('');
+    const BASE = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/chincha/documents`;
+    const mkT  = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
+    try {
+      const resp = await Promise.race([fetch(`${BASE}/members/${p}`), mkT(12000)]);
+      if (resp.status === 403) throw new Error('ไม่มีสิทธิ์เข้าถึง');
+      if (resp.status !== 200 && resp.status !== 404) throw new Error(`HTTP ${resp.status}`);
+      if (resp.status === 404) {
+        const n = name.trim() || 'ไม่ระบุชื่อ';
+        const listResp = await Promise.race([fetch(`${BASE}/members?pageSize=1`), mkT(8000)]);
+        const listJson = await listResp.json();
+        const isFirst  = !listJson.documents?.length;
+        await fetch(`${BASE}/members/${p}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: {
+            name:     { stringValue: n },
+            phone:    { stringValue: p },
+            approved: { booleanValue: isFirst },
+          }}),
+        });
+        if (isFirst) { onLogin({ name: n, phone: p }); }
+        else { setMode('pending'); }
+        return;
+      }
+      const json = await resp.json();
+      const f    = json.fields || {};
+      const memberName = f.name?.stringValue || 'สมาชิก';
+      const approved   = f.approved?.booleanValue || false;
+      if (!approved) { setMode('pending'); return; }
+      onLogin({ name: memberName, phone: p });
+    } catch (e) {
+      setError(e?.message || 'เชื่อมต่อไม่ได้ ลองใหม่ครับ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === 'pending') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center"
+        style={{ background:'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)' }}>
+        <div className="text-6xl mb-6">⏳</div>
+        <h2 className="text-2xl font-black text-amber-300 mb-3">{t('pendingTitle')}</h2>
+        <p className="text-amber-500 text-sm leading-relaxed max-w-xs">{t('pendingMsg')}</p>
+        <button onClick={() => setMode('login')} className="mt-8 px-6 py-3 rounded-2xl font-bold text-amber-900 bg-amber-300 active:scale-95">
+          ← กลับ
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-md mx-auto relative overflow-hidden"
+      style={{ background:'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)' }}>
+      <div className="absolute inset-0 opacity-[0.06]"
+        style={{ backgroundImage:'url(/chincha-logo.jpg)', backgroundSize:'110px', backgroundRepeat:'repeat' }} />
+
+      <div className="relative z-10 text-center mb-10 w-full">
+        <img src="/chincha-logo.jpg" alt="CHINCHA" className="w-44 h-44 rounded-full object-cover mx-auto mb-5 border-4 border-amber-300 shadow-2xl" />
+        <h1 className="text-4xl font-black text-amber-300 tracking-widest">CHINCHA</h1>
+        <p className="text-amber-500 text-sm mt-1">{t('tagline')}</p>
+        <div className="flex justify-center gap-2 mt-5">
+          {['th','my','en'].map(l => (
+            <button key={l} onClick={() => setLang(l)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${lang===l ? 'bg-amber-300 text-amber-900 border-amber-300' : 'text-amber-400 border-amber-700'}`}>
+              {l==='th'?'ไทย':l==='my'?'မြန်မာ':'EN'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 w-full space-y-3">
+        <input
+          type="tel" inputMode="numeric" value={phone} onChange={e => setPhone(e.target.value)}
+          placeholder={t('phonePlaceholder')}
+          className="w-full p-4 rounded-2xl text-stone-800 font-bold text-base outline-none bg-white/90"
+        />
+        {mode === 'register' && (
+          <input
+            type="text" value={name} onChange={e => setName(e.target.value)}
+            placeholder={t('namePlaceholder')}
+            className="w-full p-4 rounded-2xl text-stone-800 font-bold text-base outline-none bg-white/90"
+          />
+        )}
+        {error && <p className="text-red-300 text-sm text-center font-bold">{error}</p>}
+        <button onClick={handleSubmit} disabled={loading}
+          className="w-full py-4 rounded-2xl font-black text-amber-900 text-lg bg-amber-300 shadow-lg active:scale-95 disabled:opacity-60 transition-all">
+          {loading ? '⏳ กำลังตรวจสอบ...' : mode === 'register' ? t('registerBtn') : t('loginBtn')}
+        </button>
+        <button onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(''); }}
+          className="w-full py-3 text-amber-400 text-sm font-bold">
+          {mode === 'login' ? '→ สมัครสมาชิกใหม่' : '← มีบัญชีแล้ว'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
   const { lang, setLang, t } = useLang();
-  const [user, setUser]     = useState(undefined);
+  const [member, setMember] = useState(undefined);
   const [tab, setTab]       = useState('order');
   const [cart, setCart]     = useState([]);
   const [modal, setModal]   = useState(null);
@@ -112,13 +250,17 @@ function App() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!auth) { setUser(null); return; }
-    getRedirectResult(auth).catch(() => {});
-    return onAuthStateChanged(auth, u => setUser(u ?? null));
+    const s = getSession();
+    if (s) {
+      setMember(s);
+      if (auth) signInAnonymously(auth).catch(() => {});
+    } else {
+      setMember(null);
+    }
   }, []);
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !member) return;
     const dateKey = new Date().toISOString().split('T')[0];
     const q = query(collection(db, 'teaOrders'), where('dateKey','==',dateKey), orderBy('createdAt','desc'));
     const unsub = onSnapshot(q, snap => {
@@ -128,29 +270,23 @@ function App() {
       onSnapshot(q2, snap => setOrders(snap.docs.map(d => ({ id:d.id, ...d.data() })).slice(0,50)), () => {});
     });
     return unsub;
-  }, []);
+  }, [member]);
 
-  const handleLogin = async () => {
-    if (!auth) return;
-    const provider = new GoogleAuthProvider();
-    try {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (isMobile) {
-        await signInWithRedirect(auth, provider);
-      } else {
-        await signInWithPopup(auth, provider);
-      }
-    } catch (err) {
-      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-cancelled-by-user') {
-        try { await signInWithRedirect(auth, provider); } catch {}
-      }
-    }
+  const handleLogin = (memberData) => {
+    saveSession(memberData);
+    setMember(memberData);
+    if (auth) signInAnonymously(auth).catch(() => {});
   };
-  const handleLogout = async () => { if (window.confirm(t('logout')+'?') && auth) await signOut(auth); };
 
-  const addToCart    = (item) => { setCart(c => [...c, { ...item, cartId: Date.now() }]); setModal(null); };
-  const removeCart   = (id)   => setCart(c => c.filter(i => i.cartId !== id));
-  const cartTotal    = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const handleLogout = () => {
+    if (!window.confirm(t('logout') + '?')) return;
+    clearSession();
+    setMember(null);
+  };
+
+  const addToCart  = (item) => { setCart(c => [...c, { ...item, cartId: Date.now() }]); setModal(null); };
+  const removeCart = (id)   => setCart(c => c.filter(i => i.cartId !== id));
+  const cartTotal  = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
   const saveOrder = async () => {
     if (!cart.length) return;
@@ -160,7 +296,7 @@ function App() {
       try {
         await addDoc(collection(db, 'teaOrders'), {
           dateKey, items: cart, total: cartTotal,
-          createdBy: user?.email || 'anon', lang,
+          createdBy: member?.name || 'ชินชา', lang,
           createdAt: serverTimestamp(),
         });
       } catch (e) { console.error(e); }
@@ -171,7 +307,7 @@ function App() {
   };
 
   // Loading
-  if (user === undefined) {
+  if (member === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background:'#3d1f0f' }}>
         <div className="text-center">
@@ -183,44 +319,13 @@ function App() {
   }
 
   // Login
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-md mx-auto relative overflow-hidden"
-        style={{ background:'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)' }}>
-        <div className="absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage:'url(/chincha-logo.jpg)', backgroundSize:'110px', backgroundRepeat:'repeat' }} />
-        <div className="relative z-10 text-center mb-10 w-full">
-          <img src="/chincha-logo.jpg" alt="CHINCHA" className="w-44 h-44 rounded-full object-cover mx-auto mb-5 border-4 border-amber-300 shadow-2xl" />
-          <h1 className="text-4xl font-black text-amber-300 tracking-widest">CHINCHA</h1>
-          <p className="text-amber-500 text-sm mt-1">{t('tagline')}</p>
-          <div className="flex justify-center gap-2 mt-5">
-            {['th','my','en'].map(l => (
-              <button key={l} onClick={() => setLang(l)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${lang===l ? 'bg-amber-300 text-amber-900 border-amber-300' : 'text-amber-400 border-amber-700'}`}>
-                {l==='th'?'ไทย':l==='my'?'မြန်မာ':'EN'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="relative z-10 w-full">
-          <button onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white text-stone-800 font-bold p-4 rounded-2xl shadow-lg active:scale-95 transition-all">
-            <svg width="20" height="20" viewBox="0 0 48 48">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-            </svg>
-            {t('loginBtn')}
-          </button>
-        </div>
-      </div>
-    );
+  if (!member) {
+    return <LoginScreen onLogin={handleLogin} lang={lang} setLang={setLang} />;
   }
 
   // Main App
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col relative overflow-hidden"
+    <div className="max-w-md mx-auto h-screen flex flex-col relative overflow-hidden"
       style={{ background:'#fdf6f0' }}>
 
       {/* Watermark pattern */}
@@ -234,7 +339,7 @@ function App() {
           <img src="/chincha-logo.jpg" alt="CHINCHA" className="w-10 h-10 rounded-full object-cover border-2 border-amber-300 shrink-0" />
           <div>
             <p className="font-black text-amber-300 leading-none">{t('appName')}</p>
-            <p className="text-amber-700 text-[10px] mt-0.5 truncate max-w-[140px]">{user.displayName || user.email}</p>
+            <p className="text-amber-700 text-[10px] mt-0.5 truncate max-w-[140px]">{member.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -257,7 +362,7 @@ function App() {
       </div>
 
       {/* Tab bar */}
-      <div className="z-10 shrink-0 flex px-4 pt-3 pb-1 gap-2">
+      <div className="z-10 shrink-0 flex px-4 pt-3 pb-1 gap-2" style={{ background:'#fdf6f0' }}>
         {[['order',t('orderTab')],['history',t('historyTab')],['summary',t('summaryTab')]].map(([id,label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-2.5 rounded-2xl font-bold text-xs transition-all ${tab===id ? 'text-white' : 'text-stone-500 bg-stone-200'}`}
@@ -339,7 +444,7 @@ function App() {
                   <div className="flex justify-between mb-2">
                     <p className="text-xs text-stone-400">
                       {o.createdAt?.toDate?.()?.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) || '—'}
-                      {o.createdBy && <span className="ml-2 text-stone-300">· {o.createdBy.split('@')[0]}</span>}
+                      {o.createdBy && <span className="ml-2 text-stone-300">· {o.createdBy}</span>}
                     </p>
                     <p className="font-black text-base" style={{ color:'#3d1f0f' }}>฿{(o.total||0).toLocaleString()}</p>
                   </div>
