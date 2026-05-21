@@ -711,15 +711,39 @@ function buildInitialRestockState() {
 }
 
 function RestockTab({ member }) {
-  const [items,   setItems]   = useState(buildInitialRestockState);
-  const [saving,  setSaving]  = useState(false);
-  const [flash,   setFlash]   = useState('');
+  const [items,       setItems]       = useState(buildInitialRestockState);
+  const [customItems, setCustomItems] = useState([]);
+  const [customInput, setCustomInput] = useState('');
+  const [saving,      setSaving]      = useState(false);
+  const [flash,       setFlash]       = useState('');
+
+  const STATUS_CFG = [
+    { key: 'normal', label: 'ปกติ',      active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    { key: 'low',    label: 'เหลือน้อย', active: 'bg-amber-100 text-amber-700 border-amber-300'     },
+    { key: 'out',    label: 'หมดแล้ว',   active: 'bg-red-100 text-red-600 border-red-300'            },
+  ];
 
   const setStatus = (id, status) =>
     setItems(prev => ({ ...prev, [id]: { ...prev[id], status } }));
 
   const adjQty = (id, delta) =>
     setItems(prev => ({ ...prev, [id]: { ...prev[id], qty: Math.max(1, (prev[id].qty||1) + delta) } }));
+
+  const addCustomItem = () => {
+    const name = customInput.trim();
+    if (!name) return;
+    setCustomItems(prev => [...prev, { cid: Date.now(), name, qty: 1, status: 'out' }]);
+    setCustomInput('');
+  };
+
+  const setCustomStatus = (cid, status) =>
+    setCustomItems(prev => prev.map(i => i.cid === cid ? { ...i, status } : i));
+
+  const adjCustomQty = (cid, delta) =>
+    setCustomItems(prev => prev.map(i => i.cid === cid ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
+
+  const removeCustom = (cid) =>
+    setCustomItems(prev => prev.filter(i => i.cid !== cid));
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -731,6 +755,9 @@ function RestockTab({ member }) {
         qty:    items[item.id]?.qty    || 1,
       });
     }));
+    customItems.forEach(ci => {
+      payload.push({ id: `custom-${ci.cid}`, name: ci.name, category: 'เพิ่มเติม', status: ci.status, qty: ci.qty });
+    });
     if (db) {
       try {
         await addDoc(collection(db, 'restock_requests'), {
@@ -742,16 +769,11 @@ function RestockTab({ member }) {
       } catch (e) { console.error(e); }
     }
     setItems(buildInitialRestockState());
+    setCustomItems([]);
     setSaving(false);
     setFlash('✅ ส่งรายการแล้ว!');
     setTimeout(() => setFlash(''), 3000);
   };
-
-  const STATUS_CFG = [
-    { key: 'normal', label: 'ปกติ',      active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
-    { key: 'low',    label: 'เหลือน้อย', active: 'bg-amber-100 text-amber-700 border-amber-300'     },
-    { key: 'out',    label: 'หมดแล้ว',   active: 'bg-red-100 text-red-600 border-red-300'            },
-  ];
 
   return (
     <div className="px-4 pt-3 pb-8">
@@ -772,11 +794,9 @@ function RestockTab({ member }) {
               const qty = items[item.id]?.qty    || 1;
               return (
                 <div key={item.id} className="p-4">
-                  {/* Name + qty */}
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-2xl">{item.emoji}</span>
                     <p className="flex-1 font-bold text-stone-800 text-sm leading-snug">{item.name}</p>
-                    {/* Qty adjuster */}
                     <div className="flex items-center gap-2 shrink-0">
                       <button onClick={() => adjQty(item.id, -1)}
                         className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
@@ -786,7 +806,6 @@ function RestockTab({ member }) {
                         style={{ background:'#6b3a2a' }}>+</button>
                     </div>
                   </div>
-                  {/* Status pills */}
                   <div className="flex gap-1.5">
                     {STATUS_CFG.map(s => (
                       <button key={s.key} onClick={() => setStatus(item.id, s.key)}
@@ -803,6 +822,57 @@ function RestockTab({ member }) {
           </div>
         </div>
       ))}
+
+      {/* ── Custom items ── */}
+      <div className="mb-5">
+        <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-2">✏️ เพิ่มรายการเอง</p>
+
+        {/* Input row */}
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text" value={customInput} onChange={e => setCustomInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCustomItem()}
+            placeholder="ชื่อสินค้า เช่น ไซรัปวานิลลา..."
+            className="flex-1 px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-amber-400 bg-white"
+          />
+          <button onClick={addCustomItem}
+            className="w-12 h-12 rounded-2xl font-black text-white text-xl flex items-center justify-center active:scale-90 shrink-0"
+            style={{ background:'#3d1f0f' }}>+</button>
+        </div>
+
+        {customItems.length > 0 && (
+          <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-stone-200 divide-y divide-stone-100">
+            {customItems.map(ci => (
+              <div key={ci.cid} className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">📝</span>
+                  <p className="flex-1 font-bold text-stone-800 text-sm">{ci.name}</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => adjCustomQty(ci.cid, -1)}
+                      className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
+                    <span className="w-5 text-center font-black text-stone-800 text-sm">{ci.qty}</span>
+                    <button onClick={() => adjCustomQty(ci.cid, +1)}
+                      className="w-7 h-7 rounded-full text-white font-bold text-sm flex items-center justify-center active:scale-90"
+                      style={{ background:'#6b3a2a' }}>+</button>
+                    <button onClick={() => removeCustom(ci.cid)}
+                      className="w-7 h-7 rounded-full bg-red-50 text-red-400 font-black text-base flex items-center justify-center active:scale-90 ml-1">×</button>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  {STATUS_CFG.map(s => (
+                    <button key={s.key} onClick={() => setCustomStatus(ci.cid, s.key)}
+                      className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] border-2 transition-all ${
+                        ci.status === s.key ? s.active : 'border-stone-200 text-stone-400 bg-white'
+                      }`}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <button onClick={handleSubmit} disabled={saving}
         className="w-full py-4 rounded-2xl font-black text-white text-base shadow-lg active:scale-95 disabled:opacity-60 transition-all"
