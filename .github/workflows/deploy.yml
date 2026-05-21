@@ -27,7 +27,7 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only firestore --project chincha-eeed6 --non-interactive
+          firebase deploy --only firestore:rules --project chincha-eeed6 --non-interactive
 
   # ── 0b. Deploy Cloud Functions (LINE webhook) ─────────────────────────────────
   deploy_functions:
