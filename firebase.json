@@ -21,6 +21,9 @@
     "source": "apps/webhook-core",
     "runtime": "nodejs22"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "firestore": [
     {
       "database": "(default)",

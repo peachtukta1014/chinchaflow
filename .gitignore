@@ -20,3 +20,5 @@ dist/
 # Editor
 .DS_Store
 *.log
+/00_peach
+/00_peach

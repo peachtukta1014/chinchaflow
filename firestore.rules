@@ -1,8 +1,53 @@
 rules_version = '2';
+
+// Database: (default) — แอป seafood-pos
+// จำกัดให้ต้องมี Firebase Auth (รวม anonymous) ยกเว้นการอ่านสมาชิกตามเบอร์โทรตอนล็อกอิน
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    match /members/{phone} {
+      // ล็อกอินด้วยเบอร์: อ่านเฉพาะเอกสารของเบอร์นั้น (doc id = เบอร์)
+      allow get: if phone.matches('^[0-9]{9,15}$');
+      // สมัครสมาชิก (legacy REST): ตรวจว่ามีสมาชิกคนแรกหรือยัง
+      allow list: if request.query.limit <= 1;
+      // สร้าง/แก้ไข: ต้องล็อกอิน (anonymous หลังเข้าแอป) หรือสมัครครั้งแรก
+      allow create: if isAuthed()
+        || (request.resource.data.phone == phone
+          && request.resource.data.keys().hasAll(['name', 'phone', 'approved']));
+      allow update: if isAuthed();
+      allow delete: if false;
+    }
+
+    match /lineOrders/{docId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /sales/{docId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /stockBatches/{docId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /customerDebts/{docId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /config/{docId} {
+      allow read, write: if isAuthed();
+    }
+
+    match /restock_requests/{docId} {
+      allow read, write: if isAuthed();
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

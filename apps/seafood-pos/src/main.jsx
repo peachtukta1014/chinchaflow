@@ -62,6 +62,17 @@ const PAY = [
 
 // ─── Firestore REST helpers (bypass SDK auth — same pattern as login) ─────────
 const _FS = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+async function _fsAuthHeaders() {
+  const base = { 'Content-Type': 'application/json' };
+  const user = auth?.currentUser;
+  if (!user) return base;
+  try {
+    const token = await user.getIdToken();
+    return { ...base, Authorization: `Bearer ${token}` };
+  } catch {
+    return base;
+  }
+}
 function _fsVal(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'boolean') return { booleanValue: v };
@@ -76,7 +87,7 @@ function _fsObj(o) {
 }
 async function fsPost(col, data) {
   const r = await fetch(`${_FS}/${col}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: await _fsAuthHeaders(),
     body: JSON.stringify({ fields: _fsObj(data) }),
   });
   if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
@@ -85,7 +96,7 @@ async function fsPatch(path, data) {
   const fields = _fsObj(data);
   const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
   const r = await fetch(`${_FS}/${path}?${qs}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH', headers: await _fsAuthHeaders(),
     body: JSON.stringify({ fields }),
   });
   if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
@@ -103,7 +114,7 @@ function _fromFsVal(v) {
 }
 async function fsRunQuery(structuredQuery) {
   const r = await fetch(`${_FS}:runQuery`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: await _fsAuthHeaders(),
     body: JSON.stringify({ structuredQuery }),
   });
   if (!r.ok) return [];
@@ -116,7 +127,7 @@ async function fsRunQuery(structuredQuery) {
 async function fsIncrementDebt(customerId, meta, delta) {
   let current = 0;
   try {
-    const r = await fetch(`${_FS}/customerDebts/${customerId}`);
+    const r = await fetch(`${_FS}/customerDebts/${customerId}`, { headers: await _fsAuthHeaders() });
     if (r.ok) { const j = await r.json(); const fv = j.fields?.totalDebt; current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0); }
   } catch {}
   return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });

@@ -1,9 +1,97 @@
 rules_version = '2';
+
+// Database: chincha (แอป chincha-tea)
+// ต้องล็อกอิน Firebase Auth + โปรไฟล์ users/{uid} ที่ approved แล้ว
 service cloud.firestore {
   match /databases/{database}/documents {
-    // App uses custom phone-based auth — allow all access from client
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userExists() {
+      return isSignedIn() && exists(userPath());
+    }
+
+    function userData() {
+      return userExists() ? get(userPath()).data : {};
+    }
+
+    function isApproved() {
+      return userExists() && userData().approved == true;
+    }
+
+    function isAdmin() {
+      return isApproved() && userData().role == 'admin';
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ─── users ───────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if isSelf(userId)
+        && request.resource.data.keys().hasAll(['name', 'email', 'role', 'approved'])
+        && request.resource.data.role == 'staff'
+        && request.resource.data.approved == false
+        && request.resource.data.email is string
+        && request.resource.data.name is string;
+
+      allow update: if isAdmin()
+        || (isSelf(userId)
+          && userExists()
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'approved']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ─── catalog (อ่านได้เมื่ออนุมัติแล้ว / แก้ได้เฉพาะแอดมิน) ─────────────────
+    match /products/{docId} {
+      allow read: if isApproved();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /toppings/{docId} {
+      allow read: if isApproved();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── operations (พนักงานสร้าง/อ่าน / แอดมินลบ) ───────────────────────────
+    match /teaOrders/{docId} {
+      allow read, create: if isApproved();
+      allow update, delete: if isAdmin();
+    }
+
+    match /dailyExpenses/{docId} {
+      allow read, create: if isApproved();
+      allow update, delete: if isAdmin();
+    }
+
+    match /restock_requests/{docId} {
+      allow read, create: if isApproved();
+      allow update, delete: if isAdmin();
+    }
+
+    match /orderSlips/{docId} {
+      allow read, create: if isApproved();
+      allow update, delete: if isAdmin();
+    }
+
+    // คอลเลกชันเก่า (เบอร์โทร) — ปิดการเข้าถึงจาก client
+    match /members/{docId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
