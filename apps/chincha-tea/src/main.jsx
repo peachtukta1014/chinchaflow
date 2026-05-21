@@ -99,20 +99,30 @@ const T = {
 // ─── Menu Data ────────────────────────────────────────────────────────────────
 
 const MENU = [
-  { id:'thai-tea',    key:'thaiTea',    S:30, M:35, L:45, emoji:'🧋', bg:'bg-orange-50',  border:'border-orange-200' },
-  { id:'green-tea',   key:'greenTea',   S:30, M:35, L:45, emoji:'🍵', bg:'bg-green-50',   border:'border-green-200'  },
-  { id:'coffee',      key:'coffee',     S:35, M:40, L:50, emoji:'☕', bg:'bg-amber-50',   border:'border-amber-200'  },
-  { id:'thai-coffee', key:'thaiCoffee', S:35, M:40, L:50, emoji:'🥤', bg:'bg-yellow-50',  border:'border-yellow-200' },
-  { id:'milk',        key:'milk',       S:25, M:30, L:40, emoji:'🥛', bg:'bg-sky-50',     border:'border-sky-200'    },
-  { id:'lemon-tea',   key:'lemonTea',   S:30, M:35, L:45, emoji:'🍋', bg:'bg-lime-50',    border:'border-lime-200'   },
-  { id:'matcha',      key:'matcha',     S:35, M:45, L:55, emoji:'🍃', bg:'bg-emerald-50', border:'border-emerald-200'},
-  { id:'cocoa',       key:'cocoa',      S:35, M:40, L:50, emoji:'🍫', bg:'bg-stone-100',  border:'border-stone-300'  },
-  { id:'taro',        key:'taro',       S:35, M:45, L:55, emoji:'🫐', bg:'bg-purple-50',  border:'border-purple-200' },
-  { id:'strawberry',  key:'strawberry', S:35, M:45, L:55, emoji:'🍓', bg:'bg-pink-50',    border:'border-pink-200'   },
+  { id:'thai-tea',    key:'thaiTea',    basePrice:30, emoji:'🧋', bg:'bg-orange-50',  border:'border-orange-200'  },
+  { id:'green-tea',   key:'greenTea',   basePrice:30, emoji:'🍵', bg:'bg-green-50',   border:'border-green-200'   },
+  { id:'coffee',      key:'coffee',     basePrice:35, emoji:'☕', bg:'bg-amber-50',   border:'border-amber-200'   },
+  { id:'thai-coffee', key:'thaiCoffee', basePrice:35, emoji:'🥤', bg:'bg-yellow-50',  border:'border-yellow-200'  },
+  { id:'milk',        key:'milk',       basePrice:25, emoji:'🥛', bg:'bg-sky-50',     border:'border-sky-200'     },
+  { id:'lemon-tea',   key:'lemonTea',   basePrice:30, emoji:'🍋', bg:'bg-lime-50',    border:'border-lime-200'    },
+  { id:'matcha',      key:'matcha',     basePrice:35, emoji:'🍃', bg:'bg-emerald-50', border:'border-emerald-200' },
+  { id:'cocoa',       key:'cocoa',      basePrice:35, emoji:'🍫', bg:'bg-stone-100',  border:'border-stone-300'   },
+  { id:'taro',        key:'taro',       basePrice:50, emoji:'🫐', bg:'bg-purple-50',  border:'border-purple-200'  },
+  { id:'strawberry',  key:'strawberry', basePrice:50, emoji:'🍓', bg:'bg-pink-50',    border:'border-pink-200'    },
 ];
 
-const SIZES = ['S', 'M', 'L'];
-const ICES  = ['noice', 'lessice', 'normalice', 'fullice'];
+const SIZES = [
+  { id:'22oz', label:'22oz', addPrice:0  },
+  { id:'32oz', label:'32oz', addPrice:15 },
+];
+
+const TOPPINGS = [
+  { id:'pearl',       label:'ไข่มุก',       price:10 },
+  { id:'coco-jelly',  label:'วุ้นมะพร้าว', price:10 },
+  { id:'grass-jelly', label:'เฉาก๊วย',     price:10 },
+  { id:'taro-ball',   label:'บัวลอย',       price:10 },
+  { id:'popping',     label:'ไข่มุกป๊อบ',  price:15 },
+];
 
 // ─── Restock Static Data ──────────────────────────────────────────────────────
 
@@ -415,7 +425,7 @@ function App() {
                   className={`${item.bg} border-2 ${item.border} rounded-3xl p-4 text-left active:scale-95 transition-all shadow-sm`}>
                   <div className="text-4xl mb-2">{item.emoji}</div>
                   <p className="font-black text-stone-800 text-sm">{t(item.key)}</p>
-                  <p className="text-stone-400 text-xs mt-0.5">฿{item.S} – ฿{item.L}</p>
+                  <p className="text-stone-500 text-sm font-bold mt-0.5">฿{item.basePrice}</p>
                 </button>
               ))}
             </div>
@@ -425,29 +435,32 @@ function App() {
                 <p className="font-bold text-stone-600 text-xs mb-3 uppercase tracking-wide">{t('items')}: {cart.length}</p>
                 <div className="space-y-2 mb-4">
                   {cart.map(item => (
-                    <div key={item.cartId} className="flex justify-between items-center pb-2 border-b border-stone-100">
+                    <div key={item.cartId} className="flex justify-between items-start pb-2 border-b border-stone-100">
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-stone-800 text-sm">{item.emoji} {t(item.key)}</p>
-                        <p className="text-[11px] text-stone-400">
-                          {t(item.sizeKey)} · {item.sweet} · {t(item.iceKey)} · ×{item.qty}
+                        <p className="text-[11px] text-stone-400 mt-0.5">
+                          {item.size}
+                          {item.toppings?.length > 0 ? ` · ${item.toppings.map(tp => tp.label).join(', ')}` : ''}
+                          {` · ×${item.qty}`}
                           {item.note ? <span className="text-orange-500 ml-1">*{item.note}</span> : null}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        <p className="font-black" style={{ color:'#6b3a2a' }}>฿{item.price * item.qty}</p>
+                      <div className="flex items-center gap-2 ml-3 shrink-0">
+                        <p className="font-black text-sm" style={{ color:'#6b3a2a' }}>฿{item.price * item.qty}</p>
                         <button onClick={() => removeCart(item.cartId)}
-                          className="w-6 h-6 rounded-full bg-red-100 text-red-500 text-sm font-black flex items-center justify-center">×</button>
+                          className="w-9 h-9 rounded-full bg-red-50 text-red-400 font-black flex items-center justify-center active:scale-90 text-base">×</button>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-[11px] text-stone-400 font-bold uppercase">{t('total')}</p>
-                    <p className="text-3xl font-black" style={{ color:'#3d1f0f' }}>฿{cartTotal.toLocaleString()}</p>
+                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wide">{t('total')}</p>
+                    <p className="text-4xl font-black leading-none mt-0.5" style={{ color:'#3d1f0f' }}>฿{cartTotal.toLocaleString()}</p>
+                    <p className="text-[10px] text-stone-400 mt-1">{cart.reduce((s,i) => s + i.qty, 0)} {t('items')}</p>
                   </div>
                   <button onClick={saveOrder} disabled={saving}
-                    className="text-white font-black px-6 py-3 rounded-2xl shadow-lg active:scale-95 disabled:opacity-60"
+                    className="text-white font-black px-7 py-3.5 rounded-2xl shadow-lg active:scale-95 disabled:opacity-60 text-base"
                     style={{ background:'#3d1f0f' }}>
                     {saving ? '...' : t('save')}
                   </button>
@@ -479,9 +492,15 @@ function App() {
                     <p className="font-black text-base" style={{ color:'#3d1f0f' }}>฿{(o.total||0).toLocaleString()}</p>
                   </div>
                   {(o.items||[]).map((it, j) => (
-                    <p key={j} className="text-sm text-stone-600">
-                      {it.emoji} {it.qty}× {it.nameSnapshot || it.key} ({it.sizeKey?.toUpperCase()}) — ฿{it.price * it.qty}
-                    </p>
+                    <div key={j} className="text-sm text-stone-600">
+                      <span className="font-medium">{it.emoji} {it.qty}× {it.nameSnapshot || it.key}</span>
+                      {(it.size || it.toppings?.length > 0) && (
+                        <span className="text-xs text-stone-400 ml-1">
+                          ({[it.size, ...(it.toppings||[]).map(tp => tp.label)].filter(Boolean).join(' · ')})
+                        </span>
+                      )}
+                      <span className="font-bold ml-1">— ฿{(it.price||0) * (it.qty||1)}</span>
+                    </div>
                   ))}
                 </div>
               ))
@@ -510,15 +529,20 @@ function App() {
 // ─── Customize Modal ──────────────────────────────────────────────────────────
 
 function CustomizeModal({ item, t, onAdd, onClose }) {
-  const [size,  setSize]  = useState('M');
-  const [sweet, setSweet] = useState('50%');
-  const [ice,   setIce]   = useState('normalice');
-  const [qty,   setQty]   = useState(1);
-  const [note,  setNote]  = useState('');
+  const [selectedSize,     setSelectedSize]     = useState(SIZES[0]);
+  const [selectedToppings, setSelectedToppings] = useState([]);
+  const [qty,              setQty]              = useState(1);
+  const [note,             setNote]             = useState('');
 
-  const priceMap = { S: item.S, M: item.M, L: item.L };
-  const price    = priceMap[size];
-  const sizeKey  = size === 'S' ? 's' : size === 'M' ? 'm' : 'l';
+  const toppingTotal = selectedToppings.reduce((s, tp) => s + tp.price, 0);
+  const unitPrice    = item.basePrice + selectedSize.addPrice + toppingTotal;
+  const lineTotal    = unitPrice * qty;
+
+  const toggleTopping = (tp) => {
+    setSelectedToppings(prev =>
+      prev.find(x => x.id === tp.id) ? prev.filter(x => x.id !== tp.id) : [...prev, tp]
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={onClose}>
@@ -526,13 +550,19 @@ function CustomizeModal({ item, t, onAdd, onClose }) {
         style={{ paddingBottom:'max(1.5rem,env(safe-area-inset-bottom))' }}
         onClick={e => e.stopPropagation()}>
 
+        {/* Header */}
         <div className="flex items-center gap-3">
           <span className="text-4xl">{item.emoji}</span>
-          <div>
+          <div className="flex-1">
             <h2 className="font-black text-stone-800 text-xl">{t(item.key)}</h2>
-            <p className="text-stone-400 text-sm">฿{price} × {qty} = <strong style={{ color:'#3d1f0f' }}>฿{price*qty}</strong></p>
+            <p className="text-stone-400 text-sm">
+              ฿{item.basePrice}
+              {selectedSize.addPrice > 0 && <span className="text-amber-600"> +{selectedSize.addPrice}</span>}
+              {toppingTotal > 0 && <span className="text-amber-600"> +{toppingTotal}</span>}
+              {' = '}<strong style={{ color:'#3d1f0f' }}>฿{lineTotal}</strong>
+            </p>
           </div>
-          <button onClick={onClose} className="ml-auto text-stone-300 text-3xl leading-none">×</button>
+          <button onClick={onClose} className="text-stone-300 text-3xl leading-none w-9 h-9 flex items-center justify-center">×</button>
         </div>
 
         {/* Size */}
@@ -540,37 +570,42 @@ function CustomizeModal({ item, t, onAdd, onClose }) {
           <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase tracking-wide">{t('size')}</p>
           <div className="flex gap-2">
             {SIZES.map(s => (
-              <button key={s} onClick={() => setSize(s)}
-                className={`flex-1 py-3 rounded-2xl font-black text-base border-2 transition-all ${size===s ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
-                style={size===s ? { background:'#3d1f0f' } : {}}>
-                {t(s.toLowerCase())}
-                <span className="block text-xs font-normal">฿{priceMap[s]}</span>
+              <button key={s.id} onClick={() => setSelectedSize(s)}
+                className={`flex-1 py-3 rounded-2xl font-black text-sm border-2 transition-all ${selectedSize.id === s.id ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
+                style={selectedSize.id === s.id ? { background:'#3d1f0f' } : {}}>
+                {s.label}
+                {s.addPrice > 0
+                  ? <span className="block text-xs font-normal">+{s.addPrice} บ.</span>
+                  : <span className="block text-xs font-normal">ราคาเริ่มต้น</span>
+                }
               </button>
             ))}
           </div>
         </div>
 
-        {/* Sweetness */}
+        {/* Toppings */}
         <div>
-          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase tracking-wide">{t('sweet')}</p>
-          <div className="flex gap-1.5">
-            {['0%','25%','50%','75%','100%'].map(s => (
-              <button key={s} onClick={() => setSweet(s)}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs border-2 transition-all ${sweet===s ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
-                style={sweet===s ? { background:'#c87941' } : {}}>{s}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Ice */}
-        <div>
-          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase tracking-wide">{t('ice')}</p>
-          <div className="flex gap-1.5">
-            {ICES.map(ic => (
-              <button key={ic} onClick={() => setIce(ic)}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-[11px] border-2 transition-all ${ice===ic ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
-                style={ice===ic ? { background:'#6ba3c8' } : {}}>{t(ic)}</button>
-            ))}
+          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase tracking-wide">ท็อปปิ้ง</p>
+          <div className="grid grid-cols-2 gap-2">
+            {TOPPINGS.map(tp => {
+              const selected = !!selectedToppings.find(x => x.id === tp.id);
+              return (
+                <button key={tp.id} onClick={() => toggleTopping(tp)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border-2 transition-all text-left ${
+                    selected ? 'border-amber-400 bg-amber-50' : 'border-stone-200 bg-white'
+                  }`}>
+                  <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                    selected ? 'bg-amber-500 border-amber-500' : 'border-stone-300'
+                  }`}>
+                    {selected && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-stone-700 truncate">{tp.label}</p>
+                    <p className="text-[10px] text-amber-600 font-bold">+{tp.price} บ.</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -592,10 +627,14 @@ function CustomizeModal({ item, t, onAdd, onClose }) {
           className="w-full p-3 bg-stone-50 border border-stone-200 rounded-2xl text-sm outline-none" />
 
         {/* Add button */}
-        <button onClick={() => onAdd({ key:item.key, emoji:item.emoji, nameSnapshot:t(item.key), size, sizeKey, price, qty, sweet, iceKey:ice, note })}
+        <button onClick={() => onAdd({
+          key: item.key, emoji: item.emoji, nameSnapshot: t(item.key),
+          size: selectedSize.label, toppings: selectedToppings,
+          price: unitPrice, qty, note, cartId: Date.now(),
+        })}
           className="w-full py-4 rounded-2xl font-black text-white text-lg shadow-lg active:scale-95"
           style={{ background:'#3d1f0f' }}>
-          {t('addToOrder')} · ฿{price*qty}
+          {t('addToOrder')} · ฿{lineTotal}
         </button>
       </div>
     </div>

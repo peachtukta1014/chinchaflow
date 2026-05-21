@@ -5,9 +5,7 @@
       "public": "apps/seafood-pos/dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
-        { "source": "/api/gemini-ocr",  "function": "geminiOcr"  },
-        { "source": "/api/gemini-voice", "function": "geminiVoice" },
-        { "source": "**",               "destination": "/index.html" }
+        { "source": "**", "destination": "/index.html" }
       ]
     },
     {
