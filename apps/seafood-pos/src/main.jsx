@@ -90,6 +90,29 @@ async function fsPatch(path, data) {
   });
   if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
 }
+function _fromFsVal(v) {
+  if (!v || 'nullValue' in v) return null;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('integerValue' in v) return parseInt(v.integerValue, 10);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('stringValue' in v) return v.stringValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(_fromFsVal);
+  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k,w]) => [k, _fromFsVal(w)]));
+  return null;
+}
+async function fsRunQuery(structuredQuery) {
+  const r = await fetch(`${_FS}:runQuery`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery }),
+  });
+  if (!r.ok) return [];
+  const rows = await r.json();
+  return rows.filter(row => row.document).map(row => {
+    const parts = row.document.name.split('/');
+    return { id: parts[parts.length - 1], ...Object.fromEntries(Object.entries(row.document.fields || {}).map(([k,v]) => [k, _fromFsVal(v)])) };
+  });
+}
 async function fsIncrementDebt(customerId, meta, delta) {
   let current = 0;
   try {
@@ -207,16 +230,23 @@ function App() {
     }, () => {});
   }, [member]);
 
-  // Badge: count pending LINE orders
+  // Badge: count pending LINE orders (REST, no auth required)
   useEffect(() => {
-    if (!db || !member) return;
+    if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
     const today = new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
-    const q = query(
-      collection(db, 'lineOrders'),
-      where('deliveryDate', '>=', today),
-      where('status', '==', 'pending'),
-    );
-    return onSnapshot(q, snap => setPendingOrders(snap.size), () => {});
+    const fetch_ = async () => {
+      const rows = await fsRunQuery({
+        from: [{ collectionId: 'lineOrders' }],
+        where: { compositeFilter: { op: 'AND', filters: [
+          { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
+          { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
+        ]}},
+      });
+      setPendingOrders(rows.length);
+    };
+    fetch_();
+    const timer = setInterval(fetch_, 30000);
+    return () => clearInterval(timer);
   }, [member]);
 
   const handleLogin = async (memberData) => {
@@ -1368,18 +1398,14 @@ function LineOrdersScreen() {
   const todayBKK = () => new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
 
   useEffect(() => {
-    if (!db) { setLoading(false); return; }
-    const q = query(collection(db, 'lineOrders'), orderBy('createdAt', 'desc'), limit(100));
-    const unsub = onSnapshot(q, snap => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, () => setLoading(false));
-    return unsub;
+    fsRunQuery({ from: [{ collectionId: 'lineOrders' }], orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }], limit: 100 })
+      .then(rows => { setOrders(rows); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   const markDone = (id) => {
-    if (!db) return;
-    setDoc(doc(db, 'lineOrders', id), { status: 'done' }, { merge: true });
+    fsPatch(`lineOrders/${id}`, { status: 'done' });
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' } : o));
   };
 
   const today    = todayBKK();
