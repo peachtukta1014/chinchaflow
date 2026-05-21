@@ -55,7 +55,7 @@ exports.lineWebhook = functions
   .https.onRequest(async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
-    const rawBody   = JSON.stringify(req.body);
+    const rawBody   = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
     const signature = req.headers['x-line-signature'] || '';
     if (!verifySignature(rawBody, signature)) { res.status(401).send('Invalid signature'); return; }
 
