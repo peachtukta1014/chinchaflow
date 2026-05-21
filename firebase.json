@@ -21,8 +21,16 @@
     "source": "apps/webhook-core",
     "runtime": "nodejs22"
   },
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  }
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    },
+    {
+      "database": "chincha",
+      "rules": "firestore-chincha.rules",
+      "indexes": "firestore-chincha.indexes.json"
+    }
+  ]
 }

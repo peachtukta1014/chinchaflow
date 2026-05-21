@@ -75,6 +75,23 @@ async function fsQueryOrders(dateKey) {
     return { id: parts[parts.length - 1], ..._fromFsFields(row.document.fields || {}) };
   });
 }
+async function fsQueryExpenses(dateKey) {
+  const r = await fetch(`${_FS}:runQuery`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: 'dailyExpenses' }],
+      where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
+      limit: 100,
+    }}),
+  });
+  if (!r.ok) return [];
+  const rows = await r.json();
+  return rows.filter(row => row.document).map(row => {
+    const parts = row.document.name.split('/');
+    return { id: parts[parts.length - 1], ..._fromFsFields(row.document.fields || {}) };
+  });
+}
 
 // ─── Session management ───────────────────────────────────────────────────────
 
@@ -320,6 +337,7 @@ function App() {
   const [saving, setSaving]     = useState(false);
   const [search, setSearch]     = useState('');
   const [showCart, setShowCart] = useState(false);
+  const [payType, setPayType]   = useState('cash');
 
   useEffect(() => {
     const s = getSession();
@@ -367,7 +385,7 @@ function App() {
     try {
       await fsPost('teaOrders', {
         dateKey, items: cart, total: cartTotal,
-        createdBy: member?.name || 'ชินชา', lang,
+        payType, createdBy: member?.name || 'ชินชา', lang,
         createdAt: new Date().toISOString(),
       });
       await refreshOrders();
@@ -500,18 +518,21 @@ function App() {
           <div className="px-4 pt-3 pb-6 space-y-3">
             {orders.length === 0
               ? <div className="text-center py-12 text-stone-300"><p className="text-6xl mb-3">📋</p><p className="font-bold">{t('noOrders')}</p></div>
-              : orders.map((o, i) => (
+              : orders.map((o, i) => {
+                const timeStr = (() => { try { return new Date(o.createdAt).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }); } catch { return '—'; } })();
+                return (
                 <div key={o.id||i} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200">
                   <div className="flex justify-between mb-2">
                     <p className="text-xs text-stone-400">
-                      {o.createdAt?.toDate?.()?.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) || '—'}
+                      {timeStr}
                       {o.createdBy && <span className="ml-2 text-stone-300">· {o.createdBy}</span>}
+                      {o.payType && <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${o.payType==='cash' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{o.payType==='cash'?'สด':'โอน'}</span>}
                     </p>
                     <p className="font-black text-base" style={{ color:'#3d1f0f' }}>฿{(o.total||0).toLocaleString()}</p>
                   </div>
                   {(o.items||[]).map((it, j) => (
                     <div key={j} className="text-sm text-stone-600">
-                      <span className="font-medium">{it.emoji} {it.qty}× {it.nameSnapshot || it.key}</span>
+                      <span className="font-medium">{it.emoji} {it.qty}× {it.nameSnapshot || it.nameEn || it.key}</span>
                       {(it.size || it.toppings?.length > 0) && (
                         <span className="text-xs text-stone-400 ml-1">
                           ({[it.size, ...(it.toppings||[]).map(tp => tp.label)].filter(Boolean).join(' · ')})
@@ -521,13 +542,14 @@ function App() {
                     </div>
                   ))}
                 </div>
-              ))
+                );
+              })
             }
           </div>
         )}
 
         {/* ── SUMMARY TAB ───────────────────────────────────────────── */}
-        {tab === 'summary' && <SummaryTab orders={orders} t={t} />}
+        {tab === 'summary' && <SummaryTab orders={orders} t={t} dateKey={dateKey} member={member} />}
 
         {/* ── RESTOCK TAB ───────────────────────────────────────────── */}
         {tab === 'restock' && <RestockTab member={member} />}
@@ -537,7 +559,7 @@ function App() {
       {modal && <CustomizeModal item={modal} t={t} onAdd={addToCart} onClose={() => setModal(null)} />}
 
       {/* Cart bottom bar */}
-      {tab === 'order' && cart.length > 0 && (
+      {cart.length > 0 && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2 bg-transparent">
           <button onClick={() => setShowCart(true)}
             className="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl shadow-xl text-white active:scale-[0.98] transition-transform"
@@ -581,6 +603,15 @@ function App() {
                         className="w-8 h-8 rounded-full bg-red-50 text-red-400 font-black flex items-center justify-center active:scale-90">×</button>
                     </div>
                   </div>
+                ))}
+              </div>
+              {/* Payment type */}
+              <div className="flex gap-2 mt-1 mb-3">
+                {[['cash','💵 สด'],['transfer','📱 โอน']].map(([v,label]) => (
+                  <button key={v} onClick={() => setPayType(v)}
+                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm border-2 transition-all ${payType===v ? (v==='cash' ? 'bg-emerald-100 text-emerald-700 border-emerald-400' : 'bg-blue-100 text-blue-700 border-blue-400') : 'bg-stone-50 text-stone-400 border-stone-200'}`}>
+                    {label}
+                  </button>
                 ))}
               </div>
               <div className="flex items-center justify-between py-3 border-t border-stone-100">
@@ -763,21 +794,55 @@ function CustomizeModal({ item, t, onAdd, onClose }) {
 
 // ─── Summary Tab ──────────────────────────────────────────────────────────────
 
-function SummaryTab({ orders, t }) {
-  const total     = orders.reduce((s, o) => s + (o.total||0), 0);
-  const allItems  = orders.flatMap(o => o.items||[]);
-  const totalCups = allItems.reduce((s, i) => s + (i.qty||1), 0);
-  const countMap  = {};
+function SummaryTab({ orders, t, dateKey, member }) {
+  const [expenses,  setExpenses]  = useState([]);
+  const [expDesc,   setExpDesc]   = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [savingExp, setSavingExp] = useState(false);
+  const [expFlash,  setExpFlash]  = useState('');
+
+  useEffect(() => { fsQueryExpenses(dateKey).then(setExpenses); }, [dateKey]);
+
+  const cashOrders     = orders.filter(o => !o.payType || o.payType === 'cash');
+  const transferOrders = orders.filter(o => o.payType === 'transfer');
+  const total          = orders.reduce((s, o) => s + (o.total||0), 0);
+  const cashTotal      = cashOrders.reduce((s, o) => s + (o.total||0), 0);
+  const transferTotal  = transferOrders.reduce((s, o) => s + (o.total||0), 0);
+  const allItems       = orders.flatMap(o => o.items||[]);
+  const totalCups      = allItems.reduce((s, i) => s + (i.qty||1), 0);
+  const totalExpenses  = expenses.reduce((s, e) => s + (e.amount||0), 0);
+  const net            = total - totalExpenses;
+
+  const countMap = {};
   allItems.forEach(i => { countMap[i.key] = (countMap[i.key]||0) + (i.qty||1); });
-  const topItems  = Object.entries(countMap).sort((a,b) => b[1]-a[1]).slice(0,3);
-  const maxCount  = topItems[0]?.[1] || 1;
+  const topItems = Object.entries(countMap).sort((a,b) => b[1]-a[1]).slice(0,3);
+  const maxCount = topItems[0]?.[1] || 1;
+
+  const addExpense = async () => {
+    const desc   = expDesc.trim();
+    const amount = parseInt(expAmount, 10);
+    if (!desc || !amount || amount <= 0) return;
+    setSavingExp(true);
+    try {
+      await fsPost('dailyExpenses', {
+        dateKey, description: desc, amount,
+        createdBy: member?.name || 'ชินชา',
+        createdAt: new Date().toISOString(),
+      });
+      setExpenses(await fsQueryExpenses(dateKey));
+      setExpDesc(''); setExpAmount('');
+      setExpFlash('✅ บันทึกแล้ว');
+      setTimeout(() => setExpFlash(''), 2000);
+    } catch (e) { console.error(e); }
+    setSavingExp(false);
+  };
 
   return (
     <div className="px-4 pt-3 pb-6 space-y-3">
       {/* Hero stats */}
       <div className="rounded-3xl p-5 text-white shadow-lg" style={{ background:'#3d1f0f' }}>
         <p className="text-amber-600 text-[10px] font-bold mb-3 uppercase tracking-widest">{t('todaySales')}</p>
-        <div className="flex items-end gap-4">
+        <div className="flex items-end gap-4 mb-4">
           <div>
             <p className="text-[11px] text-amber-600 font-bold uppercase tracking-wide mb-0.5">ยอดรวม</p>
             <p className="text-5xl font-black text-amber-200 leading-none">฿{total.toLocaleString()}</p>
@@ -787,8 +852,66 @@ function SummaryTab({ orders, t }) {
             <p className="text-4xl font-black text-amber-300 leading-none">{totalCups}<span className="text-lg font-bold text-amber-600 ml-1">แก้ว</span></p>
           </div>
         </div>
+        <div className="flex gap-3 pt-3 border-t border-amber-900">
+          <div className="flex-1 rounded-2xl p-3" style={{ background:'rgba(16,185,129,0.15)' }}>
+            <p className="text-[10px] text-emerald-400 font-bold mb-1">💵 เงินสด</p>
+            <p className="text-xl font-black text-emerald-300">฿{cashTotal.toLocaleString()}</p>
+            <p className="text-[10px] text-emerald-600">{cashOrders.length} ออเดอร์</p>
+          </div>
+          <div className="flex-1 rounded-2xl p-3" style={{ background:'rgba(59,130,246,0.15)' }}>
+            <p className="text-[10px] text-blue-400 font-bold mb-1">📱 โอน</p>
+            <p className="text-xl font-black text-blue-300">฿{transferTotal.toLocaleString()}</p>
+            <p className="text-[10px] text-blue-600">{transferOrders.length} ออเดอร์</p>
+          </div>
+        </div>
         <p className="text-amber-700 text-xs mt-3">{orders.length} {t('orders')}</p>
       </div>
+
+      {/* Expenses section */}
+      <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200">
+        <p className="font-bold text-stone-500 text-[10px] uppercase tracking-widest mb-3">💸 ค่าใช้จ่าย</p>
+        {expFlash && <p className="text-emerald-600 text-xs font-bold mb-2">{expFlash}</p>}
+        <div className="flex gap-2 mb-3">
+          <input value={expDesc} onChange={e => setExpDesc(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addExpense()}
+            placeholder="รายการ..."
+            className="flex-1 px-3 py-2.5 rounded-xl border-2 border-stone-200 text-sm outline-none focus:border-amber-400" />
+          <input value={expAmount} onChange={e => setExpAmount(e.target.value.replace(/\D/g,''))}
+            onKeyDown={e => e.key === 'Enter' && addExpense()}
+            placeholder="฿" inputMode="numeric"
+            className="w-20 px-3 py-2.5 rounded-xl border-2 border-stone-200 text-sm outline-none focus:border-amber-400 text-center font-bold" />
+          <button onClick={addExpense} disabled={savingExp || !expDesc.trim() || !expAmount}
+            className="px-3 py-2.5 rounded-xl font-black text-white text-sm active:scale-95 disabled:opacity-50"
+            style={{ background:'#3d1f0f' }}>
+            {savingExp ? '⏳' : '+'}
+          </button>
+        </div>
+        {expenses.length === 0
+          ? <p className="text-stone-300 text-xs text-center py-2">ยังไม่มีค่าใช้จ่าย</p>
+          : <div className="space-y-1.5 mb-3">
+              {expenses.map((e, i) => (
+                <div key={e.id||i} className="flex justify-between items-center py-1.5 border-b border-stone-100 last:border-0">
+                  <p className="text-sm text-stone-600">{e.description}</p>
+                  <p className="font-black text-sm text-red-500">-฿{(e.amount||0).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+        }
+        <div className="flex justify-between items-center pt-2 border-t border-stone-100">
+          <p className="text-xs font-bold text-stone-400">รวมค่าใช้จ่าย</p>
+          <p className="font-black text-red-500">-฿{totalExpenses.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Net */}
+      {totalExpenses > 0 && (
+        <div className="rounded-2xl p-4 border-2 border-stone-200 bg-stone-50 flex justify-between items-center">
+          <p className="font-bold text-stone-500 text-sm">กำไรสุทธิ</p>
+          <p className={`text-2xl font-black ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            ฿{net.toLocaleString()}
+          </p>
+        </div>
+      )}
 
       {/* Top 3 mini chart */}
       <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200">

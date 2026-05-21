@@ -4,7 +4,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const crypto    = require('crypto');
 
 admin.initializeApp();
-const db = getFirestore('chincha');
+const db = getFirestore();
 
 // ── LINE signature verification ───────────────────────────────────────────────
 function verifySignature(rawBody, signature) {
