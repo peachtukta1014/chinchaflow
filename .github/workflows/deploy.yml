@@ -32,7 +32,6 @@ jobs:
           {
             echo "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}"
-            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
           } > apps/webhook-core/.env
 
       - name: Deploy functions
@@ -65,7 +64,6 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET:     ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID:             ${{ secrets.VITE_FIREBASE_APP_ID_SHRIMP }}
-          VITE_GEMINI_API_KEY:              ${{ secrets.VITE_GEMINI_API_KEY }}
 
       - name: Deploy to Firebase Hosting (shrimp)
         uses: FirebaseExtended/action-hosting-deploy@v0
