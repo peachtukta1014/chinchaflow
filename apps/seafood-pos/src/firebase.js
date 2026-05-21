@@ -22,6 +22,6 @@ export const isFirebaseReady    = missingKeys.length === 0;
 export const firebaseMissingKeys = missingKeys;
 
 export const app     = isFirebaseReady ? initializeApp(firebaseConfig) : null;
-export const db      = app ? getFirestore(app, 'chincha') : null;
+export const db      = app ? getFirestore(app) : null;
 export const storage = app ? getStorage(app)   : null;
 export const auth    = app ? getAuth(app)       : null;

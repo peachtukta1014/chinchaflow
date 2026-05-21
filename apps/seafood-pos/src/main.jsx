@@ -5,7 +5,7 @@ import {
   onSnapshot, orderBy, query, serverTimestamp, setDoc, where,
 } from 'firebase/firestore';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
   Bell, Camera, CheckCircle, ChevronRight, Delete, Edit3,
   Home, LogOut, MapPin, Mic, MicOff, Package, PlusCircle,
@@ -47,10 +47,10 @@ const CUSTOMERS = [
 ];
 
 const PRODUCTS = [
-  { id: 'large',  name: 'ไซส์ใหญ่',  type: 'live', price: 1450 },
-  { id: 'medium', name: 'ไซส์กลาง', type: 'live', price: 1100 },
-  { id: 'small',  name: 'ไซส์เล็ก',  type: 'live', price: 850  },
-  { id: 'dead',   name: 'กุ้งตาย',   type: 'dead', price: 0    },
+  { id: 'large',  name: 'กุ้งใหญ่', emoji: '🦐', type: 'live', price: 1450 },
+  { id: 'medium', name: 'กุ้งกลาง', emoji: '🦐', type: 'live', price: 1100 },
+  { id: 'small',  name: 'กุ้งเล็ก',  emoji: '🦐', type: 'live', price: 850  },
+  { id: 'dead',   name: 'กุ้งตาย',  emoji: '🦐', type: 'dead', price: 0    },
 ];
 
 const PAY = [
@@ -198,6 +198,9 @@ function parseVoice(text) {
   return orders;
 }
 
+// ─── Admin email (always gets admin+approved on register) ────────────────────
+const ADMIN_EMAIL = 'peach_admin@chincha.com';
+
 // ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
 
 const SESSION_KEY = 'koseafood-session';
@@ -217,72 +220,62 @@ function clearSession() { localStorage.removeItem(SESSION_KEY); }
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
 
 function App() {
-  const [member, setMember]     = useState(undefined); // undefined=loading, null=logged out, obj=logged in
-  const [activeTab, setActiveTab] = useState('pos');
-  const [stock, setStock]       = useState({ live: 0, dead: 0 });
+  const [member, setMember]         = useState(undefined);
+  const [activeTab, setActiveTab]   = useState('pos');
+  const [stock, setStock]           = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
   const [pendingOrders, setPendingOrders] = useState(0);
 
-  // On mount: restore session → sign in anonymously (satisfies Firestore auth rules)
+  // Session restore via Firebase Auth persistence
   useEffect(() => {
-    const session = getSession();
-    if (!session) { setMember(null); return; }
-    if (!auth) { setMember(session); return; }
-    signInAnonymously(auth)
-      .then(() => setMember(session))
-      .catch(() => setMember(session));
+    if (!auth) { setMember(null); return; }
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) { setMember(null); return; }
+      try {
+        const resp = await fetch(`${_FS}/users/${user.uid}`);
+        if (!resp.ok) { await signOut(auth); return; }
+        const json = await resp.json();
+        const f = json.fields || {};
+        if (!f.approved?.booleanValue) { await signOut(auth); return; }
+        setMember({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: user.email || '', role: f.role?.stringValue || 'staff' });
+      } catch { setMember(null); }
+    });
   }, []);
 
-  // Real-time shared stock from Firestore
+  // Real-time shared stock
   useEffect(() => {
     if (!db || !member) return;
-    return onSnapshot(doc(db, 'config', 'stock'), (snap) => {
-      if (snap.exists()) setStock(snap.data());
-    }, () => {});
+    return onSnapshot(doc(db, 'config', 'stock'), snap => { if (snap.exists()) setStock(snap.data()); }, () => {});
   }, [member]);
 
-  // Badge: count pending LINE orders (REST, no auth required)
+  // Badge: pending LINE orders
   useEffect(() => {
     if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
     const today = new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
-    const fetch_ = async () => {
-      const rows = await fsRunQuery({
-        from: [{ collectionId: 'lineOrders' }],
-        where: { compositeFilter: { op: 'AND', filters: [
-          { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
-          { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
-        ]}},
-      });
+    const load = async () => {
+      const rows = await fsRunQuery({ from: [{ collectionId: 'lineOrders' }], where: { compositeFilter: { op: 'AND', filters: [
+        { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
+        { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
+      ]}} });
       setPendingOrders(rows.length);
     };
-    fetch_();
-    const timer = setInterval(fetch_, 30000);
-    return () => clearInterval(timer);
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
   }, [member]);
 
-  const handleLogin = async (memberData) => {
-    saveSession(memberData);
-    if (auth) { try { await signInAnonymously(auth); } catch {} }
-    setMember(memberData);
-  };
-
+  const handleLogin  = (m) => setMember(m);
   const handleLogout = async () => {
     if (!window.confirm('ออกจากระบบ?')) return;
-    clearSession();
-    setMember(null);
     if (auth) await signOut(auth).catch(() => {});
   };
 
   const updateMainStock = (live, dead) => {
-    const val = {
-      live: Math.max(0, parseFloat(live.toFixed(3))),
-      dead: Math.max(0, parseFloat(dead.toFixed(3))),
-    };
+    const val = { live: Math.max(0, parseFloat(live.toFixed(3))), dead: Math.max(0, parseFloat(dead.toFixed(3))) };
     setStock(val);
     if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
   };
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (member === undefined) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -294,39 +287,55 @@ function App() {
     );
   }
 
-  // ── Login / Register ──────────────────────────────────────────────────────
   if (!member) return <LoginScreen onLogin={handleLogin} />;
 
-  // ── Main App ──────────────────────────────────────────────────────────────
+  const isAdmin = member.role === 'admin';
+
   return (
     <div className="bg-slate-50 h-screen font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
         <img src="/logo.jpg" alt="" className="w-72 h-72 object-contain opacity-[0.04]" />
       </div>
 
-      <div className="bg-slate-900 text-white px-4 pt-6 pb-4 rounded-b-3xl shadow-lg flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center gap-3">
-          <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
-          <div>
-            <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
-            <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">{member.name}</p>
+      {/* Header */}
+      <div className="bg-slate-900 text-white z-10 shrink-0">
+        <div className="px-4 pt-6 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
+            <div>
+              <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
+                {member.name}
+                {isAdmin && <span className="ml-1.5 text-purple-400">· แอดมิน</span>}
+              </p>
+            </div>
           </div>
+          <button onClick={handleLogout}
+            className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-400 active:scale-95">
+            <LogOut size={18} />
+          </button>
         </div>
-        <button onClick={handleLogout}
-          className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-400 active:scale-95 transition-all">
-          <LogOut size={18} />
-        </button>
+        {/* Admin tabs row */}
+        {isAdmin && (
+          <div className="px-4 pb-3 flex gap-2">
+            {[['admin-users','👥 สมาชิก'],['admin-products','⚙️ ตั้งค่าสินค้า']].map(([t,label]) => (
+              <button key={t} onClick={() => setActiveTab(t)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab===t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'    && <Dashboard stock={stock} />}
-        {activeTab === 'pos'     && (
-          <POSMobile user={member} stock={stock} updateMainStock={updateMainStock}
-            onSaveBill={(bill) => setTransactions([bill, ...transactions])} />
-        )}
-        {activeTab === 'stock'   && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
-        {activeTab === 'members' && <MembersScreen />}
-        {activeTab === 'orders'  && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
+        {activeTab === 'home'           && <Dashboard stock={stock} />}
+        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => setTransactions([b,...transactions])} />}
+        {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
+        {activeTab === 'members'        && <MembersScreen />}
+        {activeTab === 'orders'         && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
+        {activeTab === 'admin-users'    && <AdminUsersScreen />}
+        {activeTab === 'admin-products' && <ProductSettingsScreen />}
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
@@ -335,7 +344,7 @@ function App() {
         <NavButton icon={<Home />}         label="ภาพรวม"    isActive={activeTab === 'home'}    onClick={() => setActiveTab('home')} />
         <NavButton icon={<Package />}      label="รับสต๊อก" isActive={activeTab === 'stock'}   onClick={() => setActiveTab('stock')} />
         <NavButton icon={<Bell />}         label="ออเดอร์"   isActive={activeTab === 'orders'}  onClick={() => setActiveTab('orders')} badge={pendingOrders} />
-        <NavButton icon={<Users />}        label="สมาชิก"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
+        <NavButton icon={<Users />}        label="ลูกค้า"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
       </div>
 
       <style>{`
@@ -349,66 +358,55 @@ function App() {
 // ─── Login / Register Screen ──────────────────────────────────────────────────
 
 function LoginScreen({ onLogin }) {
-  const [phone, setPhone]   = useState('');
-  const [name, setName]     = useState('');
-  const [mode, setMode]     = useState('login');   // 'login' | 'register' | 'pending'
-  const [error, setError]   = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+  const [name,     setName]     = useState('');
+  const [mode,     setMode]     = useState('login'); // 'login' | 'register' | 'pending'
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  const BASE = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
   const handleSubmit = async () => {
-    const p = phone.trim().replace(/\D/g, '');
-    if (p.length < 9) { setError('กรุณากรอกเบอร์โทรให้ถูกต้อง'); return; }
-    if (mode === 'register' && !name.trim()) { setError('กรุณากรอกชื่อ'); return; }
-
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-    if (!projectId) { setError('Firebase config ไม่ครบ'); return; }
-
+    if (!email.trim() || !password) { setError('กรุณากรอก Email และ Password'); return; }
+    if (mode === 'register' && !name.trim()) { setError('กรุณากรอกชื่อเล่น'); return; }
+    if (!auth) { setError('Firebase ยังไม่พร้อม'); return; }
     setLoading(true); setError('');
-    // Use Firestore REST API directly — bypasses SDK auth token issues entirely
-    const BASE = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-    const mkT = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
-
     try {
-      const resp = await Promise.race([fetch(`${BASE}/members/${p}`), mkT(12000)]);
-
-      if (resp.status === 403) { throw new Error('permission-denied — เพิ่ม members rule ใน Firestore'); }
-      if (resp.status !== 200 && resp.status !== 404) { throw new Error(`HTTP ${resp.status}`); }
-
-      if (resp.status === 404) {
-        // New member
-        const n = name.trim() || 'ไม่ระบุชื่อ';
-        const listResp = await Promise.race([fetch(`${BASE}/members?pageSize=1`), mkT(8000)]);
-        const listJson = await listResp.json();
+      if (mode === 'register') {
+        const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const listJson = await fetch(`${BASE}/users?pageSize=1`).then(r => r.json());
         const isFirst  = !listJson.documents?.length;
-
-        await fetch(`${BASE}/members/${p}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+        const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const grantAdmin   = isFirst || isAdminEmail;
+        await fetch(`${BASE}/users/${user.uid}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fields: {
-            name:     { stringValue: n },
-            phone:    { stringValue: p },
-            approved: { booleanValue: isFirst },
+            name:      { stringValue: name.trim() },
+            email:     { stringValue: email.trim() },
+            role:      { stringValue: grantAdmin ? 'admin' : 'staff' },
+            approved:  { booleanValue: grantAdmin },
+            createdAt: { stringValue: new Date().toISOString() },
           }}),
         });
-
-        if (isFirst) { onLogin({ name: n, phone: p }); }
-        else         { setMode('pending'); }
-        return;
+        if (!grantAdmin) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: 'admin' });
+      } else {
+        const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const resp = await fetch(`${BASE}/users/${user.uid}`);
+        if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
+        const f = (await resp.json()).fields || {};
+        if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: email.trim(), role: f.role?.stringValue || 'staff' });
       }
-
-      const json = await resp.json();
-      const f    = json.fields || {};
-      const memberName = f.name?.stringValue || 'สมาชิก';
-      const approved   = f.approved?.booleanValue || false;
-
-      if (!approved) { setMode('pending'); return; }
-      onLogin({ name: memberName, phone: p });
-
     } catch (e) {
-      setError(e?.message || 'เชื่อมต่อไม่ได้');
-    } finally {
-      setLoading(false);
-    }
+      const c = e.code || '';
+      if (c.includes('email-already-in-use'))                       setError('Email นี้ถูกใช้แล้ว');
+      else if (c.includes('wrong-password') || c.includes('invalid-credential')) setError('Email หรือ Password ไม่ถูกต้อง');
+      else if (c.includes('user-not-found'))                        setError('ไม่พบบัญชีนี้ กรุณาสมัครสมาชิกก่อน');
+      else if (c.includes('weak-password'))                         setError('Password ต้องมีอย่างน้อย 6 ตัวอักษร');
+      else setError(e?.message || 'เชื่อมต่อไม่ได้');
+    } finally { setLoading(false); }
   };
 
   if (mode === 'pending') {
@@ -418,10 +416,10 @@ function LoginScreen({ onLogin }) {
         <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-2xl p-6 text-center w-full">
           <p className="text-4xl mb-3">⏳</p>
           <p className="text-yellow-300 font-bold text-lg">รอการอนุมัติ</p>
-          <p className="text-slate-400 text-sm mt-2">เจ้าของร้านจะอนุมัติให้เร็วๆ นี้ครับ</p>
-          <p className="text-slate-500 text-xs mt-1">เบอร์: {phone.replace(/\D/g,'')}</p>
+          <p className="text-slate-400 text-sm mt-2">แอดมินจะอนุมัติสิทธิ์ให้เร็วๆ นี้ครับ</p>
+          <p className="text-slate-500 text-xs mt-1">{email}</p>
         </div>
-        <button onClick={() => { setMode('login'); setPhone(''); setName(''); }}
+        <button onClick={() => { setMode('login'); setEmail(''); setPassword(''); setName(''); }}
           className="mt-6 text-slate-400 text-sm underline">ย้อนกลับ</button>
       </div>
     );
@@ -441,31 +439,30 @@ function LoginScreen({ onLogin }) {
       <div className="relative z-10 w-full space-y-3">
         {mode === 'register' && (
           <input value={name} onChange={e => setName(e.target.value)}
-            placeholder="ชื่อ-นามสกุล"
+            placeholder="ชื่อเล่น"
             className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-2xl px-4 py-4 text-base focus:outline-none focus:border-blue-500" />
         )}
-        <input value={phone} onChange={e => setPhone(e.target.value)}
-          placeholder="เบอร์โทร"
-          type="tel" inputMode="numeric"
+        <input value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="Email" type="email" inputMode="email"
+          className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-2xl px-4 py-4 text-base focus:outline-none focus:border-blue-500" />
+        <input value={password} onChange={e => setPassword(e.target.value)}
+          placeholder="Password" type="password"
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-2xl px-4 py-4 text-base focus:outline-none focus:border-blue-500" />
 
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
         <button onClick={handleSubmit} disabled={loading}
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50">
-          {loading ? 'กำลังตรวจสอบ...' : mode === 'register' ? 'ขอเข้าใช้งาน' : 'เข้าสู่ระบบ'}
+          {loading ? 'กำลังตรวจสอบ...' : mode === 'register' ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}
         </button>
 
         <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
           className="w-full text-slate-400 text-sm py-2">
-          {mode === 'login' ? 'ยังไม่มีบัญชี? ขอสมัครสมาชิก' : 'มีบัญชีแล้ว? เข้าสู่ระบบ'}
+          {mode === 'login' ? 'ยังไม่มีบัญชี? → สมัครสมาชิก' : 'มีบัญชีแล้ว? → เข้าสู่ระบบ'}
         </button>
 
-        {!isFirebaseReady && (
-          <p className="text-yellow-400 text-xs text-center">
-            ⚠️ Firebase config ยังไม่ครบ
-          </p>
-        )}
+        {!isFirebaseReady && <p className="text-yellow-400 text-xs text-center">⚠️ Firebase config ยังไม่ครบ</p>}
       </div>
     </div>
   );
@@ -474,26 +471,12 @@ function LoginScreen({ onLogin }) {
 // ─── Members Screen (approve/reject pending members) ─────────────────────────
 
 function MembersScreen() {
-  const [tab, setTab]             = useState('staff');
-  const [members, setMembers]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [editId, setEditId]       = useState(null);
-  const [editName, setEditName]   = useState('');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cusLoading, setCusLoading]   = useState(true);
   const [cusEditId, setCusEditId]     = useState(null);
   const [cusEditData, setCusEditData] = useState({ name: '', zone: '', phone: '' });
   const [showAdd, setShowAdd]         = useState(false);
   const [newCus, setNewCus]           = useState({ name: '', zone: '', phone: '' });
-
-  useEffect(() => {
-    if (!db) { setLoading(false); return; }
-    const q = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, snap => {
-      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, () => setLoading(false));
-  }, []);
 
   useEffect(() => {
     if (!db) { setCusLoading(false); return; }
@@ -504,15 +487,6 @@ function MembersScreen() {
       setCusLoading(false);
     }, () => setCusLoading(false));
   }, []);
-
-  const setApproved = (phone, val) =>
-    setDoc(doc(db, 'members', phone), { approved: val }, { merge: true });
-
-  const saveName = async (phone) => {
-    if (!editName.trim()) return;
-    await setDoc(doc(db, 'members', phone), { name: editName.trim() }, { merge: true });
-    setEditId(null);
-  };
 
   const allCustomers = [
     ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
@@ -537,84 +511,9 @@ function MembersScreen() {
     setShowAdd(false);
   };
 
-  const MemberCard = ({ m, showApprove }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          {editId === m.id ? (
-            <input value={editName} onChange={e => setEditName(e.target.value)}
-              className="w-full border border-blue-400 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 mb-1"
-              autoFocus onKeyDown={e => e.key === 'Enter' && saveName(m.phone)} />
-          ) : (
-            <p className="font-bold text-slate-800 truncate">{m.name}</p>
-          )}
-          <p className="text-xs text-slate-400">{m.phone}</p>
-        </div>
-        <div className="flex gap-2 ml-2 shrink-0">
-          {editId === m.id ? (
-            <>
-              <button onClick={() => saveName(m.phone)}
-                className="bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">บันทึก</button>
-              <button onClick={() => setEditId(null)}
-                className="text-slate-400 text-xs border border-slate-200 px-2 py-1.5 rounded-lg">ยกเลิก</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { setEditId(m.id); setEditName(m.name); }}
-                className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg">แก้ไข</button>
-              {showApprove
-                ? <button onClick={() => setApproved(m.phone, true)}
-                    className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">อนุมัติ</button>
-                : <button onClick={() => setApproved(m.phone, false)}
-                    className="text-xs text-red-400 border border-red-100 px-2 py-1.5 rounded-lg">ลบ</button>
-              }
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const pending  = members.filter(m => !m.approved);
-  const approved = members.filter(m =>  m.approved);
-
   return (
     <div className="p-4 space-y-4">
-      <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
-        <button onClick={() => setTab('staff')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${tab === 'staff' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>
-          สมาชิก
-        </button>
-        <button onClick={() => setTab('customers')}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${tab === 'customers' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}>
-          ลูกค้า ({allCustomers.length})
-        </button>
-      </div>
-
-      {tab === 'staff' && (
-        <>
-          <h2 className="text-base font-black text-slate-800">จัดการสมาชิก</h2>
-          {loading && <p className="text-slate-400 text-sm text-center py-8">กำลังโหลด...</p>}
-          {pending.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">รออนุมัติ ({pending.length})</p>
-              <div className="space-y-2">{pending.map(m => <MemberCard key={m.id} m={m} showApprove={true} />)}</div>
-            </div>
-          )}
-          {approved.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">สมาชิก ({approved.length})</p>
-              <div className="space-y-2">{approved.map(m => <MemberCard key={m.id} m={m} showApprove={false} />)}</div>
-            </div>
-          )}
-          {!loading && members.length === 0 && (
-            <p className="text-slate-400 text-sm text-center py-12">ยังไม่มีสมาชิก</p>
-          )}
-        </>
-      )}
-
-      {tab === 'customers' && (
-        <>
+      <>
           <div className="flex items-center justify-between">
             <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
             <button onClick={() => setShowAdd(v => !v)}
@@ -684,8 +583,7 @@ function MembersScreen() {
               </div>
             )
           }
-        </>
-      )}
+      </>
     </div>
   );
 }
@@ -698,6 +596,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
   const [weight, setWeight]         = useState('');
   const [customPrice, setCustomPrice] = useState(PRODUCTS[0].price.toString());
+  const [loadedPrices, setLoadedPrices] = useState({});
   const [note, setNote]             = useState('');
   const [inputMode, setInputMode]   = useState('weight');
   const [saving, setSaving]         = useState(false);
@@ -734,8 +633,8 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
       setCart(prev => [...prev, ...complete.map(o => {
         const prod = PRODUCTS.find(p => p.id === o.productId);
         const w = parseFloat(o.weight) || 0;
-        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * prod.price;
-        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : prod.price, total, note: '' };
+        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * priceOf(prod.id);
+        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : priceOf(prod.id), total, note: '' };
       })]);
     } else if (parsedOrders.length > 0) {
       const first = parsedOrders[0];
@@ -765,12 +664,29 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     finally { setPhotoUploading(false); }
   };
 
+  useEffect(() => {
+    fetch(`${_FS}/productSettings/shrimp`)
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!j?.fields) return;
+        const p = {};
+        ['large','medium','small'].forEach(k => {
+          const v = j.fields[k];
+          if (v) p[k] = parseInt(v.integerValue ?? v.doubleValue ?? 0);
+        });
+        setLoadedPrices(p);
+      })
+      .catch(() => {});
+  }, []);
+
+  const priceOf = (productId) => loadedPrices[productId] ?? PRODUCTS.find(p => p.id === productId)?.price ?? 0;
+
   const handleProductChange = (productId) => {
     setSelectedProduct(productId);
     const prod = PRODUCTS.find(p => p.id === productId);
     setWeight(''); setNote('');
     if (prod.type === 'dead') { setCustomPrice(''); setInputMode('price'); }
-    else { setCustomPrice(prod.price.toString()); setInputMode('weight'); }
+    else { setCustomPrice(priceOf(productId).toString()); setInputMode('weight'); }
   };
 
   const handleNumpad = (num) => {
@@ -793,7 +709,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
       total: currentItemTotal, note,
     }]);
     setWeight(''); setNote('');
-    if (!isDeadShrimp) setCustomPrice(activeProduct.price.toString());
+    if (!isDeadShrimp) setCustomPrice(priceOf(activeProduct.id).toString());
     setInputMode('weight');
   };
 
@@ -1484,6 +1400,141 @@ function LineOrdersScreen() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Admin: User Management ────────────────────────────────────────────────────
+
+function AdminUsersScreen() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadUsers = async () => {
+    const rows = await fsRunQuery({
+      from: [{ collectionId: 'users' }],
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
+      limit: 100,
+    });
+    setUsers(rows);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadUsers(); }, []);
+
+  const setApproved = async (uid, val) => {
+    await fsPatch(`users/${uid}`, { approved: val });
+    setUsers(prev => prev.map(u => u.id === uid ? { ...u, approved: val } : u));
+  };
+
+  const setRole = async (uid, role) => {
+    await fsPatch(`users/${uid}`, { role });
+    setUsers(prev => prev.map(u => u.id === uid ? { ...u, role } : u));
+  };
+
+  if (loading) return <div className="p-8 text-center text-slate-400">กำลังโหลด...</div>;
+
+  return (
+    <div className="px-4 pt-4 pb-8 space-y-3">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">จัดการสมาชิก ({users.length} คน)</p>
+      {users.length === 0 && <p className="text-slate-300 text-center py-12">ยังไม่มีสมาชิก</p>}
+      {users.map(u => (
+        <div key={u.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+          <div className="flex justify-between items-start mb-3">
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-slate-800 truncate">{u.name || '—'}</p>
+              <p className="text-xs text-slate-400 truncate">{u.email}</p>
+            </div>
+            <div className="flex items-center gap-1 ml-2 shrink-0">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                {u.role === 'admin' ? 'แอดมิน' : 'สตาฟ'}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-600'}`}>
+                {u.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {!u.approved
+              ? <button onClick={() => setApproved(u.id, true)}
+                  className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold active:scale-95">✓ อนุมัติ</button>
+              : <button onClick={() => setApproved(u.id, false)}
+                  className="flex-1 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold active:scale-95">✗ ระงับ</button>
+            }
+            <button onClick={() => setRole(u.id, u.role === 'admin' ? 'staff' : 'admin')}
+              className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold active:scale-95">
+              {u.role === 'admin' ? '→ สตาฟ' : '→ แอดมิน'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Admin: Product Settings ───────────────────────────────────────────────────
+
+function ProductSettingsScreen() {
+  const defaultPrices = { large: 1450, medium: 1100, small: 850 };
+  const [prices, setPrices] = useState(defaultPrices);
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash]   = useState('');
+
+  useEffect(() => {
+    fetch(`${_FS}/productSettings/shrimp`)
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!j?.fields) return;
+        const p = {};
+        ['large','medium','small'].forEach(k => {
+          const v = j.fields[k];
+          if (v) p[k] = parseInt(v.integerValue ?? v.doubleValue ?? defaultPrices[k]);
+        });
+        if (Object.keys(p).length) setPrices(prev => ({ ...prev, ...p }));
+      })
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const fields = _fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
+      const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
+      await fetch(`${_FS}/productSettings/shrimp?${qs}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      });
+      setFlash('✅ บันทึกราคาแล้ว');
+    } catch { setFlash('⚠️ บันทึกไม่สำเร็จ'); }
+    setSaving(false);
+    setTimeout(() => setFlash(''), 2500);
+  };
+
+  return (
+    <div className="px-4 pt-4 pb-8 space-y-4">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">ตั้งค่าราคาสินค้า</p>
+      {flash && <p className="text-center text-sm font-bold py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">{flash}</p>}
+      {PRODUCTS.filter(p => p.type === 'live').map(p => (
+        <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-bold text-slate-800">{p.emoji} {p.name}</p>
+              <p className="text-xs text-slate-400">ราคาต่อกิโลกรัม</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-bold">฿</span>
+              <input type="number" inputMode="numeric"
+                value={prices[p.id]}
+                onChange={e => setPrices(prev => ({ ...prev, [p.id]: parseInt(e.target.value) || 0 }))}
+                className="w-24 text-right bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 text-lg font-black text-slate-800 focus:outline-none focus:border-blue-400" />
+            </div>
+          </div>
+        </div>
+      ))}
+      <button onClick={save} disabled={saving}
+        className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black text-base shadow-lg active:scale-95 disabled:opacity-50">
+        {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกราคา'}
+      </button>
     </div>
   );
 }
