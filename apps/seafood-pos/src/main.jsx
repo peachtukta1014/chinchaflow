@@ -92,45 +92,37 @@ function useVoice(onText) {
 }
 
 // ─── Voice command parser (regex fallback) ───────────────────────────────────
-// "ตาจุ้ย 1 กุ้งเล็ก 3 โล" → { customerId:'c2', productId:'small', weight:'3' }
+// Returns array of { customerId, productId, weight } — supports multi-order in one utterance
 function parseVoice(text) {
-  const THAI_NUM = { ศูนย์:'0',หนึ่ง:'1',สอง:'2',สาม:'3',สี่:'4',ห้า:'5',หก:'6',เจ็ด:'7',แปด:'8',เก้า:'9',ครึ่ง:'0.5' };
+  const THAI_NUM = { 'ศูนย์':'0','หนึ่ง':'1','สอง':'2','สาม':'3','สี่':'4','ห้า':'5','หก':'6','เจ็ด':'7','แปด':'8','เก้า':'9','ครึ่ง':'0.5' };
   let t = text;
   Object.entries(THAI_NUM).forEach(([k,v]) => { t = t.replaceAll(k, v); });
-  const result = { customerId: null, productId: null, weight: null };
-  const sorted = [...CUSTOMERS].sort((a,b) => b.name.length - a.name.length);
-  for (const c of sorted) {
+  const orders = [];
+  const foundCustomers = [];
+  CUSTOMERS.forEach(c => {
     let cn = c.name;
     Object.entries(THAI_NUM).forEach(([k,v]) => { cn = cn.replaceAll(k, v); });
-    if (t.includes(cn)) { result.customerId = c.id; t = t.replace(cn, ' '); break; }
-    if (text.includes(c.name)) { result.customerId = c.id; t = t.replace(c.name, ' '); break; }
+    let idx = t.indexOf(c.name);
+    if (idx === -1 && t.includes(cn)) idx = t.indexOf(cn);
+    if (idx !== -1) foundCustomers.push({ id: c.id, name: c.name, index: idx });
+  });
+  foundCustomers.sort((a, b) => a.index - b.index);
+  for (let i = 0; i < foundCustomers.length; i++) {
+    const cur = foundCustomers[i];
+    const endIndex = (i + 1 < foundCustomers.length) ? foundCustomers[i + 1].index : t.length;
+    const seg = t.substring(cur.index, endIndex);
+    let productId = null;
+    if (/ใหญ่/.test(seg)) productId = 'large';
+    else if (/กลาง/.test(seg)) productId = 'medium';
+    else if (/เล็ก|จิ๋ว/.test(seg)) productId = 'small';
+    else if (/ตาย|น็อค/.test(seg)) productId = 'dead';
+    let weight = null;
+    const mUnit = seg.match(/(\d+(?:\.\d+)?)\s*(โล|กก|กิโล)/);
+    if (mUnit) { weight = mUnit[1]; }
+    else { const nums = seg.match(/\d+(?:\.\d+)?/g) || []; if (nums.length) weight = nums[nums.length - 1]; }
+    if (productId && weight) orders.push({ customerId: cur.id, productId, weight });
   }
-  if (/ใหญ่/.test(text))            result.productId = 'large';
-  else if (/กลาง/.test(text))       result.productId = 'medium';
-  else if (/เล็ก|จิ๋ว/.test(text))  result.productId = 'small';
-  else if (/ตาย/.test(text))        result.productId = 'dead';
-  const nums = t.match(/\d+(?:\.\d+)?/g) || [];
-  const withUnit = nums.find(n => { const i = t.indexOf(n); return /โล|กก|กิโล/.test(t.slice(i + n.length, i + n.length + 6)); });
-  if (withUnit) result.weight = withUnit;
-  else if (nums.length) result.weight = nums[nums.length - 1];
-  return result;
-}
-
-// ─── Gemini voice parser (calls backend, falls back to regex) ────────────────
-async function parseVoiceWithGemini(text) {
-  try {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 5000);
-    const resp = await fetch('/api/gemini-voice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: ctrl.signal,
-      body: JSON.stringify({ text, customers: CUSTOMERS }),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return data.success ? data.result : null;
-  } catch { return null; }
+  return orders;
 }
 
 // ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
@@ -651,21 +643,29 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [voiceResult, setVoiceResult] = useState('');
   const voiceTimerRef = useRef(null);
 
-  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice(async (text) => {
+  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice((text) => {
     setVoiceResult(text);
     clearTimeout(voiceTimerRef.current);
     voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 4000);
-
-    let p = await parseVoiceWithGemini(text);
-    if (!p) p = parseVoice(text);
-
-    if (p.customerId) setSelectedCustomer(p.customerId);
-    if (p.productId)  handleProductChange(p.productId);
-    if (p.weight) {
-      if (!p.productId && inputMode === 'price') setCustomPrice(p.weight);
-      else setWeight(p.weight);
-    }
-    if (!p.customerId && !p.productId && !p.weight) {
+    const parsedOrders = parseVoice(text);
+    const complete = parsedOrders.filter(o => o.customerId && o.productId && o.weight);
+    if (complete.length > 0) {
+      setSelectedCustomer(complete[0].customerId);
+      setCart(prev => [...prev, ...complete.map(o => {
+        const prod = PRODUCTS.find(p => p.id === o.productId);
+        const w = parseFloat(o.weight) || 0;
+        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * prod.price;
+        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : prod.price, total, note: '' };
+      })]);
+    } else if (parsedOrders.length > 0) {
+      const first = parsedOrders[0];
+      if (first.customerId) setSelectedCustomer(first.customerId);
+      if (first.productId) handleProductChange(first.productId);
+      if (first.weight) {
+        const prod = first.productId ? PRODUCTS.find(p => p.id === first.productId) : null;
+        if (prod?.type === 'dead') setCustomPrice(first.weight); else setWeight(first.weight);
+      }
+    } else {
       const m = text.match(/\d+(?:\.\d+)?/);
       if (m) { if (inputMode === 'weight') setWeight(m[0]); else setCustomPrice(m[0]); }
     }
@@ -676,38 +676,12 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     if (!file) return;
     setPhotoUploading(true);
     try {
-      // Upload to Storage
       if (storage) {
         const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
         await uploadBytes(r, file);
         setPhotoUrl(await getDownloadURL(r));
       }
-
-      // Gemini OCR via backend: read bill → auto-fill weight & price
-      try {
-        const toBase64 = (f) => new Promise((res, rej) => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result.split(',')[1]);
-          reader.onerror = rej;
-          reader.readAsDataURL(f);
-        });
-        const b64     = await toBase64(file);
-        const ocrResp = await fetch('/api/gemini-ocr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: b64, mimeType: file.type || 'image/jpeg' }),
-        });
-        if (ocrResp.ok) {
-          const ocrData = await ocrResp.json();
-          const match   = (ocrData.text || '').match(/\{[\s\S]*\}/);
-          if (match) {
-            const { weight: w, pricePerKg: p } = JSON.parse(match[0]);
-            if (w != null && !isNaN(w)) setWeight(String(w));
-            if (p != null && !isNaN(p)) setCustomPrice(String(p));
-          }
-        }
-      } catch { /* OCR is best-effort */ }
-    } catch { /* storage or Gemini may not be available */ }
+    } catch { }
     finally { setPhotoUploading(false); }
   };
 
