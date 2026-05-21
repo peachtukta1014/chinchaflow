@@ -39,7 +39,7 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions --project chincha-eeed6 --non-interactive
+          firebase deploy --only functions --project chincha-eeed6 --non-interactive --force
 
   # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
   deploy_shrimp:
