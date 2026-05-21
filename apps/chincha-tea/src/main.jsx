@@ -99,16 +99,22 @@ const T = {
 // ─── Menu Data ────────────────────────────────────────────────────────────────
 
 const MENU = [
-  { id:'thai-tea',    key:'thaiTea',    basePrice:30, emoji:'🧋', bg:'bg-orange-50',  border:'border-orange-200'  },
-  { id:'green-tea',   key:'greenTea',   basePrice:30, emoji:'🍵', bg:'bg-green-50',   border:'border-green-200'   },
-  { id:'coffee',      key:'coffee',     basePrice:35, emoji:'☕', bg:'bg-amber-50',   border:'border-amber-200'   },
-  { id:'thai-coffee', key:'thaiCoffee', basePrice:35, emoji:'🥤', bg:'bg-yellow-50',  border:'border-yellow-200'  },
-  { id:'milk',        key:'milk',       basePrice:25, emoji:'🥛', bg:'bg-sky-50',     border:'border-sky-200'     },
-  { id:'lemon-tea',   key:'lemonTea',   basePrice:30, emoji:'🍋', bg:'bg-lime-50',    border:'border-lime-200'    },
-  { id:'matcha',      key:'matcha',     basePrice:35, emoji:'🍃', bg:'bg-emerald-50', border:'border-emerald-200' },
-  { id:'cocoa',       key:'cocoa',      basePrice:35, emoji:'🍫', bg:'bg-stone-100',  border:'border-stone-300'   },
-  { id:'taro',        key:'taro',       basePrice:50, emoji:'🫐', bg:'bg-purple-50',  border:'border-purple-200'  },
-  { id:'strawberry',  key:'strawberry', basePrice:50, emoji:'🍓', bg:'bg-pink-50',    border:'border-pink-200'    },
+  { id:'thai-tea',    key:'thaiTea',    nameEn:'Thai Tea',         basePrice:30, tag:'ชาดี',      star:true,  emoji:'🧋', bg:'bg-orange-50',  border:'border-orange-200'  },
+  { id:'green-tea',   key:'greenTea',   nameEn:'Green Tea',        basePrice:30, tag:'เย็น/ร้อน', star:false, emoji:'🍵', bg:'bg-green-50',   border:'border-green-200'   },
+  { id:'lemon-tea',   key:'lemonTea',   nameEn:'Lemon Tea',        basePrice:30, tag:'เส้น',      star:false, emoji:'🍋', bg:'bg-lime-50',    border:'border-lime-200'    },
+  { id:'matcha',      key:'matcha',     nameEn:'Matcha',           basePrice:35, tag:'พรีเมียม',  star:true,  emoji:'🍃', bg:'bg-emerald-50', border:'border-emerald-200' },
+  { id:'coffee',      key:'coffee',     nameEn:'Coffee',           basePrice:35, tag:'ยอดนิยม',   star:false, emoji:'☕', bg:'bg-amber-50',   border:'border-amber-200'   },
+  { id:'thai-coffee', key:'thaiCoffee', nameEn:'Thai Iced Coffee', basePrice:35, tag:'เย็น',      star:false, emoji:'🥤', bg:'bg-yellow-50',  border:'border-yellow-200'  },
+  { id:'milk',        key:'milk',       nameEn:'Fresh Milk',       basePrice:25, tag:'นมสด',      star:false, emoji:'🥛', bg:'bg-sky-50',     border:'border-sky-200'     },
+  { id:'cocoa',       key:'cocoa',      nameEn:'Cocoa',            basePrice:35, tag:'ช็อกโก',    star:false, emoji:'🍫', bg:'bg-stone-100',  border:'border-stone-300'   },
+  { id:'taro',        key:'taro',       nameEn:'Taro Blend',       basePrice:50, tag:'พิเศษ',     star:true,  emoji:'🫐', bg:'bg-purple-50',  border:'border-purple-200'  },
+  { id:'strawberry',  key:'strawberry', nameEn:'Strawberry Blend', basePrice:50, tag:'ซีซั่น',    star:true,  emoji:'🍓', bg:'bg-pink-50',    border:'border-pink-200'    },
+];
+
+const MENU_CATEGORIES = [
+  { id:'tea',   label:'ชาร้อน / ชาเย็น', labelEn:'TEA',   accent:'#c87941', accentBg:'#fff5eb', itemIds:['thai-tea','green-tea','lemon-tea','matcha']       },
+  { id:'milk',  label:'ชานม / กาแฟ',     labelEn:'MILK',  accent:'#4a7a5a', accentBg:'#edf7f0', itemIds:['coffee','thai-coffee','milk','cocoa']             },
+  { id:'fruit', label:'น้ำผลไม้ปั่น',    labelEn:'FRUIT', accent:'#b94a6a', accentBg:'#fdeef2', itemIds:['taro','strawberry']                               },
 ];
 
 const SIZES = [
@@ -253,12 +259,14 @@ function LoginScreen({ onLogin, lang, setLang }) {
 
 function App() {
   const { lang, setLang, t } = useLang();
-  const [member, setMember] = useState(undefined);
-  const [tab, setTab]       = useState('order');
-  const [cart, setCart]     = useState([]);
-  const [modal, setModal]   = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [member, setMember]     = useState(undefined);
+  const [tab, setTab]           = useState('order');
+  const [cart, setCart]         = useState([]);
+  const [modal, setModal]       = useState(null);
+  const [orders, setOrders]     = useState([]);
+  const [saving, setSaving]     = useState(false);
+  const [search, setSearch]     = useState('');
+  const [showCart, setShowCart] = useState(false);
 
   useEffect(() => {
     const s = getSession();
@@ -391,63 +399,45 @@ function App() {
 
         {/* ── ORDER TAB ─────────────────────────────────────────────── */}
         {tab === 'order' && (
-          <div className="px-4 pb-6">
-            <p className="text-[11px] font-bold text-stone-400 mt-3 mb-2 tracking-widest uppercase">{t('menu')}</p>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              {MENU.map(item => (
-                <button key={item.id} onClick={() => setModal(item)}
-                  className={`${item.bg} border-2 ${item.border} rounded-3xl p-4 text-left active:scale-95 transition-all shadow-sm`}>
-                  <div className="text-4xl mb-2">{item.emoji}</div>
-                  <p className="font-black text-stone-800 text-sm">{t(item.key)}</p>
-                  <p className="text-stone-500 text-sm font-bold mt-0.5">฿{item.basePrice}</p>
-                </button>
-              ))}
+          <div className="pb-32">
+            {/* Search */}
+            <div className="px-4 pt-3 pb-1">
+              <div className="relative">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+                </svg>
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="ค้นหาเมนู..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-stone-100 text-sm text-stone-700 outline-none border-2 border-transparent focus:border-amber-300 transition-colors"
+                />
+              </div>
             </div>
 
-            {cart.length > 0 && (
-              <div className="bg-white rounded-3xl shadow-sm p-4 border border-stone-200">
-                <p className="font-bold text-stone-600 text-xs mb-3 uppercase tracking-wide">{t('items')}: {cart.length}</p>
-                <div className="space-y-2 mb-4">
-                  {cart.map(item => (
-                    <div key={item.cartId} className="flex justify-between items-start pb-2 border-b border-stone-100">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-stone-800 text-sm">{item.emoji} {t(item.key)}</p>
-                        <p className="text-[11px] text-stone-400 mt-0.5">
-                          {item.size}
-                          {item.toppings?.length > 0 ? ` · ${item.toppings.map(tp => tp.label).join(', ')}` : ''}
-                          {` · ×${item.qty}`}
-                          {item.note ? <span className="text-orange-500 ml-1">*{item.note}</span> : null}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-3 shrink-0">
-                        <p className="font-black text-sm" style={{ color:'#6b3a2a' }}>฿{item.price * item.qty}</p>
-                        <button onClick={() => removeCart(item.cartId)}
-                          className="w-9 h-9 rounded-full bg-red-50 text-red-400 font-black flex items-center justify-center active:scale-90 text-base">×</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wide">{t('total')}</p>
-                    <p className="text-4xl font-black leading-none mt-0.5" style={{ color:'#3d1f0f' }}>฿{cartTotal.toLocaleString()}</p>
-                    <p className="text-[10px] text-stone-400 mt-1">{cart.reduce((s,i) => s + i.qty, 0)} {t('items')}</p>
+            {/* Category sections */}
+            {MENU_CATEGORIES.map(cat => {
+              const kw = search.trim().toLowerCase();
+              const catItems = MENU.filter(m =>
+                cat.itemIds.includes(m.id) &&
+                (!kw || t(m.key).toLowerCase().includes(kw) || m.nameEn.toLowerCase().includes(kw))
+              );
+              if (!catItems.length) return null;
+              return (
+                <div key={cat.id} className="px-4 mt-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-px flex-1 bg-stone-200" />
+                    <p className="text-[11px] font-black tracking-widest whitespace-nowrap" style={{ color: cat.accent }}>
+                      {cat.label}<span className="font-light text-stone-300 ml-2">{cat.labelEn}</span>
+                    </p>
+                    <div className="h-px flex-1 bg-stone-200" />
                   </div>
-                  <button onClick={saveOrder} disabled={saving}
-                    className="text-white font-black px-7 py-3.5 rounded-2xl shadow-lg active:scale-95 disabled:opacity-60 text-base"
-                    style={{ background:'#3d1f0f' }}>
-                    {saving ? '...' : t('save')}
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    {catItems.map(item => (
+                      <MenuCard key={item.id} item={item} cat={cat} t={t} onAdd={() => setModal(item)} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {cart.length === 0 && (
-              <div className="text-center py-10 text-stone-300">
-                <p className="text-6xl mb-3">🧋</p>
-                <p className="font-bold text-sm">{t('noOrders')}</p>
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
 
@@ -492,11 +482,113 @@ function App() {
       {/* Customize Modal */}
       {modal && <CustomizeModal item={modal} t={t} onAdd={addToCart} onClose={() => setModal(null)} />}
 
+      {/* Cart bottom bar */}
+      {tab === 'order' && cart.length > 0 && (
+        <div className="z-20 shrink-0 px-4 pb-4 pt-2 bg-transparent">
+          <button onClick={() => setShowCart(true)}
+            className="w-full flex items-center justify-between px-5 py-3.5 rounded-2xl shadow-xl text-white active:scale-[0.98] transition-transform"
+            style={{ background:'#3d1f0f' }}>
+            <div>
+              <p className="text-[10px] text-amber-600 font-bold leading-none mb-0.5">ยอดรวม</p>
+              <p className="text-xl font-black leading-none">฿{cartTotal.toLocaleString()}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-amber-500">{cart.reduce((s,i) => s+i.qty, 0)} แก้ว</span>
+              <span className="font-bold text-sm bg-white/20 px-3 py-1 rounded-xl">ดูตะกร้า →</span>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Cart sheet */}
+      {showCart && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setShowCart(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl"
+            style={{ paddingBottom:'max(1.5rem,env(safe-area-inset-bottom))' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-stone-200 rounded-full mx-auto mt-3 mb-4" />
+            <div className="px-5">
+              <p className="font-black text-stone-800 mb-3">{t('items')} · {cart.length}</p>
+              <div className="space-y-2 max-h-64 overflow-y-auto mb-4" style={{ scrollbarWidth:'none' }}>
+                {cart.map(item => (
+                  <div key={item.cartId} className="flex justify-between items-start pb-2 border-b border-stone-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-stone-800 text-sm">{item.emoji} {t(item.key)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">
+                        {item.size}
+                        {item.toppings?.length > 0 ? ` · ${item.toppings.map(tp => tp.label).join(', ')}` : ''}
+                        {` · ×${item.qty}`}
+                        {item.note ? <span className="text-orange-500 ml-1">*{item.note}</span> : null}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                      <p className="font-black text-sm" style={{ color:'#6b3a2a' }}>฿{item.price * item.qty}</p>
+                      <button onClick={() => removeCart(item.cartId)}
+                        className="w-8 h-8 rounded-full bg-red-50 text-red-400 font-black flex items-center justify-center active:scale-90">×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-stone-100">
+                <div>
+                  <p className="text-xs text-stone-400 font-bold">{t('total')}</p>
+                  <p className="text-3xl font-black leading-none" style={{ color:'#3d1f0f' }}>฿{cartTotal.toLocaleString()}</p>
+                </div>
+                <button onClick={() => { saveOrder(); setShowCart(false); }} disabled={saving}
+                  className="px-8 py-3.5 rounded-2xl font-black text-white text-base shadow-lg active:scale-95 disabled:opacity-60"
+                  style={{ background:'#3d1f0f' }}>
+                  {saving ? '⏳' : t('save')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         body { background: #fdf6f0; }
         ::-webkit-scrollbar { display: none; }
+        @keyframes ripple-anim { from { transform:scale(0); opacity:0.5; } to { transform:scale(4); opacity:0; } }
+        .ripple-span { animation: ripple-anim 0.5s ease-out forwards; }
       `}</style>
     </div>
+  );
+}
+
+// ─── Menu Card ────────────────────────────────────────────────────────────────
+
+function MenuCard({ item, cat, t, onAdd }) {
+  const [ripples, setRipples] = useState([]);
+  const handleClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const id = Date.now();
+    setRipples(prev => [...prev, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+    setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 500);
+    onAdd();
+  };
+  return (
+    <button onClick={handleClick}
+      className="relative overflow-hidden text-left bg-white rounded-2xl border border-stone-100 p-3.5 shadow-sm active:scale-95 transition-transform">
+      {ripples.map(r => (
+        <span key={r.id} className="ripple-span absolute rounded-full pointer-events-none"
+          style={{ left: r.x - 40, top: r.y - 40, width: 80, height: 80, background: cat.accent + '33' }} />
+      ))}
+      {item.star && <span className="absolute top-2.5 right-2.5 text-amber-400 text-xs leading-none">★</span>}
+      <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 leading-tight"
+        style={{ background: cat.accentBg, color: cat.accent }}>
+        {item.tag}
+      </span>
+      <p className="font-black text-stone-800 text-sm leading-tight">{t(item.key)}</p>
+      <p className="text-[10px] text-stone-400 mb-2 leading-tight">{item.nameEn}</p>
+      <div className="flex items-center justify-between mt-1">
+        <div>
+          <span className="font-black text-sm" style={{ color:'#3d1f0f' }}>฿{item.basePrice}</span>
+          <span className="text-[10px] text-stone-300 ml-1">~{item.basePrice + 15}</span>
+        </div>
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-base shrink-0"
+          style={{ background: cat.accent }}>+</div>
+      </div>
+    </button>
   );
 }
 
