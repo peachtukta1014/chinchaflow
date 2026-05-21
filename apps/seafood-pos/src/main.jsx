@@ -61,10 +61,7 @@ const PAY = [
 ];
 
 // ─── Firestore REST helpers (bypass SDK auth — same pattern as login) ─────────
-// Sales/stock/members → default database (seafood shop's own data)
-// lineOrders         → chincha database (written there by LINE webhook)
-const _FS       = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-const _CHINCHA  = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/chincha/documents`;
+const _FS = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 function _fsVal(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === 'boolean') return { booleanValue: v };
@@ -105,7 +102,7 @@ function _fromFsVal(v) {
   return null;
 }
 async function fsRunQuery(structuredQuery) {
-  const r = await fetch(`${_CHINCHA}:runQuery`, {
+  const r = await fetch(`${_FS}:runQuery`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ structuredQuery }),
   });
@@ -115,15 +112,6 @@ async function fsRunQuery(structuredQuery) {
     const parts = row.document.name.split('/');
     return { id: parts[parts.length - 1], ...Object.fromEntries(Object.entries(row.document.fields || {}).map(([k,v]) => [k, _fromFsVal(v)])) };
   });
-}
-async function fsPatchChincha(path, data) {
-  const fields = _fsObj(data);
-  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  const r = await fetch(`${_CHINCHA}/${path}?${qs}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields }),
-  });
-  if (!r.ok) throw new Error(`Firestore chincha /${path} PATCH failed (HTTP ${r.status})`);
 }
 async function fsIncrementDebt(customerId, meta, delta) {
   let current = 0;
@@ -1416,7 +1404,7 @@ function LineOrdersScreen() {
   }, []);
 
   const markDone = (id) => {
-    fsPatchChincha(`lineOrders/${id}`, { status: 'done' });
+    fsPatch(`lineOrders/${id}`, { status: 'done' });
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' } : o));
   };
 
