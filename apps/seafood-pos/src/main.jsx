@@ -730,11 +730,12 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
       timestamp: new Date().toLocaleTimeString('th-TH'),
       recordedBy: user.name,
     };
-    if (isFirebaseReady && db) {
-      try {
-        setSaving(true);
-        const dateKey = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD" partition key
-        await addDoc(collection(db, 'sales'), {
+    setSaving(true);
+    try {
+      if (isFirebaseReady && db) {
+        const dateKey = new Date().toISOString().split('T')[0];
+        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+        await withTimeout(addDoc(collection(db, 'sales'), {
           ...billData,
           dateKey,
           items: cart.map(i => ({
@@ -742,28 +743,32 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
             weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
           })),
           createdAt: serverTimestamp(), source: 'koseafood-pos',
-        });
+        }));
         if (remaining > 0) {
-          await setDoc(doc(db, 'customerDebts', selectedCustomer), {
+          await withTimeout(setDoc(doc(db, 'customerDebts', selectedCustomer), {
             customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
             totalDebt: increment(remaining),
             lastBillNo: billNoRef.current,
             lastUpdated: serverTimestamp(),
-          }, { merge: true });
+          }, { merge: true }));
         }
-      } catch (err) { console.error(err); }
-      finally { setSaving(false); }
+      }
+      let liveD = 0, deadD = 0;
+      cart.forEach(i => { if (i.type === 'dead') deadD += i.weight; else liveD += i.weight; });
+      updateMainStock(Math.max(0, stock.live - liveD), Math.max(0, stock.dead - deadD));
+      onSaveBill(billData);
+      const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
+      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
+      setCart([]); setSelectedCustomer('general');
+      setPaymentType('cash'); setPaidAmount('');
+      setPhotoUrl(null);
+      billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setSaving(false);
     }
-    let liveD = 0, deadD = 0;
-    cart.forEach(i => { if (i.type === 'dead') deadD += i.weight; else liveD += i.weight; });
-    updateMainStock(Math.max(0, stock.live - liveD), Math.max(0, stock.dead - deadD));
-    onSaveBill(billData);
-    const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
-    alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
-    setCart([]); setSelectedCustomer('general');
-    setPaymentType('cash'); setPaidAmount('');
-    setPhotoUrl(null);
-    billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
   };
 
   const groupedCustomers = CUSTOMERS.reduce((acc, c) => {
@@ -971,22 +976,27 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
   const handleReceive = async () => {
     if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
-    if (isFirebaseReady && db) {
-      try {
-        setSaving(true);
-        await addDoc(collection(db, 'stockBatches'), {
+    setSaving(true);
+    try {
+      if (isFirebaseReady && db) {
+        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+        await withTimeout(addDoc(collection(db, 'stockBatches'), {
           purchaseDate: serverTimestamp(),
           liveKg, deadKg, costPerKg, transport,
           totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
           remainingLiveKg: liveKg, remainingDeadKg: deadKg,
           note: rcvNote,
-        });
-      } catch (err) { console.error(err); }
-      finally { setSaving(false); }
+        }));
+      }
+      updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+      alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
+      setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setSaving(false);
     }
-    updateMainStock(stock.live + liveKg, stock.dead + deadKg);
-    alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
-    setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
   };
 
   const handleDead = () => {
