@@ -124,32 +124,6 @@ const TOPPINGS = [
   { id:'popping',     label:'ไข่มุกป๊อบ',  price:15 },
 ];
 
-// ─── Restock Static Data ──────────────────────────────────────────────────────
-
-const RESTOCK_ITEMS = [
-  {
-    category: 'เครื่องปรุง & วัตถุดิบ',
-    emoji: '🧂',
-    items: [
-      { id: 'thai-tea-powder',    name: 'ชาไทย (ผง)',    emoji: '🧡' },
-      { id: 'fresh-milk',         name: 'นมสด (กล่อง)', emoji: '🥛' },
-      { id: 'lemon-powder',       name: 'มะนาวผง',       emoji: '🍋' },
-      { id: 'green-tea-powder',   name: 'ผงชาเขียว',     emoji: '🍵' },
-      { id: 'matcha-powder',      name: 'ผงมัทฉะ',       emoji: '🍃' },
-      { id: 'cocoa-powder',       name: 'โกโก้ (ผง)',    emoji: '🍫' },
-      { id: 'ground-coffee',      name: 'กาแฟคั่วบด',    emoji: '☕' },
-    ],
-  },
-  {
-    category: 'อุปกรณ์บรรจุภัณฑ์',
-    emoji: '📦',
-    items: [
-      { id: 'cup-22oz-95mm',      name: 'แก้ว (22oz) ปาก 95mm',     emoji: '🥤' },
-      { id: 'lid-95mm-semidome',  name: 'ฝากึ่งโดมตัดเรียบ 95mm',   emoji: '🫙' },
-      { id: 'bubble-straw',       name: 'หลอดไข่มุก',               emoji: '🫧' },
-    ],
-  },
-];
 
 // ─── useLang hook ─────────────────────────────────────────────────────────────
 
@@ -702,20 +676,11 @@ function SummaryTab({ orders, t }) {
 
 // ─── Restock Tab ─────────────────────────────────────────────────────────────
 
-function buildInitialRestockState() {
-  const s = {};
-  RESTOCK_ITEMS.forEach(cat => cat.items.forEach(item => {
-    s[item.id] = { status: 'normal', qty: 1 };
-  }));
-  return s;
-}
-
 function RestockTab({ member }) {
-  const [items,       setItems]       = useState(buildInitialRestockState);
-  const [customItems, setCustomItems] = useState([]);
-  const [customInput, setCustomInput] = useState('');
-  const [saving,      setSaving]      = useState(false);
-  const [flash,       setFlash]       = useState('');
+  const [items,  setItems]  = useState([]);
+  const [input,  setInput]  = useState('');
+  const [saving, setSaving] = useState(false);
+  const [flash,  setFlash]  = useState('');
 
   const STATUS_CFG = [
     { key: 'normal', label: 'ปกติ',      active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
@@ -723,53 +688,36 @@ function RestockTab({ member }) {
     { key: 'out',    label: 'หมดแล้ว',   active: 'bg-red-100 text-red-600 border-red-300'            },
   ];
 
-  const setStatus = (id, status) =>
-    setItems(prev => ({ ...prev, [id]: { ...prev[id], status } }));
-
-  const adjQty = (id, delta) =>
-    setItems(prev => ({ ...prev, [id]: { ...prev[id], qty: Math.max(1, (prev[id].qty||1) + delta) } }));
-
-  const addCustomItem = () => {
-    const name = customInput.trim();
+  const addItem = () => {
+    const name = input.trim();
     if (!name) return;
-    setCustomItems(prev => [...prev, { cid: Date.now(), name, qty: 1, status: 'out' }]);
-    setCustomInput('');
+    setItems(prev => [...prev, { cid: Date.now(), name, qty: 1, status: 'out' }]);
+    setInput('');
   };
 
-  const setCustomStatus = (cid, status) =>
-    setCustomItems(prev => prev.map(i => i.cid === cid ? { ...i, status } : i));
+  const setStatus = (cid, status) =>
+    setItems(prev => prev.map(i => i.cid === cid ? { ...i, status } : i));
 
-  const adjCustomQty = (cid, delta) =>
-    setCustomItems(prev => prev.map(i => i.cid === cid ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
+  const adjQty = (cid, delta) =>
+    setItems(prev => prev.map(i => i.cid === cid ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
 
-  const removeCustom = (cid) =>
-    setCustomItems(prev => prev.filter(i => i.cid !== cid));
+  const removeItem = (cid) =>
+    setItems(prev => prev.filter(i => i.cid !== cid));
 
   const handleSubmit = async () => {
+    if (!items.length) return;
     setSaving(true);
-    const payload = [];
-    RESTOCK_ITEMS.forEach(cat => cat.items.forEach(item => {
-      payload.push({
-        id: item.id, name: item.name, category: cat.category,
-        status: items[item.id]?.status || 'normal',
-        qty:    items[item.id]?.qty    || 1,
-      });
-    }));
-    customItems.forEach(ci => {
-      payload.push({ id: `custom-${ci.cid}`, name: ci.name, category: 'เพิ่มเติม', status: ci.status, qty: ci.qty });
-    });
     if (db) {
       try {
         await addDoc(collection(db, 'restock_requests'), {
           uid: member?.phone || 'unknown',
           createdBy: member?.name || 'ชินชา',
-          items: payload,
+          items: items.map(i => ({ name: i.name, qty: i.qty, status: i.status })),
           createdAt: serverTimestamp(),
         });
       } catch (e) { console.error(e); }
     }
-    setItems(buildInitialRestockState());
-    setCustomItems([]);
+    setItems([]);
     setSaving(false);
     setFlash('✅ ส่งรายการแล้ว!');
     setTimeout(() => setFlash(''), 3000);
@@ -783,101 +731,62 @@ function RestockTab({ member }) {
         </div>
       )}
 
-      {RESTOCK_ITEMS.map(cat => (
-        <div key={cat.category} className="mb-5">
-          <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-2">
-            {cat.emoji} {cat.category}
-          </p>
-          <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-stone-200 divide-y divide-stone-100">
-            {cat.items.map(item => {
-              const st  = items[item.id]?.status || 'normal';
-              const qty = items[item.id]?.qty    || 1;
-              return (
-                <div key={item.id} className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">{item.emoji}</span>
-                    <p className="flex-1 font-bold text-stone-800 text-sm leading-snug">{item.name}</p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => adjQty(item.id, -1)}
-                        className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
-                      <span className="w-5 text-center font-black text-stone-800 text-sm">{qty}</span>
-                      <button onClick={() => adjQty(item.id, +1)}
-                        className="w-7 h-7 rounded-full text-white font-bold text-sm flex items-center justify-center active:scale-90"
-                        style={{ background:'#6b3a2a' }}>+</button>
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {STATUS_CFG.map(s => (
-                      <button key={s.key} onClick={() => setStatus(item.id, s.key)}
-                        className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] border-2 transition-all ${
-                          st === s.key ? s.active : 'border-stone-200 text-stone-400 bg-white'
-                        }`}>
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {/* ── Custom items ── */}
-      <div className="mb-5">
-        <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-2">✏️ เพิ่มรายการเอง</p>
-
-        {/* Input row */}
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text" value={customInput} onChange={e => setCustomInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addCustomItem()}
-            placeholder="ชื่อสินค้า เช่น ไซรัปวานิลลา..."
-            className="flex-1 px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-amber-400 bg-white"
-          />
-          <button onClick={addCustomItem}
-            className="w-12 h-12 rounded-2xl font-black text-white text-xl flex items-center justify-center active:scale-90 shrink-0"
-            style={{ background:'#3d1f0f' }}>+</button>
-        </div>
-
-        {customItems.length > 0 && (
-          <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-stone-200 divide-y divide-stone-100">
-            {customItems.map(ci => (
-              <div key={ci.cid} className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">📝</span>
-                  <p className="flex-1 font-bold text-stone-800 text-sm">{ci.name}</p>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => adjCustomQty(ci.cid, -1)}
-                      className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
-                    <span className="w-5 text-center font-black text-stone-800 text-sm">{ci.qty}</span>
-                    <button onClick={() => adjCustomQty(ci.cid, +1)}
-                      className="w-7 h-7 rounded-full text-white font-bold text-sm flex items-center justify-center active:scale-90"
-                      style={{ background:'#6b3a2a' }}>+</button>
-                    <button onClick={() => removeCustom(ci.cid)}
-                      className="w-7 h-7 rounded-full bg-red-50 text-red-400 font-black text-base flex items-center justify-center active:scale-90 ml-1">×</button>
-                  </div>
-                </div>
-                <div className="flex gap-1.5">
-                  {STATUS_CFG.map(s => (
-                    <button key={s.key} onClick={() => setCustomStatus(ci.cid, s.key)}
-                      className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] border-2 transition-all ${
-                        ci.status === s.key ? s.active : 'border-stone-200 text-stone-400 bg-white'
-                      }`}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Input row */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text" value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addItem()}
+          placeholder="ชื่อสินค้า / အမည် / Item name..."
+          className="flex-1 px-4 py-3.5 rounded-2xl border-2 border-stone-200 text-sm text-stone-800 outline-none focus:border-amber-400 bg-white"
+        />
+        <button onClick={addItem}
+          className="w-14 h-14 rounded-2xl font-black text-white text-2xl flex items-center justify-center active:scale-90 shrink-0 shadow"
+          style={{ background:'#3d1f0f' }}>+</button>
       </div>
 
-      <button onClick={handleSubmit} disabled={saving}
-        className="w-full py-4 rounded-2xl font-black text-white text-base shadow-lg active:scale-95 disabled:opacity-60 transition-all"
+      {items.length > 0 && (
+        <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-stone-200 divide-y divide-stone-100 mb-4">
+          {items.map(item => (
+            <div key={item.cid} className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <p className="flex-1 font-bold text-stone-800 text-sm">{item.name}</p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => adjQty(item.cid, -1)}
+                    className="w-7 h-7 rounded-full bg-stone-100 text-stone-700 font-bold text-sm flex items-center justify-center active:scale-90">−</button>
+                  <span className="w-5 text-center font-black text-stone-800 text-sm">{item.qty}</span>
+                  <button onClick={() => adjQty(item.cid, +1)}
+                    className="w-7 h-7 rounded-full text-white font-bold text-sm flex items-center justify-center active:scale-90"
+                    style={{ background:'#6b3a2a' }}>+</button>
+                  <button onClick={() => removeItem(item.cid)}
+                    className="w-7 h-7 rounded-full bg-red-50 text-red-400 font-black text-base flex items-center justify-center active:scale-90 ml-1">×</button>
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                {STATUS_CFG.map(s => (
+                  <button key={s.key} onClick={() => setStatus(item.cid, s.key)}
+                    className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] border-2 transition-all ${
+                      item.status === s.key ? s.active : 'border-stone-200 text-stone-400 bg-white'
+                    }`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {items.length === 0 && (
+        <div className="text-center py-12 text-stone-300">
+          <p className="text-5xl mb-3">📋</p>
+          <p className="font-bold text-sm">พิมพ์ชื่อสินค้าแล้วกด +</p>
+        </div>
+      )}
+
+      <button onClick={handleSubmit} disabled={saving || !items.length}
+        className="w-full py-4 rounded-2xl font-black text-white text-base shadow-lg active:scale-95 disabled:opacity-40 transition-all"
         style={{ background:'#3d1f0f' }}>
-        {saving ? '⏳ กำลังส่ง...' : '📋 ส่งรายการสั่งของ'}
+        {saving ? '⏳ กำลังส่ง...' : `📋 ส่งรายการสั่งของ${items.length > 0 ? ` (${items.length})` : ''}`}
       </button>
     </div>
   );
