@@ -60,6 +60,45 @@ const PAY = [
   { id: 'installment', label: 'ผ่อน', cls: 'bg-purple-500'  },
 ];
 
+// ─── Firestore REST helpers (bypass SDK auth — same pattern as login) ─────────
+const _FS = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/chincha/documents`;
+function _fsVal(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'string') return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(_fsVal) } };
+  if (typeof v === 'object') return { mapValue: { fields: _fsObj(v) } };
+  return { nullValue: null };
+}
+function _fsObj(o) {
+  return Object.fromEntries(Object.entries(o).filter(([,v]) => v !== undefined).map(([k,v]) => [k, _fsVal(v)]));
+}
+async function fsPost(col, data) {
+  const r = await fetch(`${_FS}/${col}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: _fsObj(data) }),
+  });
+  if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
+}
+async function fsPatch(path, data) {
+  const fields = _fsObj(data);
+  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const r = await fetch(`${_FS}/${path}?${qs}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
+}
+async function fsIncrementDebt(customerId, meta, delta) {
+  let current = 0;
+  try {
+    const r = await fetch(`${_FS}/customerDebts/${customerId}`);
+    if (r.ok) { const j = await r.json(); const fv = j.fields?.totalDebt; current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0); }
+  } catch {}
+  return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });
+}
+
 // ─── Voice Hook ───────────────────────────────────────────────────────────────
 
 function useVoice(onText) {
@@ -732,25 +771,24 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     };
     setSaving(true);
     try {
-      if (isFirebaseReady && db) {
+      if (isFirebaseReady) {
         const dateKey = new Date().toISOString().split('T')[0];
+        const now = new Date().toISOString();
         const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(addDoc(collection(db, 'sales'), {
+        await withTimeout(fsPost('sales', {
           ...billData,
           dateKey,
           items: cart.map(i => ({
             productId: i.productId, productName: i.productName, type: i.type,
             weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
           })),
-          createdAt: serverTimestamp(), source: 'koseafood-pos',
+          createdAt: now, source: 'koseafood-pos',
         }));
         if (remaining > 0) {
-          await withTimeout(setDoc(doc(db, 'customerDebts', selectedCustomer), {
+          await withTimeout(fsIncrementDebt(selectedCustomer, {
             customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
-            totalDebt: increment(remaining),
-            lastBillNo: billNoRef.current,
-            lastUpdated: serverTimestamp(),
-          }, { merge: true }));
+            lastBillNo: billNoRef.current, lastUpdated: now,
+          }, remaining));
         }
       }
       let liveD = 0, deadD = 0;
@@ -978,10 +1016,10 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     setSaving(true);
     try {
-      if (isFirebaseReady && db) {
+      if (isFirebaseReady) {
         const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(addDoc(collection(db, 'stockBatches'), {
-          purchaseDate: serverTimestamp(),
+        await withTimeout(fsPost('stockBatches', {
+          purchaseDate: new Date().toISOString(),
           liveKg, deadKg, costPerKg, transport,
           totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
           remainingLiveKg: liveKg, remainingDeadKg: deadKg,

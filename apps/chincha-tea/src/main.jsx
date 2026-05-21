@@ -23,6 +23,59 @@ const fbApp   = fbReady ? initializeApp(fbConfig, 'chincha-tea') : null;
 const db      = fbApp ? getFirestore(fbApp, 'chincha') : null;
 const auth    = fbApp ? getAuth(fbApp) : null;
 
+// ─── Firestore REST helpers (bypass SDK auth issues) ─────────────────────────
+const _FS = `https://firestore.googleapis.com/v1/projects/${env.VITE_FIREBASE_PROJECT_ID}/databases/chincha/documents`;
+function _fsVal(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'string') return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(_fsVal) } };
+  if (typeof v === 'object') return { mapValue: { fields: _fsObj(v) } };
+  return { nullValue: null };
+}
+function _fsObj(o) {
+  return Object.fromEntries(Object.entries(o).filter(([,v]) => v !== undefined).map(([k,v]) => [k, _fsVal(v)]));
+}
+function _fromFsVal(v) {
+  if (!v || 'nullValue' in v) return null;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('integerValue' in v) return parseInt(v.integerValue, 10);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('stringValue' in v) return v.stringValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(_fromFsVal);
+  if ('mapValue' in v) return _fromFsFields(v.mapValue.fields || {});
+  return null;
+}
+function _fromFsFields(fields) {
+  return Object.fromEntries(Object.entries(fields).map(([k,v]) => [k, _fromFsVal(v)]));
+}
+async function fsPost(col, data) {
+  const r = await fetch(`${_FS}/${col}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: _fsObj(data) }),
+  });
+  if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
+}
+async function fsQueryOrders(dateKey) {
+  const r = await fetch(`${_FS}:runQuery`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: 'teaOrders' }],
+      where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+      limit: 100,
+    }}),
+  });
+  if (!r.ok) return [];
+  const rows = await r.json();
+  return rows.filter(row => row.document).map(row => {
+    const parts = row.document.name.split('/');
+    return { id: parts[parts.length - 1], ..._fromFsFields(row.document.fields || {}) };
+  });
+}
+
 // ─── Session management ───────────────────────────────────────────────────────
 
 const SESSION_KEY  = 'chincha-tea-session';
@@ -281,17 +334,15 @@ function App() {
     }
   }, []);
 
+  const dateKey = new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+  const refreshOrders = async () => {
+    const docs = await fsQueryOrders(dateKey);
+    setOrders(docs);
+  };
+
   useEffect(() => {
-    if (!db || !member) return;
-    const dateKey = new Date().toISOString().split('T')[0];
-    const q = query(collection(db, 'teaOrders'), where('dateKey','==',dateKey), orderBy('createdAt','desc'));
-    const unsub = onSnapshot(q, snap => {
-      setOrders(snap.docs.map(d => ({ id:d.id, ...d.data() })));
-    }, () => {
-      const q2 = query(collection(db, 'teaOrders'), orderBy('createdAt','desc'));
-      onSnapshot(q2, snap => setOrders(snap.docs.map(d => ({ id:d.id, ...d.data() })).slice(0,50)), () => {});
-    });
-    return unsub;
+    if (!member) return;
+    refreshOrders();
   }, [member]);
 
   const handleLogin = async (memberData) => {
@@ -313,15 +364,18 @@ function App() {
   const saveOrder = async () => {
     if (!cart.length) return;
     setSaving(true);
-    const dateKey = new Date().toISOString().split('T')[0];
-    if (db) {
-      try {
-        await addDoc(collection(db, 'teaOrders'), {
-          dateKey, items: cart, total: cartTotal,
-          createdBy: member?.name || 'ชินชา', lang,
-          createdAt: serverTimestamp(),
-        });
-      } catch (e) { console.error(e); }
+    try {
+      await fsPost('teaOrders', {
+        dateKey, items: cart, total: cartTotal,
+        createdBy: member?.name || 'ชินชา', lang,
+        createdAt: new Date().toISOString(),
+      });
+      await refreshOrders();
+    } catch (e) {
+      console.error(e);
+      alert('⚠️ บันทึกไม่สำเร็จ');
+      setSaving(false);
+      return;
     }
     alert(t('saved'));
     setCart([]);
@@ -799,16 +853,14 @@ function RestockTab({ member }) {
   const handleSubmit = async () => {
     if (!items.length) return;
     setSaving(true);
-    if (db) {
-      try {
-        await addDoc(collection(db, 'restock_requests'), {
-          uid: member?.phone || 'unknown',
-          createdBy: member?.name || 'ชินชา',
-          items: items.map(i => ({ name: i.name, qty: i.qty, status: i.status })),
-          createdAt: serverTimestamp(),
-        });
-      } catch (e) { console.error(e); }
-    }
+    try {
+      await fsPost('restock_requests', {
+        uid: member?.phone || 'unknown',
+        createdBy: member?.name || 'ชินชา',
+        items: items.map(i => ({ name: i.name, qty: i.qty, status: i.status })),
+        createdAt: new Date().toISOString(),
+      });
+    } catch (e) { console.error(e); }
     setItems([]);
     setSaving(false);
     setFlash('✅ ส่งรายการแล้ว!');
