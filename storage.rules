@@ -16,6 +16,13 @@ service firebase.storage {
     }
 
     // รูปบิลขายหน้าร้าน (seafood-pos)
+    match /billPhotos/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /billPhotos/{dateKey}/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
