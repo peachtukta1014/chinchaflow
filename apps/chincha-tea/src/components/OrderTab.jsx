@@ -1,20 +1,28 @@
 import { useCallback, useMemo, useState } from 'react';
 import { DRINK_CATEGORIES } from '../lib/constants';
-import { parseTeaVoice, useVoice, voiceLinesToCart } from '../lib/voiceOrder';
+import { parseTeaVoice, useVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
 import { MenuCard } from './MenuCard';
 import { CustomizeModal } from './CustomizeModal';
 
-export function OrderTab({ menuItems, toppingsList, t, onAddToCart, setModalItem, modalItem }) {
+export function OrderTab({ menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit, setModalItem, modalItem }) {
   const [search, setSearch] = useState('');
   const [voiceLog, setVoiceLog] = useState('');
 
   const onVoiceFinal = useCallback((text) => {
     setVoiceLog(text);
     const lines = parseTeaVoice(text, menuItems, toppingsList);
-    if (!lines.length) return;
     const cartLines = voiceLinesToCart(lines, t);
     cartLines.forEach((line) => onAddToCart(line));
-  }, [menuItems, toppingsList, t, onAddToCart]);
+
+    if (hasVoiceCommitCommand(text)) {
+      const hasItemsToCommit = canVoiceCommit || cartLines.length > 0;
+      if (!hasItemsToCommit) {
+        setVoiceLog(`${text} · ยังไม่มีรายการในตะกร้า`);
+        return;
+      }
+      onVoiceCommit?.({ pendingLines: cartLines, rawText: text });
+    }
+  }, [menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit]);
 
   const { listening, toggle, liveText } = useVoice(onVoiceFinal);
 
