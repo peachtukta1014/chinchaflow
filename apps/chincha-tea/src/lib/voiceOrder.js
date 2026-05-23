@@ -155,6 +155,8 @@ export function useVoice(onFinalText) {
   const [liveText, setLiveText] = useState('');
   const recRef = useRef(null);
   const wantListenRef = useRef(false);
+  const onFinalTextRef = useRef(onFinalText);
+  onFinalTextRef.current = onFinalText;
 
   const stop = useCallback(() => {
     wantListenRef.current = false;
@@ -181,7 +183,7 @@ export function useVoice(onFinalText) {
         if (e.results[i].isFinal) {
           const text = e.results[i][0].transcript.trim();
           setLiveText(text);
-          if (text) onFinalText(text);
+          if (text) onFinalTextRef.current(text);
         }
       }
     };
@@ -198,7 +200,7 @@ export function useVoice(onFinalText) {
     };
     rec.start();
     setListening(true);
-  }, [onFinalText]);
+  }, []);
 
   const toggle = useCallback(() => {
     if (listening) stop();

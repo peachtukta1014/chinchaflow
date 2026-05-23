@@ -113,20 +113,28 @@ export async function fsListCollection(col, pageSize = 200) {
 }
 
 export async function fsQueryOrders(dateKey) {
-  return fsRunQuery({
+  const docs = await fsRunQuery({
     from: [{ collectionId: 'teaOrders' }],
     where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
-    orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-    limit: 100,
+    limit: 200,
+  });
+  return docs.sort((a, b) => {
+    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
+    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
+    return tb.localeCompare(ta);
   });
 }
 
 export async function fsQueryExpenses(dateKey) {
-  return fsRunQuery({
+  const docs = await fsRunQuery({
     from: [{ collectionId: 'dailyExpenses' }],
     where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
-    orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
     limit: 100,
+  });
+  return docs.sort((a, b) => {
+    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
+    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
+    return ta.localeCompare(tb);
   });
 }
 

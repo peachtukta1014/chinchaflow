@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const env = import.meta.env;
@@ -19,5 +18,4 @@ export const fbReady = required.every((k) => Boolean(firebaseConfig[k]));
 
 export const fbApp = fbReady ? initializeApp(firebaseConfig, 'chincha-tea') : null;
 export const auth = fbApp ? getAuth(fbApp) : null;
-export const db = fbApp ? getFirestore(fbApp, 'chincha') : null;
 export const storage = fbApp ? getStorage(fbApp) : null;
