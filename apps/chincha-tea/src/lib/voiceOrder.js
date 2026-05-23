@@ -7,6 +7,8 @@ const THAI_NUM = {
   zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5',
 };
 
+const VOICE_COMMIT_RE = /(จบบิล|คิดเงิน|บันทึก(?:ออเดอร์)?|คอมมิท|confirm|checkout|save order)/i;
+
 const SWEET_PATTERNS = [
   { re: /ไม่หวาน|โนชูการ์|no\s*sugar|0\s*%|ศูนย์\s*เปอร์/, sweet: '0', label: '0%' },
   { re: /หวาน\s*(?:น้อย|25)|ยี่สิบห้า|25\s*%/, sweet: '25', label: '25%' },
@@ -40,6 +42,10 @@ function normalize(text) {
   return t;
 }
 
+export function hasVoiceCommitCommand(text) {
+  return VOICE_COMMIT_RE.test(text || '');
+}
+
 function buildMenuPatterns(menuItems) {
   return menuItems
     .filter((m) => m.active !== false)
@@ -58,10 +64,6 @@ function buildMenuPatterns(menuItems) {
     });
 }
 
-/**
- * Parse Thai/English mixed voice into cart line(s).
- * Returns [{ menuItem, qty, size, sweetLabel, iceId, toppings[], note }]
- */
 export function parseTeaVoice(rawText, menuItems, toppingsList) {
   const t = normalize(rawText);
   if (!t.trim()) return [];
@@ -104,9 +106,6 @@ export function parseTeaVoice(rawText, menuItems, toppingsList) {
     const toppingIds = new Set();
     for (const syn of TOPPING_SYNONYMS) {
       if (syn.re.test(chunk)) syn.ids.forEach((id) => toppingIds.add(id));
-    }
-    if (/(แอด|เพิ่ม|extra|add)\s*/i.test(chunk)) {
-      TOPPING_SYNONYMS.forEach((syn) => { if (syn.re.test(chunk)) syn.ids.forEach((id) => toppingIds.add(id)); });
     }
 
     const toppings = toppingsList.filter((tp) => toppingIds.has(tp.id));
