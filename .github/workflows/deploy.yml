@@ -23,13 +23,28 @@ jobs:
       - name: Install firebase-tools
         run: npm install -g firebase-tools
 
-      - name: Deploy Firestore rules & indexes
+      - name: Deploy Firestore rules & indexes (default database)
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          # Deploy rules + indexes for both (default) and chincha databases
-          # firestore.indexes.json no longer contains the problematic stockBatches index
           firebase deploy --only firestore --project chincha-eeed6 --non-interactive
+
+      - name: Deploy chincha database rules via Admin SDK
+        run: |
+          npm install --no-save firebase-admin
+          node - << 'EOF'
+          const admin = require('firebase-admin');
+          const fs = require('fs');
+          admin.initializeApp({
+            credential: admin.credential.cert(JSON.parse(fs.readFileSync('/tmp/sa.json', 'utf8'))),
+            projectId: 'chincha-eeed6',
+          });
+          const src = fs.readFileSync('firestore-chincha.rules', 'utf8');
+          admin.securityRules()
+            .releaseFirestoreRulesetFromSource(src, 'chincha')
+            .then((r) => { console.log('chincha rules deployed:', r.name); })
+            .catch((e) => { console.error('chincha rules error:', e.message); process.exit(1); });
+          EOF
 
   # ── 0b. Deploy Cloud Functions (LINE webhook) ─────────────────────────────────
   deploy_functions:
