@@ -245,10 +245,13 @@ function App() {
     if (auth) await signOut(auth).catch(() => {});
   };
 
-  const updateMainStock = (live, dead) => {
+  const updateMainStock = async (live, dead) => {
     const val = { live: Math.max(0, parseFloat(live.toFixed(3))), dead: Math.max(0, parseFloat(dead.toFixed(3))) };
     setStock(val);
-    if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
+    if (db) {
+      await setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() });
+    }
+    return val;
   };
 
   if (member === undefined) {
@@ -679,7 +682,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     setSelectedProduct(productId);
     const prod = PRODUCTS.find(p => p.id === productId);
     setWeight(''); setNote('');
-    if (prod.type === 'dead') { setCustomPrice(''); setInputMode('price'); }
+    if (prod.type === 'dead') { setCustomPrice(''); setInputMode('weight'); }
     else { setCustomPrice(priceOf(productId).toString()); setInputMode('weight'); }
   };
 
@@ -694,8 +697,8 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   };
 
   const addToCart = () => {
-    if (!isDeadShrimp && !weight) return alert('ใส่น้ำหนักก่อนนะครับ');
-    if (!customPrice) return alert('ใส่ราคาก่อนครับ');
+    if (!weight) return alert(isDeadShrimp ? 'ใส่น้ำหนักกุ้งตายก่อนนะครับ เพื่อให้ตัดสต๊อกถูกต้อง' : 'ใส่น้ำหนักก่อนนะครับ');
+    if (!customPrice) return alert(isDeadShrimp ? 'ใส่ยอดขายเหมาก่อนครับ' : 'ใส่ราคาก่อนครับ');
     setCart([...cart, {
       id: Date.now(), productId: activeProduct.id, productName: activeProduct.name,
       type: activeProduct.type, weight: parseFloat(weight) || 0,
@@ -749,7 +752,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
           }, remain));
         }
       }
-      updateMainStock(Math.max(0, stock.live - liveKg), Math.max(0, stock.dead - deadKg));
+      await updateMainStock(Math.max(0, stock.live - liveKg), Math.max(0, stock.dead - deadKg));
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
@@ -1074,7 +1077,7 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
           note: rcvNote,
         }));
       }
-      updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+      await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
       alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
@@ -1085,12 +1088,17 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
     }
   };
 
-  const handleDead = () => {
+  const handleDead = async () => {
     if (!deadWeight) return;
     const w = parseFloat(deadWeight);
     if (w > stock.live) return alert('ยอดกุ้งตายมากกว่ากุ้งเป็นครับ');
-    updateMainStock(stock.live - w, stock.dead + w);
-    alert('ย้ายยอดกุ้งตายสำเร็จ!'); setDeadWeight('');
+    try {
+      await updateMainStock(stock.live - w, stock.dead + w);
+      alert('ย้ายยอดกุ้งตายสำเร็จ!'); setDeadWeight('');
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ อัปเดตสต๊อกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    }
   };
 
   return (
