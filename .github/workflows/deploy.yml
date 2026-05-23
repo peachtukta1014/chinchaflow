@@ -89,19 +89,19 @@ jobs:
       - name: Enable Cloud Scheduler API
         run: gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6
 
-      - name: Deploy LINE webhooks (ไม่มี pubsub.schedule ใน codebase นี้)
+      - name: Deploy LINE webhooks (codebase default — ไม่มี Scheduler)
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only \
-            "functions:lineWebhook,functions:lineWebhookTea,functions:teaPushSummary" \
+          firebase deploy --only functions:default \
             --project chincha-eeed6 --non-interactive --force
 
-      - name: Deploy scheduled tea summary (codebase แยก)
+      - name: Deploy scheduled tea summary (codebase tea-scheduled)
+        continue-on-error: true
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions:tea-scheduled:teaDailyScheduledSummary \
+          firebase deploy --only functions:tea-scheduled \
             --project chincha-eeed6 --non-interactive --force
 
   # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
