@@ -2,6 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ─── Chincha Tea helpers ───────────────────────────────────────────────────
     function signedIn() {
       return request.auth != null;
     }
@@ -27,6 +28,21 @@ service cloud.firestore {
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
+
+    // ─── Seafood POS helpers ───────────────────────────────────────────────────
+    function shrimpUserData() {
+      return get(/databases/$(database)/documents/shrimp_users/$(request.auth.uid)).data;
+    }
+
+    function isApprovedShrimp() {
+      return signedIn() && shrimpUserData().approved == true;
+    }
+
+    function isAdminShrimp() {
+      return isApprovedShrimp() && shrimpUserData().role == 'admin';
+    }
+
+    // ─── Chincha Tea collections ───────────────────────────────────────────────
 
     match /users/{uid} {
       allow get: if isOwner(uid) || isAdmin();
@@ -66,6 +82,58 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ─── Seafood POS collections ───────────────────────────────────────────────
+
+    // Shrimp user profiles — own doc read/write; list for first-user/approval check
+    match /shrimp_users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if signedIn();
+      allow write: if signedIn() && (request.auth.uid == uid || isAdminShrimp());
+    }
+
+    // Sales — approved staff can read/create; admin can update/delete
+    match /sales/{docId} {
+      allow read, create: if isApprovedShrimp();
+      allow update, delete: if isAdminShrimp();
+    }
+
+    // Customer debts — staff read/create/update; admin delete
+    match /customerDebts/{docId} {
+      allow read, create, update: if isApprovedShrimp();
+      allow delete: if isAdminShrimp();
+    }
+
+    // Stock batches — staff read/create; admin update/delete
+    match /stockBatches/{docId} {
+      allow read, create: if isApprovedShrimp();
+      allow update, delete: if isAdminShrimp();
+    }
+
+    // Customers list — staff read/create/update; admin delete
+    match /customers/{docId} {
+      allow read, create, update: if isApprovedShrimp();
+      allow delete: if isAdminShrimp();
+    }
+
+    // Config (stock) — approved read; admin write
+    match /config/{docId} {
+      allow read: if isApprovedShrimp();
+      allow write: if isAdminShrimp();
+    }
+
+    // Product settings (shrimp prices) — approved read; admin write
+    match /productSettings/{docId} {
+      allow read: if isApprovedShrimp();
+      allow write: if isAdminShrimp();
+    }
+
+    // LINE orders — approved read/create; admin update/delete
+    match /lineOrders/{docId} {
+      allow read, create: if isApprovedShrimp();
+      allow update, delete: if isAdminShrimp();
+    }
+
+    // Deny everything else
     match /{document=**} {
       allow read, write: if false;
     }
