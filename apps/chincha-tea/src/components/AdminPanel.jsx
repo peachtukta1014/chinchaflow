@@ -11,6 +11,7 @@ import {
   fsQueryUsers,
   fsSetConfig,
 } from '../lib/firestoreRest';
+import { validateTeaLineTargets } from '../lib/lineIds';
 
 const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
 const DEFAULT_LINE_CONFIG = {
@@ -410,10 +411,16 @@ function LineSettingsSection({ t }) {
     : '(ตั้ง VITE_FIREBASE_PROJECT_ID)';
 
   const save = async () => {
+    const errKey = validateTeaLineTargets(form);
+    if (errKey) {
+      setFlash(`⚠️ ${t(errKey)}`);
+      return;
+    }
     setSaving(true);
     try {
       await fsSetConfig('teaLine', {
         ...form,
+        notifyGroupId: (form.notifyGroupId || '').trim(),
         updatedAt: new Date().toISOString(),
       });
       setFlash('✅ บันทึกการตั้งค่าแล้ว');
@@ -450,14 +457,14 @@ function LineSettingsSection({ t }) {
         <label className="text-[10px] font-bold text-stone-500 block">LINE Group ID (แจ้งสรุปปิดวัน)</label>
         <input
           className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
-          placeholder="Cxxxxxxxx..."
+          placeholder={t('lineGroupIdPlaceholder')}
           value={form.notifyGroupId || ''}
           onChange={(e) => setForm({ ...form, notifyGroupId: e.target.value.trim() })}
         />
         <label className="text-[10px] font-bold text-stone-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
         <input
           className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
-          placeholder="Uxxx,Uyyy"
+          placeholder={t('lineUserIdsPlaceholder')}
           value={form.notifyUserIds || ''}
           onChange={(e) => setForm({ ...form, notifyUserIds: e.target.value })}
         />
