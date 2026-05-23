@@ -7,8 +7,9 @@ import {
   browserSessionPersistence,
 } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
-import { auth, fbReady } from '../firebase';
-import { fsGetDoc, fsPatch, fsListCollection } from '../lib/firestoreRest';
+import { doc, getDoc, setDoc, collection, getDocs, limit, query } from 'firebase/firestore';
+import { auth, db, fbReady } from '../firebase';
+import { fsPatch } from '../lib/firestoreRest';
 import { T } from '../lib/i18n';
 
 export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
@@ -22,11 +23,12 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const [error, setError] = useState('');
 
   const loadOrCreateProfile = async (uid, em) => {
-    let profile = await fsGetDoc(`users/${uid}`);
-    if (!profile) {
-      const existing = await fsListCollection('users', 1);
-      const isFirst = existing.length === 0;
-      await fsPatch(`users/${uid}`, {
+    const docRef = doc(db, 'users', uid);
+    let snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      const colSnap = await getDocs(query(collection(db, 'users'), limit(1)));
+      const isFirst = colSnap.empty;
+      await setDoc(docRef, {
         name: em.split('@')[0],
         email: em,
         role: isFirst ? 'admin' : 'staff',
@@ -34,10 +36,10 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
         uid,
         createdAt: new Date().toISOString(),
       });
-      profile = await fsGetDoc(`users/${uid}`);
+      snap = await getDoc(docRef);
     }
-    if (!profile) throw new Error('สร้างบัญชีไม่สำเร็จ');
-    return { uid, ...profile };
+    if (!snap.exists()) throw new Error('สร้างบัญชีไม่สำเร็จ');
+    return { uid, ...snap.data() };
   };
 
   const handleRegister = async () => {
@@ -52,7 +54,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await createUserWithEmailAndPassword(auth, em, pw);
-      await fsPatch(`users/${cred.user.uid}`, {
+      await setDoc(doc(db, 'users', cred.user.uid), {
         name,
         email: em,
         role: 'staff',
