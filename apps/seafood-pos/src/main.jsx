@@ -493,12 +493,16 @@ function MembersScreen() {
     ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
   ];
 
+  const [saveFlash, setSaveFlash] = useState('');
+  const showFlash = (msg) => { setSaveFlash(msg); setTimeout(() => setSaveFlash(''), 2500); };
+
   const saveCusEdit = async (id) => {
     if (!cusEditData.name.trim()) return;
     await setDoc(doc(db, 'customers', id), {
       name: cusEditData.name.trim(), zone: cusEditData.zone.trim(), phone: cusEditData.phone.trim(),
     }, { merge: true });
     setCusEditId(null);
+    showFlash('✅ บันทึกสำเร็จแล้วครับ');
   };
 
   const addCustomer = async () => {
@@ -509,10 +513,16 @@ function MembersScreen() {
     });
     setNewCus({ name: '', zone: '', phone: '' });
     setShowAdd(false);
+    showFlash('✅ เพิ่มลูกค้าสำเร็จแล้วครับ');
   };
 
   return (
     <div className="p-4 space-y-4">
+      {saveFlash && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-xl">
+          {saveFlash}
+        </div>
+      )}
       <>
           <div className="flex items-center justify-between">
             <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
