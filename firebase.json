@@ -17,17 +17,10 @@
       ]
     }
   ],
-  "functions": [
-    {
-      "source": "apps/webhook-core",
-      "runtime": "nodejs20"
-    },
-    {
-      "source": "apps/webhook-core-scheduled",
-      "codebase": "tea-scheduled",
-      "runtime": "nodejs20"
-    }
-  ],
+  "functions": {
+    "source": "apps/webhook-core",
+    "runtime": "nodejs20"
+  },
   "storage": {
     "rules": "storage.rules"
   },

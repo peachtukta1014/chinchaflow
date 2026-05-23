@@ -49,6 +49,7 @@ function tomorrowBKK() {
 exports.lineWebhook = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
+    try {
     if (req.method === 'GET') { res.status(200).send('ok'); return; }
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
@@ -89,12 +90,17 @@ exports.lineWebhook = functions
     }
 
     res.status(200).json({ status: 'ok' });
+    } catch (err) {
+      console.error('lineWebhook', err);
+      res.status(500).json({ error: 'internal' });
+    }
   });
 
 // ── LINE Webhook — ร้านชา: บอทแจ้งสรุปปิดวัน (ไม่รับออเดอร์ลูกค้า) ───────────
 exports.lineWebhookTea = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
+    try {
     if (req.method === 'GET') { res.status(200).send('ok'); return; }
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
@@ -148,9 +154,11 @@ exports.lineWebhookTea = functions
     }
 
     res.status(200).json({ status: 'ok' });
+    } catch (err) {
+      console.error('lineWebhookTea', err);
+      res.status(500).json({ error: 'internal' });
+    }
   });
-
-// สรุปอัตโนมัติ → apps/webhook-core-scheduled (แยก codebase ไม่บล็อก deploy webhook)
 
 // ── แอดมินกดส่งสรุปจากแอป (Bearer Firebase ID token) ─────────────────────────
 exports.teaPushSummary = functions
@@ -158,6 +166,7 @@ exports.teaPushSummary = functions
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    if (req.method === 'GET') { res.status(200).json({ ok: true, hint: 'POST with Bearer token' }); return; }
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
