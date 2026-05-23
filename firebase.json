@@ -20,13 +20,12 @@
   "functions": [
     {
       "source": "apps/webhook-core",
-      "codebase": "default",
-      "runtime": "nodejs22"
+      "runtime": "nodejs20"
     },
     {
       "source": "apps/webhook-core-scheduled",
       "codebase": "tea-scheduled",
-      "runtime": "nodejs22"
+      "runtime": "nodejs20"
     }
   ],
   "storage": {

@@ -49,6 +49,7 @@ function tomorrowBKK() {
 exports.lineWebhook = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
+    if (req.method === 'GET') { res.status(200).send('ok'); return; }
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
     const rawBody   = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
@@ -94,6 +95,7 @@ exports.lineWebhook = functions
 exports.lineWebhookTea = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
+    if (req.method === 'GET') { res.status(200).send('ok'); return; }
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
     const rawBody   = req.rawBody ?? Buffer.from(JSON.stringify(req.body));

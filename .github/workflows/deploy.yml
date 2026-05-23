@@ -92,12 +92,15 @@ jobs:
           gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6 \
             || echo "ข้าม: เปิด API เองที่ Console ถ้าต้องการสรุป LINE อัตโนมัติ"
 
-      - name: Deploy LINE webhooks (codebase default — ไม่มี Scheduler)
+      - name: Deploy LINE webhooks
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions:default \
+          firebase deploy --only \
+            "functions:lineWebhook,functions:lineWebhookTea,functions:teaPushSummary" \
             --project chincha-eeed6 --non-interactive --force
+          echo "Health check tea webhook:"
+          curl -sfS "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhookTea" || true
 
       - name: Deploy scheduled tea summary (codebase tea-scheduled)
         continue-on-error: true
