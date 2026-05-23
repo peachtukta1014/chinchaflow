@@ -624,15 +624,29 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!storage) {
+      alert('Firebase Storage ยังไม่พร้อม กรุณาตรวจ config แล้วลองใหม่ครับ');
+      return;
+    }
+    if (!file.type?.startsWith('image/')) {
+      alert('กรุณาเลือกรูปภาพเท่านั้นครับ');
+      return;
+    }
+
     setPhotoUploading(true);
     try {
-      if (storage) {
-        const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
-        await uploadBytes(r, file);
-        setPhotoUrl(await getDownloadURL(r));
-      }
-    } catch { }
-    finally { setPhotoUploading(false); }
+      const dateKey = dateKeyBangkok();
+      const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const r = stRef(storage, `billPhotos/${dateKey}/${billNoRef.current}_${Date.now()}.${ext}`);
+      await uploadBytes(r, file, { contentType: file.type || 'image/jpeg' });
+      setPhotoUrl(await getDownloadURL(r));
+    } catch (err) {
+      console.error(err);
+      alert('อัปโหลดรูปบิลไป Firebase ไม่สำเร็จ กรุณาลองใหม่ครับ');
+    } finally {
+      setPhotoUploading(false);
+      e.target.value = '';
+    }
   };
 
   useEffect(() => {
@@ -926,7 +940,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
                   ? <img src={photoUrl} className="w-full h-full object-cover rounded-xl" alt="bill" />
                   : <Camera size={20} className="text-slate-400" />}
             </button>
-            <input ref={photoInputRef} type="file" accept="image/*"
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment"
               onChange={handlePhotoChange} className="hidden" />
             {cart.length > 0 && (
               <button onClick={handleSaveBill} disabled={saving}
