@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, fbReady } from './firebase';
-import { fsPost, fsQueryOrders } from './lib/firestoreRest';
+import { auth, fbReady } from './firebase';
+import { fsGetDoc, fsPost, fsQueryOrders } from './lib/firestoreRest';
 import { dateKeyBangkok } from './lib/constants';
 import { useLang } from './lib/i18n';
 import { useCatalog } from './lib/useCatalog';
@@ -49,13 +48,12 @@ function App() {
         return;
       }
       try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (!snap.exists()) {
+        const profile = await fsGetDoc(`users/${user.uid}`);
+        if (!profile) {
           setAuthPending(true);
           setMember(null);
           return;
         }
-        const profile = snap.data();
         if (profile.approved !== true) {
           setAuthPending(true);
           setMember(null);
