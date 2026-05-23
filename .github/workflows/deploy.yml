@@ -64,6 +64,10 @@ jobs:
         run: npm install
         working-directory: apps/webhook-core
 
+      - name: Install scheduled function dependencies
+        run: npm install
+        working-directory: apps/webhook-core-scheduled
+
       - name: Write env vars for functions
         run: |
           {
@@ -72,6 +76,7 @@ jobs:
             echo "LINE_TEA_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_TEA_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
           } > apps/webhook-core/.env
+          cp apps/webhook-core/.env apps/webhook-core-scheduled/.env
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -81,13 +86,10 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Enable Cloud Scheduler API (required for teaDailyScheduledSummary)
-        continue-on-error: true
-        run: |
-          gcloud services enable cloudscheduler.googleapis.com \
-            --project=chincha-eeed6
+      - name: Enable Cloud Scheduler API
+        run: gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6
 
-      - name: Deploy LINE webhooks (HTTPS — ไม่ต้องใช้ Scheduler)
+      - name: Deploy LINE webhooks (ไม่มี pubsub.schedule ใน codebase นี้)
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
@@ -95,14 +97,12 @@ jobs:
             "functions:lineWebhook,functions:lineWebhookTea,functions:teaPushSummary" \
             --project chincha-eeed6 --non-interactive --force
 
-      - name: Deploy scheduled tea summary (optional)
-        continue-on-error: true
+      - name: Deploy scheduled tea summary (codebase แยก)
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions:teaDailyScheduledSummary \
+          firebase deploy --only functions:tea-scheduled:teaDailyScheduledSummary \
             --project chincha-eeed6 --non-interactive --force
-          echo "✓ teaDailyScheduledSummary deployed"
 
   # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
   deploy_shrimp:
