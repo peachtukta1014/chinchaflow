@@ -1163,31 +1163,32 @@ const Dashboard = ({ stock }) => {
     const unsubs = [];
     const todayKey = dateKeyBangkok();
 
-    // Query today's sales by dateKey — no composite index needed (single-field auto-index)
-    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
-    const sortSales = (docs) => docs.sort((a, b) => {
-      const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
-      const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
-      return tb.localeCompare(ta);
-    });
-    unsubs.push(onSnapshot(salesQ, snap => {
-      setFirestoreSales(sortSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setLoading(false);
-    }, () => {
-      // Fallback: load recent 200 and filter by date
-      const fallbackQ = query(collection(db, 'sales'), limit(200));
-      const unsub2 = onSnapshot(fallbackQ, snap => {
-        const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
-        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const filtered = all.filter(s => {
-          const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
-          return d && d >= todayMidnight;
-        });
-        setFirestoreSales(sortSales(filtered));
-        setLoading(false);
-      }, () => setLoading(false));
-      unsubs.push(unsub2);
-    }));
+    // Query today's sales by dateKey — no composite index needed (single-field auto-index)
+    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
+    const sortSales = (docs) => docs.sort((a, b) => {
+      const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
+      const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
+      return tb.localeCompare(ta);
+    });
+    unsubs.push(onSnapshot(salesQ, snap => {
+      setFirestoreSales(sortSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setLoading(false);
+    }, () => {
+      // Fallback: load recent 200 and filter by date
+      const fallbackQ = query(collection(db, 'sales'), limit(200));
+      const unsub2 = onSnapshot(fallbackQ, snap => {
+        const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const filtered = all.filter(s => {
+          if (s.dateKey) return s.dateKey === todayKey;
+          const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
+          return d && d >= todayMidnight;
+        });
+        setFirestoreSales(sortSales(filtered));
+        setLoading(false);
+      }, () => setLoading(false));
+      unsubs.push(unsub2);
+    }));
 
     unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
       setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
