@@ -1124,22 +1124,27 @@ const Dashboard = ({ stock }) => {
     const unsubs = [];
     const todayKey = new Date().toISOString().split('T')[0];
 
-    // Query today's sales by dateKey partition (composite index: dateKey ASC + createdAt DESC)
-    const salesQ = query(
-      collection(db, 'sales'),
-      where('dateKey', '==', todayKey),
-      orderBy('createdAt', 'desc'),
-    );
+    // Query today's sales by dateKey — no composite index needed (single-field auto-index)
+    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
+    const sortSales = (docs) => docs.sort((a, b) => {
+      const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
+      const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
+      return tb.localeCompare(ta);
+    });
     unsubs.push(onSnapshot(salesQ, snap => {
-      setFirestoreSales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setFirestoreSales(sortSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
       setLoading(false);
     }, () => {
-      // Fallback: load without dateKey filter if index not ready yet
-      const fallbackQ = query(collection(db, 'sales'), orderBy('createdAt', 'desc'), limit(100));
+      // Fallback: load recent 200 and filter by date
+      const fallbackQ = query(collection(db, 'sales'), limit(200));
       const unsub2 = onSnapshot(fallbackQ, snap => {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        setFirestoreSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(s => s.createdAt?.toDate?.() >= today));
+        const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const filtered = all.filter(s => {
+          const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
+          return d && d >= todayMidnight;
+        });
+        setFirestoreSales(sortSales(filtered));
         setLoading(false);
       }, () => setLoading(false));
       unsubs.push(unsub2);
