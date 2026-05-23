@@ -232,7 +232,8 @@ function App() {
     return onAuthStateChanged(auth, async (user) => {
       if (!user) { setMember(null); return; }
       try {
-        const resp = await fetch(`${_FS}/shrimp_users/${user.uid}`);
+        const token = await user.getIdToken();
+        const resp = await fetch(`${_FS}/shrimp_users/${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
         if (!resp.ok) { await signOut(auth); return; }
         const json = await resp.json();
         const f = json.fields || {};
@@ -679,7 +680,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   };
 
   useEffect(() => {
-    fetch(`${_FS}/productSettings/shrimp`)
+    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -1495,7 +1496,7 @@ function ProductSettingsScreen() {
   const [flash, setFlash]   = useState('');
 
   useEffect(() => {
-    fetch(`${_FS}/productSettings/shrimp`)
+    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -1514,10 +1515,11 @@ function ProductSettingsScreen() {
     try {
       const fields = _fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
       const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
-      await fetch(`${_FS}/productSettings/shrimp?${qs}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      const r = await fetch(`${_FS}/productSettings/shrimp?${qs}`, {
+        method: 'PATCH', headers: await _fsAuthHeaders(),
         body: JSON.stringify({ fields }),
       });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setFlash('✅ บันทึกราคาแล้ว');
     } catch { setFlash('⚠️ บันทึกไม่สำเร็จ'); }
     setSaving(false);
