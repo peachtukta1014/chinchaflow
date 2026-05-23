@@ -1,6 +1,24 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // User profiles — only owner can read/write their own doc
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Tea orders — any authenticated user can read and create
+    match /teaOrders/{docId} {
+      allow read, create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Admin can list users collection (for first-user check)
+    match /users/{uid} {
+      allow list: if request.auth != null;
+    }
+
+    // Everything else requires authentication
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
