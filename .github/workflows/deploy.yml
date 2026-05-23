@@ -86,8 +86,11 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Enable Cloud Scheduler API
-        run: gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6
+      - name: Enable Cloud Scheduler API (optional — SA อาจไม่มีสิทธิ์)
+        continue-on-error: true
+        run: |
+          gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6 \
+            || echo "ข้าม: เปิด API เองที่ Console ถ้าต้องการสรุป LINE อัตโนมัติ"
 
       - name: Deploy LINE webhooks (codebase default — ไม่มี Scheduler)
         run: |
