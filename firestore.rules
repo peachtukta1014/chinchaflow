@@ -130,6 +130,8 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow write: if isAdmin() || isAdminShrimp();
+      // พนักงานกุ้งรับสต็อก → อัปเดตยอดกุ้งเป็น/ตาย (เฉพาะ config/stock)
+      allow update, create: if isApprovedShrimp() && docId == 'stock';
     }
 
     // Product settings (shrimp prices) — approved read; admin write

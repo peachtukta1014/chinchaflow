@@ -99,13 +99,24 @@ async function fsPost(col, data) {
   if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
 }
 async function fsPatch(path, data) {
-  const fields = _fsObj(data);
-  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  const r = await fetch(`${_FS}/${path}?${qs}`, {
-    method: 'PATCH', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
+  const fields = _fsObj(data);
+  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const r = await fetch(`${_FS}/${path}?${qs}`, {
+    method: 'PATCH', headers: await _fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
+}
+async function fsSetStockDoc(data) {
+  try {
+    await fsPatch('config/stock', data);
+  } catch {
+    const r = await fetch(`${_FS}/config?documentId=stock`, {
+      method: 'POST', headers: await _fsAuthHeaders(),
+      body: JSON.stringify({ fields: _fsObj(data) }),
+    });
+    if (!r.ok) throw new Error(`Firestore config/stock POST failed (HTTP ${r.status})`);
+  }
 }
 function _fromFsVal(v) {
   if (!v || 'nullValue' in v) return null;
@@ -245,11 +256,22 @@ function App() {
     if (auth) await signOut(auth).catch(() => {});
   };
 
-  const updateMainStock = (live, dead) => {
-    const val = { live: Math.max(0, parseFloat(live.toFixed(3))), dead: Math.max(0, parseFloat(dead.toFixed(3))) };
-    setStock(val);
-    if (db) setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }).catch(console.error);
-  };
+  const updateMainStock = async (live, dead) => {
+    const val = {
+      live: Math.max(0, parseFloat(Number(live).toFixed(3))),
+      dead: Math.max(0, parseFloat(Number(dead).toFixed(3))),
+    };
+    setStock(val);
+    const payload = { ...val, updatedAt: new Date().toISOString() };
+    try {
+      if (isFirebaseReady) await fsSetStockDoc(payload);
+    } catch (e) {
+      console.warn('fsSetStockDoc', e);
+      if (db) {
+        setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }, { merge: true }).catch(console.error);
+      }
+    }
+  };
 
   if (member === undefined) {
     return (
@@ -1045,22 +1067,22 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
   const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
 
-  const handleReceive = async () => {
-    if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
-    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
-    setSaving(true);
-    try {
-      if (isFirebaseReady) {
-        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(fsPost('stockBatches', {
-          purchaseDate: new Date().toISOString(),
-          liveKg, deadKg, costPerKg, transport,
-          totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
-          remainingLiveKg: liveKg, remainingDeadKg: deadKg,
-          note: rcvNote,
-        }));
-      }
-      updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+  const handleReceive = async () => {
+    if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
+    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    setSaving(true);
+    try {
+      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+      await withTimeout(updateMainStock(stock.live + liveKg, stock.dead + deadKg));
+      if (isFirebaseReady) {
+        await withTimeout(fsPost('stockBatches', {
+          purchaseDate: new Date().toISOString(),
+          liveKg, deadKg, costPerKg, transport,
+          totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
+          remainingLiveKg: liveKg, remainingDeadKg: deadKg,
+          note: rcvNote,
+        }));
+      }
       alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
@@ -1186,30 +1208,31 @@ const Dashboard = ({ stock }) => {
     if (!db) { setLoading(false); return; }
     const unsubs = [];
     const todayKey = dateKeyBangkok();
+    const loadTimer = setTimeout(() => setLoading(false), 8000);
 
-    // Query today's sales by dateKey — no composite index needed (single-field auto-index)
-    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
     const sortSales = (docs) => docs.sort((a, b) => {
       const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
       const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
       return tb.localeCompare(ta);
     });
-    unsubs.push(onSnapshot(salesQ, snap => {
-      setFirestoreSales(sortSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const applySales = (docs) => {
+      setFirestoreSales(sortSales(docs));
       setLoading(false);
+    };
+
+    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
+    unsubs.push(onSnapshot(salesQ, snap => {
+      applySales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, () => {
-      // Fallback: load recent 200 and filter by date
       const fallbackQ = query(collection(db, 'sales'), limit(200));
       const unsub2 = onSnapshot(fallbackQ, snap => {
         const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
-        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const filtered = all.filter(s => {
+        const filtered = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => {
           if (s.dateKey) return s.dateKey === todayKey;
           const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
           return d && d >= todayMidnight;
         });
-        setFirestoreSales(sortSales(filtered));
-        setLoading(false);
+        applySales(filtered);
       }, () => {
         setLoading(false);
         if (retryCount < 3) setTimeout(() => setRetryCount(c => c + 1), 5000);
@@ -1217,19 +1240,35 @@ const Dashboard = ({ stock }) => {
       unsubs.push(unsub2);
     }));
 
-    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
-      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
-    }, () => {}));
+    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
+      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
+    }, () => {}));
 
-    const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
-    unsubs.push(onSnapshot(batchQ, snap => {
-      setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {}));
+    const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
+    unsubs.push(onSnapshot(batchQ, snap => {
+      setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {
+      fsRunQuery({
+        from: [{ collectionId: 'stockBatches' }],
+        orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
+        limit: 30,
+      }).then((rows) => setStockBatches(rows)).catch(() => {});
+    }));
 
-    return () => unsubs.forEach(u => u());
-  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { clearTimeout(loadTimer); unsubs.forEach(u => u()); };
+  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const todaySales = firestoreSales; // already filtered by dateKey in query
+  const displayStock = (() => {
+    const live = Number(stock?.live) || 0;
+    const dead = Number(stock?.dead) || 0;
+    if (live > 0 || dead > 0) return { live, dead };
+    return stockBatches.reduce((acc, b) => ({
+      live: acc.live + (parseFloat(b.remainingLiveKg ?? b.liveKg) || 0),
+      dead: acc.dead + (parseFloat(b.remainingDeadKg ?? b.deadKg) || 0),
+    }), { live: 0, dead: 0 });
+  })();
+
+  const todaySales = firestoreSales;
 
   const todayTotal  = todaySales.reduce((s, t) => s + (t.total || 0), 0);
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);
@@ -1256,11 +1295,11 @@ const Dashboard = ({ stock }) => {
         </div>
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-[2rem] p-5 text-white">
           <p className="text-blue-200 text-xs font-bold mb-1">กุ้งเป็น</p>
-          <p className="text-2xl font-black">{stock.live.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
-        </div>
-        <div className="bg-gradient-to-br from-red-400 to-orange-500 rounded-[2rem] p-5 text-white">
-          <p className="text-red-100 text-xs font-bold mb-1">กุ้งตาย</p>
-          <p className="text-2xl font-black">{stock.dead.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
+          <p className="text-2xl font-black">{displayStock.live.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
+        </div>
+        <div className="bg-gradient-to-br from-red-400 to-orange-500 rounded-[2rem] p-5 text-white">
+          <p className="text-red-100 text-xs font-bold mb-1">กุ้งตาย</p>
+          <p className="text-2xl font-black">{displayStock.dead.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
         </div>
         <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white col-span-2">
           <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
