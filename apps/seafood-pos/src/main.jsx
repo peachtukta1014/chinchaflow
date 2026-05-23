@@ -232,7 +232,7 @@ function App() {
     return onAuthStateChanged(auth, async (user) => {
       if (!user) { setMember(null); return; }
       try {
-        const resp = await fetch(`${_FS}/users/${user.uid}`);
+        const resp = await fetch(`${_FS}/shrimp_users/${user.uid}`);
         if (!resp.ok) { await signOut(auth); return; }
         const json = await resp.json();
         const f = json.fields || {};
@@ -375,11 +375,11 @@ function LoginScreen({ onLogin }) {
     try {
       if (mode === 'register') {
         const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        const listJson = await fetch(`${BASE}/users?pageSize=1`).then(r => r.json());
+        const listJson = await fetch(`${BASE}/shrimp_users?pageSize=1`).then(r => r.json());
         const isFirst  = !listJson.documents?.length;
         const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const grantAdmin   = isFirst || isAdminEmail;
-        await fetch(`${BASE}/users/${user.uid}`, {
+        await fetch(`${BASE}/shrimp_users/${user.uid}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fields: {
             name:      { stringValue: name.trim() },
@@ -393,7 +393,7 @@ function LoginScreen({ onLogin }) {
         onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: 'admin' });
       } else {
         const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
-        const resp = await fetch(`${BASE}/users/${user.uid}`);
+        const resp = await fetch(`${BASE}/shrimp_users/${user.uid}`);
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
         if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
@@ -1412,7 +1412,7 @@ function AdminUsersScreen() {
 
   const loadUsers = async () => {
     const rows = await fsRunQuery({
-      from: [{ collectionId: 'users' }],
+      from: [{ collectionId: "shrimp_users" }],
       orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
       limit: 100,
     });
@@ -1423,12 +1423,12 @@ function AdminUsersScreen() {
   useEffect(() => { loadUsers(); }, []);
 
   const setApproved = async (uid, val) => {
-    await fsPatch(`users/${uid}`, { approved: val });
+    await fsPatch(`shrimp_users/${uid}`, { approved: val });
     setUsers(prev => prev.map(u => u.id === uid ? { ...u, approved: val } : u));
   };
 
   const setRole = async (uid, role) => {
-    await fsPatch(`users/${uid}`, { role });
+    await fsPatch(`shrimp_users/${uid}`, { role });
     setUsers(prev => prev.map(u => u.id === uid ? { ...u, role } : u));
   };
 
