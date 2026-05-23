@@ -12,6 +12,7 @@ import {
   ShoppingCart, Users, X,
 } from 'lucide-react';
 import { auth, db, storage, isFirebaseReady } from './firebase';
+import { dateKeyBangkok, tomorrowDateKeyBangkok } from './lib/date';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -249,21 +250,21 @@ function App() {
     return onSnapshot(doc(db, 'config', 'stock'), snap => { if (snap.exists()) setStock(snap.data()); }, () => {});
   }, [member]);
 
-  // Badge: pending LINE orders
-  useEffect(() => {
-    if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
-    const today = new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
-    const load = async () => {
-      const rows = await fsRunQuery({ from: [{ collectionId: 'lineOrders' }], where: { compositeFilter: { op: 'AND', filters: [
-        { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
-        { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
-      ]}} });
-      setPendingOrders(rows.length);
-    };
-    load();
-    const t = setInterval(load, 30000);
-    return () => clearInterval(t);
-  }, [member]);
+  // Badge: pending LINE orders
+  useEffect(() => {
+    if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
+    const today = dateKeyBangkok();
+    const load = async () => {
+      const rows = await fsRunQuery({ from: [{ collectionId: 'lineOrders' }], where: { compositeFilter: { op: 'AND', filters: [
+        { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
+        { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
+      ]}} });
+      setPendingOrders(rows.length);
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [member]);
 
   const handleLogin  = (m) => setMember(m);
   const handleLogout = async () => {
@@ -742,58 +743,58 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     setInputMode('weight');
   };
 
-  const handleSaveBill = async () => {
-    if (cart.length === 0) return;
-    if (paymentType === 'installment' && !paidAmount) return alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ');
-    const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
-    const billData = {
-      billNo: billNoRef.current,
-      customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
-      items: cart, total: cartTotal,
-      paymentType, paidAmount: paidAmt, remainingAmount: remaining,
-      photoUrl: photoUrl || null,
-      timestamp: new Date().toLocaleTimeString('th-TH'),
-      recordedBy: user.name,
-    };
-    setSaving(true);
-    try {
-      if (isFirebaseReady) {
-        const dateKey = new Date().toISOString().split('T')[0];
-        const now = new Date().toISOString();
-        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(fsPost('sales', {
-          ...billData,
-          dateKey,
-          items: cart.map(i => ({
-            productId: i.productId, productName: i.productName, type: i.type,
-            weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
-          })),
-          createdAt: now, source: 'koseafood-pos',
-        }));
-        if (remaining > 0) {
-          await withTimeout(fsIncrementDebt(selectedCustomer, {
-            customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
-            lastBillNo: billNoRef.current, lastUpdated: now,
-          }, remaining));
-        }
-      }
-      let liveD = 0, deadD = 0;
-      cart.forEach(i => { if (i.type === 'dead') deadD += i.weight; else liveD += i.weight; });
-      updateMainStock(Math.max(0, stock.live - liveD), Math.max(0, stock.dead - deadD));
-      onSaveBill(billData);
-      const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
-      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
-      setCart([]); setSelectedCustomer('general');
-      setPaymentType('cash'); setPaidAmount('');
-      setPhotoUrl(null);
-      billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
-    } catch (err) {
-      console.error(err);
-      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSaveBill = async () => {
+    if (cart.length === 0) return;
+    if (paymentType === 'installment' && !paidAmount) return alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ');
+    const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
+    const billData = {
+      billNo: billNoRef.current,
+      customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
+      items: cart, total: cartTotal,
+      paymentType, paidAmount: paidAmt, remainingAmount: remaining,
+      photoUrl: photoUrl || null,
+      timestamp: new Date().toLocaleTimeString('th-TH'),
+      recordedBy: user.name,
+    };
+    setSaving(true);
+    try {
+      if (isFirebaseReady) {
+        const dateKey = dateKeyBangkok();
+        const now = new Date().toISOString();
+        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+        await withTimeout(fsPost('sales', {
+          ...billData,
+          dateKey,
+          items: cart.map(i => ({
+            productId: i.productId, productName: i.productName, type: i.type,
+            weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
+          })),
+          createdAt: now, source: 'koseafood-pos',
+        }));
+        if (remaining > 0) {
+          await withTimeout(fsIncrementDebt(selectedCustomer, {
+            customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
+            lastBillNo: billNoRef.current, lastUpdated: now,
+          }, remaining));
+        }
+      }
+      let liveD = 0, deadD = 0;
+      cart.forEach(i => { if (i.type === 'dead') deadD += i.weight; else liveD += i.weight; });
+      updateMainStock(Math.max(0, stock.live - liveD), Math.max(0, stock.dead - deadD));
+      onSaveBill(billData);
+      const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
+      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
+      setCart([]); setSelectedCustomer('general');
+      setPaymentType('cash'); setPaidAmount('');
+      setPhotoUrl(null);
+      billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const allCustomers = [
     ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
@@ -1141,10 +1142,10 @@ const Dashboard = ({ stock }) => {
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
 
-  useEffect(() => {
-    if (!db) { setLoading(false); return; }
-    const unsubs = [];
-    const todayKey = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    if (!db) { setLoading(false); return; }
+    const unsubs = [];
+    const todayKey = dateKeyBangkok();
 
     // Query today's sales by dateKey — no composite index needed (single-field auto-index)
     const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
@@ -1364,7 +1365,7 @@ function LineOrdersScreen() {
   const [orders,  setOrders]  = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const todayBKK = () => new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+  const todayBKK = dateKeyBangkok;
 
   useEffect(() => {
     fsRunQuery({ from: [{ collectionId: 'lineOrders' }], orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }], limit: 100 })
@@ -1377,9 +1378,9 @@ function LineOrdersScreen() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' } : o));
   };
 
-  const today    = todayBKK();
-  const tomorrow = new Date(Date.now() + 7 * 3600000 + 86400000).toISOString().split('T')[0];
-  const dateLabel = (k) => k === today ? 'วันนี้' : k === tomorrow ? 'พรุ่งนี้' : k;
+  const today    = todayBKK();
+  const tomorrow = tomorrowDateKeyBangkok();
+  const dateLabel = (k) => k === today ? 'วันนี้' : k === tomorrow ? 'พรุ่งนี้' : k;
 
   // Group by deliveryDate, show today + future only
   const upcoming = orders.filter(o => (o.deliveryDate || '') >= today);
