@@ -120,13 +120,22 @@ function sortByCreatedAtDesc(docs) {
   });
 }
 
+function orderMatchesDateKey(doc, dateKey) {
+  if (doc.dateKey === dateKey) return true;
+  const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
+  return created.startsWith(dateKey);
+}
+
 export async function fsQueryOrders(dateKey) {
   const docs = await fsRunQuery({
     from: [{ collectionId: 'teaOrders' }],
     where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
     limit: 200,
   });
-  return sortByCreatedAtDesc(docs);
+  if (docs.length > 0) return sortByCreatedAtDesc(docs);
+  // ออเดอร์เก่าที่ไม่มี dateKey — ดึงรายการแล้วกรองจาก createdAt
+  const all = await fsListCollection('teaOrders', 200);
+  return sortByCreatedAtDesc(all.filter((d) => orderMatchesDateKey(d, dateKey)));
 }
 
 export async function fsQueryRestocks(limit = 50) {
