@@ -1,7 +1,14 @@
+const path = require('path');
+try {
+  require('dotenv').config({ path: path.join(__dirname, '../.env') });
+} catch {
+  /* dotenv optional */
+}
+
 const functions = require('firebase-functions/v1');
-const admin     = require('firebase-admin');
+const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
-const crypto    = require('crypto');
+const crypto = require('crypto');
 const {
   todayBKK,
   buildSummaryForDate,
@@ -13,9 +20,10 @@ const {
   getTeaLineConfig,
 } = require('./teaDailySummary');
 
-admin.initializeApp();
-const dbShrimp = getFirestore();                  // (default) — ร้านกุ้ง
-const dbTea    = getFirestore();                  // (default) — ร้านชา
+function db() {
+  if (!admin.apps.length) admin.initializeApp();
+  return getFirestore();
+}
 
 // ── LINE signature verification ───────────────────────────────────────────────
 function verifySignature(rawBody, signature, secret) {
@@ -73,7 +81,7 @@ exports.lineWebhook = functions
       const items      = parseOrderItems(text);
 
       if (items.length > 0) {
-        await dbShrimp.collection('lineOrders').add({
+        await db().collection('lineOrders').add({
           source: 'line', lineUserId: userId, lineGroupId: groupId,
           rawText: text, items, deliveryDate,
           status: 'pending',
@@ -82,7 +90,7 @@ exports.lineWebhook = functions
         const summary = items.map(i => `• ${i.product} ${i.qty} ${i.unit}`).join('\n');
         await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
       } else {
-        await dbShrimp.collection('line_messages').add({
+        await db().collection('line_messages').add({
           userId, groupId, text,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -129,11 +137,11 @@ exports.lineWebhookTea = functions
       if (SUMMARY_CMD.test(text)) {
         const dateKey = todayBKK();
         try {
-          const summary = await buildSummaryForDate(dbTea, dateKey);
+          const summary = await buildSummaryForDate(db(), dateKey);
           await lineReply(replyToken, summary, token);
-          const config = await getTeaLineConfig(dbTea);
+          const config = await getTeaLineConfig(db());
           if (config.notifyGroupId && groupId && config.notifyGroupId !== groupId) {
-            await dispatchTeaSummary(dbTea, dateKey, token);
+            await dispatchTeaSummary(db(), dateKey, token);
           }
         } catch (err) {
           console.error('tea summary reply', err);
@@ -142,7 +150,7 @@ exports.lineWebhookTea = functions
         continue;
       }
 
-      await dbTea.collection('line_messages').add({
+      await db().collection('line_messages').add({
         userId, groupId, text,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -176,7 +184,7 @@ exports.teaPushSummary = functions
 
     try {
       const decoded = await admin.auth().verifyIdToken(idToken);
-      const userSnap = await dbTea.collection('users').doc(decoded.uid).get();
+      const userSnap = await db().collection('users').doc(decoded.uid).get();
       const user = userSnap.data();
       if (!userSnap.exists || user.approved !== true || user.role !== 'admin') {
         res.status(403).json({ error: 'admin only' }); return;
@@ -186,7 +194,7 @@ exports.teaPushSummary = functions
       const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
       if (!token) { res.status(500).json({ error: 'LINE token not configured' }); return; }
 
-      const { message, results, targetCount } = await dispatchTeaSummary(dbTea, dateKey, token);
+      const { message, results, targetCount } = await dispatchTeaSummary(db(), dateKey, token);
       if (targetCount === 0) {
         res.status(400).json({
           error: 'no_targets',
