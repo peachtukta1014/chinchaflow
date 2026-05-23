@@ -1,0 +1,68 @@
+# เคลียร์ข้อมูลร้านชาใน Firestore (รันจาก GitHub ไม่ต้องมีเครื่อง local)
+# Actions → Tea DB Reset → Run workflow
+
+name: Tea DB Reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (ดูอย่างเดียว ไม่ลบ)'
+        type: boolean
+        default: true
+      wipe_chincha_db:
+        description: 'ลบใน database ชื่อ chincha ด้วย (ข้อมูลเก่าค้าง)'
+        type: boolean
+        default: true
+      seed_menu:
+        description: 'ใส่เมนูเริ่มต้นหลังลบ'
+        type: boolean
+        default: true
+      confirm_phrase:
+        description: 'พิมพ์ RESET เพื่อลบจริง (ไม่ต้องกรอกถ้า dry run)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  reset_tea_firestore:
+    name: Reset tea Firestore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate confirmation
+        if: inputs.dry_run != true
+        run: |
+          if [ "${{ inputs.confirm_phrase }}" != "RESET" ]; then
+            echo "❌ ต้องพิมพ์ RESET ในช่อง confirm_phrase เพื่อลบจริง"
+            exit 1
+          fi
+
+      - name: Run tea-db-reset
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+          FIREBASE_PROJECT_ID: chincha-eeed6
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="--dry-run"
+          else
+            ARGS="--confirm"
+            if [ "${{ inputs.wipe_chincha_db }}" = "true" ]; then
+              ARGS="$ARGS --chincha-db"
+            fi
+            if [ "${{ inputs.seed_menu }}" != "true" ]; then
+              ARGS="$ARGS --no-seed"
+            fi
+          fi
+          echo "Running: node scripts/tea-db-reset.mjs $ARGS"
+          node scripts/tea-db-reset.mjs $ARGS

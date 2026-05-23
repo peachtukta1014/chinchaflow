@@ -20,6 +20,10 @@ gcloud auth application-default login --project chincha-eeed6
 npm install
 npm run tea:db-reset:dry          # ดูก่อน
 npm run tea:db-reset:all          # ลบ (default) + chincha DB + seed เมนู
+
+**ไม่มีเครื่อง local:** GitHub → Actions → **Tea DB Reset** → Run workflow  
+1) dry run เปิดไว้ก่อน 2) รอบถัดไป ปิด dry run + พิมพ์ `RESET` ใน confirm_phrase
+
 firebase deploy --only firestore:rules,firestore:indexes,functions,hosting:tea
 ```
 
