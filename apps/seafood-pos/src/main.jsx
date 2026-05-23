@@ -18,194 +18,23 @@ import {
   isVoiceOrderComplete,
   parseShrimpVoice,
 } from './lib/voiceParse';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const CUSTOMERS = [
-  { id: 'general', name: 'ลูกค้าทั่วไปและตลาดนัด', zone: 'ทั่วไป' },
-  { id: 'c1',  name: 'จ๊ะขียด',           zone: 'ป่าตอง' },
-  { id: 'c2',  name: 'ตาจุ้ยหนึ่ง',           zone: 'ป่าตอง' },
-  { id: 'c3',  name: 'ตาจุ้ยสอง',           zone: 'ป่าตอง' },
-  { id: 'c4',  name: 'น้องเล็กหนึ่ง',         zone: 'ป่าตอง' },
-  { id: 'c5',  name: 'ปุ้ย',               zone: 'ป่าตอง' },
-  { id: 'c6',  name: 'พี่แหวว,ป้าแหวว',            zone: 'ป่าตอง' },
-  { id: 'c7',  name: 'ร้านเฟิร์ส',          zone: 'ป่าตอง' },
-  { id: 'c8',  name: 'ร้านสองพี่น้องหนึ่ง',    zone: 'ป่าตอง' },
-  { id: 'c9',  name: 'ร้านสองพี่น้องสอง',    zone: 'ป่าตอง' },
-  { id: 'c10', name: 'ร้านแสนสบาย',         zone: 'ป่าตอง' },
-  { id: 'c11', name: 'น้องเล็กสอง',          zone: 'กะทู้'  },
-  { id: 'c12', name: 'อีสานรสเด็ด',         zone: 'กะทู้'  },
-  { id: 'c13', name: 'โบ๊ทซีฟู้ด',          zone: 'ภูเก็ต' },
-  { id: 'c14', name: 'ร้านคุณเชษฐ์',        zone: 'ภูเก็ต' },
-  { id: 'c15', name: 'ร้าน มุขมณี',         zone: 'ราไวย์' },
-  { id: 'c16', name: 'ร้าน ฟาง',           zone: 'ราไวย์' },
-  { id: 'c17', name: 'ร้าน ป้าก้อย',        zone: 'ราไวย์' },
-  { id: 'c18', name: 'ร้าน มด',            zone: 'ราไวย์' },
-  { id: 'c19', name: 'ร้าน อ้อม',          zone: 'ราไวย์' },
-  { id: 'c20', name: 'ร้าน ป้าแมว',         zone: 'ราไวย์' },
-  { id: 'c21', name: 'ร้าน เฮง 777',       zone: 'ราไวย์' },
-  { id: 'c22', name: 'ร้าน โอเล่',         zone: 'ราไวย์' },
-  { id: 'c23', name: 'ร้าน โกห้า',         zone: 'ราไวย์' },
-  { id: 'c24', name: 'ร้าน วิทยาซีฟู้ด',   zone: 'ราไวย์' },
-  { id: 'c25', name: 'ร้าน ฟลุ๊ค',         zone: 'ราไวย์' },
-  { id: 'c26', name: 'ร้าน มุกอันดา',       zone: 'ราไวย์' },
-  { id: 'c27', name: 'ร้าน สตูล',          zone: 'ราไวย์' },
-];
-
-const PRODUCTS = [
-  { id: 'large',  name: 'กุ้งใหญ่,A', emoji: '🦐', type: 'live', price: 1450 },
-  { id: 'medium', name: 'กุ้งกลาง,B', emoji: '🦐', type: 'live', price: 1100 },
-  { id: 'small',  name: 'กุ้งเล็ก,C',  emoji: '🦐', type: 'live', price: 850  },
-  { id: 'dead',   name: 'กุ้งตาย',  emoji: '🦐', type: 'dead', price: 0    },
-];
-
-const PAY = [
-  { id: 'cash',        label: 'สด',   cls: 'bg-emerald-500' },
-  { id: 'transfer',    label: 'โอน',  cls: 'bg-blue-500'    },
-  { id: 'credit',      label: 'ค้าง', cls: 'bg-orange-500'  },
-  { id: 'installment', label: 'ผ่อน', cls: 'bg-purple-500'  },
-];
-
-// ─── Firestore REST helpers (bypass SDK auth — same pattern as login) ─────────
-const _FS = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-async function _fsAuthHeaders() {
-  const base = { 'Content-Type': 'application/json' };
-  const user = auth?.currentUser;
-  if (!user) return base;
-  try {
-    const token = await user.getIdToken();
-    return { ...base, Authorization: `Bearer ${token}` };
-  } catch {
-    return base;
-  }
-}
-function _fsVal(v) {
-  if (v === null || v === undefined) return { nullValue: null };
-  if (typeof v === 'boolean') return { booleanValue: v };
-  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === 'string') return { stringValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(_fsVal) } };
-  if (typeof v === 'object') return { mapValue: { fields: _fsObj(v) } };
-  return { nullValue: null };
-}
-function _fsObj(o) {
-  return Object.fromEntries(Object.entries(o).filter(([,v]) => v !== undefined).map(([k,v]) => [k, _fsVal(v)]));
-}
-async function fsPost(col, data) {
-  const r = await fetch(`${_FS}/${col}`, {
-    method: 'POST', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ fields: _fsObj(data) }),
-  });
-  if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
-}
-async function fsPatch(path, data) {
-  const fields = _fsObj(data);
-  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  const r = await fetch(`${_FS}/${path}?${qs}`, {
-    method: 'PATCH', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
-}
-async function fsSetStockDoc(data) {
-  try {
-    await fsPatch('config/stock', data);
-  } catch {
-    const r = await fetch(`${_FS}/config?documentId=stock`, {
-      method: 'POST', headers: await _fsAuthHeaders(),
-      body: JSON.stringify({ fields: _fsObj(data) }),
-    });
-    if (!r.ok) throw new Error(`Firestore config/stock POST failed (HTTP ${r.status})`);
-  }
-}
-function _fromFsVal(v) {
-  if (!v || 'nullValue' in v) return null;
-  if ('booleanValue' in v) return v.booleanValue;
-  if ('integerValue' in v) return parseInt(v.integerValue, 10);
-  if ('doubleValue' in v) return v.doubleValue;
-  if ('stringValue' in v) return v.stringValue;
-  if ('timestampValue' in v) return v.timestampValue;
-  if ('arrayValue' in v) return (v.arrayValue.values || []).map(_fromFsVal);
-  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k,w]) => [k, _fromFsVal(w)]));
-  return null;
-}
-async function fsRunQuery(structuredQuery) {
-  const r = await fetch(`${_FS}:runQuery`, {
-    method: 'POST', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ structuredQuery }),
-  });
-  if (!r.ok) return [];
-  const rows = await r.json();
-  return rows.filter(row => row.document).map(row => {
-    const parts = row.document.name.split('/');
-    return { id: parts[parts.length - 1], ...Object.fromEntries(Object.entries(row.document.fields || {}).map(([k,v]) => [k, _fromFsVal(v)])) };
-  });
-}
-async function fsIncrementDebt(customerId, meta, delta) {
-  let current = 0;
-  try {
-    const r = await fetch(`${_FS}/customerDebts/${customerId}`, { headers: await _fsAuthHeaders() });
-    if (r.ok) { const j = await r.json(); const fv = j.fields?.totalDebt; current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0); }
-  } catch {}
-  return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });
-}
-
-// ─── Voice Hook ───────────────────────────────────────────────────────────────
-
-function useVoice(onText) {
-  const [listening, setListening] = useState(false);
-  const [liveText, setLiveText]   = useState('');
-  const recRef = useRef(null);
-  const onTextRef = useRef(onText);
-  onTextRef.current = onText;
-
-  const toggle = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('ใช้ Chrome เพื่อเปิด Voice ครับ'); return; }
-    if (listening) { recRef.current?.stop(); return; }
-    const rec = new SR();
-    rec.lang = 'th-TH';
-    rec.continuous = false;
-    rec.interimResults = true;
-    recRef.current = rec;
-    rec.onresult = (e) => {
-      const interim = Array.from(e.results).map(r => r[0].transcript).join('');
-      setLiveText(interim);
-      const last = e.results[e.results.length - 1];
-      if (last.isFinal) onTextRef.current(last[0].transcript.trim());
-    };
-    rec.onerror = () => { setListening(false); setLiveText(''); };
-    rec.onend   = () => { setListening(false); setLiveText(''); };
-    rec.start();
-    setListening(true);
-  };
-
-  return { listening, toggle, liveText };
-}
-
-// ─── Admin email (always gets admin+approved on register) ────────────────────
-const ADMIN_EMAIL = 'peach_admin@chincha.com';
-
-// ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
-
-const SESSION_KEY = 'koseafood-session';
-const SESSION_DAYS = 30;
-
-function getSession() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-    if (!s?.phone || !s?.loginAt) return null;
-    if (Date.now() - s.loginAt > SESSION_DAYS * 86400000) { localStorage.removeItem(SESSION_KEY); return null; }
-    return s;
-  } catch { return null; }
-}
-function saveSession(m) { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...m, loginAt: Date.now() })); }
-function clearSession() { localStorage.removeItem(SESSION_KEY); }
+import { ADMIN_EMAIL, CUSTOMERS, PAY, PRODUCTS } from './constants';
+import {
+  FS_BASE,
+  fsAuthHeaders,
+  fsIncrementDebt,
+  fsObj,
+  fsPatch,
+  fsPost,
+  fsRunQuery,
+  fsSetStockDoc,
+} from './lib/firestoreRest';
+import { useVoice } from './hooks/useVoice';
 
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
 
 function App() {
-  const [member, setMember]         = useState(undefined);
+  const [member, setMember]         = useState(undefined);
   const [activeTab, setActiveTab]   = useState('pos');
   const [stock, setStock]           = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
@@ -218,7 +47,7 @@ function App() {
       if (!user) { setMember(null); return; }
       try {
         const token = await user.getIdToken();
-        const resp = await fetch(`${_FS}/shrimp_users/${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
+        const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
         if (!resp.ok) { await signOut(auth); return; }
         const json = await resp.json();
         const f = json.fields || {};
@@ -362,7 +191,6 @@ function LoginScreen({ onLogin }) {
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
 
-  const BASE = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) { setError('กรุณากรอก Email และ Password'); return; }
@@ -374,11 +202,11 @@ function LoginScreen({ onLogin }) {
         const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const token    = await user.getIdToken();
         const authH    = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-        const listJson = await fetch(`${BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
+        const listJson = await fetch(`${FS_BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
         const isFirst  = !listJson.documents?.length;
         const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const grantAdmin   = isFirst || isAdminEmail;
-        await fetch(`${BASE}/shrimp_users/${user.uid}`, {
+        await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, {
           method: 'PATCH', headers: authH,
           body: JSON.stringify({ fields: {
             name:      { stringValue: name.trim() },
@@ -394,7 +222,7 @@ function LoginScreen({ onLogin }) {
         const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
         const token    = await user.getIdToken();
         const authH    = { Authorization: `Bearer ${token}` };
-        const resp = await fetch(`${BASE}/shrimp_users/${user.uid}`, { headers: authH });
+        const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
         if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
@@ -667,7 +495,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   }, []);
 
   useEffect(() => {
-    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
+    fsAuthHeaders().then(h => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -1607,7 +1435,7 @@ function ProductSettingsScreen() {
   const [flash, setFlash]   = useState('');
 
   useEffect(() => {
-    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
+    fsAuthHeaders().then(h => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -1624,10 +1452,10 @@ function ProductSettingsScreen() {
   const save = async () => {
     setSaving(true);
     try {
-      const fields = _fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
+      const fields = fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
       const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
-      const r = await fetch(`${_FS}/productSettings/shrimp?${qs}`, {
-        method: 'PATCH', headers: await _fsAuthHeaders(),
+      const r = await fetch(`${FS_BASE}/productSettings/shrimp?${qs}`, {
+        method: 'PATCH', headers: await fsAuthHeaders(),
         body: JSON.stringify({ fields }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
