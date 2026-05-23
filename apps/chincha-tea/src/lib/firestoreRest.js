@@ -2,7 +2,7 @@ import { auth } from '../firebase';
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
 export const FS_BASE = projectId
-  ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/chincha/documents`
+  ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
   : null;
 
 async function authHeaders() {
