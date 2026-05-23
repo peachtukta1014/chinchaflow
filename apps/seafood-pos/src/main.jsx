@@ -375,12 +375,14 @@ function LoginScreen({ onLogin }) {
     try {
       if (mode === 'register') {
         const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        const listJson = await fetch(`${BASE}/shrimp_users?pageSize=1`).then(r => r.json());
+        const token    = await user.getIdToken();
+        const authH    = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        const listJson = await fetch(`${BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
         const isFirst  = !listJson.documents?.length;
         const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const grantAdmin   = isFirst || isAdminEmail;
         await fetch(`${BASE}/shrimp_users/${user.uid}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          method: 'PATCH', headers: authH,
           body: JSON.stringify({ fields: {
             name:      { stringValue: name.trim() },
             email:     { stringValue: email.trim() },
@@ -393,7 +395,9 @@ function LoginScreen({ onLogin }) {
         onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: 'admin' });
       } else {
         const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
-        const resp = await fetch(`${BASE}/shrimp_users/${user.uid}`);
+        const token    = await user.getIdToken();
+        const authH    = { Authorization: `Bearer ${token}` };
+        const resp = await fetch(`${BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
         if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
