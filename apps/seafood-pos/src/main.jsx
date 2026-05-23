@@ -1157,6 +1157,7 @@ const Dashboard = ({ stock }) => {
   const [customerDebts, setCustomerDebts]   = useState([]);
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!db) { setLoading(false); return; }
@@ -1186,7 +1187,10 @@ const Dashboard = ({ stock }) => {
         });
         setFirestoreSales(sortSales(filtered));
         setLoading(false);
-      }, () => setLoading(false));
+      }, () => {
+        setLoading(false);
+        if (retryCount < 3) setTimeout(() => setRetryCount(c => c + 1), 5000);
+      });
       unsubs.push(unsub2);
     }));
 
@@ -1200,7 +1204,7 @@ const Dashboard = ({ stock }) => {
     }, () => {}));
 
     return () => unsubs.forEach(u => u());
-  }, []);
+  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const todaySales = firestoreSales; // already filtered by dateKey in query
 
