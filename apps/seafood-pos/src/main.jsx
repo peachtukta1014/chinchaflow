@@ -746,6 +746,10 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const handleSaveBill = async () => {
     if (cart.length === 0) return;
     if (paymentType === 'installment' && !paidAmount) return alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ');
+    const liveKg = cart.reduce((s, i) => i.type !== 'dead' ? s + i.weight : s, 0);
+    const deadKg = cart.reduce((s, i) => i.type === 'dead' ? s + i.weight : s, 0);
+    if (liveKg > stock.live) { alert(`⚠️ กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
+    if (deadKg > stock.dead) { alert(`⚠️ กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
     const billData = {
       billNo: billNoRef.current,
@@ -778,9 +782,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
           }, remaining));
         }
       }
-      let liveD = 0, deadD = 0;
-      cart.forEach(i => { if (i.type === 'dead') deadD += i.weight; else liveD += i.weight; });
-      updateMainStock(Math.max(0, stock.live - liveD), Math.max(0, stock.dead - deadD));
+      updateMainStock(Math.max(0, stock.live - liveKg), Math.max(0, stock.dead - deadKg));
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
