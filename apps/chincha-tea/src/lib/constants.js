@@ -1,23 +1,26 @@
-/** หมวดเครื่องดื่มสำหรับ CRUD / แสดงเมนู */
+/** หมวดเครื่องดื่ม — ร้านชงชา · กาแฟ · ผลไม้ปั่น (ไม่ใช่คาเฟ่) */
 export const DRINK_CATEGORIES = [
-  { id: 'milk-tea', label: 'ชานม', labelEn: 'MILK TEA', accent: '#c87941', accentBg: '#fff5eb', emoji: '🧋' },
-  { id: 'clear-tea', label: 'ชาใส', labelEn: 'CLEAR TEA', accent: '#4a7a5a', accentBg: '#edf7f0', emoji: '🍵' },
-  { id: 'coffee', label: 'กาแฟ', labelEn: 'COFFEE', accent: '#8b5a2b', accentBg: '#faf3eb', emoji: '☕' },
-  { id: 'soda', label: 'โซดา', labelEn: 'SODA', accent: '#3b82a8', accentBg: '#eef6fb', emoji: '🥤' },
-  { id: 'blended', label: 'เมนูปั่น', labelEn: 'BLENDED', accent: '#b94a6a', accentBg: '#fdeef2', emoji: '🍓' },
+  { id: 'milk-tea', label: 'ชานม/ชงชา', labelMy: 'လက်ဖက်နို့', labelEn: 'MILK TEA', accent: '#c87941', accentBg: '#fff5eb', emoji: '🧋' },
+  { id: 'clear-tea', label: 'ชาชง', labelMy: 'လက်ဖက်ရည်ချို', labelEn: 'BREWED TEA', accent: '#4a7a5a', accentBg: '#edf7f0', emoji: '🍵' },
+  { id: 'coffee', label: 'กาแฟ', labelMy: 'ကော်ဖီ', labelEn: 'COFFEE', accent: '#8b5a2b', accentBg: '#faf3eb', emoji: '☕' },
+  { id: 'blended', label: 'ผลไม้สดปั่น', labelMy: '်သီးဖျော်ပါး', labelEn: 'FRUIT SMOOTHIE', accent: '#b94a6a', accentBg: '#fdeef2', emoji: '🍓' },
 ];
 
 export const DEFAULT_MENU = [
-  { id: 'thai-tea', key: 'thaiTea', nameEn: 'Thai Tea', nameTh: 'ชาไทย', basePrice: 30, category: 'milk-tea', tag: 'ชาดี', star: true, emoji: '🧋', active: true },
-  { id: 'brown-sugar', key: 'brownSugar', nameEn: 'Brown Sugar Milk', nameTh: 'ชานมบราวน์ชูการ์', basePrice: 35, category: 'milk-tea', tag: 'ยอดนิยม', star: true, emoji: '🧋', active: true },
-  { id: 'green-tea', key: 'greenTea', nameEn: 'Green Tea', nameTh: 'ชาเขียว', basePrice: 30, category: 'clear-tea', tag: 'เย็น/ร้อน', star: false, emoji: '🍵', active: true },
-  { id: 'lemon-tea', key: 'lemonTea', nameEn: 'Lemon Tea', nameTh: 'ชามะนาว', basePrice: 30, category: 'clear-tea', tag: 'เส้น', star: false, emoji: '🍋', active: true },
-  { id: 'matcha', key: 'matcha', nameEn: 'Matcha', nameTh: 'มัทฉะ', basePrice: 35, category: 'clear-tea', tag: 'พรีเมียม', star: true, emoji: '🍃', active: true },
-  { id: 'coffee', key: 'coffee', nameEn: 'Coffee', nameTh: 'กาแฟ', basePrice: 35, category: 'coffee', tag: 'ยอดนิยม', star: false, emoji: '☕', active: true },
-  { id: 'thai-coffee', key: 'thaiCoffee', nameEn: 'Thai Iced Coffee', nameTh: 'โอเลี้ยง', basePrice: 35, category: 'coffee', tag: 'เย็น', star: false, emoji: '🥤', active: true },
-  { id: 'soda-lime', key: 'sodaLime', nameEn: 'Lime Soda', nameTh: 'โซดามะนาว', basePrice: 30, category: 'soda', tag: 'สดชื่น', star: false, emoji: '🥤', active: true },
-  { id: 'taro', key: 'taro', nameEn: 'Taro Blend', nameTh: 'เผือกปั่น', basePrice: 50, category: 'blended', tag: 'พิเศษ', star: true, emoji: '🫐', active: true },
-  { id: 'strawberry', key: 'strawberry', nameEn: 'Strawberry Blend', nameTh: 'สตรอว์เบอร์รีปั่น', basePrice: 50, category: 'blended', tag: 'ซีซั่น', star: true, emoji: '🍓', active: true },
+  { id: 'thai-tea', key: 'thaiTea', nameEn: 'Thai Tea', nameTh: 'ชาไทย', basePrice: 30, category: 'milk-tea', tag: 'ชงชา', star: true, emoji: '🧋', active: true },
+  { id: 'brown-sugar', key: 'brownSugar', nameEn: 'Brown Sugar Milk Tea', nameTh: 'ชานมบราวน์ชูการ์', basePrice: 35, category: 'milk-tea', tag: 'ยอดนิยม', star: true, emoji: '🧋', active: true },
+  { id: 'green-tea', key: 'greenTea', nameEn: 'Green Tea', nameTh: 'ชาเขียว', basePrice: 30, category: 'clear-tea', tag: 'ชง', star: false, emoji: '🍵', active: true },
+  { id: 'lemon-tea', key: 'lemonTea', nameEn: 'Lemon Tea', nameTh: 'ชามะนาว', basePrice: 30, category: 'clear-tea', tag: 'ชง', star: false, emoji: '🍋', active: true },
+  { id: 'matcha', key: 'matcha', nameEn: 'Matcha', nameTh: 'มัทฉะ', basePrice: 35, category: 'clear-tea', tag: 'ชง', star: true, emoji: '🍃', active: true },
+  { id: 'black-tea', key: 'blackTea', nameEn: 'Black Tea', nameTh: 'ชาดำ', basePrice: 25, category: 'clear-tea', tag: 'ชง', star: false, emoji: '🍵', active: true },
+  { id: 'coffee', key: 'coffee', nameEn: 'Coffee', nameTh: 'กาแฟเย็น', basePrice: 35, category: 'coffee', tag: 'กาแฟ', star: true, emoji: '☕', active: true },
+  { id: 'thai-coffee', key: 'thaiCoffee', nameEn: 'Thai Iced Coffee', nameTh: 'โอเลี้ยง', basePrice: 35, category: 'coffee', tag: 'กาแฟ', star: false, emoji: '🥤', active: true },
+  { id: 'latte', key: 'latte', nameEn: 'Latte', nameTh: 'ลาเต้', basePrice: 40, category: 'coffee', tag: 'กาแฟ', star: false, emoji: '☕', active: true },
+  { id: 'mango-smoothie', key: 'mangoSmoothie', nameEn: 'Mango Smoothie', nameTh: 'มะม่วงปั่น', basePrice: 45, category: 'blended', tag: 'ผลไม้', star: true, emoji: '🥭', active: true },
+  { id: 'strawberry', key: 'strawberry', nameEn: 'Strawberry Smoothie', nameTh: 'สตรอว์เบอร์รีปั่น', basePrice: 45, category: 'blended', tag: 'ผลไม้', star: true, emoji: '🍓', active: true },
+  { id: 'watermelon', key: 'watermelonSmoothie', nameEn: 'Watermelon Smoothie', nameTh: 'แตงโมปั่น', basePrice: 40, category: 'blended', tag: 'ผลไม้', star: false, emoji: '🍉', active: true },
+  { id: 'mixed-fruit', key: 'mixedFruitSmoothie', nameEn: 'Mixed Fruit Smoothie', nameTh: 'ผลไม้รวมปั่น', basePrice: 50, category: 'blended', tag: 'รวม', star: false, emoji: '🍹', active: true },
+  { id: 'taro', key: 'taro', nameEn: 'Taro Smoothie', nameTh: 'เผือกปั่น', basePrice: 45, category: 'blended', tag: 'ปั่น', star: false, emoji: '🫐', active: true },
 ];
 
 export const DEFAULT_TOPPINGS = [
@@ -48,15 +51,27 @@ export const ICE_OPTIONS = [
   { id: 'fullice', labelKey: 'fullice' },
 ];
 
-export function dateKeyBangkok() {
-  return new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+export function dateKeyBangkok(d = new Date()) {
+  return new Date(d.getTime() + 7 * 3600000).toISOString().split('T')[0];
 }
 
-export function menuItemToCard(item, t) {
+/** เลื่อนวันที่ YYYY-MM-DD (+1 / -1) */
+export function shiftDateKey(dateKey, days) {
+  const d = new Date(`${dateKey}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+}
+
+export function menuItemToCard(item, t, lang = 'th') {
   const cat = DRINK_CATEGORIES.find((c) => c.id === item.category) || DRINK_CATEGORIES[0];
+  const nameMy = item.nameMy || (lang === 'my' && t?.(item.key));
+  const primary = lang === 'my'
+    ? (nameMy || item.nameTh || t?.(item.key) || item.nameEn)
+    : (item.nameTh || t?.(item.key) || item.nameEn);
   return {
     ...item,
-    nameDisplay: item.nameTh || t(item.key) || item.nameEn,
+    nameDisplay: primary,
+    nameSub: lang === 'my' ? (item.nameTh || item.nameEn) : item.nameEn,
     cat,
     bg: 'bg-white',
     border: 'border-stone-100',

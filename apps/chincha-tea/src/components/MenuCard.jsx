@@ -9,7 +9,8 @@ export function MenuCard({ item, cat, t, onAdd }) {
     setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 500);
     onAdd();
   };
-  const name = item.nameTh || t(item.key) || item.nameEn;
+  const name = item.nameDisplay || item.nameTh || t(item.key) || item.nameEn;
+  const sub = item.nameSub || item.nameEn;
   return (
     <button
       type="button"
@@ -31,7 +32,7 @@ export function MenuCard({ item, cat, t, onAdd }) {
         {item.tag || cat.label}
       </span>
       <p className="font-black text-stone-800 text-sm leading-tight">{name}</p>
-      <p className="text-[10px] text-stone-400 mb-2 leading-tight">{item.nameEn}</p>
+      {sub && <p className="text-[10px] text-stone-400 mb-2 leading-tight">{sub}</p>}
       <div className="flex items-center justify-between mt-1">
         <span className="font-black text-sm" style={{ color: '#3d1f0f' }}>฿{item.basePrice}</span>
         <div

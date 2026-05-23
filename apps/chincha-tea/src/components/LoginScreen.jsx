@@ -12,14 +12,14 @@ import { auth, fbReady } from '../firebase';
 import { fsGetDoc, fsPatch, fsListCollection } from '../lib/firestoreRest';
 import { T } from '../lib/i18n';
 
-function friendlyAuthError(code) {
+function authErrorKey(code) {
   if (!code) return null;
-  if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-  if (code.includes('email-already-in-use')) return 'อีเมลนี้มีบัญชีแล้ว ลองเข้าสู่ระบบแทน';
-  if (code.includes('weak-password')) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัว';
-  if (code.includes('invalid-email')) return 'รูปแบบอีเมลไม่ถูกต้อง';
-  if (code.includes('too-many-requests')) return 'ลองใหม่ภายหลัง (พยายามเกินกำหนด)';
-  if (code.includes('network-request-failed')) return 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต';
+  if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'authInvalidLogin';
+  if (code.includes('email-already-in-use')) return 'authEmailInUse';
+  if (code.includes('weak-password')) return 'authWeakPw';
+  if (code.includes('invalid-email')) return 'authInvalidEmail';
+  if (code.includes('too-many-requests')) return 'authTooMany';
+  if (code.includes('network-request-failed')) return 'authNetwork';
   return null;
 }
 
@@ -49,7 +49,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       });
       profile = await fsGetDoc(`users/${uid}`);
     }
-    if (!profile) throw new Error('สร้างบัญชีไม่สำเร็จ');
+    if (!profile) throw new Error('authCreateFailed');
     return { uid, ...profile };
   };
 
@@ -57,9 +57,9 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     const em = email.trim().toLowerCase();
     const pw = password.trim();
     const name = nickname.trim();
-    if (!em || !pw || pw.length < 6) { setError('กรุณากรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัว'); return; }
-    if (!name) { setError('กรุณากรอกชื่อเล่น'); return; }
-    if (!auth || !fbReady) { setError('Firebase ยังไม่พร้อม'); return; }
+    if (!em || !pw || pw.length < 6) { setError(t('authNeedEmailPw')); return; }
+    if (!name) { setError(t('authNeedNickname')); return; }
+    if (!auth || !fbReady) { setError(t('storageNotReady')); return; }
     setLoading(true);
     setError('');
     try {
@@ -82,7 +82,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       }
     } catch (e) {
       const code = e?.code || '';
-      setError(friendlyAuthError(code) || e?.message || 'สมัครไม่สำเร็จ');
+      const key = authErrorKey(code);
+      setError(key ? t(key) : (e?.message?.startsWith('auth') ? t(e.message) : e?.message) || t('authRegisterFailed'));
     } finally {
       setLoading(false);
     }
@@ -91,8 +92,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const handleLogin = async () => {
     const em = email.trim().toLowerCase();
     const pw = password.trim();
-    if (!em || !pw) { setError('กรุณากรอกอีเมลและรหัสผ่าน'); return; }
-    if (!auth || !fbReady) { setError('Firebase ยังไม่พร้อม'); return; }
+    if (!em || !pw) { setError(t('authNeedLoginFields')); return; }
+    if (!auth || !fbReady) { setError(t('storageNotReady')); return; }
     setLoading(true);
     setError('');
     try {
@@ -106,7 +107,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       onAuthed(profile);
     } catch (e) {
       const code = e?.code || '';
-      setError(friendlyAuthError(code) || e?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+      const key = authErrorKey(code);
+      setError(key ? t(key) : e?.message || t('authLoginFailed'));
     } finally {
       setLoading(false);
     }
@@ -114,15 +116,16 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
 
   const handleResetPassword = async () => {
     const em = email.trim().toLowerCase();
-    if (!em) { setError('กรุณากรอกอีเมลก่อนกด "ลืมรหัสผ่าน"'); return; }
-    if (!auth) { setError('Firebase ยังไม่พร้อม'); return; }
+    if (!em) { setError(t('authForgotEmail')); return; }
+    if (!auth) { setError(t('storageNotReady')); return; }
     try {
       await sendPasswordResetEmail(auth, em);
       setResetSent(true);
       setError('');
     } catch (e) {
       const code = e?.code || '';
-      setError(friendlyAuthError(code) || 'ส่งอีเมลไม่สำเร็จ');
+      const key = authErrorKey(code);
+      setError(key ? t(key) : t('authResetFailed'));
     }
   };
 

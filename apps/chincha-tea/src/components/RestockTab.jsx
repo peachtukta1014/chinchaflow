@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
-import { fsPost } from '../lib/firestoreRest';
+import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
 
 export function RestockTab({ member, t }) {
   const [items, setItems] = useState([]);
+  const [recentRequests, setRecentRequests] = useState([]);
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState('');
@@ -13,10 +14,14 @@ export function RestockTab({ member, t }) {
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
 
+  useEffect(() => {
+    fsQueryRestocks(20).then(setRecentRequests).catch(() => {});
+  }, []);
+
   const STATUS_CFG = [
-    { key: 'normal', label: 'ปกติ', active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
-    { key: 'low', label: 'เหลือน้อย', active: 'bg-amber-100 text-amber-700 border-amber-300' },
-    { key: 'out', label: 'หมดแล้ว', active: 'bg-red-100 text-red-600 border-red-300' },
+    { key: 'normal', label: t('statusNormal'), active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    { key: 'low', label: t('statusLow'), active: 'bg-amber-100 text-amber-700 border-amber-300' },
+    { key: 'out', label: t('statusOut'), active: 'bg-red-100 text-red-600 border-red-300' },
   ];
 
   const addItem = () => {
@@ -28,7 +33,7 @@ export function RestockTab({ member, t }) {
 
   const uploadOrderPhoto = async (file) => {
     if (!file || !storage) {
-      alert('Firebase Storage ยังไม่พร้อม');
+      alert(t('storageNotReady'));
       return;
     }
     setUploading(true);
@@ -50,7 +55,7 @@ export function RestockTab({ member, t }) {
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
-      alert('อัปโหลดไม่สำเร็จ');
+      alert(t('uploadFailed'));
     }
     setUploading(false);
   };
@@ -59,7 +64,8 @@ export function RestockTab({ member, t }) {
     if (!items.length) return;
     setSaving(true);
     try {
-      await fsPost('restock_requests', {
+      await fsPost('restocks', {
+        dateKey,
         uid: member?.uid || 'unknown',
         createdBy: member?.name || 'ชินชา',
         items: items.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
@@ -67,6 +73,7 @@ export function RestockTab({ member, t }) {
       });
       setItems([]);
       setFlash('✅ ส่งรายการแล้ว!');
+      setRecentRequests(await fsQueryRestocks(20));
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
@@ -97,7 +104,7 @@ export function RestockTab({ member, t }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addItem()}
-          placeholder="ชื่อสินค้า..."
+          placeholder={t('restockPlaceholder')}
           className="flex-1 px-4 py-3.5 rounded-2xl border-2 border-stone-200 text-sm outline-none focus:border-amber-400 bg-white"
         />
         <button type="button" onClick={addItem} className="w-14 h-14 rounded-2xl font-black text-white text-2xl shrink-0" style={{ background: '#3d1f0f' }}>+</button>
@@ -138,8 +145,29 @@ export function RestockTab({ member, t }) {
         className="w-full py-4 rounded-2xl font-black text-white disabled:opacity-40"
         style={{ background: '#3d1f0f' }}
       >
-        {saving ? '⏳...' : `📋 ส่งรายการสั่งของ${items.length ? ` (${items.length})` : ''}`}
+        {saving ? '⏳...' : `📋 ${t('submitRestock')}${items.length ? ` (${items.length})` : ''}`}
       </button>
+
+      {recentRequests.length > 0 && (
+        <div className="mt-4">
+          <p className="font-black text-xs text-stone-500 uppercase mb-2">{t('recentRestocks')}</p>
+          <div className="space-y-2">
+            {recentRequests.map((req) => (
+              <div key={req.id} className="bg-white rounded-2xl p-3 border border-stone-200">
+                <p className="text-[10px] text-stone-400 mb-1">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
+                {(req.items || []).map((it, i) => (
+                  <p key={i} className="text-xs text-stone-600">
+                    {it.name} ×{it.qty}
+                    <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

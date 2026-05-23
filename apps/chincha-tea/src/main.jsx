@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, fbReady } from './firebase';
 import { fsGetDoc, fsPost, fsQueryOrders } from './lib/firestoreRest';
-import { dateKeyBangkok } from './lib/constants';
+import { dateKeyBangkok, shiftDateKey } from './lib/constants';
 import { useLang } from './lib/i18n';
 import { useCatalog } from './lib/useCatalog';
 import { LoginScreen } from './components/LoginScreen';
@@ -13,7 +13,7 @@ import { SummaryTab } from './components/SummaryTab';
 import { RestockTab } from './components/RestockTab';
 
 function App() {
-  const { lang, setLang, t } = useLang();
+  const { lang, setLang, t, isMy } = useLang();
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
   const [tab, setTab] = useState('order');
@@ -26,12 +26,13 @@ function App() {
 
   const isAuthed = member && member.approved === true;
   const { menuItems, toppingsList, refreshCatalog } = useCatalog(!!isAuthed);
-  const dateKey = dateKeyBangkok();
+  const todayKey = dateKeyBangkok();
+  const [viewDateKey, setViewDateKey] = useState(todayKey);
 
   const refreshOrders = useCallback(async () => {
-    const docs = await fsQueryOrders(dateKey);
+    const docs = await fsQueryOrders(viewDateKey);
     setOrders(docs);
-  }, [dateKey]);
+  }, [viewDateKey]);
 
   useEffect(() => {
     if (!fbReady) {
@@ -89,7 +90,7 @@ function App() {
     setSaving(true);
     try {
       await fsPost('teaOrders', {
-        dateKey,
+        dateKey: todayKey,
         items: cart,
         total: cartTotal,
         payType,
@@ -103,7 +104,7 @@ function App() {
       alert(t('saved'));
     } catch (e) {
       console.error(e);
-      alert('⚠️ บันทึกไม่สำเร็จ');
+      alert(`⚠️ ${t('saveFailed')}`);
     }
     setSaving(false);
   };
@@ -163,6 +164,11 @@ function App() {
         </div>
       </header>
 
+      {isMy && (
+        <p className="z-10 shrink-0 mx-4 mt-1 px-3 py-2 rounded-xl text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 text-center leading-snug">
+          {t('staffBanner')}
+        </p>
+      )}
       <nav className="z-10 shrink-0 flex px-2 pt-2 pb-1 gap-1 overflow-x-auto" style={{ background: '#fdf6f0', scrollbarWidth: 'none' }}>
         {tabs.map(([id, label]) => (
           <button
@@ -182,6 +188,7 @@ function App() {
           <OrderTab
             menuItems={menuItems}
             toppingsList={toppingsList}
+            lang={lang}
             t={t}
             onAddToCart={addToCart}
             setModalItem={setModalItem}
@@ -190,6 +197,11 @@ function App() {
         )}
         {tab === 'history' && (
           <div className="px-4 pt-3 pb-6 space-y-3">
+            <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 mb-2">
+              <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black text-stone-600">‹</button>
+              <p className="flex-1 text-center text-xs font-black text-stone-600">{viewDateKey === todayKey ? t('todaySales') : viewDateKey}</p>
+              <button type="button" disabled={viewDateKey >= todayKey} onClick={() => setViewDateKey(shiftDateKey(viewDateKey, 1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black disabled:opacity-30">›</button>
+            </div>
             {orders.length === 0 ? (
               <p className="text-center text-stone-300 py-12">{t('noOrders')}</p>
             ) : (
@@ -198,7 +210,7 @@ function App() {
                   <div className="flex justify-between mb-2">
                     <p className="text-xs text-stone-400">
                       {(() => { try { return new Date(o.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }); } catch { return '—'; } })()}
-                      {o.payType && <span className="ml-2 font-bold">{o.payType === 'cash' ? 'สด' : 'โอน'}</span>}
+                      {o.payType && <span className="ml-2 font-bold">{o.payType === 'cash' ? t('cash') : t('transfer')}</span>}
                     </p>
                     <p className="font-black" style={{ color: '#3d1f0f' }}>฿{(o.total || 0).toLocaleString()}</p>
                   </div>
@@ -213,9 +225,19 @@ function App() {
             )}
           </div>
         )}
-        {tab === 'summary' && <SummaryTab orders={orders} t={t} dateKey={dateKey} member={member} menuItems={menuItems} />}
+        {tab === 'summary' && (
+          <SummaryTab
+            orders={orders}
+            t={t}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+            member={member}
+            menuItems={menuItems}
+            isAdmin={isAdmin}
+          />
+        )}
         {tab === 'restock' && <RestockTab member={member} t={t} />}
-        {tab === 'admin' && isAdmin && <AdminPanel t={t} />}
+        {tab === 'admin' && isAdmin && <AdminPanel t={t} onOrdersChanged={refreshOrders} />}
       </main>
 
       {cart.length > 0 && tab !== 'admin' && (
@@ -243,7 +265,7 @@ function App() {
               ))}
             </div>
             <div className="flex gap-2 mb-3">
-              {[['cash', '💵 สด'], ['transfer', '📱 โอน']].map(([v, label]) => (
+              {[['cash', `💵 ${t('cash')}`], ['transfer', `📱 ${t('transfer')}`]].map(([v, label]) => (
                 <button key={v} type="button" onClick={() => setPayType(v)} className={`flex-1 py-2 rounded-xl font-bold text-sm border-2 ${payType === v ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}>{label}</button>
               ))}
             </div>

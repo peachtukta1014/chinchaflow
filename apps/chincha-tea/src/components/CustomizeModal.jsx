@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { SIZES } from '../lib/constants';
+import { menuDisplayName, toppingDisplayLabel, toppingDisplaySub } from '../lib/displayNames';
 
-export function CustomizeModal({ item, toppingsList, t, onAdd, onClose }) {
+export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) {
   const [selectedSize, setSelectedSize] = useState(SIZES[0]);
   const [selectedToppings, setSelectedToppings] = useState([]);
   const [qty, setQty] = useState(1);
@@ -10,7 +11,8 @@ export function CustomizeModal({ item, toppingsList, t, onAdd, onClose }) {
   const toppingTotal = selectedToppings.reduce((s, tp) => s + (tp.price || 0), 0);
   const unitPrice = (item.basePrice || 0) + selectedSize.addPrice + toppingTotal;
   const lineTotal = unitPrice * qty;
-  const name = item.nameTh || t(item.key) || item.nameEn;
+  const name = menuDisplayName(item, lang, t);
+  const nameSub = lang === 'my' ? (item.nameTh || item.nameEn) : item.nameEn;
 
   const toggleTopping = (tp) => {
     setSelectedToppings((prev) =>
@@ -29,6 +31,7 @@ export function CustomizeModal({ item, toppingsList, t, onAdd, onClose }) {
           <span className="text-4xl">{item.emoji}</span>
           <div className="flex-1">
             <h2 className="font-black text-stone-800 text-xl">{name}</h2>
+            {nameSub && <p className="text-xs text-stone-400">{nameSub}</p>}
             <p className="text-stone-400 text-sm">
               ฿{item.basePrice}
               {toppingTotal > 0 && <span className="text-amber-600"> +{toppingTotal}</span>}
@@ -55,7 +58,7 @@ export function CustomizeModal({ item, toppingsList, t, onAdd, onClose }) {
           </div>
         </div>
         <div>
-          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">ท็อปปิ้ง</p>
+          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">{t('toppings')}</p>
           <div className="grid grid-cols-2 gap-2">
             {toppingsList.map((tp) => {
               const selected = !!selectedToppings.find((x) => x.id === tp.id);
@@ -66,7 +69,11 @@ export function CustomizeModal({ item, toppingsList, t, onAdd, onClose }) {
                   onClick={() => toggleTopping(tp)}
                   className={`px-3 py-2.5 rounded-2xl border-2 text-left text-xs font-bold ${selected ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}
                 >
-                  {tp.label} +{tp.price}
+                  <span>{toppingDisplayLabel(tp, lang)}</span>
+                  {toppingDisplaySub(tp, lang) && (
+                    <span className="block text-[9px] text-stone-400 font-normal">{toppingDisplaySub(tp, lang)}</span>
+                  )}
+                  <span className="text-amber-600"> +{tp.price}</span>
                 </button>
               );
             })}

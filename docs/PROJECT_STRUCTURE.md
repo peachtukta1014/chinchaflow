@@ -3,7 +3,7 @@
 ## Apps
 
 - `apps/seafood-pos` — POS กุ้ง (React + Vite + Firebase) ✅
-- `apps/chincha-tea` — ร้านชา POS (React + Vite + Firebase) 🔲
+- `apps/chincha-tea` — ร้านชงชา/กาแฟ/ผลไม้ปั่น — บันทึกยอดขายรายวัน (React + Vite + Firebase)
 - `apps/webhook-core` — LINE Webhook + Firebase Functions 🔲
 
 ## Packages

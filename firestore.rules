@@ -82,6 +82,17 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /orderSlips/{docId} {
+      allow read, create: if isApproved();
+      allow update, delete: if isAdmin();
+    }
+
+    match /line_messages/{docId} {
+      allow read: if isAdmin() || isAdminShrimp();
+      allow create: if false;
+      allow update, delete: if isAdmin() || isAdminShrimp();
+    }
+
     // ─── Seafood POS collections ───────────────────────────────────────────────
 
     // Shrimp user profiles — own doc read/write; list for first-user/approval check
@@ -115,10 +126,10 @@ service cloud.firestore {
       allow delete: if isAdminShrimp();
     }
 
-    // Config (stock) — approved read; admin write
+    // Config — stock (shrimp), LINE/settings (tea)
     match /config/{docId} {
-      allow read: if isApprovedShrimp();
-      allow write: if isAdminShrimp();
+      allow read: if isApproved() || isApprovedShrimp();
+      allow write: if isAdmin() || isAdminShrimp();
     }
 
     // Product settings (shrimp prices) — approved read; admin write
@@ -127,10 +138,11 @@ service cloud.firestore {
       allow write: if isAdminShrimp();
     }
 
-    // LINE orders — approved read/create; admin update/delete
+    // LINE orders — กุ้ง (staff สร้างได้) + ชา (สร้างผ่าน Cloud Functions)
     match /lineOrders/{docId} {
-      allow read, create: if isApprovedShrimp();
-      allow update, delete: if isAdminShrimp();
+      allow read: if isApproved() || isApprovedShrimp();
+      allow create: if isApprovedShrimp();
+      allow update, delete: if isAdmin() || isAdminShrimp();
     }
 
     // Deny everything else

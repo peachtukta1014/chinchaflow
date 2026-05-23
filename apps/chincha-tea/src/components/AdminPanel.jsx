@@ -1,15 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DRINK_CATEGORIES } from '../lib/constants';
+import { DRINK_CATEGORIES, dateKeyBangkok, shiftDateKey } from '../lib/constants';
 import {
   fsDelete,
+  fsGetConfig,
   fsPatch,
   fsPost,
+  fsQueryOrders,
   fsQueryProducts,
   fsQueryToppings,
   fsQueryUsers,
+  fsSetConfig,
 } from '../lib/firestoreRest';
 
-export function AdminPanel({ t }) {
+const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
+const DEFAULT_LINE_CONFIG = {
+  webhookFunction: 'lineWebhookTea',
+  webhookRegion: 'asia-southeast1',
+  envSecret: 'LINE_TEA_CHANNEL_SECRET',
+  envToken: 'LINE_TEA_CHANNEL_ACCESS_TOKEN',
+  notifyGroupId: '',
+  notifyUserIds: '',
+  autoSummaryEnabled: true,
+  autoSummaryHour: 22,
+};
+
+export function AdminPanel({ t, onOrdersChanged }) {
   const [section, setSection] = useState('members');
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -81,24 +96,24 @@ export function AdminPanel({ t }) {
       {flash && (
         <div className="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">{flash}</div>
       )}
-      <div className="flex gap-2">
-        {[['members', t('members')], ['products', t('products')]].map(([id, label]) => (
+      <div className="flex gap-1.5 flex-wrap">
+        {[['members', t('members')], ['products', t('products')], ['orders', t('orderHistory')], ['settings', t('lineSettings')]].map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setSection(id)}
-            className={`flex-1 py-2.5 rounded-2xl font-bold text-xs ${section === id ? 'text-white' : 'bg-stone-200 text-stone-500'}`}
+            className={`shrink-0 px-3 py-2 rounded-2xl font-bold text-[10px] ${section === id ? 'text-white' : 'bg-stone-200 text-stone-500'}`}
             style={section === id ? { background: '#3d1f0f' } : {}}
           >
             {label}
           </button>
         ))}
       </div>
-      {loading ? (
+      {loading && (section === 'members' || section === 'products') ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
       ) : section === 'members' ? (
         <MembersSection users={users} t={t} onUpdate={updateUser} />
-      ) : (
+      ) : section === 'products' ? (
         <ProductsSection
           products={products}
           toppings={toppings}
@@ -108,6 +123,10 @@ export function AdminPanel({ t }) {
           onDeleteProduct={(id) => fsDelete(`products/${id}`).then(refresh)}
           onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(refresh)}
         />
+      ) : section === 'orders' ? (
+        <OrdersSection t={t} onChanged={onOrdersChanged} />
+      ) : (
+        <LineSettingsSection t={t} />
       )}
     </div>
   );
@@ -273,6 +292,203 @@ function ToppingFormModal({ form, t, onClose, onSave }) {
       <input className="field" type="number" placeholder="ราคา" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
       <button type="button" onClick={() => onSave(f)} className="w-full py-3 mt-2 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
     </ModalShell>
+  );
+}
+
+function OrdersSection({ t, onChanged }) {
+  const todayKey = dateKeyBangkok();
+  const [viewDateKey, setViewDateKey] = useState(todayKey);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editOrder, setEditOrder] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setOrders(await fsQueryOrders(viewDateKey));
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  }, [viewDateKey]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const saveOrder = async (form) => {
+    await fsPatch(`teaOrders/${form.id}`, {
+      total: parseInt(form.total, 10) || 0,
+      payType: form.payType,
+    });
+    setEditOrder(null);
+    await load();
+    onChanged?.();
+  };
+
+  const deleteOrder = async (id) => {
+    if (!window.confirm(t('confirmDeleteOrder'))) return;
+    await fsDelete(`teaOrders/${id}`);
+    await load();
+    onChanged?.();
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200">
+        <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black">‹</button>
+        <p className="flex-1 text-center text-xs font-black text-stone-700">{viewDateKey}</p>
+        <button type="button" disabled={viewDateKey >= todayKey} onClick={() => setViewDateKey(shiftDateKey(viewDateKey, 1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black disabled:opacity-30">›</button>
+      </div>
+      {loading ? (
+        <p className="text-center text-stone-400 py-6">{t('loading')}</p>
+      ) : orders.length === 0 ? (
+        <p className="text-center text-stone-400 py-6">{t('noOrders')}</p>
+      ) : (
+        orders.map((o) => (
+          <div key={o.id} className="bg-white rounded-2xl p-4 border border-stone-200">
+            <div className="flex justify-between mb-2">
+              <p className="text-xs text-stone-400">
+                {o.createdBy || '—'} · {o.payType === 'transfer' ? 'โอน' : 'สด'}
+              </p>
+              <p className="font-black" style={{ color: '#3d1f0f' }}>฿{(o.total || 0).toLocaleString()}</p>
+            </div>
+            {(o.items || []).slice(0, 3).map((it, j) => (
+              <p key={j} className="text-xs text-stone-500 truncate">{it.qty}× {it.nameSnapshot || it.nameEn}</p>
+            ))}
+            <div className="flex gap-2 mt-3">
+              <button type="button" onClick={() => setEditOrder(o)} className="flex-1 py-2 rounded-xl border-2 border-amber-200 text-xs font-bold text-amber-800">{t('edit')}</button>
+              <button type="button" onClick={() => deleteOrder(o.id)} className="flex-1 py-2 rounded-xl border-2 border-red-200 text-xs font-bold text-red-600">{t('delete')}</button>
+            </div>
+          </div>
+        ))
+      )}
+      {editOrder && (
+        <OrderEditModal
+          order={editOrder}
+          t={t}
+          onClose={() => setEditOrder(null)}
+          onSave={saveOrder}
+        />
+      )}
+    </div>
+  );
+}
+
+function OrderEditModal({ order, t, onClose, onSave }) {
+  const [total, setTotal] = useState(String(order.total || 0));
+  const [payType, setPayType] = useState(order.payType || 'cash');
+  return (
+    <ModalShell title={t('editOrder')} onClose={onClose}>
+      <p className="text-xs text-stone-400 mb-3">ID: {order.id}</p>
+      <label className="text-xs font-bold text-stone-500">ยอดรวม (฿)</label>
+      <input className="field" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
+      <label className="text-xs font-bold text-stone-500 mt-2 block">การชำระ</label>
+      <div className="flex gap-2 mb-3">
+        {[['cash', 'สด'], ['transfer', 'โอน']].map(([v, label]) => (
+          <button key={v} type="button" onClick={() => setPayType(v)} className={`flex-1 py-2 rounded-xl font-bold text-sm border-2 ${payType === v ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}>{label}</button>
+        ))}
+      </div>
+      <button type="button" onClick={() => onSave({ id: order.id, total, payType })} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
+    </ModalShell>
+  );
+}
+
+function LineSettingsSection({ t }) {
+  const [form, setForm] = useState({ ...DEFAULT_LINE_CONFIG });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState('');
+
+  useEffect(() => {
+    fsGetConfig('teaLine').then((doc) => {
+      if (doc) setForm({ ...DEFAULT_LINE_CONFIG, ...doc });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const webhookUrl = PROJECT_ID
+    ? `https://${form.webhookRegion}-${PROJECT_ID}.cloudfunctions.net/${form.webhookFunction}`
+    : '(ตั้ง VITE_FIREBASE_PROJECT_ID)';
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await fsSetConfig('teaLine', {
+        ...form,
+        updatedAt: new Date().toISOString(),
+      });
+      setFlash('✅ บันทึกการตั้งค่าแล้ว');
+      setTimeout(() => setFlash(''), 2500);
+    } catch (e) {
+      console.error(e);
+      setFlash('⚠️ บันทึกไม่สำเร็จ');
+    }
+    setSaving(false);
+  };
+
+  if (loading) return <p className="text-center text-stone-400 py-8">{t('loading')}</p>;
+
+  return (
+    <div className="space-y-3">
+      {flash && <div className="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold">{flash}</div>}
+      <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-2">
+        <p className="font-black text-sm text-stone-800">{t('lineWebhookUrl')}</p>
+        <p className="text-[10px] text-stone-400 break-all font-mono bg-stone-50 p-2 rounded-lg">{webhookUrl}</p>
+        <p className="text-[10px] text-stone-500">{t('lineWebhookHint')}</p>
+      </div>
+      <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 text-xs text-amber-900 space-y-2">
+        <p className="font-black">{t('lineBotPurpose')}</p>
+        <p className="text-[11px] leading-relaxed">{t('lineBotPurposeDesc')}</p>
+      </div>
+      <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 text-xs text-amber-900 space-y-1">
+        <p className="font-black">{t('lineEnvKeys')}</p>
+        <p><code className="bg-white px-1 rounded">{form.envSecret}</code> — Channel Secret (Functions env)</p>
+        <p><code className="bg-white px-1 rounded">{form.envToken}</code> — Channel Access Token (Functions env)</p>
+        <p className="text-[10px] opacity-80">รหัสลับตั้งใน Firebase Console → Functions → Environment variables เท่านั้น</p>
+      </div>
+      <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-3">
+        <p className="font-bold text-xs text-stone-700">{t('lineNotifyTargets')}</p>
+        <label className="text-[10px] font-bold text-stone-500 block">LINE Group ID (แจ้งสรุปปิดวัน)</label>
+        <input
+          className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
+          placeholder="Cxxxxxxxx..."
+          value={form.notifyGroupId || ''}
+          onChange={(e) => setForm({ ...form, notifyGroupId: e.target.value.trim() })}
+        />
+        <label className="text-[10px] font-bold text-stone-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
+        <input
+          className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
+          placeholder="Uxxx,Uyyy"
+          value={form.notifyUserIds || ''}
+          onChange={(e) => setForm({ ...form, notifyUserIds: e.target.value })}
+        />
+        <p className="text-[10px] text-stone-400">{t('lineGroupIdHint')}</p>
+      </div>
+      <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-2">
+        <p className="font-bold text-xs text-stone-700">{t('lineAutoSummary')}</p>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.autoSummaryEnabled !== false}
+            onChange={(e) => setForm({ ...form, autoSummaryEnabled: e.target.checked })}
+          />
+          {t('lineAutoSummaryOn')}
+        </label>
+        <label className="text-[10px] font-bold text-stone-500 block">{t('lineAutoSummaryTime')} (0–23)</label>
+        <input
+          type="number"
+          min={0}
+          max={23}
+          className="w-24 px-3 py-2 rounded-xl border-2 border-stone-200 text-sm font-bold text-center"
+          value={form.autoSummaryHour ?? 22}
+          onChange={(e) => setForm({ ...form, autoSummaryHour: parseInt(e.target.value, 10) || 22 })}
+        />
+        <p className="text-[10px] text-stone-400">เวลาไทย (Bangkok)</p>
+        <p className="text-[10px] text-stone-400">{t('lineCommands')}: สรุป · สรุปวันนี้ · ปิดวัน · help</p>
+      </div>
+      <button type="button" disabled={saving} onClick={save} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>
+        {saving ? '⏳' : t('save')}
+      </button>
+    </div>
   );
 }
 

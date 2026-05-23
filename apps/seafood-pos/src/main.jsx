@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   addDoc, collection, doc, getDoc, getDocs, increment, limit,
@@ -13,6 +13,11 @@ import {
 } from 'lucide-react';
 import { auth, db, storage, isFirebaseReady } from './firebase';
 import { dateKeyBangkok, tomorrowDateKeyBangkok } from './lib/date';
+import {
+  hasVoiceCommitCommand,
+  isVoiceOrderComplete,
+  parseShrimpVoice,
+} from './lib/voiceParse';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -140,6 +145,8 @@ function useVoice(onText) {
   const [listening, setListening] = useState(false);
   const [liveText, setLiveText]   = useState('');
   const recRef = useRef(null);
+  const onTextRef = useRef(onText);
+  onTextRef.current = onText;
 
   const toggle = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -154,7 +161,7 @@ function useVoice(onText) {
       const interim = Array.from(e.results).map(r => r[0].transcript).join('');
       setLiveText(interim);
       const last = e.results[e.results.length - 1];
-      if (last.isFinal) onText(last[0].transcript.trim());
+      if (last.isFinal) onTextRef.current(last[0].transcript.trim());
     };
     rec.onerror = () => { setListening(false); setLiveText(''); };
     rec.onend   = () => { setListening(false); setLiveText(''); };
@@ -163,44 +170,6 @@ function useVoice(onText) {
   };
 
   return { listening, toggle, liveText };
-}
-
-// ─── Voice command parser (regex fallback) ───────────────────────────────────
-// Returns array of { customerId, productId, weight } — supports multi-order in one utterance
-function parseVoice(text) {
-  const THAI_NUM = { 'ศูนย์':'0','หนึ่ง':'1','สอง':'2','สาม':'3','สี่':'4','ห้า':'5','หก':'6','เจ็ด':'7','แปด':'8','เก้า':'9','ครึ่ง':'0.5' };
-  let t = text;
-  Object.entries(THAI_NUM).forEach(([k,v]) => { t = t.replaceAll(k, v); });
-  const orders = [];
-  const foundCustomers = [];
-  CUSTOMERS.forEach(c => {
-    let cn = c.name;
-    Object.entries(THAI_NUM).forEach(([k,v]) => { cn = cn.replaceAll(k, v); });
-    let idx = t.indexOf(c.name);
-    if (idx === -1 && t.includes(cn)) idx = t.indexOf(cn);
-    if (idx !== -1) foundCustomers.push({ id: c.id, name: c.name, index: idx });
-  });
-  foundCustomers.sort((a, b) => a.index - b.index);
-  for (let i = 0; i < foundCustomers.length; i++) {
-    const cur = foundCustomers[i];
-    const endIndex = (i + 1 < foundCustomers.length) ? foundCustomers[i + 1].index : t.length;
-    const seg = t.substring(cur.index, endIndex);
-    let productId = null;
-    if (/ใหญ่/.test(seg)) productId = 'large';
-    else if (/กลาง/.test(seg)) productId = 'medium';
-    else if (/เล็ก|จิ๋ว/.test(seg)) productId = 'small';
-    else if (/ตาย|น็อค/.test(seg)) productId = 'dead';
-    let weight = null;
-    const mUnit = seg.match(/(\d+(?:\.\d+)?)\s*(โล|กก|กิโล)/);
-    if (mUnit) { weight = mUnit[1]; }
-    else { const nums = seg.match(/\d+(?:\.\d+)?/g) || []; if (nums.length) weight = nums[nums.length - 1]; }
-    if (productId && weight) orders.push({ customerId: cur.id, productId, weight });
-  }
-  return orders;
-}
-
-function hasVoiceCommitCommand(text) {
-  return /(จบบิล|บันทึก|คอมมิต|คิดเงิน|checkout|confirm|save)/i.test(text || '');
 }
 
 // ─── Admin email (always gets admin+approved on register) ────────────────────
@@ -632,6 +601,11 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const photoInputRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
+  const allCustomers = useMemo(() => [
+    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
+    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
+  ], [fsCustomers]);
+
   const activeProduct    = PRODUCTS.find(p => p.id === selectedProduct);
   const isDeadShrimp     = activeProduct?.type === 'dead';
   const currentItemTotal = isDeadShrimp
@@ -646,40 +620,6 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
 
   const [voiceResult, setVoiceResult] = useState('');
   const voiceTimerRef = useRef(null);
-
-  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice((text) => {
-    setVoiceResult(text);
-    clearTimeout(voiceTimerRef.current);
-    voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 4000);
-    const parsedOrders = parseVoice(text);
-    const complete = parsedOrders.filter(o => o.customerId && o.productId && o.weight);
-    const commit = hasVoiceCommitCommand(text);
-    if (complete.length > 0) {
-      const newItems = complete.map(o => {
-        const prod = PRODUCTS.find(p => p.id === o.productId);
-        const w = parseFloat(o.weight) || 0;
-        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * priceOf(prod.id);
-        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : priceOf(prod.id), total, note: '' };
-      });
-      setSelectedCustomer(complete[0].customerId);
-      if (commit) {
-        saveBillWithCart([...cart, ...newItems]);
-      } else {
-        setCart(prev => [...prev, ...newItems]);
-      }
-    } else if (parsedOrders.length > 0) {
-      const first = parsedOrders[0];
-      if (first.customerId) setSelectedCustomer(first.customerId);
-      if (first.productId) handleProductChange(first.productId);
-      if (first.weight) {
-        const prod = first.productId ? PRODUCTS.find(p => p.id === first.productId) : null;
-        if (prod?.type === 'dead') setCustomPrice(first.weight); else setWeight(first.weight);
-      }
-    } else {
-      const m = text.match(/\d+(?:\.\d+)?/);
-      if (m) { if (inputMode === 'weight') setWeight(m[0]); else setCustomPrice(m[0]); }
-    }
-  });
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
@@ -812,10 +752,93 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   };
   const handleSaveBill = () => saveBillWithCart(cart);
 
-  const allCustomers = [
-    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
-    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
-  ];
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+
+  const applyVoiceDraft = (draft) => {
+    if (draft.customerId) setSelectedCustomer(draft.customerId);
+    if (draft.productId) {
+      const prod = PRODUCTS.find((p) => p.id === draft.productId);
+      setSelectedProduct(draft.productId);
+      setNote('');
+      if (prod?.type === 'dead') {
+        setCustomPrice(draft.weight != null ? String(draft.weight) : '');
+        setWeight('');
+        setInputMode('price');
+      } else {
+        setCustomPrice(String(priceOf(draft.productId)));
+        setInputMode('weight');
+        setWeight(draft.weight != null ? String(draft.weight) : '');
+      }
+    } else if (draft.weight != null) {
+      const prod = PRODUCTS.find((p) => p.id === selectedProduct);
+      if (prod?.type === 'dead') setCustomPrice(String(draft.weight));
+      else setWeight(String(draft.weight));
+    }
+  };
+
+  const buildCartItemsFromVoice = (complete) => complete.map((o) => {
+    const prod = PRODUCTS.find((p) => p.id === o.productId);
+    if (!prod) return null;
+    const w = parseFloat(o.weight) || 0;
+    const ppk = prod.type === 'dead' ? 0 : priceOf(prod.id);
+    const total = prod.type === 'dead' ? w : w * ppk;
+    return {
+      id: Date.now() + Math.random(),
+      productId: prod.id,
+      productName: prod.name,
+      type: prod.type,
+      weight: w,
+      pricePerKg: ppk,
+      total,
+      note: '',
+    };
+  }).filter(Boolean);
+
+  const onVoiceText = (text) => {
+    setVoiceResult(text);
+    clearTimeout(voiceTimerRef.current);
+    voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 6000);
+    const parsed = parseShrimpVoice(text, allCustomers, selectedCustomer);
+    const complete = parsed.filter(isVoiceOrderComplete);
+    const commit = hasVoiceCommitCommand(text);
+
+    if (complete.length > 0) {
+      applyVoiceDraft(complete[complete.length - 1]);
+      const newItems = buildCartItemsFromVoice(complete);
+      if (newItems.length) {
+        setSelectedCustomer(complete[0].customerId);
+        if (commit) {
+          saveBillWithCart([...cartRef.current, ...newItems]);
+          setVoiceResult(`${text} · ✅ บันทึกแล้ว`);
+        } else {
+          setCart((prev) => [...prev, ...newItems]);
+          setVoiceResult(`${text} · ✅ เพิ่ม ${newItems.length} รายการ`);
+        }
+      }
+      return;
+    }
+
+    if (parsed.length > 0) {
+      applyVoiceDraft(parsed[0]);
+      const miss = [];
+      if (!parsed[0].productId) miss.push('ขนาดกุ้ง (ใหญ่/กลาง/เล็ก/ตาย)');
+      if (!parsed[0].weight) miss.push('น้ำหนัก (กก.)');
+      setVoiceResult(miss.length ? `${text} · ยังขาด: ${miss.join(', ')}` : `${text} · ตรวจสอบแล้วกด + เพิ่มตะกร้า`);
+      return;
+    }
+
+    const m = text.match(/\d+(?:\.\d+)?/);
+    if (m) {
+      if (inputMode === 'weight') setWeight(m[0]);
+      else setCustomPrice(m[0]);
+      setVoiceResult(`${text} · ใส่ตัวเลขในช่องที่เลือก`);
+    } else {
+      setVoiceResult(`${text} · ลอง: "กุ้งใหญ่ 2 กิโล" หรือ "จ๊ะขียด กุ้งกลาง 1.5 กก."`);
+    }
+  };
+
+  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice(onVoiceText);
 
   const groupedCustomers = allCustomers.reduce((acc, c) => {
     const zone = c.zone || 'อื่นๆ';

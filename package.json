@@ -10,7 +10,13 @@
   "scripts": {
     "dev:seafood": "npm run dev --workspace=seafood-pos",
     "dev:tea": "npm run dev --workspace=chincha-tea",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "tea:db-reset": "node scripts/tea-db-reset.mjs --confirm",
+    "tea:db-reset:dry": "node scripts/tea-db-reset.mjs --dry-run",
+    "tea:db-reset:all": "node scripts/tea-db-reset.mjs --confirm --chincha-db"
+  },
+  "devDependencies": {
+    "firebase-admin": "^13.0.0"
   },
   "engines": {
     "node": ">=20"

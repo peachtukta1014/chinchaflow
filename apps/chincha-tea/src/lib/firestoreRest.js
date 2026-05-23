@@ -112,17 +112,26 @@ export async function fsListCollection(col, pageSize = 200) {
   });
 }
 
+function sortByCreatedAtDesc(docs) {
+  return docs.sort((a, b) => {
+    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
+    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
+    return tb.localeCompare(ta);
+  });
+}
+
 export async function fsQueryOrders(dateKey) {
   const docs = await fsRunQuery({
     from: [{ collectionId: 'teaOrders' }],
     where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
     limit: 200,
   });
-  return docs.sort((a, b) => {
-    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
-    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
-    return tb.localeCompare(ta);
-  });
+  return sortByCreatedAtDesc(docs);
+}
+
+export async function fsQueryRestocks(limit = 50) {
+  const docs = await fsListCollection('restocks', 100);
+  return sortByCreatedAtDesc(docs).slice(0, limit);
 }
 
 export async function fsQueryExpenses(dateKey) {
@@ -148,4 +157,21 @@ export async function fsQueryProducts() {
 
 export async function fsQueryToppings() {
   return fsListCollection('toppings');
+}
+
+export async function fsGetConfig(docId = 'teaLine') {
+  return fsGetDoc(`config/${docId}`);
+}
+
+export async function fsSetConfig(docId, data) {
+  const existing = await fsGetDoc(`config/${docId}`);
+  if (existing) await fsPatch(`config/${docId}`, data);
+  else {
+    const r = await fetch(`${FS_BASE}/config?documentId=${encodeURIComponent(docId)}`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ fields: fsObj(data) }),
+    });
+    if (!r.ok) throw new Error(`POST config/${docId} HTTP ${r.status}`);
+  }
 }
