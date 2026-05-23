@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -10,6 +11,17 @@ import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
 import { fsGetDoc, fsPatch, fsListCollection } from '../lib/firestoreRest';
 import { T } from '../lib/i18n';
+
+function friendlyAuthError(code) {
+  if (!code) return null;
+  if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  if (code.includes('email-already-in-use')) return 'อีเมลนี้มีบัญชีแล้ว ลองเข้าสู่ระบบแทน';
+  if (code.includes('weak-password')) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัว';
+  if (code.includes('invalid-email')) return 'รูปแบบอีเมลไม่ถูกต้อง';
+  if (code.includes('too-many-requests')) return 'ลองใหม่ภายหลัง (พยายามเกินกำหนด)';
+  if (code.includes('network-request-failed')) return 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต';
+  return null;
+}
 
 export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const t = (key) => T[lang]?.[key] ?? T.th?.[key] ?? key;
@@ -20,6 +32,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const loadOrCreateProfile = async (uid, em) => {
     let profile = await fsGetDoc(`users/${uid}`);
@@ -52,17 +65,24 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await createUserWithEmailAndPassword(auth, em, pw);
+      const existing = await fsListCollection('users', 1);
+      const isFirst = existing.length === 0;
       await fsPatch(`users/${cred.user.uid}`, {
         name,
         email: em,
-        role: 'staff',
-        approved: false,
+        role: isFirst ? 'admin' : 'staff',
+        approved: isFirst,
         uid: cred.user.uid,
         createdAt: new Date().toISOString(),
       });
-      setPending(true);
+      if (isFirst) {
+        onAuthed({ uid: cred.user.uid, name, email: em, role: 'admin', approved: true });
+      } else {
+        setPending(true);
+      }
     } catch (e) {
-      setError(e?.message || 'สมัครไม่สำเร็จ');
+      const code = e?.code || '';
+      setError(friendlyAuthError(code) || e?.message || 'สมัครไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
@@ -85,9 +105,24 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       }
       onAuthed(profile);
     } catch (e) {
-      setError(e?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+      const code = e?.code || '';
+      setError(friendlyAuthError(code) || e?.message || 'เข้าสู่ระบบไม่สำเร็จ');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const em = email.trim().toLowerCase();
+    if (!em) { setError('กรุณากรอกอีเมลก่อนกด "ลืมรหัสผ่าน"'); return; }
+    if (!auth) { setError('Firebase ยังไม่พร้อม'); return; }
+    try {
+      await sendPasswordResetEmail(auth, em);
+      setResetSent(true);
+      setError('');
+    } catch (e) {
+      const code = e?.code || '';
+      setError(friendlyAuthError(code) || 'ส่งอีเมลไม่สำเร็จ');
     }
   };
 
@@ -177,6 +212,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
           {t('rememberMe')}
         </label>
         {error && <p className="text-red-300 text-sm text-center font-bold">{error}</p>}
+        {resetSent && <p className="text-emerald-300 text-sm text-center font-bold">ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว</p>}
         <button
           type="button"
           onClick={handleSubmit}
@@ -185,9 +221,18 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
         >
           {loading ? '⏳...' : mode === 'register' ? t('registerBtn') : t('loginBtn')}
         </button>
+        {mode === 'login' && (
+          <button
+            type="button"
+            onClick={handleResetPassword}
+            className="w-full py-2 text-amber-600 text-xs font-bold"
+          >
+            ลืมรหัสผ่าน? กดส่งลิงก์รีเซ็ตทางอีเมล
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => { setMode((m) => (m === 'login' ? 'register' : 'login')); setError(''); }}
+          onClick={() => { setMode((m) => (m === 'login' ? 'register' : 'login')); setError(''); setResetSent(false); }}
           className="w-full py-3 text-amber-400 text-sm font-bold"
         >
           {mode === 'login' ? '→ สมัครสมาชิกใหม่' : '← มีบัญชีแล้ว'}
