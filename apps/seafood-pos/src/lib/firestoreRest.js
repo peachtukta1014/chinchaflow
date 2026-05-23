@@ -119,6 +119,48 @@ export async function fsRunQuery(structuredQuery) {
   return rows.filter((row) => row.document).map(docFromRow);
 }
 
+export async function fsListCollection(col, pageSize = 200) {
+  const r = await fetch(`${FS_BASE}/${col}?pageSize=${pageSize}`, { headers: await fsAuthHeaders() });
+  if (!r.ok) return [];
+  const json = await r.json();
+  return (json.documents || []).map((doc) => {
+    const parts = doc.name.split('/');
+    return { id: parts[parts.length - 1], ...fromFsFields(doc.fields || {}) };
+  });
+}
+
+function sortSalesDesc(docs) {
+  return docs.sort((a, b) => {
+    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
+    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
+    return tb.localeCompare(ta);
+  });
+}
+
+function saleMatchesDateKey(doc, dateKey) {
+  if (doc.dateKey === dateKey) return true;
+  const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
+  return created.startsWith(dateKey);
+}
+
+/** โหลดบิลขายตามวัน — REST (เดียวกับตอนบันทึก fsPost) */
+export async function fsQuerySales(dateKey) {
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'dateKey' },
+        op: 'EQUAL',
+        value: { stringValue: dateKey },
+      },
+    },
+    limit: 200,
+  });
+  if (docs.length > 0) return sortSalesDesc(docs);
+  const all = await fsListCollection('sales', 200);
+  return sortSalesDesc(all.filter((d) => saleMatchesDateKey(d, dateKey)));
+}
+
 export async function fsIncrementDebt(customerId, meta, delta) {
   let current = 0;
   try {

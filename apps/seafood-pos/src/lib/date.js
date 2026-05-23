@@ -1,9 +1,12 @@
+/** วันที่ตาม timezone กรุงเทพ (YYYY-MM-DD) */
 export function dateKeyBangkok(date = new Date()) {
-  return new Date(date.getTime() + 7 * 3600000).toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(date);
 }
 
 export function tomorrowDateKeyBangkok(date = new Date()) {
-  return new Date(date.getTime() + 7 * 3600000 + 86400000).toISOString().split('T')[0];
+  const d = new Date(`${dateKeyBangkok(date)}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return dateKeyBangkok(d);
 }
 
 if (typeof window !== 'undefined') {

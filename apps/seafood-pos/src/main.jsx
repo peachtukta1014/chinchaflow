@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   addDoc, collection, doc, getDoc, getDocs, increment, limit,
@@ -26,9 +26,11 @@ import {
   fsObj,
   fsPatch,
   fsPost,
+  fsQuerySales,
   fsRunQuery,
   fsSetStockDoc,
 } from './lib/firestoreRest';
+import { aggregateDailySales, billMatchesDateKey, mergeSalesDocs } from './lib/salesAggregate';
 import { useVoice } from './hooks/useVoice';
 
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ function App() {
   const [activeTab, setActiveTab]   = useState('pos');
   const [stock, setStock]           = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
+  const [salesRefresh, setSalesRefresh] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
 
   // Session restore via Firebase Auth persistence
@@ -155,8 +158,8 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} />}
-        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => setTransactions([b,...transactions])} />}
+        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} active />}
+        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
@@ -554,8 +557,10 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     const paidA = paymentType === 'cash' || paymentType === 'transfer' ? total : paymentType === 'credit' ? 0 : (parseFloat(paidAmount) || 0);
     const remain = total - paidA;
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
+    const dateKey = dateKeyBangkok();
     const billData = {
       billNo: billNoRef.current,
+      dateKey,
       customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
       items: cartItems, total,
       paymentType, paidAmount: paidA, remainingAmount: remain,
@@ -566,7 +571,6 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     setSaving(true);
     try {
       if (isFirebaseReady) {
-        const dateKey = dateKeyBangkok();
         const now = new Date().toISOString();
         const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
         await withTimeout(fsPost('sales', {
@@ -1024,49 +1028,53 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-const Dashboard = ({ stock }) => {
+const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) => {
   const [dashTab, setDashTab]       = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [customerDebts, setCustomerDebts]   = useState([]);
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
+  const todayKey = dateKeyBangkok();
+
+  const loadSalesRest = useCallback(async () => {
+    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const docs = await fsQuerySales(todayKey);
+      setFirestoreSales(docs);
+    } catch (e) {
+      console.warn('fsQuerySales', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [todayKey, refreshKey]);
 
   useEffect(() => {
-    if (!db) { setLoading(false); return; }
-    const unsubs = [];
-    const todayKey = dateKeyBangkok();
-    const loadTimer = setTimeout(() => setLoading(false), 8000);
+    if (!active) return undefined;
+    setLoading(true);
+    loadSalesRest();
+    const iv = setInterval(loadSalesRest, 25000);
+    return () => clearInterval(iv);
+  }, [loadSalesRest, active]);
 
-    const sortSales = (docs) => docs.sort((a, b) => {
-      const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
-      const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
-      return tb.localeCompare(ta);
-    });
-    const applySales = (docs) => {
-      setFirestoreSales(sortSales(docs));
-      setLoading(false);
-    };
-
+  useEffect(() => {
+    if (!db) return undefined;
     const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
-    unsubs.push(onSnapshot(salesQ, snap => {
-      applySales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {
-      const fallbackQ = query(collection(db, 'sales'), limit(200));
-      const unsub2 = onSnapshot(fallbackQ, snap => {
-        const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
-        const filtered = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => {
-          if (s.dateKey) return s.dateKey === todayKey;
-          const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
-          return d && d >= todayMidnight;
-        });
-        applySales(filtered);
-      }, () => {
-        setLoading(false);
-        if (retryCount < 3) setTimeout(() => setRetryCount(c => c + 1), 5000);
-      });
-      unsubs.push(unsub2);
-    }));
+    return onSnapshot(
+      salesQ,
+      (snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (docs.length > 0) setFirestoreSales((prev) => mergeSalesDocs(docs, prev));
+      },
+      () => {},
+    );
+  }, [todayKey, refreshKey]);
+
+  useEffect(() => {
+    if (!db) { return undefined; }
+    const unsubs = [];
 
     unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
       setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
@@ -1083,8 +1091,8 @@ const Dashboard = ({ stock }) => {
       }).then((rows) => setStockBatches(rows)).catch(() => {});
     }));
 
-    return () => { clearTimeout(loadTimer); unsubs.forEach(u => u()); };
-  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { unsubs.forEach(u => u()); };
+  }, []);
 
   const displayStock = (() => {
     const live = Number(stock?.live) || 0;
@@ -1096,9 +1104,11 @@ const Dashboard = ({ stock }) => {
     }), { live: 0, dead: 0 });
   })();
 
-  const todaySales = firestoreSales;
+  const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
+  const todaySales = mergeSalesDocs(firestoreSales, localToday);
+  const salesSummary = aggregateDailySales(todaySales);
 
-  const todayTotal  = todaySales.reduce((s, t) => s + (t.total || 0), 0);
+  const todayTotal  = salesSummary.revenueTotal;
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);
   const todayTransfer = todaySales.filter(s => s.paymentType === 'transfer').reduce((s, t) => s + t.total, 0);
   const todayCredit = todaySales.filter(s => s.paymentType === 'credit').reduce((s, t) => s + t.total, 0);
@@ -1149,6 +1159,35 @@ const Dashboard = ({ stock }) => {
       {/* Today tab */}
       {dashTab === 'today' && (
         <>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-3">น้ำหนักขายวันนี้ (กุ้งเป็น)</h3>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              {[['large', 'A'], ['medium', 'B'], ['small', 'C']].map(([id, label]) => (
+                <div key={id} className="bg-blue-50 rounded-xl p-2">
+                  <p className="text-slate-500 font-bold">{label}</p>
+                  <p className="font-black text-blue-700 text-sm">{(salesSummary.gradeKg[id] || 0).toFixed(1)}</p>
+                  <p className="text-[10px] text-slate-400">กก.</p>
+                </div>
+              ))}
+              <div className="bg-slate-100 rounded-xl p-2">
+                <p className="text-slate-500 font-bold">รวม</p>
+                <p className="font-black text-slate-800 text-sm">{salesSummary.gradeTotalKg.toFixed(1)}</p>
+                <p className="text-[10px] text-slate-400">กก.</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-slate-500 text-xs">ยอดขายกุ้งเป็น</p>
+                <p className="font-black text-emerald-600">฿{salesSummary.liveRevenue.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">{salesSummary.liveKg.toFixed(1)} กก.</p>
+              </div>
+              <div>
+                <p className="text-slate-500 text-xs">ยอดขายกุ้งตาย</p>
+                <p className="font-black text-orange-600">฿{salesSummary.deadRevenue.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">{salesSummary.deadKg.toFixed(1)} กก.</p>
+              </div>
+            </div>
+          </div>
           <div className="bg-white p-5 rounded-[2rem] shadow-sm">
             <h3 className="font-bold text-slate-800 mb-4">แยกตามการชำระ</h3>
             {payBreakdown.map(pt => (
