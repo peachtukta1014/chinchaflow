@@ -499,15 +499,19 @@ function MembersScreen() {
   ];
 
   const [saveFlash, setSaveFlash] = useState('');
-  const showFlash = (msg) => { setSaveFlash(msg); setTimeout(() => setSaveFlash(''), 2500); };
+  const showFlash = (msg) => { setSaveFlash(msg); setTimeout(() => setSaveFlash(''), 3000); };
 
   const saveCusEdit = async (id) => {
     if (!cusEditData.name.trim()) return;
-    await setDoc(doc(db, 'customers', id), {
-      name: cusEditData.name.trim(), zone: cusEditData.zone.trim(), phone: cusEditData.phone.trim(),
-    }, { merge: true });
-    setCusEditId(null);
-    showFlash('✅ บันทึกสำเร็จแล้วครับ');
+    try {
+      await setDoc(doc(db, 'customers', id), {
+        name: cusEditData.name.trim(), zone: cusEditData.zone.trim(), phone: cusEditData.phone.trim(),
+      }, { merge: true });
+      setCusEditId(null);
+      showFlash('✅ บันทึกสำเร็จแล้วครับ');
+    } catch (e) {
+      showFlash('❌ บันทึกไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+    }
   };
 
   const addCustomer = async () => {
@@ -524,7 +528,7 @@ function MembersScreen() {
   return (
     <div className="p-4 space-y-4">
       {saveFlash && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-xl">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white text-sm font-bold px-6 py-3 rounded-2xl shadow-2xl whitespace-nowrap">
           {saveFlash}
         </div>
       )}
@@ -607,6 +611,7 @@ function MembersScreen() {
 
 const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
+  const [fsCustomers, setFsCustomers] = useState({});
   const [cart, setCart]             = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
   const [weight, setWeight]         = useState('');
@@ -680,6 +685,15 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   };
 
   useEffect(() => {
+    if (!db) return;
+    return onSnapshot(collection(db, 'customers'), snap => {
+      const map = {};
+      snap.docs.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
+      setFsCustomers(map);
+    }, () => {});
+  }, []);
+
+  useEffect(() => {
     _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
@@ -731,7 +745,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const handleSaveBill = async () => {
     if (cart.length === 0) return;
     if (paymentType === 'installment' && !paidAmount) return alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ');
-    const customer = CUSTOMERS.find(c => c.id === selectedCustomer);
+    const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
     const billData = {
       billNo: billNoRef.current,
       customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
@@ -781,8 +795,16 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     }
   };
 
-  const groupedCustomers = CUSTOMERS.reduce((acc, c) => {
-    if (!acc[c.zone]) acc[c.zone] = []; acc[c.zone].push(c); return acc;
+  const allCustomers = [
+    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
+    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
+  ];
+
+  const groupedCustomers = allCustomers.reduce((acc, c) => {
+    const zone = c.zone || 'อื่นๆ';
+    if (!acc[zone]) acc[zone] = [];
+    acc[zone].push(c);
+    return acc;
   }, {});
 
   return (
