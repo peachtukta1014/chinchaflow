@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
-import { fsGetDoc, fsPatch } from '../lib/firestoreRest';
+import { fsGetDoc, fsPatch, fsListCollection } from '../lib/firestoreRest';
 import { T } from '../lib/i18n';
 
 export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
@@ -21,9 +21,22 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const loadProfile = async (uid) => {
-    const profile = await fsGetDoc(`users/${uid}`);
-    if (!profile) throw new Error('ไม่พบข้อมูลผู้ใช้ในระบบ');
+  const loadOrCreateProfile = async (uid, em) => {
+    let profile = await fsGetDoc(`users/${uid}`);
+    if (!profile) {
+      const existing = await fsListCollection('users', 1);
+      const isFirst = existing.length === 0;
+      await fsPatch(`users/${uid}`, {
+        name: em.split('@')[0],
+        email: em,
+        role: isFirst ? 'admin' : 'staff',
+        approved: isFirst,
+        uid,
+        createdAt: new Date().toISOString(),
+      });
+      profile = await fsGetDoc(`users/${uid}`);
+    }
+    if (!profile) throw new Error('สร้างบัญชีไม่สำเร็จ');
     return { uid, ...profile };
   };
 
@@ -65,7 +78,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await signInWithEmailAndPassword(auth, em, pw);
-      const profile = await loadProfile(cred.user.uid);
+      const profile = await loadOrCreateProfile(cred.user.uid, em);
       if (profile.approved !== true) {
         setPending(true);
         return;
