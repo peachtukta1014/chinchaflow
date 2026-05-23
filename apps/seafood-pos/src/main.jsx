@@ -21,15 +21,15 @@ function dateKeyBangkok(date = new Date()) {
 
 const CUSTOMERS = [
   { id: 'general', name: 'ลูกค้าทั่วไปและตลาดนัด', zone: 'ทั่วไป' },
-  { id: 'c1',  name: 'เจ๊เขียด',           zone: 'ป่าตอง' },
-  { id: 'c2',  name: 'ตาจุ้ย 1',           zone: 'ป่าตอง' },
-  { id: 'c3',  name: 'ตาจุ้ย 2',           zone: 'ป่าตอง' },
-  { id: 'c4',  name: 'น้องเล็ก 1',         zone: 'ป่าตอง' },
+  { id: 'c1',  name: 'จ๊ะเขียด',           zone: 'ป่าตอง' },
+  { id: 'c2',  name: 'ตาจุ้ยหนึ่ง',           zone: 'ป่าตอง' },
+  { id: 'c3',  name: 'ตาจุ้ยสอง',           zone: 'ป่าตอง' },
+  { id: 'c4',  name: 'น้องเล็กหนึ่ง',         zone: 'ป่าตอง' },
   { id: 'c5',  name: 'ปุ้ย',               zone: 'ป่าตอง' },
-  { id: 'c6',  name: 'เจ๊แหวว',            zone: 'ป่าตอง' },
+  { id: 'c6',  name: 'ป้าแหวว',            zone: 'ป่าตอง' },
   { id: 'c7',  name: 'ร้านเฟิร์ส',          zone: 'ป่าตอง' },
-  { id: 'c8',  name: 'ร้านสองพี่น้อง 1',    zone: 'ป่าตอง' },
-  { id: 'c9',  name: 'ร้านสองพี่น้อง 2',    zone: 'ป่าตอง' },
+  { id: 'c8',  name: 'ร้านสองพี่น้องหนึ่ง,    zone: 'ป่าตอง' },
+  { id: 'c9',  name: 'ร้านสองพี่น้องสอง',    zone: 'ป่าตอง' },
   { id: 'c10', name: 'ร้านแสนสบาย',         zone: 'ป่าตอง' },
   { id: 'c11', name: 'น้องเล็ก 2',          zone: 'กะทู้'  },
   { id: 'c12', name: 'อีสานรสเด็ด',         zone: 'กะทู้'  },
@@ -51,9 +51,9 @@ const CUSTOMERS = [
 ];
 
 const PRODUCTS = [
-  { id: 'large',  name: 'กุ้งใหญ่', emoji: '🦐', type: 'live', price: 1450 },
-  { id: 'medium', name: 'กุ้งกลาง', emoji: '🦐', type: 'live', price: 1100 },
-  { id: 'small',  name: 'กุ้งเล็ก',  emoji: '🦐', type: 'live', price: 850  },
+  { id: 'large',  name: 'กุ้งใหญ่,A', emoji: '🦐', type: 'live', price: 1450 },
+  { id: 'medium', name: 'กุ้งกลาง,B', emoji: '🦐', type: 'live', price: 1100 },
+  { id: 'small',  name: 'กุ้งเล็ก.C',  emoji: '🦐', type: 'live', price: 850  },
   { id: 'dead',   name: 'กุ้งตาย',  emoji: '🦐', type: 'dead', price: 0    },
 ];
 
