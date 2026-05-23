@@ -199,6 +199,10 @@ function parseVoice(text) {
   return orders;
 }
 
+function hasVoiceCommitCommand(text) {
+  return /(จบบิล|บันทึก|คอมมิต|คิดเงิน|checkout|confirm|save)/i.test(text || '');
+}
+
 // ─── Admin email (always gets admin+approved on register) ────────────────────
 const ADMIN_EMAIL = 'peach_admin@chincha.com';
 
@@ -643,33 +647,39 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [voiceResult, setVoiceResult] = useState('');
   const voiceTimerRef = useRef(null);
 
-  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice((text) => {
-    setVoiceResult(text);
-    clearTimeout(voiceTimerRef.current);
-    voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 4000);
-    const parsedOrders = parseVoice(text);
-    const complete = parsedOrders.filter(o => o.customerId && o.productId && o.weight);
-    if (complete.length > 0) {
-      setSelectedCustomer(complete[0].customerId);
-      setCart(prev => [...prev, ...complete.map(o => {
-        const prod = PRODUCTS.find(p => p.id === o.productId);
-        const w = parseFloat(o.weight) || 0;
-        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * priceOf(prod.id);
-        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : priceOf(prod.id), total, note: '' };
-      })]);
-    } else if (parsedOrders.length > 0) {
-      const first = parsedOrders[0];
-      if (first.customerId) setSelectedCustomer(first.customerId);
-      if (first.productId) handleProductChange(first.productId);
-      if (first.weight) {
-        const prod = first.productId ? PRODUCTS.find(p => p.id === first.productId) : null;
-        if (prod?.type === 'dead') setCustomPrice(first.weight); else setWeight(first.weight);
-      }
-    } else {
-      const m = text.match(/\d+(?:\.\d+)?/);
-      if (m) { if (inputMode === 'weight') setWeight(m[0]); else setCustomPrice(m[0]); }
-    }
-  });
+  const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice((text) => {
+    setVoiceResult(text);
+    clearTimeout(voiceTimerRef.current);
+    voiceTimerRef.current = setTimeout(() => setVoiceResult(''), 4000);
+    const parsedOrders = parseVoice(text);
+    const complete = parsedOrders.filter(o => o.customerId && o.productId && o.weight);
+    const commit = hasVoiceCommitCommand(text);
+    if (complete.length > 0) {
+      const newItems = complete.map(o => {
+        const prod = PRODUCTS.find(p => p.id === o.productId);
+        const w = parseFloat(o.weight) || 0;
+        const total = prod.type === 'dead' ? (parseFloat(o.weight) || 0) : w * priceOf(prod.id);
+        return { id: Date.now() + Math.random(), productId: prod.id, productName: prod.name, type: prod.type, weight: w, pricePerKg: prod.type === 'dead' ? 0 : priceOf(prod.id), total, note: '' };
+      });
+      setSelectedCustomer(complete[0].customerId);
+      if (commit) {
+        saveBillWithCart([...cart, ...newItems]);
+      } else {
+        setCart(prev => [...prev, ...newItems]);
+      }
+    } else if (parsedOrders.length > 0) {
+      const first = parsedOrders[0];
+      if (first.customerId) setSelectedCustomer(first.customerId);
+      if (first.productId) handleProductChange(first.productId);
+      if (first.weight) {
+        const prod = first.productId ? PRODUCTS.find(p => p.id === first.productId) : null;
+        if (prod?.type === 'dead') setCustomPrice(first.weight); else setWeight(first.weight);
+      }
+    } else {
+      const m = text.match(/\d+(?:\.\d+)?/);
+      if (m) { if (inputMode === 'weight') setWeight(m[0]); else setCustomPrice(m[0]); }
+    }
+  });
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
@@ -743,19 +753,22 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     setInputMode('weight');
   };
 
-  const handleSaveBill = async () => {
-    if (cart.length === 0) return;
-    if (paymentType === 'installment' && !paidAmount) return alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ');
-    const liveKg = cart.reduce((s, i) => i.type !== 'dead' ? s + i.weight : s, 0);
-    const deadKg = cart.reduce((s, i) => i.type === 'dead' ? s + i.weight : s, 0);
+  const saveBillWithCart = async (cartItems) => {
+    if (cartItems.length === 0 || saving) return;
+    if (paymentType === 'installment' && !paidAmount) { alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ'); return; }
+    const liveKg = cartItems.reduce((s, i) => i.type !== 'dead' ? s + i.weight : s, 0);
+    const deadKg = cartItems.reduce((s, i) => i.type === 'dead' ? s + i.weight : s, 0);
     if (liveKg > stock.live) { alert(`⚠️ กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
     if (deadKg > stock.dead) { alert(`⚠️ กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
+    const total = cartItems.reduce((s, i) => s + i.total, 0);
+    const paidA = paymentType === 'cash' || paymentType === 'transfer' ? total : paymentType === 'credit' ? 0 : (parseFloat(paidAmount) || 0);
+    const remain = total - paidA;
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
     const billData = {
       billNo: billNoRef.current,
       customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
-      items: cart, total: cartTotal,
-      paymentType, paidAmount: paidAmt, remainingAmount: remaining,
+      items: cartItems, total,
+      paymentType, paidAmount: paidA, remainingAmount: remain,
       photoUrl: photoUrl || null,
       timestamp: new Date().toLocaleTimeString('th-TH'),
       recordedBy: user.name,
@@ -769,23 +782,23 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
         await withTimeout(fsPost('sales', {
           ...billData,
           dateKey,
-          items: cart.map(i => ({
+          items: cartItems.map(i => ({
             productId: i.productId, productName: i.productName, type: i.type,
             weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
           })),
           createdAt: now, source: 'koseafood-pos',
         }));
-        if (remaining > 0) {
+        if (remain > 0) {
           await withTimeout(fsIncrementDebt(selectedCustomer, {
             customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
             lastBillNo: billNoRef.current, lastUpdated: now,
-          }, remaining));
+          }, remain));
         }
       }
       updateMainStock(Math.max(0, stock.live - liveKg), Math.max(0, stock.dead - deadKg));
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
-      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${cartTotal.toLocaleString()} | ${payLabel}${remaining > 0 ? `\nค้าง ฿${remaining.toLocaleString()}` : ''}`);
+      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
       setCart([]); setSelectedCustomer('general');
       setPaymentType('cash'); setPaidAmount('');
       setPhotoUrl(null);
@@ -797,6 +810,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
       setSaving(false);
     }
   };
+  const handleSaveBill = () => saveBillWithCart(cart);
 
   const allCustomers = [
     ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
