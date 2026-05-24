@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { dateKeyBangkok, shiftDateKey } from '../lib/constants';
-import { fsPost, fsQueryExpenses } from '../lib/firestoreRest';
+import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestoreRest';
 import { pushTeaLineSummary } from '../lib/lineNotify';
+import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from '../lib/restockService';
 
 export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
   const [expenses, setExpenses] = useState([]);
@@ -11,11 +12,15 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
   const [expFlash, setExpFlash] = useState('');
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
+  const [restocks, setRestocks] = useState([]);
 
   const todayKey = dateKeyBangkok();
   const isToday = viewDateKey === todayKey;
 
-  useEffect(() => { fsQueryExpenses(viewDateKey).then(setExpenses); }, [viewDateKey]);
+  useEffect(() => {
+    fsQueryExpenses(viewDateKey).then(setExpenses);
+    fsQueryRestocksByDate(viewDateKey).then(setRestocks);
+  }, [viewDateKey]);
 
   const cashOrders = orders.filter((o) => !o.payType || o.payType === 'cash');
   const transferOrders = orders.filter((o) => o.payType === 'transfer');
@@ -25,7 +30,9 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
   const allItems = orders.flatMap((o) => o.items || []);
   const totalCups = allItems.reduce((s, i) => s + (i.qty || 1), 0);
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const net = total - totalExpenses;
+  const totalRestockPurchased = sumPurchasedRestocks(restocks);
+  const net = total - totalExpenses - totalRestockPurchased;
+  const purchasedRestocks = restocks.filter(isRestockPurchased);
 
   const countMap = {};
   allItems.forEach((i) => { countMap[i.key] = (countMap[i.key] || 0) + (i.qty || 1); });
@@ -157,13 +164,40 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
             <span className="font-black text-red-500">-฿{(e.amount || 0).toLocaleString()}</span>
           </div>
         ))}
-        {totalExpenses > 0 && (
-          <div className="flex justify-between pt-2 mt-2 border-t">
-            <span className="text-xs font-bold text-stone-400">{t('netProfitLabel')}</span>
-            <span className={`font-black ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>฿{net.toLocaleString()}</span>
-          </div>
-        )}
       </div>
+      {(purchasedRestocks.length > 0 || totalRestockPurchased > 0) && (
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-emerald-200">
+          <p className="font-bold text-stone-500 text-[10px] uppercase mb-1">📦 {t('restockPurchasesSection')}</p>
+          <p className="text-[10px] text-stone-400 mb-3">{t('restockPurchasesHint')}</p>
+          {purchasedRestocks.map((r) => (
+            <div key={r.id} className="flex justify-between py-1.5 border-b border-stone-100 text-sm">
+              <span className="truncate pr-2">
+                {(r.items || []).map((it) => it.name).join(', ') || '—'}
+                <span className="text-[10px] text-stone-400 ml-1">({r.createdBy})</span>
+              </span>
+              <span className="font-black text-emerald-700 shrink-0">฿{restockPurchaseTotal(r).toLocaleString()}</span>
+            </div>
+          ))}
+          {totalRestockPurchased > 0 && (
+            <div className="flex justify-between pt-2 mt-2 border-t">
+              <span className="text-xs font-bold text-stone-500">{t('restockPurchasesSection')}</span>
+              <span className="font-black text-emerald-700">฿{totalRestockPurchased.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      )}
+      {(totalExpenses > 0 || totalRestockPurchased > 0) && (
+        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+          <div className="flex justify-between text-sm">
+            <span className="font-bold text-stone-600">{t('netProfitLabel')}</span>
+            <span className="text-stone-400 text-xs">ขาย − ค่าใช้จ่าย − ซื้อของ</span>
+          </div>
+          <p className={`text-2xl font-black mt-1 ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            ฿{net.toLocaleString()}
+          </p>
+          <p className="text-[10px] text-stone-500 mt-1">{t('profitAfterRestock')}</p>
+        </div>
+      )}
       <div className="bg-white rounded-3xl p-4 border border-stone-200">
         <p className="font-bold text-stone-500 text-[10px] uppercase mb-3">{t('topItems')}</p>
         {topItems.length === 0 ? (

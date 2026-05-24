@@ -5,8 +5,12 @@ import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
 import {
   canManageRestock,
+  canMarkRestockPurchased,
   deleteRestockRequest,
+  isRestockPurchased,
+  markRestockPurchased,
   removeRestockLine,
+  restockPurchaseTotal,
 } from '../lib/restockService';
 
 export function RestockTab({ member, t }) {
@@ -17,6 +21,8 @@ export function RestockTab({ member, t }) {
   const [flash, setFlash] = useState('');
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [purchaseEditId, setPurchaseEditId] = useState(null);
+  const [purchaseAmount, setPurchaseAmount] = useState('');
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
 
@@ -77,6 +83,7 @@ export function RestockTab({ member, t }) {
         uid: member?.uid || 'unknown',
         createdBy: member?.name || 'ชินชา',
         items: items.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
+        purchaseStatus: 'pending',
         createdAt: new Date().toISOString(),
       });
       setItems([]);
@@ -121,6 +128,30 @@ export function RestockTab({ member, t }) {
     } catch (e) {
       console.error(e);
       alert(t('restockDeleteFailed'));
+    }
+    setDeletingId(null);
+  };
+
+  const handleSavePurchase = async (req) => {
+    const amount = parseInt(purchaseAmount.replace(/\D/g, ''), 10);
+    if (!amount || amount <= 0) {
+      alert(t('restockPurchaseInvalid'));
+      return;
+    }
+    setDeletingId(req.id);
+    try {
+      const patch = await markRestockPurchased(req.id, {
+        purchaseTotal: amount,
+        purchasedBy: member?.name || '—',
+      });
+      setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
+      setPurchaseEditId(null);
+      setPurchaseAmount('');
+      setFlash(t('restockPurchaseSaved'));
+      setTimeout(() => setFlash(''), 3000);
+    } catch (e) {
+      console.error(e);
+      alert(t('saveFailed'));
     }
     setDeletingId(null);
   };
@@ -198,22 +229,75 @@ export function RestockTab({ member, t }) {
           <div className="space-y-2">
             {recentRequests.map((req) => {
               const canDel = canManageRestock(req, member);
+              const canPurchase = canMarkRestockPurchased(req, member);
+              const purchased = isRestockPurchased(req);
               const busy = deletingId === req.id;
+              const editing = purchaseEditId === req.id;
               return (
-              <div key={req.id} className={`bg-white rounded-2xl p-3 border border-stone-200 ${busy ? 'opacity-60' : ''}`}>
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
-                  {canDel && (
+              <div key={req.id} className={`bg-white rounded-2xl p-3 border ${purchased ? 'border-emerald-200' : 'border-stone-200'} ${busy ? 'opacity-60' : ''}`}>
+                <div className="flex items-start justify-between gap-2 mb-1 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
+                    {purchased ? (
+                      <p className="text-[10px] font-bold text-emerald-600">
+                        ✓ {t('restockPurchased')} · ฿{restockPurchaseTotal(req).toLocaleString()}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] font-bold text-amber-600">{t('restockPending')}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {canPurchase && !purchased && !editing && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => { setPurchaseEditId(req.id); setPurchaseAmount(''); }}
+                        className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg active:scale-95 disabled:opacity-50"
+                      >
+                        {t('markPurchased')}
+                      </button>
+                    )}
+                    {canDel && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleDeleteRestock(req)}
+                        className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg active:scale-95 disabled:opacity-50"
+                      >
+                        {busy ? '…' : t('deleteRestock')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {editing && (
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={purchaseAmount}
+                      onChange={(e) => setPurchaseAmount(e.target.value.replace(/\D/g, ''))}
+                      placeholder={t('purchaseAmountPlaceholder')}
+                      className="flex-1 px-3 py-2 rounded-xl border-2 border-emerald-200 text-sm font-bold outline-none"
+                      autoFocus
+                    />
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => handleDeleteRestock(req)}
-                      className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg shrink-0 active:scale-95 disabled:opacity-50"
+                      onClick={() => handleSavePurchase(req)}
+                      className="px-3 py-2 rounded-xl font-black text-white text-xs shrink-0"
+                      style={{ background: '#1a8f4c' }}
                     >
-                      {busy ? '…' : t('deleteRestock')}
+                      {t('savePurchase')}
                     </button>
-                  )}
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => { setPurchaseEditId(null); setPurchaseAmount(''); }}
+                      className="px-2 py-2 text-stone-400 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 {(req.items || []).map((it, i) => (
                   <div key={i} className="flex items-center gap-1 text-xs text-stone-600">
                     <p className="flex-1 min-w-0">
@@ -222,7 +306,7 @@ export function RestockTab({ member, t }) {
                         {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
                       </span>
                     </p>
-                    {canDel && (
+                    {canDel && !purchased && (
                       <button
                         type="button"
                         disabled={busy}
