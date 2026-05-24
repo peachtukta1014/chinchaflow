@@ -1,0 +1,40 @@
+name: Shrimp Full Reset (on-demand)
+
+# รันครั้งเดียวเมื่อ push ไฟล์ trigger (Cloud Agent / CI)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.ops/TRIGGER_SHRIMP_FULL_RESET'
+
+permissions:
+  contents: write
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin
+
+      - name: Full shrimp data reset
+        env:
+          FIREBASE_PROJECT_ID: chincha-eeed6
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          node scripts/shrimp-stock-reset.mjs --confirm --full
+
+      - name: Remove trigger file (avoid repeat on next push)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f .ops/TRIGGER_SHRIMP_FULL_RESET || true
+          git commit -m "chore(ops): remove shrimp full-reset trigger after run" || true
+          git push origin main || true
