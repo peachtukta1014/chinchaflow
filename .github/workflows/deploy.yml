@@ -23,11 +23,11 @@ jobs:
       - name: Install firebase-tools
         run: npm install -g firebase-tools
 
-      - name: Deploy Firestore rules & indexes (default database)
+      - name: Deploy Firestore rules, indexes & Storage rules
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only firestore --project chincha-eeed6 --non-interactive
+          firebase deploy --only firestore,storage --project chincha-eeed6 --non-interactive
 
       - name: Deploy chincha database rules via Admin SDK
         run: |

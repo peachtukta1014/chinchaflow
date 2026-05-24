@@ -31,13 +31,6 @@
         { "fieldPath": "deliveryDate", "order": "ASCENDING" },
         { "fieldPath": "status",       "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "lineOrders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []
