@@ -1,3 +1,6 @@
+/**
+ * Firestore REST — ใช้ Bearer token จาก Firebase Auth (pattern เดียวกับ chincha-tea)
+ */
 import { auth } from '../firebase';
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -5,7 +8,7 @@ export const FS_BASE = projectId
   ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
   : null;
 
-async function authHeaders() {
+export async function fsAuthHeaders() {
   const base = { 'Content-Type': 'application/json' };
   const user = auth?.currentUser;
   if (!user) return base;
@@ -41,38 +44,44 @@ export function fromFsVal(v) {
   if ('stringValue' in v) return v.stringValue;
   if ('timestampValue' in v) return v.timestampValue;
   if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFsVal);
-  if ('mapValue' in v) return fromFsFields(v.mapValue.fields || {});
+  if ('mapValue' in v) {
+    return Object.fromEntries(
+      Object.entries(v.mapValue.fields || {}).map(([k, w]) => [k, fromFsVal(w)]),
+    );
+  }
   return null;
-}
-
-export function fromFsFields(fields) {
-  return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, fromFsVal(v)]));
 }
 
 function docFromRow(row) {
   const parts = row.document.name.split('/');
-  return { id: parts[parts.length - 1], ...fromFsFields(row.document.fields || {}) };
+  return {
+    id: parts[parts.length - 1],
+    ...Object.fromEntries(
+      Object.entries(row.document.fields || {}).map(([k, v]) => [k, fromFsVal(v)]),
+    ),
+  };
+}
+
+export function fromFsFields(fields) {
+  return Object.fromEntries(Object.entries(fields || {}).map(([k, v]) => [k, fromFsVal(v)]));
 }
 
 export async function fsGetDoc(path) {
-  const r = await fetch(`${FS_BASE}/${path}`, { headers: await authHeaders() });
+  const r = await fetch(`${FS_BASE}/${path}`, { headers: await fsAuthHeaders() });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  return { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
+  return { id: parts[parts.length - 1], ...fromFsFields(json.fields) };
 }
 
 export async function fsPost(col, data) {
   const r = await fetch(`${FS_BASE}/${col}`, {
     method: 'POST',
-    headers: await authHeaders(),
+    headers: await fsAuthHeaders(),
     body: JSON.stringify({ fields: fsObj(data) }),
   });
-  if (!r.ok) throw new Error(`POST /${col} HTTP ${r.status}`);
-  const json = await r.json();
-  const parts = json.name.split('/');
-  return { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
+  if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
 }
 
 export async function fsPatch(path, data) {
@@ -80,21 +89,29 @@ export async function fsPatch(path, data) {
   const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
   const r = await fetch(`${FS_BASE}/${path}?${qs}`, {
     method: 'PATCH',
-    headers: await authHeaders(),
+    headers: await fsAuthHeaders(),
     body: JSON.stringify({ fields }),
   });
-  if (!r.ok) throw new Error(`PATCH ${path} HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
 }
 
-export async function fsDelete(path) {
-  const r = await fetch(`${FS_BASE}/${path}`, { method: 'DELETE', headers: await authHeaders() });
-  if (!r.ok && r.status !== 404) throw new Error(`DELETE ${path} HTTP ${r.status}`);
+export async function fsSetStockDoc(data) {
+  try {
+    await fsPatch('config/stock', data);
+  } catch {
+    const r = await fetch(`${FS_BASE}/config?documentId=stock`, {
+      method: 'POST',
+      headers: await fsAuthHeaders(),
+      body: JSON.stringify({ fields: fsObj(data) }),
+    });
+    if (!r.ok) throw new Error(`Firestore config/stock POST failed (HTTP ${r.status})`);
+  }
 }
 
 export async function fsRunQuery(structuredQuery) {
   const r = await fetch(`${FS_BASE}:runQuery`, {
     method: 'POST',
-    headers: await authHeaders(),
+    headers: await fsAuthHeaders(),
     body: JSON.stringify({ structuredQuery }),
   });
   if (!r.ok) return [];
@@ -103,7 +120,7 @@ export async function fsRunQuery(structuredQuery) {
 }
 
 export async function fsListCollection(col, pageSize = 200) {
-  const r = await fetch(`${FS_BASE}/${col}?pageSize=${pageSize}`, { headers: await authHeaders() });
+  const r = await fetch(`${FS_BASE}/${col}?pageSize=${pageSize}`, { headers: await fsAuthHeaders() });
   if (!r.ok) return [];
   const json = await r.json();
   return (json.documents || []).map((doc) => {
@@ -112,7 +129,7 @@ export async function fsListCollection(col, pageSize = 200) {
   });
 }
 
-function sortByCreatedAtDesc(docs) {
+function sortSalesDesc(docs) {
   return docs.sort((a, b) => {
     const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
     const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
@@ -120,67 +137,41 @@ function sortByCreatedAtDesc(docs) {
   });
 }
 
-function orderMatchesDateKey(doc, dateKey) {
+function saleMatchesDateKey(doc, dateKey) {
   if (doc.dateKey === dateKey) return true;
   const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
   return created.startsWith(dateKey);
 }
 
-export async function fsQueryOrders(dateKey) {
+/** โหลดบิลขายตามวัน — REST (เดียวกับตอนบันทึก fsPost) */
+export async function fsQuerySales(dateKey) {
   const docs = await fsRunQuery({
-    from: [{ collectionId: 'teaOrders' }],
-    where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'dateKey' },
+        op: 'EQUAL',
+        value: { stringValue: dateKey },
+      },
+    },
     limit: 200,
   });
-  if (docs.length > 0) return sortByCreatedAtDesc(docs);
-  // ออเดอร์เก่าที่ไม่มี dateKey — ดึงรายการแล้วกรองจาก createdAt
-  const all = await fsListCollection('teaOrders', 200);
-  return sortByCreatedAtDesc(all.filter((d) => orderMatchesDateKey(d, dateKey)));
+  if (docs.length > 0) return sortSalesDesc(docs);
+  const all = await fsListCollection('sales', 200);
+  return sortSalesDesc(all.filter((d) => saleMatchesDateKey(d, dateKey)));
 }
 
-export async function fsQueryRestocks(limit = 50) {
-  const docs = await fsListCollection('restocks', 100);
-  return sortByCreatedAtDesc(docs).slice(0, limit);
-}
-
-export async function fsQueryExpenses(dateKey) {
-  const docs = await fsRunQuery({
-    from: [{ collectionId: 'dailyExpenses' }],
-    where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
-    limit: 100,
-  });
-  return docs.sort((a, b) => {
-    const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
-    const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
-    return ta.localeCompare(tb);
-  });
-}
-
-export async function fsQueryUsers() {
-  return fsListCollection('users');
-}
-
-export async function fsQueryProducts() {
-  return fsListCollection('products');
-}
-
-export async function fsQueryToppings() {
-  return fsListCollection('toppings');
-}
-
-export async function fsGetConfig(docId = 'teaLine') {
-  return fsGetDoc(`config/${docId}`);
-}
-
-export async function fsSetConfig(docId, data) {
-  const existing = await fsGetDoc(`config/${docId}`);
-  if (existing) await fsPatch(`config/${docId}`, data);
-  else {
-    const r = await fetch(`${FS_BASE}/config?documentId=${encodeURIComponent(docId)}`, {
-      method: 'POST',
-      headers: await authHeaders(),
-      body: JSON.stringify({ fields: fsObj(data) }),
-    });
-    if (!r.ok) throw new Error(`POST config/${docId} HTTP ${r.status}`);
+export async function fsIncrementDebt(customerId, meta, delta) {
+  let current = 0;
+  try {
+    const r = await fetch(`${FS_BASE}/customerDebts/${customerId}`, { headers: await fsAuthHeaders() });
+    if (r.ok) {
+      const j = await r.json();
+      const fv = j.fields?.totalDebt;
+      current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
+    }
+  } catch {
+    /* best-effort read */
   }
+  return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });
 }

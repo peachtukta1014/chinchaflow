@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   addDoc, collection, doc, getDoc, getDocs, increment, limit,
@@ -18,186 +18,29 @@ import {
   isVoiceOrderComplete,
   parseShrimpVoice,
 } from './lib/voiceParse';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const CUSTOMERS = [
-  { id: 'general', name: 'ลูกค้าทั่วไปและตลาดนัด', zone: 'ทั่วไป' },
-  { id: 'c1',  name: 'จ๊ะขียด',           zone: 'ป่าตอง' },
-  { id: 'c2',  name: 'ตาจุ้ยหนึ่ง',           zone: 'ป่าตอง' },
-  { id: 'c3',  name: 'ตาจุ้ยสอง',           zone: 'ป่าตอง' },
-  { id: 'c4',  name: 'น้องเล็กหนึ่ง',         zone: 'ป่าตอง' },
-  { id: 'c5',  name: 'ปุ้ย',               zone: 'ป่าตอง' },
-  { id: 'c6',  name: 'พี่แหวว,ป้าแหวว',            zone: 'ป่าตอง' },
-  { id: 'c7',  name: 'ร้านเฟิร์ส',          zone: 'ป่าตอง' },
-  { id: 'c8',  name: 'ร้านสองพี่น้องหนึ่ง',    zone: 'ป่าตอง' },
-  { id: 'c9',  name: 'ร้านสองพี่น้องสอง',    zone: 'ป่าตอง' },
-  { id: 'c10', name: 'ร้านแสนสบาย',         zone: 'ป่าตอง' },
-  { id: 'c11', name: 'น้องเล็กสอง',          zone: 'กะทู้'  },
-  { id: 'c12', name: 'อีสานรสเด็ด',         zone: 'กะทู้'  },
-  { id: 'c13', name: 'โบ๊ทซีฟู้ด',          zone: 'ภูเก็ต' },
-  { id: 'c14', name: 'ร้านคุณเชษฐ์',        zone: 'ภูเก็ต' },
-  { id: 'c15', name: 'ร้าน มุขมณี',         zone: 'ราไวย์' },
-  { id: 'c16', name: 'ร้าน ฟาง',           zone: 'ราไวย์' },
-  { id: 'c17', name: 'ร้าน ป้าก้อย',        zone: 'ราไวย์' },
-  { id: 'c18', name: 'ร้าน มด',            zone: 'ราไวย์' },
-  { id: 'c19', name: 'ร้าน อ้อม',          zone: 'ราไวย์' },
-  { id: 'c20', name: 'ร้าน ป้าแมว',         zone: 'ราไวย์' },
-  { id: 'c21', name: 'ร้าน เฮง 777',       zone: 'ราไวย์' },
-  { id: 'c22', name: 'ร้าน โอเล่',         zone: 'ราไวย์' },
-  { id: 'c23', name: 'ร้าน โกห้า',         zone: 'ราไวย์' },
-  { id: 'c24', name: 'ร้าน วิทยาซีฟู้ด',   zone: 'ราไวย์' },
-  { id: 'c25', name: 'ร้าน ฟลุ๊ค',         zone: 'ราไวย์' },
-  { id: 'c26', name: 'ร้าน มุกอันดา',       zone: 'ราไวย์' },
-  { id: 'c27', name: 'ร้าน สตูล',          zone: 'ราไวย์' },
-];
-
-const PRODUCTS = [
-  { id: 'large',  name: 'กุ้งใหญ่,A', emoji: '🦐', type: 'live', price: 1450 },
-  { id: 'medium', name: 'กุ้งกลาง,B', emoji: '🦐', type: 'live', price: 1100 },
-  { id: 'small',  name: 'กุ้งเล็ก,C',  emoji: '🦐', type: 'live', price: 850  },
-  { id: 'dead',   name: 'กุ้งตาย',  emoji: '🦐', type: 'dead', price: 0    },
-];
-
-const PAY = [
-  { id: 'cash',        label: 'สด',   cls: 'bg-emerald-500' },
-  { id: 'transfer',    label: 'โอน',  cls: 'bg-blue-500'    },
-  { id: 'credit',      label: 'ค้าง', cls: 'bg-orange-500'  },
-  { id: 'installment', label: 'ผ่อน', cls: 'bg-purple-500'  },
-];
-
-// ─── Firestore REST helpers (bypass SDK auth — same pattern as login) ─────────
-const _FS = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-async function _fsAuthHeaders() {
-  const base = { 'Content-Type': 'application/json' };
-  const user = auth?.currentUser;
-  if (!user) return base;
-  try {
-    const token = await user.getIdToken();
-    return { ...base, Authorization: `Bearer ${token}` };
-  } catch {
-    return base;
-  }
-}
-function _fsVal(v) {
-  if (v === null || v === undefined) return { nullValue: null };
-  if (typeof v === 'boolean') return { booleanValue: v };
-  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === 'string') return { stringValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(_fsVal) } };
-  if (typeof v === 'object') return { mapValue: { fields: _fsObj(v) } };
-  return { nullValue: null };
-}
-function _fsObj(o) {
-  return Object.fromEntries(Object.entries(o).filter(([,v]) => v !== undefined).map(([k,v]) => [k, _fsVal(v)]));
-}
-async function fsPost(col, data) {
-  const r = await fetch(`${_FS}/${col}`, {
-    method: 'POST', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ fields: _fsObj(data) }),
-  });
-  if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
-}
-async function fsPatch(path, data) {
-  const fields = _fsObj(data);
-  const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  const r = await fetch(`${_FS}/${path}?${qs}`, {
-    method: 'PATCH', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
-}
-function _fromFsVal(v) {
-  if (!v || 'nullValue' in v) return null;
-  if ('booleanValue' in v) return v.booleanValue;
-  if ('integerValue' in v) return parseInt(v.integerValue, 10);
-  if ('doubleValue' in v) return v.doubleValue;
-  if ('stringValue' in v) return v.stringValue;
-  if ('timestampValue' in v) return v.timestampValue;
-  if ('arrayValue' in v) return (v.arrayValue.values || []).map(_fromFsVal);
-  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k,w]) => [k, _fromFsVal(w)]));
-  return null;
-}
-async function fsRunQuery(structuredQuery) {
-  const r = await fetch(`${_FS}:runQuery`, {
-    method: 'POST', headers: await _fsAuthHeaders(),
-    body: JSON.stringify({ structuredQuery }),
-  });
-  if (!r.ok) return [];
-  const rows = await r.json();
-  return rows.filter(row => row.document).map(row => {
-    const parts = row.document.name.split('/');
-    return { id: parts[parts.length - 1], ...Object.fromEntries(Object.entries(row.document.fields || {}).map(([k,v]) => [k, _fromFsVal(v)])) };
-  });
-}
-async function fsIncrementDebt(customerId, meta, delta) {
-  let current = 0;
-  try {
-    const r = await fetch(`${_FS}/customerDebts/${customerId}`, { headers: await _fsAuthHeaders() });
-    if (r.ok) { const j = await r.json(); const fv = j.fields?.totalDebt; current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0); }
-  } catch {}
-  return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });
-}
-
-// ─── Voice Hook ───────────────────────────────────────────────────────────────
-
-function useVoice(onText) {
-  const [listening, setListening] = useState(false);
-  const [liveText, setLiveText]   = useState('');
-  const recRef = useRef(null);
-  const onTextRef = useRef(onText);
-  onTextRef.current = onText;
-
-  const toggle = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('ใช้ Chrome เพื่อเปิด Voice ครับ'); return; }
-    if (listening) { recRef.current?.stop(); return; }
-    const rec = new SR();
-    rec.lang = 'th-TH';
-    rec.continuous = false;
-    rec.interimResults = true;
-    recRef.current = rec;
-    rec.onresult = (e) => {
-      const interim = Array.from(e.results).map(r => r[0].transcript).join('');
-      setLiveText(interim);
-      const last = e.results[e.results.length - 1];
-      if (last.isFinal) onTextRef.current(last[0].transcript.trim());
-    };
-    rec.onerror = () => { setListening(false); setLiveText(''); };
-    rec.onend   = () => { setListening(false); setLiveText(''); };
-    rec.start();
-    setListening(true);
-  };
-
-  return { listening, toggle, liveText };
-}
-
-// ─── Admin email (always gets admin+approved on register) ────────────────────
-const ADMIN_EMAIL = 'peach_admin@chincha.com';
-
-// ─── Session helpers (localStorage, 30-day TTL) ───────────────────────────────
-
-const SESSION_KEY = 'koseafood-session';
-const SESSION_DAYS = 30;
-
-function getSession() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-    if (!s?.phone || !s?.loginAt) return null;
-    if (Date.now() - s.loginAt > SESSION_DAYS * 86400000) { localStorage.removeItem(SESSION_KEY); return null; }
-    return s;
-  } catch { return null; }
-}
-function saveSession(m) { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...m, loginAt: Date.now() })); }
-function clearSession() { localStorage.removeItem(SESSION_KEY); }
+import { ADMIN_EMAIL, CUSTOMERS, PAY, PRODUCTS } from './constants';
+import {
+  FS_BASE,
+  fsAuthHeaders,
+  fsIncrementDebt,
+  fsObj,
+  fsPatch,
+  fsPost,
+  fsQuerySales,
+  fsRunQuery,
+  fsSetStockDoc,
+} from './lib/firestoreRest';
+import { aggregateDailySales, billMatchesDateKey, mergeSalesDocs } from './lib/salesAggregate';
+import { useVoice } from './hooks/useVoice';
 
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
 
 function App() {
-  const [member, setMember]         = useState(undefined);
+  const [member, setMember]         = useState(undefined);
   const [activeTab, setActiveTab]   = useState('pos');
   const [stock, setStock]           = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
+  const [salesRefresh, setSalesRefresh] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
 
   // Session restore via Firebase Auth persistence
@@ -207,7 +50,7 @@ function App() {
       if (!user) { setMember(null); return; }
       try {
         const token = await user.getIdToken();
-        const resp = await fetch(`${_FS}/shrimp_users/${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
+        const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
         if (!resp.ok) { await signOut(auth); return; }
         const json = await resp.json();
         const f = json.fields || {};
@@ -245,14 +88,25 @@ function App() {
     if (auth) await signOut(auth).catch(() => {});
   };
 
-  const updateMainStock = async (live, dead) => {
-    const val = { live: Math.max(0, parseFloat(live.toFixed(3))), dead: Math.max(0, parseFloat(dead.toFixed(3))) };
-    setStock(val);
-    if (db) {
-      await setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() });
-    }
-    return val;
-  };
+  const updateMainStock = async (live, dead) => {
+    const val = {
+      live: Math.max(0, parseFloat(Number(live).toFixed(3))),
+      dead: Math.max(0, parseFloat(Number(dead).toFixed(3))),
+    };
+    setStock(val);
+    const payload = { ...val, updatedAt: new Date().toISOString() };
+    try {
+      if (isFirebaseReady) await fsSetStockDoc(payload);
+    } catch (e) {
+      console.warn('fsSetStockDoc', e);
+      if (db) {
+        await setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }, { merge: true });
+      } else {
+        throw e;
+      }
+    }
+    return val;
+  };
 
   if (member === undefined) {
     return (
@@ -307,8 +161,8 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} />}
-        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => setTransactions([b,...transactions])} />}
+        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} active />}
+        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
@@ -343,7 +197,6 @@ function LoginScreen({ onLogin }) {
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
 
-  const BASE = `https://firestore.googleapis.com/v1/projects/${import.meta.env.VITE_FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) { setError('กรุณากรอก Email และ Password'); return; }
@@ -355,11 +208,11 @@ function LoginScreen({ onLogin }) {
         const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
         const token    = await user.getIdToken();
         const authH    = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-        const listJson = await fetch(`${BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
+        const listJson = await fetch(`${FS_BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
         const isFirst  = !listJson.documents?.length;
         const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const grantAdmin   = isFirst || isAdminEmail;
-        await fetch(`${BASE}/shrimp_users/${user.uid}`, {
+        await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, {
           method: 'PATCH', headers: authH,
           body: JSON.stringify({ fields: {
             name:      { stringValue: name.trim() },
@@ -375,7 +228,7 @@ function LoginScreen({ onLogin }) {
         const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
         const token    = await user.getIdToken();
         const authH    = { Authorization: `Bearer ${token}` };
-        const resp = await fetch(`${BASE}/shrimp_users/${user.uid}`, { headers: authH });
+        const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
         if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
@@ -662,7 +515,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   }, []);
 
   useEffect(() => {
-    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
+    fsAuthHeaders().then(h => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -721,8 +574,10 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     const paidA = paymentType === 'cash' || paymentType === 'transfer' ? total : paymentType === 'credit' ? 0 : (parseFloat(paidAmount) || 0);
     const remain = total - paidA;
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
+    const dateKey = dateKeyBangkok();
     const billData = {
       billNo: billNoRef.current,
+      dateKey,
       customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
       items: cartItems, total,
       paymentType, paidAmount: paidA, remainingAmount: remain,
@@ -733,7 +588,6 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
     setSaving(true);
     try {
       if (isFirebaseReady) {
-        const dateKey = dateKeyBangkok();
         const now = new Date().toISOString();
         const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
         await withTimeout(fsPost('sales', {
@@ -1062,22 +916,22 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
   const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
 
-  const handleReceive = async () => {
-    if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
-    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
-    setSaving(true);
-    try {
-      if (isFirebaseReady) {
-        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(fsPost('stockBatches', {
-          purchaseDate: new Date().toISOString(),
-          liveKg, deadKg, costPerKg, transport,
-          totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
-          remainingLiveKg: liveKg, remainingDeadKg: deadKg,
-          note: rcvNote,
-        }));
-      }
-      await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+  const handleReceive = async () => {
+    if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
+    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    setSaving(true);
+    try {
+      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
+      if (isFirebaseReady) {
+        await withTimeout(fsPost('stockBatches', {
+          purchaseDate: new Date().toISOString(),
+          liveKg, deadKg, costPerKg, transport,
+          totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
+          remainingLiveKg: liveKg, remainingDeadKg: deadKg,
+          note: rcvNote,
+        }));
+      }
+      await withTimeout(updateMainStock(stock.live + liveKg, stock.dead + deadKg));
       alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
@@ -1196,64 +1050,87 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-const Dashboard = ({ stock }) => {
+const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) => {
   const [dashTab, setDashTab]       = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [customerDebts, setCustomerDebts]   = useState([]);
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
+  const todayKey = dateKeyBangkok();
+
+  const loadSalesRest = useCallback(async () => {
+    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const docs = await fsQuerySales(todayKey);
+      setFirestoreSales(docs);
+    } catch (e) {
+      console.warn('fsQuerySales', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [todayKey, refreshKey]);
 
   useEffect(() => {
-    if (!db) { setLoading(false); return; }
-    const unsubs = [];
-    const todayKey = dateKeyBangkok();
+    if (!active) return undefined;
+    setLoading(true);
+    loadSalesRest();
+    const iv = setInterval(loadSalesRest, 25000);
+    return () => clearInterval(iv);
+  }, [loadSalesRest, active]);
 
-    // Query today's sales by dateKey — no composite index needed (single-field auto-index)
+  useEffect(() => {
+    if (!db) return undefined;
     const salesQ = query(collection(db, 'sales'), where('dateKey', '==', todayKey));
-    const sortSales = (docs) => docs.sort((a, b) => {
-      const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt?.toDate?.()?.toISOString() ?? '');
-      const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt?.toDate?.()?.toISOString() ?? '');
-      return tb.localeCompare(ta);
-    });
-    unsubs.push(onSnapshot(salesQ, snap => {
-      setFirestoreSales(sortSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      setLoading(false);
+    return onSnapshot(
+      salesQ,
+      (snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (docs.length > 0) setFirestoreSales((prev) => mergeSalesDocs(docs, prev));
+      },
+      () => {},
+    );
+  }, [todayKey, refreshKey]);
+
+  useEffect(() => {
+    if (!db) { return undefined; }
+    const unsubs = [];
+
+    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
+      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
+    }, () => {}));
+
+    const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
+    unsubs.push(onSnapshot(batchQ, snap => {
+      setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, () => {
-      // Fallback: load recent 200 and filter by date
-      const fallbackQ = query(collection(db, 'sales'), limit(200));
-      const unsub2 = onSnapshot(fallbackQ, snap => {
-        const todayMidnight = new Date(todayKey + 'T00:00:00+07:00');
-        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const filtered = all.filter(s => {
-          if (s.dateKey) return s.dateKey === todayKey;
-          const d = s.createdAt?.toDate?.() ?? (s.createdAt ? new Date(s.createdAt) : null);
-          return d && d >= todayMidnight;
-        });
-        setFirestoreSales(sortSales(filtered));
-        setLoading(false);
-      }, () => {
-        setLoading(false);
-        if (retryCount < 3) setTimeout(() => setRetryCount(c => c + 1), 5000);
-      });
-      unsubs.push(unsub2);
+      fsRunQuery({
+        from: [{ collectionId: 'stockBatches' }],
+        orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
+        limit: 30,
+      }).then((rows) => setStockBatches(rows)).catch(() => {});
     }));
 
-    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
-      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
-    }, () => {}));
+    return () => { unsubs.forEach(u => u()); };
+  }, []);
 
-    const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
-    unsubs.push(onSnapshot(batchQ, snap => {
-      setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {}));
+  const displayStock = (() => {
+    const live = Number(stock?.live) || 0;
+    const dead = Number(stock?.dead) || 0;
+    if (live > 0 || dead > 0) return { live, dead };
+    return stockBatches.reduce((acc, b) => ({
+      live: acc.live + (parseFloat(b.remainingLiveKg ?? b.liveKg) || 0),
+      dead: acc.dead + (parseFloat(b.remainingDeadKg ?? b.deadKg) || 0),
+    }), { live: 0, dead: 0 });
+  })();
 
-    return () => unsubs.forEach(u => u());
-  }, [retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
+  const todaySales = mergeSalesDocs(firestoreSales, localToday);
+  const salesSummary = aggregateDailySales(todaySales);
 
-  const todaySales = firestoreSales; // already filtered by dateKey in query
-
-  const todayTotal  = todaySales.reduce((s, t) => s + (t.total || 0), 0);
+  const todayTotal  = salesSummary.revenueTotal;
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);
   const todayTransfer = todaySales.filter(s => s.paymentType === 'transfer').reduce((s, t) => s + t.total, 0);
   const todayCredit = todaySales.filter(s => s.paymentType === 'credit').reduce((s, t) => s + t.total, 0);
@@ -1278,11 +1155,11 @@ const Dashboard = ({ stock }) => {
         </div>
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-[2rem] p-5 text-white">
           <p className="text-blue-200 text-xs font-bold mb-1">กุ้งเป็น</p>
-          <p className="text-2xl font-black">{stock.live.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
-        </div>
-        <div className="bg-gradient-to-br from-red-400 to-orange-500 rounded-[2rem] p-5 text-white">
-          <p className="text-red-100 text-xs font-bold mb-1">กุ้งตาย</p>
-          <p className="text-2xl font-black">{stock.dead.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
+          <p className="text-2xl font-black">{displayStock.live.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
+        </div>
+        <div className="bg-gradient-to-br from-red-400 to-orange-500 rounded-[2rem] p-5 text-white">
+          <p className="text-red-100 text-xs font-bold mb-1">กุ้งตาย</p>
+          <p className="text-2xl font-black">{displayStock.dead.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
         </div>
         <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white col-span-2">
           <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
@@ -1304,6 +1181,35 @@ const Dashboard = ({ stock }) => {
       {/* Today tab */}
       {dashTab === 'today' && (
         <>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-3">น้ำหนักขายวันนี้ (กุ้งเป็น)</h3>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              {[['large', 'A'], ['medium', 'B'], ['small', 'C']].map(([id, label]) => (
+                <div key={id} className="bg-blue-50 rounded-xl p-2">
+                  <p className="text-slate-500 font-bold">{label}</p>
+                  <p className="font-black text-blue-700 text-sm">{(salesSummary.gradeKg[id] || 0).toFixed(1)}</p>
+                  <p className="text-[10px] text-slate-400">กก.</p>
+                </div>
+              ))}
+              <div className="bg-slate-100 rounded-xl p-2">
+                <p className="text-slate-500 font-bold">รวม</p>
+                <p className="font-black text-slate-800 text-sm">{salesSummary.gradeTotalKg.toFixed(1)}</p>
+                <p className="text-[10px] text-slate-400">กก.</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-slate-500 text-xs">ยอดขายกุ้งเป็น</p>
+                <p className="font-black text-emerald-600">฿{salesSummary.liveRevenue.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">{salesSummary.liveKg.toFixed(1)} กก.</p>
+              </div>
+              <div>
+                <p className="text-slate-500 text-xs">ยอดขายกุ้งตาย</p>
+                <p className="font-black text-orange-600">฿{salesSummary.deadRevenue.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-400">{salesSummary.deadKg.toFixed(1)} กก.</p>
+              </div>
+            </div>
+          </div>
           <div className="bg-white p-5 rounded-[2rem] shadow-sm">
             <h3 className="font-bold text-slate-800 mb-4">แยกตามการชำระ</h3>
             {payBreakdown.map(pt => (
@@ -1590,7 +1496,7 @@ function ProductSettingsScreen() {
   const [flash, setFlash]   = useState('');
 
   useEffect(() => {
-    _fsAuthHeaders().then(h => fetch(`${_FS}/productSettings/shrimp`, { headers: h }))
+    fsAuthHeaders().then(h => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (!j?.fields) return;
@@ -1607,10 +1513,10 @@ function ProductSettingsScreen() {
   const save = async () => {
     setSaving(true);
     try {
-      const fields = _fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
+      const fields = fsObj({ large: prices.large, medium: prices.medium, small: prices.small });
       const qs = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
-      const r = await fetch(`${_FS}/productSettings/shrimp?${qs}`, {
-        method: 'PATCH', headers: await _fsAuthHeaders(),
+      const r = await fetch(`${FS_BASE}/productSettings/shrimp?${qs}`, {
+        method: 'PATCH', headers: await fsAuthHeaders(),
         body: JSON.stringify({ fields }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

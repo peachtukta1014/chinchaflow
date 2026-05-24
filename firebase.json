@@ -17,18 +17,10 @@
       ]
     }
   ],
-  "functions": [
-    {
-      "source": "apps/webhook-core",
-      "codebase": "default",
-      "runtime": "nodejs22"
-    },
-    {
-      "source": "apps/webhook-core-scheduled",
-      "codebase": "tea-scheduled",
-      "runtime": "nodejs22"
-    }
-  ],
+  "functions": {
+    "source": "apps/webhook-core",
+    "runtime": "nodejs20"
+  },
   "storage": {
     "rules": "storage.rules"
   },

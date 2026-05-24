@@ -1,0 +1,49 @@
+# กดรันเองได้: Actions → Deploy Functions Only → Run workflow
+name: Deploy Functions Only
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy_functions:
+    name: Deploy LINE Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install -g firebase-tools
+
+      - run: npm install
+        working-directory: apps/webhook-core
+
+      - name: Write LINE env
+        run: |
+          {
+            echo "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}"
+            echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}"
+            echo "LINE_TEA_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_TEA_CHANNEL_ACCESS_TOKEN }}"
+            echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
+          } > apps/webhook-core/.env
+
+      - name: Deploy functions
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          firebase deploy --only functions --project chincha-eeed6 --non-interactive --force
+
+      - name: Verify webhooks
+        run: |
+          BASE="https://asia-southeast1-chincha-eeed6.cloudfunctions.net"
+          for name in lineWebhookTea lineWebhook teaPushSummary; do
+            for i in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/$name" || echo "000")
+              echo "$name try $i -> $code"
+              if [ "$code" = "200" ]; then break; fi
+              sleep 15
+            done
+            if [ "$code" != "200" ]; then exit 1; fi
+          done

@@ -64,10 +64,6 @@ jobs:
         run: npm install
         working-directory: apps/webhook-core
 
-      - name: Install scheduled function dependencies
-        run: npm install
-        working-directory: apps/webhook-core-scheduled
-
       - name: Write env vars for functions
         run: |
           {
@@ -76,33 +72,31 @@ jobs:
             echo "LINE_TEA_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_TEA_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
           } > apps/webhook-core/.env
-          cp apps/webhook-core/.env apps/webhook-core-scheduled/.env
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Enable Cloud Scheduler API
-        run: gcloud services enable cloudscheduler.googleapis.com --project=chincha-eeed6
-
-      - name: Deploy LINE webhooks (ไม่มี pubsub.schedule ใน codebase นี้)
+      - name: Deploy all LINE functions
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only \
-            "functions:lineWebhook,functions:lineWebhookTea,functions:teaPushSummary" \
-            --project chincha-eeed6 --non-interactive --force
+          firebase deploy --only functions --project chincha-eeed6 --non-interactive --force
 
-      - name: Deploy scheduled tea summary (codebase แยก)
+      - name: Wait and verify webhooks (must return 200 ok)
+        continue-on-error: true
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions:tea-scheduled:teaDailyScheduledSummary \
-            --project chincha-eeed6 --non-interactive --force
+          BASE="https://asia-southeast1-chincha-eeed6.cloudfunctions.net"
+          for name in lineWebhookTea lineWebhook; do
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              code=$(curl -s -o /tmp/h -w "%{http_code}" "$BASE/$name" || echo "000")
+              echo "try $i $name -> HTTP $code"
+              if [ "$code" = "200" ]; then ok=1; break; fi
+              sleep 15
+            done
+            if [ "$ok" != "1" ]; then
+              echo "FAIL: $name not healthy"
+              exit 1
+            fi
+          done
+          echo "All webhooks healthy"
 
   # ── 1. Build & deploy Shrimp POS ─────────────────────────────────────────────
   deploy_shrimp:
