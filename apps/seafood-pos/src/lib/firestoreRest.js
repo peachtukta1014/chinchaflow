@@ -82,6 +82,10 @@ export async function fsPost(col, data) {
     body: JSON.stringify({ fields: fsObj(data) }),
   });
   if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
+  const json = await r.json().catch(() => null);
+  if (!json?.name) return null;
+  const parts = json.name.split('/');
+  return parts[parts.length - 1];
 }
 
 export async function fsPatch(path, data) {

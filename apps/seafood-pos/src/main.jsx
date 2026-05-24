@@ -32,6 +32,15 @@ import {
   fsSetStockDoc,
 } from './lib/firestoreRest';
 import { aggregateDailySales, billMatchesDateKey, mergeSalesDocs } from './lib/salesAggregate';
+import {
+  actualQtyOf,
+  applyActualToCartItem,
+  cartStockKg,
+  hasAnyQtyMismatch,
+  lineItemsToCartItems,
+  qtyDiffersFromOrder,
+  resolveLineCustomer,
+} from './lib/lineOrderToSale';
 import { useVoice } from './hooks/useVoice';
 
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
@@ -160,7 +169,18 @@ function App() {
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members'        && <MembersScreen />}
-        {activeTab === 'orders'         && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
+        {activeTab === 'orders'         && (
+          <LineOrdersScreen
+            user={member}
+            stock={stock}
+            updateMainStock={updateMainStock}
+            onSaleRecorded={() => setSalesRefresh((n) => n + 1)}
+            onOrderDone={() => {
+              const today = dateKeyBangkok();
+              fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today }).then(setPendingOrders);
+            }}
+          />
+        )}
         {activeTab === 'admin-users'    && <AdminUsersScreen />}
         {activeTab === 'admin-products' && <ProductSettingsScreen />}
       </div>
@@ -1329,13 +1349,227 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
   );
 };
 
+// ─── LINE delivery: ยืนยันน้ำหนักส่งจริงก่อนบันทึกยอดขาย ───────────────────────
+
+function LineDeliveryConfirmSheet({
+  order,
+  cartItems: initialCart,
+  unknownProducts,
+  stock,
+  priceOf,
+  allCustomers,
+  saving,
+  onClose,
+  onConfirm,
+}) {
+  const [lines, setLines] = useState(initialCart);
+  const [draftQty, setDraftQty] = useState({});
+  const [ackMismatch, setAckMismatch] = useState(false);
+
+  useEffect(() => {
+    setLines(initialCart);
+    setDraftQty({});
+    setAckMismatch(false);
+  }, [initialCart, order?.id]);
+
+  const customer = resolveLineCustomer(order.customerName, allCustomers);
+  const { liveKg, deadKg, total } = cartStockKg(lines);
+  const mismatch = hasAnyQtyMismatch(lines);
+
+  const displayQty = (row) => (
+    draftQty[row.lineKey] !== undefined ? draftQty[row.lineKey] : String(actualQtyOf(row))
+  );
+
+  const setActual = (lineKey, raw) => {
+    setDraftQty((prev) => ({ ...prev, [lineKey]: raw }));
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    setLines((prev) => prev.map((row) => (
+      row.lineKey === lineKey ? applyActualToCartItem(row, raw, priceOf) : row
+    )));
+    setAckMismatch(false);
+  };
+
+  const handleConfirm = () => {
+    const invalid = lines.some((row) => {
+      const a = actualQtyOf(row);
+      return !Number.isFinite(a) || a <= 0;
+    });
+    if (invalid) {
+      alert('กรุณาใส่น้ำหนัก/ยอดส่งจริงทุกรายการ (มากกว่า 0)');
+      return;
+    }
+    if (mismatch && !ackMismatch) {
+      alert('น้ำหนักส่งจริงไม่ตรงกับที่สั่ง — กรุณาติ๊กยืนยันด้านล่างก่อนบันทึก');
+      return;
+    }
+    if (liveKg > stock.live) {
+      alert(`กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      return;
+    }
+    if (deadKg > stock.dead) {
+      alert(`กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      return;
+    }
+    onConfirm({ cartItems: lines, customer, total, liveKg, deadKg });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/50" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-t-3xl max-h-[88vh] flex flex-col shadow-2xl">
+        <div className="px-4 pt-4 pb-2 border-b border-slate-100 shrink-0">
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-800">ยืนยันน้ำหนักส่งจริง</p>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">{customer.name}</p>
+              {order.rawText && (
+                <p className="text-[10px] text-slate-400 mt-1 italic truncate">&quot;{order.rawText}&quot;</p>
+              )}
+            </div>
+            <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+              <X size={18} className="text-slate-500" />
+            </button>
+          </div>
+          {unknownProducts.length > 0 && (
+            <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-2">
+              ข้ามรายการที่แปลงไม่ได้: {unknownProducts.join(', ')}
+            </p>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            ชั่ง/นับน้ำหนักจริงก่อนบันทึก — ถ้าไม่ตรงกับที่สั่งใน LINE ให้แก้ช่อง &quot;ส่งจริง&quot;
+          </p>
+          {lines.map((row) => {
+            const soldByBaht = row.type === 'dead' && row.orderedUnit === 'บาท';
+            const unitLabel = soldByBaht ? 'บาท' : 'กก.';
+            const actual = actualQtyOf(row);
+            const differs = qtyDiffersFromOrder(row, actual) && Number.isFinite(actual);
+            return (
+              <div
+                key={row.lineKey}
+                className={`rounded-2xl border p-3 ${differs ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50'}`}
+              >
+                <p className="text-sm font-bold text-slate-800">{row.productName}</p>
+                <div className="flex items-center gap-2 mt-2 text-xs">
+                  <span className="text-slate-500 shrink-0">สั่งมา</span>
+                  <span className="font-bold text-slate-600">
+                    {row.orderedQty} {row.orderedUnit || unitLabel}
+                  </span>
+                  {differs && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-auto">
+                      ไม่ตรง
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs font-bold text-green-700 shrink-0">ส่งจริง</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={displayQty(row)}
+                    onChange={(e) => setActual(row.lineKey, e.target.value)}
+                    className="flex-1 bg-white border-2 border-green-200 rounded-xl px-3 py-2 text-lg font-black text-slate-800 text-center"
+                  />
+                  <span className="text-xs text-slate-500 w-8 shrink-0">{unitLabel}</span>
+                </div>
+                {!soldByBaht && row.type !== 'dead' && (
+                  <p className="text-[10px] text-slate-400 mt-1 text-right">
+                    ฿{(row.total || 0).toLocaleString()} @ {row.pricePerKg}/กก.
+                  </p>
+                )}
+                {soldByBaht && (
+                  <p className="text-[10px] text-slate-400 mt-1 text-right">
+                    ยอดเหมา ฿{(row.total || 0).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="px-4 pb-6 pt-2 border-t border-slate-100 shrink-0 space-y-3"
+          style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-500">ยอดรวม</span>
+            <span className="font-black text-lg text-slate-800">฿{total.toLocaleString()}</span>
+          </div>
+          <p className="text-[10px] text-slate-400 text-center">
+            ตัดสต๊อก เป็น {liveKg} กก. · ตาย {deadKg} กก.
+          </p>
+          {mismatch && (
+            <label className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 rounded-xl p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ackMismatch}
+                onChange={(e) => setAckMismatch(e.target.checked)}
+                className="mt-0.5 shrink-0"
+              />
+              <span>ยืนยันแล้วว่าน้ำหนักส่งจริงถูกต้อง (ต่างจากที่สั่งใน LINE)</span>
+            </label>
+          )}
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleConfirm}
+            className="w-full bg-green-600 text-white font-bold py-3.5 rounded-2xl active:scale-[0.98] disabled:opacity-50"
+          >
+            {saving ? 'กำลังบันทึก...' : 'บันทึกยอดขาย'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── LINE Orders Screen ───────────────────────────────────────────────────────
 
-function LineOrdersScreen() {
-  const [orders,  setOrders]  = useState([]);
-  const [loading, setLoading] = useState(true);
+function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrderDone }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [deliverySheet, setDeliverySheet] = useState(null);
+  const [loadedPrices, setLoadedPrices] = useState({});
+  const [fsCustomers, setFsCustomers] = useState({});
 
   const todayBKK = dateKeyBangkok;
+
+  const allCustomers = useMemo(() => [
+    ...CUSTOMERS.map((c) => ({ ...c, ...(fsCustomers[c.id] || {}) })),
+    ...Object.values(fsCustomers).filter((c) => !CUSTOMERS.find((b) => b.id === c.id)),
+  ], [fsCustomers]);
+
+  const priceOf = useCallback(
+    (productId) => loadedPrices[productId] ?? PRODUCTS.find((p) => p.id === productId)?.price ?? 0,
+    [loadedPrices],
+  );
+
+  useEffect(() => {
+    if (!db) return;
+    return onSnapshot(collection(db, 'customers'), (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
+      setFsCustomers(map);
+    }, () => {});
+  }, []);
+
+  useEffect(() => {
+    fsAuthHeaders().then((h) => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j?.fields) return;
+        const p = {};
+        ['large', 'medium', 'small'].forEach((k) => {
+          const v = j.fields[k];
+          if (v) p[k] = parseInt(v.integerValue ?? v.doubleValue ?? 0, 10);
+        });
+        setLoadedPrices(p);
+      })
+      .catch(() => {});
+  }, []);
 
   const loadOrders = useCallback(async () => {
     const today = dateKeyBangkok();
@@ -1350,10 +1584,111 @@ function LineOrdersScreen() {
     return () => clearInterval(t);
   }, [loadOrders]);
 
-  const markDone = (id) => {
-    fsPatch(`lineOrders/${id}`, { status: 'done' });
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' } : o));
-  };
+  const openDeliverySheet = (order) => {
+    if (!order || order.status === 'done' || savingId || deliverySheet) return;
+    if (order.salesId) {
+      confirmDeliveryLegacyDone(order);
+      return;
+    }
+
+    const { cartItems, unknownProducts } = lineItemsToCartItems(order.items, priceOf);
+    if (cartItems.length === 0) {
+      alert(unknownProducts.length
+        ? `ไม่รู้จักสินค้า: ${unknownProducts.join(', ')}\nกรุณาบันทึกบิลที่หน้าขายของ`
+        : 'ไม่มีรายการสินค้าในออเดอร์นี้');
+      return;
+    }
+    if (unknownProducts.length) {
+      const ok = window.confirm(
+        `มีบางรายการแปลงไม่ได้: ${unknownProducts.join(', ')}\nบันทึกเฉพาะรายการที่รู้จัก (${cartItems.length} รายการ)?`,
+      );
+      if (!ok) return;
+    }
+    setDeliverySheet({ order, cartItems, unknownProducts });
+  };
+
+  const confirmDeliveryLegacyDone = async (order) => {
+    await fsPatch(`lineOrders/${order.id}`, { status: 'done' });
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'done' } : o)));
+    onOrderDone?.();
+  };
+
+  const saveDeliverySale = async ({ cartItems, customer, total, liveKg, deadKg }) => {
+    const order = deliverySheet?.order;
+    if (!order) return;
+
+    const billNo = `LINE-${Date.now().toString().slice(-8)}`;
+    const dateKey = dateKeyBangkok();
+    const fulfilledItems = cartItems.map((i) => ({
+      productId: i.productId,
+      productName: i.productName,
+      orderedQty: i.orderedQty,
+      orderedUnit: i.orderedUnit,
+      actualQty: actualQtyOf(i),
+      lineTotal: i.total,
+    }));
+
+    setSavingId(order.id);
+    try {
+      const now = new Date().toISOString();
+      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))]);
+
+      const salesId = await withTimeout(fsPost('sales', {
+        billNo,
+        dateKey,
+        customerName: customer.name,
+        customerId: customer.id,
+        zone: customer.zone || 'ทั่วไป',
+        items: cartItems.map((i) => ({
+          productId: i.productId,
+          productName: i.productName,
+          type: i.type,
+          weightKg: i.weight,
+          pricePerKg: i.pricePerKg,
+          lineTotal: i.total,
+          note: i.note || '',
+        })),
+        total,
+        paymentType: 'cash',
+        paidAmount: total,
+        remainingAmount: 0,
+        photoUrl: null,
+        timestamp: new Date().toLocaleTimeString('th-TH'),
+        recordedBy: user?.name || 'พนักงาน',
+        createdAt: now,
+        source: 'line-order',
+        lineOrderId: order.id,
+        lineRawText: order.rawText || '',
+        fulfilledItems,
+      }));
+
+      await withTimeout(updateMainStock(
+        Math.max(0, stock.live - liveKg),
+        Math.max(0, stock.dead - deadKg),
+      ));
+
+      await withTimeout(fsPatch(`lineOrders/${order.id}`, {
+        status: 'done',
+        salesId: salesId || null,
+        billNo,
+        completedAt: now,
+        fulfilledItems,
+      }));
+
+      setOrders((prev) => prev.map((o) => (o.id === order.id
+        ? { ...o, status: 'done', salesId, billNo }
+        : o)));
+      setDeliverySheet(null);
+      onSaleRecorded?.();
+      onOrderDone?.();
+      alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}`);
+    } catch (err) {
+      console.error(err);
+      alert('บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const today    = todayBKK();
   const tomorrow = tomorrowDateKeyBangkok();
@@ -1380,9 +1715,23 @@ function LineOrdersScreen() {
     </div>
   );
 
-  return (
-    <div className="px-4 pt-4 pb-6 space-y-5">
-      {Object.entries(grouped).sort().map(([date, items]) => (
+  return (
+    <>
+      {deliverySheet && (
+        <LineDeliveryConfirmSheet
+          order={deliverySheet.order}
+          cartItems={deliverySheet.cartItems}
+          unknownProducts={deliverySheet.unknownProducts}
+          stock={stock}
+          priceOf={priceOf}
+          allCustomers={allCustomers}
+          saving={savingId === deliverySheet.order.id}
+          onClose={() => !savingId && setDeliverySheet(null)}
+          onConfirm={saveDeliverySale}
+        />
+      )}
+    <div className="px-4 pt-4 pb-6 space-y-5">
+      {Object.entries(grouped).sort().map(([date, items]) => (
         <div key={date}>
           <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
             📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
@@ -1404,13 +1753,22 @@ function LineOrdersScreen() {
                     <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
                   </div>
-                  {o.status === 'done'
-                    ? <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">✓ เสร็จ</span>
-                    : <button onClick={() => markDone(o.id)}
-                        className="text-xs bg-green-500 text-white font-bold px-3 py-1 rounded-xl active:scale-95 shrink-0">
-                        ✓ เสร็จ
-                      </button>
-                  }
+                  {o.status === 'done'
+                    ? (
+                      <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
+                        ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
+                      </span>
+                    )
+                    : (
+                      <button
+                        type="button"
+                        disabled={savingId === o.id}
+                        onClick={() => openDeliverySheet(o)}
+                        className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 shrink-0 disabled:opacity-50"
+                      >
+                        {savingId === o.id ? 'กำลังบันทึก...' : 'ส่งเรียบร้อย'}
+                      </button>
+                    )}
                 </div>
                 <div className="space-y-1">
                   {(o.items || []).map((item, i) => (
@@ -1429,8 +1787,9 @@ function LineOrdersScreen() {
           </div>
         </div>
       ))}
-    </div>
-  );
+    </div>
+    </>
+  );
 }
 
 // ─── Admin: User Management ────────────────────────────────────────────────────
