@@ -144,7 +144,8 @@ service cloud.firestore {
     match /lineOrders/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow create: if isApprovedShrimp();
-      allow update, delete: if isAdmin() || isAdminShrimp();
+      allow update: if isApprovedShrimp();
+      allow delete: if isAdmin() || isAdminShrimp();
     }
 
     // Deny everything else

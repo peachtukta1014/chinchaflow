@@ -32,6 +32,11 @@ import {
   fsSetStockDoc,
 } from './lib/firestoreRest';
 import { aggregateDailySales, billMatchesDateKey, mergeSalesDocs } from './lib/salesAggregate';
+import {
+  cartStockKg,
+  lineItemsToCartItems,
+  resolveLineCustomer,
+} from './lib/lineOrderToSale';
 import { useVoice } from './hooks/useVoice';
 
 // ─── App (Auth Shell) ─────────────────────────────────────────────────────────
@@ -160,7 +165,18 @@ function App() {
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members'        && <MembersScreen />}
-        {activeTab === 'orders'         && <LineOrdersScreen onNewOrder={() => setActiveTab('orders')} />}
+        {activeTab === 'orders'         && (
+          <LineOrdersScreen
+            user={member}
+            stock={stock}
+            updateMainStock={updateMainStock}
+            onSaleRecorded={() => setSalesRefresh((n) => n + 1)}
+            onOrderDone={() => {
+              const today = dateKeyBangkok();
+              fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today }).then(setPendingOrders);
+            }}
+          />
+        )}
         {activeTab === 'admin-users'    && <AdminUsersScreen />}
         {activeTab === 'admin-products' && <ProductSettingsScreen />}
       </div>
@@ -1331,11 +1347,48 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
 
 // ─── LINE Orders Screen ───────────────────────────────────────────────────────
 
-function LineOrdersScreen() {
-  const [orders,  setOrders]  = useState([]);
-  const [loading, setLoading] = useState(true);
+function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrderDone }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [loadedPrices, setLoadedPrices] = useState({});
+  const [fsCustomers, setFsCustomers] = useState({});
 
   const todayBKK = dateKeyBangkok;
+
+  const allCustomers = useMemo(() => [
+    ...CUSTOMERS.map((c) => ({ ...c, ...(fsCustomers[c.id] || {}) })),
+    ...Object.values(fsCustomers).filter((c) => !CUSTOMERS.find((b) => b.id === c.id)),
+  ], [fsCustomers]);
+
+  const priceOf = useCallback(
+    (productId) => loadedPrices[productId] ?? PRODUCTS.find((p) => p.id === productId)?.price ?? 0,
+    [loadedPrices],
+  );
+
+  useEffect(() => {
+    if (!db) return;
+    return onSnapshot(collection(db, 'customers'), (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
+      setFsCustomers(map);
+    }, () => {});
+  }, []);
+
+  useEffect(() => {
+    fsAuthHeaders().then((h) => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j?.fields) return;
+        const p = {};
+        ['large', 'medium', 'small'].forEach((k) => {
+          const v = j.fields[k];
+          if (v) p[k] = parseInt(v.integerValue ?? v.doubleValue ?? 0, 10);
+        });
+        setLoadedPrices(p);
+      })
+      .catch(() => {});
+  }, []);
 
   const loadOrders = useCallback(async () => {
     const today = dateKeyBangkok();
@@ -1350,10 +1403,110 @@ function LineOrdersScreen() {
     return () => clearInterval(t);
   }, [loadOrders]);
 
-  const markDone = (id) => {
-    fsPatch(`lineOrders/${id}`, { status: 'done' });
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'done' } : o));
-  };
+  const confirmDelivery = async (order) => {
+    if (!order || order.status === 'done' || savingId) return;
+    if (order.salesId) {
+      await fsPatch(`lineOrders/${order.id}`, { status: 'done' });
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'done' } : o)));
+      onOrderDone?.();
+      return;
+    }
+
+    const { cartItems, unknownProducts } = lineItemsToCartItems(order.items, priceOf);
+    if (cartItems.length === 0) {
+      alert(unknownProducts.length
+        ? `ไม่รู้จักสินค้า: ${unknownProducts.join(', ')}\nกรุณาบันทึกบิลที่หน้าขายของ`
+        : 'ไม่มีรายการสินค้าในออเดอร์นี้');
+      return;
+    }
+    if (unknownProducts.length) {
+      const ok = window.confirm(
+        `มีบางรายการแปลงไม่ได้: ${unknownProducts.join(', ')}\nบันทึกเฉพาะรายการที่รู้จัก (${cartItems.length} รายการ)?`,
+      );
+      if (!ok) return;
+    }
+
+    const { liveKg, deadKg, total } = cartStockKg(cartItems);
+    if (liveKg > stock.live) {
+      alert(`กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      return;
+    }
+    if (deadKg > stock.dead) {
+      alert(`กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      return;
+    }
+
+    const customer = resolveLineCustomer(order.customerName, allCustomers);
+    const billNo = `LINE-${Date.now().toString().slice(-8)}`;
+    const dateKey = dateKeyBangkok();
+    const summary = cartItems.map((i) => (
+      i.type === 'dead'
+        ? `${i.productName} ${i.total.toLocaleString()} บาท`
+        : `${i.productName} ${i.weight} กก.`
+    )).join('\n');
+
+    if (!window.confirm(
+      `ยืนยันส่งเรียบร้อยและบันทึกยอดขาย?\n\nลูกค้า: ${customer.name}\n${summary}\n\nยอดรวม ฿${total.toLocaleString()}\nตัดสต๊อก เป็น ${liveKg} กก. / ตาย ${deadKg} กก.`,
+    )) return;
+
+    setSavingId(order.id);
+    try {
+      const now = new Date().toISOString();
+      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))]);
+
+      const salesId = await withTimeout(fsPost('sales', {
+        billNo,
+        dateKey,
+        customerName: customer.name,
+        customerId: customer.id,
+        zone: customer.zone || 'ทั่วไป',
+        items: cartItems.map((i) => ({
+          productId: i.productId,
+          productName: i.productName,
+          type: i.type,
+          weightKg: i.weight,
+          pricePerKg: i.pricePerKg,
+          lineTotal: i.total,
+          note: i.note || '',
+        })),
+        total,
+        paymentType: 'cash',
+        paidAmount: total,
+        remainingAmount: 0,
+        photoUrl: null,
+        timestamp: new Date().toLocaleTimeString('th-TH'),
+        recordedBy: user?.name || 'พนักงาน',
+        createdAt: now,
+        source: 'line-order',
+        lineOrderId: order.id,
+        lineRawText: order.rawText || '',
+      }));
+
+      await withTimeout(updateMainStock(
+        Math.max(0, stock.live - liveKg),
+        Math.max(0, stock.dead - deadKg),
+      ));
+
+      await withTimeout(fsPatch(`lineOrders/${order.id}`, {
+        status: 'done',
+        salesId: salesId || null,
+        billNo,
+        completedAt: now,
+      }));
+
+      setOrders((prev) => prev.map((o) => (o.id === order.id
+        ? { ...o, status: 'done', salesId, billNo }
+        : o)));
+      onSaleRecorded?.();
+      onOrderDone?.();
+      alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}`);
+    } catch (err) {
+      console.error(err);
+      alert('บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const today    = todayBKK();
   const tomorrow = tomorrowDateKeyBangkok();
@@ -1404,13 +1557,22 @@ function LineOrdersScreen() {
                     <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
                   </div>
-                  {o.status === 'done'
-                    ? <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">✓ เสร็จ</span>
-                    : <button onClick={() => markDone(o.id)}
-                        className="text-xs bg-green-500 text-white font-bold px-3 py-1 rounded-xl active:scale-95 shrink-0">
-                        ✓ เสร็จ
-                      </button>
-                  }
+                  {o.status === 'done'
+                    ? (
+                      <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
+                        ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
+                      </span>
+                    )
+                    : (
+                      <button
+                        type="button"
+                        disabled={savingId === o.id}
+                        onClick={() => confirmDelivery(o)}
+                        className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 shrink-0 disabled:opacity-50"
+                      >
+                        {savingId === o.id ? 'กำลังบันทึก...' : 'ส่งเรียบร้อย'}
+                      </button>
+                    )}
                 </div>
                 <div className="space-y-1">
                   {(o.items || []).map((item, i) => (
