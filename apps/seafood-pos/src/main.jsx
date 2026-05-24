@@ -26,6 +26,7 @@ import {
   fsObj,
   fsPatch,
   fsPost,
+  fsQueryLineOrders,
   fsQuerySales,
   fsRunQuery,
   fsSetStockDoc,
@@ -71,10 +72,7 @@ function App() {
     if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
     const today = dateKeyBangkok();
     const load = async () => {
-      const rows = await fsRunQuery({ from: [{ collectionId: 'lineOrders' }], where: { compositeFilter: { op: 'AND', filters: [
-        { fieldFilter: { field: { fieldPath: 'deliveryDate' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: today } } },
-        { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
-      ]}} });
+      const rows = await fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today });
       setPendingOrders(rows.length);
     };
     load();
@@ -451,7 +449,8 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [paidAmount, setPaidAmount] = useState('');
   const [photoUrl, setPhotoUrl]     = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
-  const photoInputRef = useRef(null);
+  const photoGalleryRef = useRef(null);
+  const photoCameraRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
   const allCustomers = useMemo(() => [
@@ -474,19 +473,33 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
   const [voiceResult, setVoiceResult] = useState('');
   const voiceTimerRef = useRef(null);
 
-  const handlePhotoChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoUploading(true);
-    try {
-      if (storage) {
-        const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
-        await uploadBytes(r, file);
-        setPhotoUrl(await getDownloadURL(r));
-      }
-    } catch { }
-    finally { setPhotoUploading(false); }
-  };
+  const uploadBillPhoto = async (file) => {
+    if (!file) return;
+    if (!storage) {
+      alert('⚠️ Firebase Storage ยังไม่พร้อม — ตรวจสอบการตั้งค่าแอป');
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop().toLowerCase() : 'jpg';
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext) ? ext : 'jpg';
+      const r = stRef(storage, `billPhotos/${billNoRef.current}.${safeExt}`);
+      const contentType = file.type || (safeExt === 'png' ? 'image/png' : 'image/jpeg');
+      await uploadBytes(r, file, { contentType });
+      setPhotoUrl(await getDownloadURL(r));
+    } catch (err) {
+      console.error('uploadBillPhoto', err);
+      alert('⚠️ อัปโหลดรูปไม่สำเร็จ\nลองถ่ายใหม่หรือเลือกรูปจากคลังอีกครั้ง');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    uploadBillPhoto(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (!db) return;
@@ -770,7 +783,7 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
             <h2 className="text-4xl font-black text-emerald-500 leading-none mt-1">฿{cartTotal.toLocaleString()}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => photoInputRef.current?.click()}
+            <button type="button" onClick={() => photoCameraRef.current?.click()}
               className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 transition-all ${
                 photoUrl ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'
               }`} title="ถ่ายรูปบิล">
@@ -780,8 +793,15 @@ const POSMobile = ({ user, stock, updateMainStock, onSaveBill }) => {
                   ? <img src={photoUrl} className="w-full h-full object-cover rounded-xl" alt="bill" />
                   : <Camera size={20} className="text-slate-400" />}
             </button>
-            <input ref={photoInputRef} type="file" accept="image/*"
-              onChange={handlePhotoChange} className="hidden" />
+            <button type="button" onClick={() => photoGalleryRef.current?.click()}
+              className="text-[10px] font-bold text-slate-500 px-2 py-2 rounded-xl border border-slate-200 bg-white active:scale-95"
+              title="เลือกรูปจากคลัง">
+              คลัง
+            </button>
+            <input ref={photoCameraRef} type="file" accept="image/*" capture="environment"
+              onChange={handlePhotoChange} className="hidden" />
+            <input ref={photoGalleryRef} type="file" accept="image/*,.heic,.heif,image/heic,image/heif"
+              onChange={handlePhotoChange} className="hidden" />
             {cart.length > 0 && (
               <button onClick={handleSaveBill} disabled={saving}
                 className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-60">
@@ -1317,11 +1337,18 @@ function LineOrdersScreen() {
 
   const todayBKK = dateKeyBangkok;
 
-  useEffect(() => {
-    fsRunQuery({ from: [{ collectionId: 'lineOrders' }], orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }], limit: 100 })
-      .then(rows => { setOrders(rows); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const loadOrders = useCallback(async () => {
+    const today = dateKeyBangkok();
+    const rows = await fsQueryLineOrders({ minDeliveryDate: today });
+    setOrders(rows);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+    const t = setInterval(loadOrders, 20000);
+    return () => clearInterval(t);
+  }, [loadOrders]);
 
   const markDone = (id) => {
     fsPatch(`lineOrders/${id}`, { status: 'done' });
@@ -1346,7 +1373,10 @@ function LineOrdersScreen() {
     <div className="flex flex-col items-center justify-center h-60 text-slate-300">
       <Bell size={48} strokeWidth={1} className="mb-3" />
       <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
-      <p className="text-xs mt-1">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
+      <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
+      <p className="text-[10px] mt-2 text-slate-400 text-center px-6 leading-relaxed">
+        Webhook กุ้ง: lineWebhook · ตัวอย่างข้อความ: &quot;กุ้งใหญ่ 2 กก&quot; หรือ &quot;2 กก กุ้งกลาง&quot;
+      </p>
     </div>
   );
 

@@ -23,6 +23,21 @@
         { "fieldPath": "dateKey",   "order": "ASCENDING"  },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "lineOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deliveryDate", "order": "ASCENDING" },
+        { "fieldPath": "status",       "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "lineOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
