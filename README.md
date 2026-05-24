@@ -2,6 +2,12 @@
 
 Monorepo สำหรับระบบธุรกิจ Chincha
 
+## เอกสาร
+
+- **[สถาปัตยกรรมระบบ (ภาษาไทย)](docs/ARCHITECTURE_TH.md)** — ภาพรวมแอป, Firestore, Cloud Functions, LINE และการ deploy
+- [โครงสร้างโปรเจกต์](docs/PROJECT_STRUCTURE.md)
+- [สถานะบนคลาว](docs/CLOUD_STATUS.md)
+
 ## Apps
 - `apps/seafood-pos` — POS กุ้ง
 - `apps/chincha-tea` — ร้านชา
