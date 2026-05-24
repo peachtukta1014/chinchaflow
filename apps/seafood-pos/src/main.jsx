@@ -1584,8 +1584,30 @@ function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrde
     return () => clearInterval(t);
   }, [loadOrders]);
 
+  const cancelLineOrder = async (order) => {
+    if (!order || order.status !== 'pending' || savingId) return;
+    const label = order.customerName || (order.rawText ? `"${order.rawText.slice(0, 50)}"` : 'ออเดอร์นี้');
+    if (!window.confirm(`ยกเลิกออเดอร์ LINE?\n\n${label}\n\nยังไม่ตัดสต๊อกและยังไม่บันทึกยอดขาย`)) return;
+
+    setSavingId(order.id);
+    try {
+      await fsPatch(`lineOrders/${order.id}`, {
+        status: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+        cancelledBy: user?.name || 'พนักงาน',
+      });
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      onOrderDone?.();
+    } catch (err) {
+      console.error(err);
+      alert('ยกเลิกไม่สำเร็จ ลองอีกครั้งครับ');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const openDeliverySheet = (order) => {
-    if (!order || order.status === 'done' || savingId || deliverySheet) return;
+    if (!order || order.status !== 'pending' || savingId || deliverySheet) return;
     if (order.salesId) {
       confirmDeliveryLegacyDone(order);
       return;
@@ -1694,8 +1716,9 @@ function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrde
   const tomorrow = tomorrowDateKeyBangkok();
   const dateLabel = (k) => k === today ? 'วันนี้' : k === tomorrow ? 'พรุ่งนี้' : k;
 
-  // Group by deliveryDate, show today + future only
-  const upcoming = orders.filter(o => (o.deliveryDate || '') >= today);
+  // Group by deliveryDate — ซ่อนออเดอร์ที่ยกเลิกแล้ว
+  const upcoming = orders.filter((o) => (o.deliveryDate || '') >= today && o.status !== 'cancelled');
+  const isPending = (o) => o.status === 'pending';
   const grouped  = upcoming.reduce((acc, o) => {
     const k = o.deliveryDate || 'ไม่ระบุ';
     (acc[k] = acc[k] || []).push(o);
@@ -1735,11 +1758,11 @@ function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrde
         <div key={date}>
           <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
             📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
-            {items.filter(o => o.status !== 'done').length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                {items.filter(o => o.status !== 'done').length} รอ
-              </span>
-            )}
+            {items.filter(isPending).length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {items.filter(isPending).length} รอ
+              </span>
+            )}
           </p>
           <div className="space-y-2">
             {items.map(o => (
@@ -1753,22 +1776,30 @@ function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrde
                     <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
                   </div>
-                  {o.status === 'done'
-                    ? (
-                      <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
-                        ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
-                      </span>
-                    )
-                    : (
+                  {o.status === 'done' ? (
+                    <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
+                      ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
+                    </span>
+                  ) : isPending(o) ? (
+                    <div className="flex flex-col gap-1 shrink-0">
                       <button
                         type="button"
                         disabled={savingId === o.id}
                         onClick={() => openDeliverySheet(o)}
-                        className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 shrink-0 disabled:opacity-50"
+                        className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 disabled:opacity-50"
                       >
                         {savingId === o.id ? 'กำลังบันทึก...' : 'ส่งเรียบร้อย'}
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        disabled={savingId === o.id}
+                        onClick={() => cancelLineOrder(o)}
+                        className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-lg active:scale-95 disabled:opacity-50"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="space-y-1">
                   {(o.items || []).map((item, i) => (
