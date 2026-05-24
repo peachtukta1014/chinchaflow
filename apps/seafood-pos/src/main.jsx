@@ -23,6 +23,7 @@ import {
   FS_BASE,
   fsAuthHeaders,
   fsIncrementDebt,
+  fsListCollection,
   fsObj,
   fsPatch,
   fsPost,
@@ -1053,7 +1054,8 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
 const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) => {
   const [dashTab, setDashTab]       = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
-  const [customerDebts, setCustomerDebts]   = useState([]);
+  const [debtBills, setDebtBills] = useState([]);
+  const [debtSavingId, setDebtSavingId] = useState(null);
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const todayKey = dateKeyBangkok();
@@ -1094,13 +1096,29 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
     );
   }, [todayKey, refreshKey]);
 
+  const loadDebtBills = useCallback(async () => {
+    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
+    try {
+      const rows = await fsListCollection('sales', 300);
+      const openBills = rows
+        .filter((b) => (Number(b.remainingAmount) || 0) > 0)
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+      setDebtBills(openBills);
+    } catch (e) {
+      console.warn('loadDebtBills', e);
+    }
+  }, [refreshKey]);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    loadDebtBills();
+    const iv = setInterval(loadDebtBills, 30000);
+    return () => clearInterval(iv);
+  }, [active, loadDebtBills]);
+
   useEffect(() => {
     if (!db) { return undefined; }
     const unsubs = [];
-
-    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
-      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
-    }, () => {}));
 
     const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
     unsubs.push(onSnapshot(batchQ, snap => {
@@ -1128,6 +1146,9 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
 
   const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
   const todaySales = mergeSalesDocs(firestoreSales, localToday);
+  const openDebtBills = mergeSalesDocs(debtBills, localBills)
+    .filter((b) => (Number(b.remainingAmount) || 0) > 0)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   const salesSummary = aggregateDailySales(todaySales);
 
   const todayTotal  = salesSummary.revenueTotal;
@@ -1135,7 +1156,8 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
   const todayTransfer = todaySales.filter(s => s.paymentType === 'transfer').reduce((s, t) => s + t.total, 0);
   const todayCredit = todaySales.filter(s => s.paymentType === 'credit').reduce((s, t) => s + t.total, 0);
   const todayInstall = todaySales.filter(s => s.paymentType === 'installment').reduce((s, t) => s + t.total, 0);
-  const totalDebt   = customerDebts.reduce((s, c) => s + (c.totalDebt || 0), 0);
+  const totalDebt   = openDebtBills.reduce((s, c) => s + (Number(c.remainingAmount) || 0), 0);
+  const debtorCount = new Set(openDebtBills.map((b) => b.customerId || b.customerName).filter(Boolean)).size;
 
   const payBreakdown = [
     { ...PAY[0], amount: todayCash,     count: todaySales.filter(s => s.paymentType === 'cash').length },
@@ -1143,6 +1165,57 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
     { ...PAY[2], amount: todayCredit,   count: todaySales.filter(s => s.paymentType === 'credit').length },
     { ...PAY[3], amount: todayInstall,  count: todaySales.filter(s => s.paymentType === 'installment').length },
   ];
+
+  const applyDebtPayment = async (bill, amount) => {
+    const billId = bill.id;
+    if (!billId) {
+      alert('บิลนี้ยังไม่ซิงก์ขึ้น Firebase กรุณารอสักครู่แล้วลองใหม่ครับ');
+      return;
+    }
+
+    const remaining = Number(bill.remainingAmount) || 0;
+    const payAmount = Math.min(Math.max(Number(amount) || 0, 0), remaining);
+    if (payAmount <= 0) return;
+
+    const nextRemaining = Math.max(0, remaining - payAmount);
+    const nextPaid = (Number(bill.paidAmount) || 0) + payAmount;
+    const now = new Date().toISOString();
+    setDebtSavingId(billId);
+    try {
+      await fsPatch(`sales/${billId}`, {
+        paidAmount: nextPaid,
+        remainingAmount: nextRemaining,
+        debtStatus: nextRemaining > 0 ? 'partial' : 'paid',
+        lastDebtPaymentAmount: payAmount,
+        lastDebtPaymentAt: now,
+      });
+      if (bill.customerId) {
+        await fsIncrementDebt(bill.customerId, {
+          customerId: bill.customerId,
+          customerName: bill.customerName || '',
+          zone: bill.zone || '',
+          lastBillNo: bill.billNo || billId,
+          lastUpdated: now,
+        }, -payAmount).catch(() => {});
+      }
+      setDebtBills((prev) => prev
+        .map((b) => (b.id === billId ? { ...b, paidAmount: nextPaid, remainingAmount: nextRemaining, debtStatus: nextRemaining > 0 ? 'partial' : 'paid' } : b))
+        .filter((b) => (Number(b.remainingAmount) || 0) > 0));
+      setFirestoreSales((prev) => prev.map((b) => (b.id === billId ? { ...b, paidAmount: nextPaid, remainingAmount: nextRemaining } : b)));
+    } catch (e) {
+      console.error(e);
+      alert('⚠️ รับชำระไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setDebtSavingId(null);
+    }
+  };
+
+  const promptDebtPayment = (bill) => {
+    const remaining = Number(bill.remainingAmount) || 0;
+    const raw = window.prompt(`รับชำระจาก ${bill.customerName || 'ลูกค้า'}\nยอดค้าง ฿${remaining.toLocaleString()}\nกรอกยอดที่รับชำระ`, String(remaining));
+    if (raw === null) return;
+    applyDebtPayment(bill, parseFloat(raw));
+  };
 
   return (
     <div className="p-5 space-y-5">
@@ -1164,13 +1237,13 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
         <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white col-span-2">
           <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
           <p className="text-3xl font-black">฿{totalDebt.toLocaleString()}</p>
-          <p className="text-orange-100 text-xs mt-1">{customerDebts.length} ราย</p>
+          <p className="text-orange-100 text-xs mt-1">{openDebtBills.length} บิล · {debtorCount} ราย</p>
         </div>
       </div>
 
       {/* Sub-tabs */}
       <div className="flex bg-slate-200 p-1.5 rounded-2xl">
-        {[['today','วันนี้'],['debts','ลูกหนี้'],['fifo','สต๊อก FIFO']].map(([id, label]) => (
+        {[['today','วันนี้'],['debts','บิลค้าง'],['fifo','สต๊อก FIFO']].map(([id, label]) => (
           <button key={id} onClick={() => setDashTab(id)}
             className={`flex-1 py-2.5 font-bold text-xs rounded-xl transition-all ${dashTab === id ? 'bg-white text-blue-600' : 'text-slate-500'}`}>
             {label}
@@ -1262,23 +1335,52 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
       {/* Debts (AR) tab */}
       {dashTab === 'debts' && (
         <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-1">ลูกหนี้ทั้งหมด</h3>
-          <p className="text-sm text-slate-500 mb-5">รวม ฿{totalDebt.toLocaleString()} ({customerDebts.length} ราย)</p>
-          {customerDebts.length === 0
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div>
+              <h3 className="font-bold text-slate-800 mb-1">บิลค้าง / ลูกหนี้</h3>
+              <p className="text-sm text-slate-500">รวม ฿{totalDebt.toLocaleString()} ({openDebtBills.length} บิล · {debtorCount} ราย)</p>
+            </div>
+            <button type="button" onClick={loadDebtBills}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold shrink-0">
+              รีเฟรช
+            </button>
+          </div>
+          {openDebtBills.length === 0
             ? <p className="text-center text-emerald-500 font-bold py-8">ไม่มีลูกหนี้ 🎉</p>
             : (
               <div className="space-y-3">
-                {[...customerDebts].sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0)).map(c => (
-                  <div key={c.id} className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <div>
-                      <p className="font-bold text-slate-800">{c.customerName}</p>
-                      <p className="text-xs text-slate-400">{c.zone} • บิล {c.lastBillNo || '—'}</p>
+                {openDebtBills.map((bill) => {
+                  const remaining = Number(bill.remainingAmount) || 0;
+                  const savingThis = debtSavingId === bill.id;
+                  const dateLabel = bill.dateKey || String(bill.createdAt || '').slice(0, 10) || '—';
+                  return (
+                  <div key={bill.id || bill.billNo} className="border-b border-slate-100 pb-4 last:border-b-0">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 truncate">{bill.customerName || 'ลูกค้า'}</p>
+                        <p className="text-xs text-slate-400">{bill.zone || '—'} • {dateLabel} • บิล {bill.billNo || bill.id || '—'}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">ยอดบิล ฿{(Number(bill.total) || 0).toLocaleString()} · จ่ายแล้ว ฿{(Number(bill.paidAmount) || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-black text-orange-500 text-lg">฿{remaining.toLocaleString()}</p>
+                        <p className="text-[10px] text-orange-400 font-bold">ยอดค้าง</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-black text-orange-500 text-lg">฿{(c.totalDebt || 0).toLocaleString()}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <button type="button" disabled={savingThis}
+                        onClick={() => promptDebtPayment(bill)}
+                        className="py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold disabled:opacity-50">
+                        รับชำระ
+                      </button>
+                      <button type="button" disabled={savingThis}
+                        onClick={() => window.confirm(`ปิดบิลค้าง ฿${remaining.toLocaleString()} ของ ${bill.customerName || 'ลูกค้า'}?`) && applyDebtPayment(bill, remaining)}
+                        className="py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold disabled:opacity-50">
+                        ปิดบิล
+                      </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
         </div>
