@@ -1,4 +1,0 @@
-# ลบไฟล์นี้อัตโนมัติหลัง GitHub Actions รัน shrimp-full-reset-on-demand.yml
-# อย่า commit ซ้ำถ้าไม่ต้องการรีเซ็ตอีกครั้ง
-triggeredAt=2026-05-24T10:30:00Z
-reason=prepare-for-tonight-orders
