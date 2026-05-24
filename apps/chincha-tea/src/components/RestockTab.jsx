@@ -3,6 +3,11 @@ import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
 import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
+import {
+  canManageRestock,
+  deleteRestockRequest,
+  removeRestockLine,
+} from '../lib/restockService';
 
 export function RestockTab({ member, t }) {
   const [items, setItems] = useState([]);
@@ -11,11 +16,14 @@ export function RestockTab({ member, t }) {
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
 
+  const refreshRecent = () => fsQueryRestocks(20).then(setRecentRequests).catch(() => {});
+
   useEffect(() => {
-    fsQueryRestocks(20).then(setRecentRequests).catch(() => {});
+    refreshRecent();
   }, []);
 
   const STATUS_CFG = [
@@ -73,12 +81,48 @@ export function RestockTab({ member, t }) {
       });
       setItems([]);
       setFlash('✅ ส่งรายการแล้ว!');
-      setRecentRequests(await fsQueryRestocks(20));
+      await refreshRecent();
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
     }
     setSaving(false);
+  };
+
+  const handleDeleteRestock = async (req) => {
+    if (!canManageRestock(req, member) || deletingId) return;
+    if (!window.confirm(t('confirmDeleteRestock'))) return;
+    setDeletingId(req.id);
+    try {
+      await deleteRestockRequest(req.id);
+      setRecentRequests((prev) => prev.filter((r) => r.id !== req.id));
+      setFlash(t('restockDeleted'));
+      setTimeout(() => setFlash(''), 3000);
+    } catch (e) {
+      console.error(e);
+      alert(t('restockDeleteFailed'));
+    }
+    setDeletingId(null);
+  };
+
+  const handleRemoveLine = async (req, lineIndex) => {
+    if (!canManageRestock(req, member) || deletingId) return;
+    if (!window.confirm(t('confirmDeleteRestockLine'))) return;
+    setDeletingId(req.id);
+    try {
+      const updated = await removeRestockLine(req, lineIndex);
+      if (updated) {
+        setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, items: updated.items } : r)));
+      } else {
+        setRecentRequests((prev) => prev.filter((r) => r.id !== req.id));
+      }
+      setFlash(t('restockDeleted'));
+      setTimeout(() => setFlash(''), 3000);
+    } catch (e) {
+      console.error(e);
+      alert(t('restockDeleteFailed'));
+    }
+    setDeletingId(null);
   };
 
   return (
@@ -152,19 +196,47 @@ export function RestockTab({ member, t }) {
         <div className="mt-4">
           <p className="font-black text-xs text-stone-500 uppercase mb-2">{t('recentRestocks')}</p>
           <div className="space-y-2">
-            {recentRequests.map((req) => (
-              <div key={req.id} className="bg-white rounded-2xl p-3 border border-stone-200">
-                <p className="text-[10px] text-stone-400 mb-1">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
+            {recentRequests.map((req) => {
+              const canDel = canManageRestock(req, member);
+              const busy = deletingId === req.id;
+              return (
+              <div key={req.id} className={`bg-white rounded-2xl p-3 border border-stone-200 ${busy ? 'opacity-60' : ''}`}>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
+                  {canDel && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleDeleteRestock(req)}
+                      className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg shrink-0 active:scale-95 disabled:opacity-50"
+                    >
+                      {busy ? '…' : t('deleteRestock')}
+                    </button>
+                  )}
+                </div>
                 {(req.items || []).map((it, i) => (
-                  <p key={i} className="text-xs text-stone-600">
-                    {it.name} ×{it.qty}
-                    <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                      {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
-                    </span>
-                  </p>
+                  <div key={i} className="flex items-center gap-1 text-xs text-stone-600">
+                    <p className="flex-1 min-w-0">
+                      {it.name} ×{it.qty}
+                      <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
+                      </span>
+                    </p>
+                    {canDel && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRemoveLine(req, i)}
+                        className="text-red-400 font-black px-1 active:scale-95 disabled:opacity-50"
+                        aria-label={t('delete')}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}
