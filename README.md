@@ -28,3 +28,16 @@ firebase deploy --only firestore:rules,firestore:indexes,functions,hosting:tea
 ```
 
 เก็บ `users` และ `config` ไว้ — หลังเคลียร์ต้องมี `users/{uid}` ที่ `approved: true`
+
+### รีเซ็ตสต๊อกกุ้ง (ก่อนเริ่มวันใหม่)
+
+```bash
+gcloud auth application-default login --project chincha-eeed6
+npm install
+npm run shrimp:stock-reset:dry
+npm run shrimp:stock-reset              # ตั้งกุ้งเป็น/ตาย = 0
+npm run shrimp:stock-reset:full         # + ลบล็อต FIFO และออเดอร์ LINE เก่า
+```
+
+LINE กุ้ง — Webhook URL ใน LINE Developers ต้องชี้ไปที่  
+`https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhook` (ไม่ใช่ lineWebhookTea)

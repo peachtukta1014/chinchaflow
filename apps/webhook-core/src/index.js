@@ -19,6 +19,7 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
+const { parseOrderItems, ORDER_FORMAT_HELP } = require('./parseLineOrder');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -30,21 +31,6 @@ function verifySignature(rawBody, signature, secret) {
   if (!secret) return true;
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
   return hash === signature;
-}
-
-// ── Parse Thai seafood order text ─────────────────────────────────────────────
-function parseOrderItems(text) {
-  const items = [];
-  const re = /([฀-๿][฀-๿\s]*?)\s+([\d.]+)\s*(กก\.?|กิโล|กิโลกรัม|kg|บาท|฿)/gi;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    items.push({
-      product: m[1].trim(),
-      qty:     parseFloat(m[2]),
-      unit:    m[3].replace('.', '').replace('กิโลกรัม', 'กก').replace('กิโล', 'กก').replace('kg', 'กก').replace('฿', 'บาท'),
-    });
-  }
-  return items;
 }
 
 function tomorrowBKK() {
@@ -89,11 +75,18 @@ exports.lineWebhook = functions
         });
         const summary = items.map(i => `• ${i.product} ${i.qty} ${i.unit}`).join('\n');
         await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
+      } else if (/^(help|ช่วย|วิธี|สั่งยังไง)/i.test(text)) {
+        await lineReply(replyToken, ORDER_FORMAT_HELP, token);
       } else {
         await db().collection('line_messages').add({
           userId, groupId, text,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        await lineReply(
+          replyToken,
+          `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`,
+          token,
+        );
       }
     }
 

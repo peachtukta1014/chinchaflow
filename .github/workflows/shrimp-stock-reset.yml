@@ -1,0 +1,42 @@
+name: Shrimp Stock Reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run only (no writes)'
+        type: boolean
+        default: true
+      clear_batches:
+        description: 'Also delete stockBatches'
+        type: boolean
+        default: false
+      clear_line_orders:
+        description: 'Also delete lineOrders'
+        type: boolean
+        default: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin
+
+      - name: Run shrimp stock reset
+        env:
+          FIREBASE_PROJECT_ID: chincha-eeed6
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          ARGS="--confirm"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          if [ "${{ inputs.clear_batches }}" = "true" ]; then ARGS="$ARGS --clear-batches"; fi
+          if [ "${{ inputs.clear_line_orders }}" = "true" ]; then ARGS="$ARGS --clear-line-orders"; fi
+          node scripts/shrimp-stock-reset.mjs $ARGS
