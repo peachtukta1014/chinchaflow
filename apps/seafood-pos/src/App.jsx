@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, ShoppingCart, Users } from 'lucide-react';
-import { auth, db, isFirebaseReady } from './firebase';
-import { dateKeyBangkok } from './lib/date';
-import { FS_BASE, fsQueryLineOrders, fsSetStockDoc } from './lib/firestoreRest';
+import { auth, db } from './firebase';
+import { FS_BASE } from './lib/firestoreRest';
+import { fetchPendingLineOrderCount } from './services/lineOrderService';
+import { normalizeStockValues, persistStock } from './services/stockService';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import Dashboard from './screens/Dashboard';
@@ -49,10 +50,8 @@ export default function App() {
   // Badge: pending LINE orders
   useEffect(() => {
     if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
-    const today = dateKeyBangkok();
     const load = async () => {
-      const rows = await fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today });
-      setPendingOrders(rows.length);
+      setPendingOrders(await fetchPendingLineOrderCount());
     };
     load();
     const t = setInterval(load, 30000);
@@ -66,20 +65,9 @@ export default function App() {
   };
 
   const updateMainStock = async (live, dead) => {
-    const val = {
-      live: Math.max(0, parseFloat(Number(live).toFixed(3))),
-      dead: Math.max(0, parseFloat(Number(dead).toFixed(3))),
-    };
+    const val = normalizeStockValues(live, dead);
     setStock(val);
-    const payload = { ...val, updatedAt: new Date().toISOString() };
-    try {
-      if (isFirebaseReady) await fsSetStockDoc(payload);
-    } catch (e) {
-      console.warn('fsSetStockDoc', e);
-      if (db) {
-        setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }, { merge: true }).catch(console.error);
-      }
-    }
+    await persistStock(val);
   };
 
   if (member === undefined) {
@@ -146,8 +134,7 @@ export default function App() {
             updateMainStock={updateMainStock}
             onSaleRecorded={() => setSalesRefresh((n) => n + 1)}
             onOrderDone={() => {
-              const today = dateKeyBangkok();
-              fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today }).then(setPendingOrders);
+              fetchPendingLineOrderCount().then(setPendingOrders);
             }}
           />
         )}

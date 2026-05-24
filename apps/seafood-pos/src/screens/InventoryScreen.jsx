@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { fsPost } from '../lib/firestoreRest';
-import { isFirebaseReady } from '../firebase';
+import { createStockBatchRecord } from '../services/stockService';
 
 export default function InventoryScreen({ stock, updateMainStock }) {
   const [tab, setTab]           = useState('receive');
@@ -25,18 +24,15 @@ export default function InventoryScreen({ stock, updateMainStock }) {
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     setSaving(true);
     try {
-      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-      await withTimeout(updateMainStock(stock.live + liveKg, stock.dead + deadKg));
-      if (isFirebaseReady) {
-        await withTimeout(fsPost('stockBatches', {
-          purchaseDate: new Date().toISOString(),
-          liveKg, deadKg, costPerKg, transport,
-          totalCost: grandTotal, effectiveCostPerKg: effectiveCost,
-          remainingLiveKg: liveKg, remainingDeadKg: deadKg,
-          note: rcvNote,
-        }));
-      }
-      alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${grandTotal.toLocaleString()} (฿${effectiveCost.toFixed(2)}/กก.)`);
+      await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
+      const { grandTotal: savedTotal, effectiveCost: savedCost } = await createStockBatchRecord({
+        liveKg,
+        deadKg,
+        costPerKg,
+        transport,
+        note: rcvNote,
+      });
+      alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
       console.error(err);

@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { PlusCircle } from 'lucide-react';
-import { db } from '../firebase';
-import { CUSTOMERS } from '../constants';
+import {
+  createCustomer,
+  mergeCustomerLists,
+  subscribeCustomers,
+  updateCustomer,
+} from '../services/customerService';
 
 export default function MembersScreen() {
   const [fsCustomers, setFsCustomers] = useState({});
@@ -12,47 +15,34 @@ export default function MembersScreen() {
   const [showAdd, setShowAdd]         = useState(false);
   const [newCus, setNewCus]           = useState({ name: '', zone: '', phone: '' });
 
-  useEffect(() => {
-    if (!db) { setCusLoading(false); return; }
-    return onSnapshot(collection(db, 'customers'), snap => {
-      const map = {};
-      snap.docs.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
-      setFsCustomers(map);
-      setCusLoading(false);
-    }, () => setCusLoading(false));
-  }, []);
+  useEffect(() => subscribeCustomers(
+    (map) => { setFsCustomers(map); setCusLoading(false); },
+    () => setCusLoading(false),
+  ), []);
 
-  const allCustomers = [
-    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
-    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
-  ];
+  const allCustomers = mergeCustomerLists(fsCustomers);
 
   const [saveFlash, setSaveFlash] = useState('');
   const showFlash = (msg) => { setSaveFlash(msg); setTimeout(() => setSaveFlash(''), 3000); };
 
-  const saveCusEdit = async (id) => {
-    if (!cusEditData.name.trim()) return;
-    try {
-      await setDoc(doc(db, 'customers', id), {
-        name: cusEditData.name.trim(), zone: cusEditData.zone.trim(), phone: cusEditData.phone.trim(),
-      }, { merge: true });
-      setCusEditId(null);
-      showFlash('✅ บันทึกสำเร็จแล้วครับ');
-    } catch (e) {
-      showFlash('❌ บันทึกไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
-    }
-  };
+  const saveCusEdit = async (id) => {
+    if (!cusEditData.name.trim()) return;
+    try {
+      await updateCustomer(id, cusEditData);
+      setCusEditId(null);
+      showFlash('✅ บันทึกสำเร็จแล้วครับ');
+    } catch (e) {
+      showFlash('❌ บันทึกไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+    }
+  };
 
-  const addCustomer = async () => {
-    if (!newCus.name.trim()) return;
-    await setDoc(doc(db, 'customers', `cx_${Date.now()}`), {
-      name: newCus.name.trim(), zone: newCus.zone.trim(), phone: newCus.phone.trim(),
-      createdAt: serverTimestamp(),
-    });
-    setNewCus({ name: '', zone: '', phone: '' });
-    setShowAdd(false);
-    showFlash('✅ เพิ่มลูกค้าสำเร็จแล้วครับ');
-  };
+  const addCustomer = async () => {
+    if (!newCus.name.trim()) return;
+    await createCustomer(newCus);
+    setNewCus({ name: '', zone: '', phone: '' });
+    setShowAdd(false);
+    showFlash('✅ เพิ่มลูกค้าสำเร็จแล้วครับ');
+  };
 
   return (
     <div className="p-4 space-y-4">

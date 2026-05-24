@@ -1,22 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { Bell } from 'lucide-react';
-import { db } from '../firebase';
 import { dateKeyBangkok, tomorrowDateKeyBangkok } from '../lib/date';
+import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
+import { lineItemsToCartItems } from '../lib/lineOrderToSale';
+import { PRODUCTS } from '../constants';
+import { mergeCustomerLists, subscribeCustomers } from '../services/customerService';
 import {
-  FS_BASE,
-  fsAuthHeaders,
-  fsPatch,
-  fsPost,
-  fsQueryLineOrders,
-} from '../lib/firestoreRest';
-import {
-  actualQtyOf,
-  cartStockKg,
-  lineItemsToCartItems,
-  resolveLineCustomer,
-} from '../lib/lineOrderToSale';
-import { CUSTOMERS, PRODUCTS } from '../constants';
+  cancelLineOrder as cancelLineOrderService,
+  fetchLineOrdersFromToday,
+  markLineOrderDoneOnly,
+  saveLineOrderDelivery,
+} from '../services/lineOrderService';
+import { deductStockForSale } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 
 export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrderDone }) {
@@ -29,24 +24,14 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
 
   const todayBKK = dateKeyBangkok;
 
-  const allCustomers = useMemo(() => [
-    ...CUSTOMERS.map((c) => ({ ...c, ...(fsCustomers[c.id] || {}) })),
-    ...Object.values(fsCustomers).filter((c) => !CUSTOMERS.find((b) => b.id === c.id)),
-  ], [fsCustomers]);
+  const allCustomers = useMemo(() => mergeCustomerLists(fsCustomers), [fsCustomers]);
 
   const priceOf = useCallback(
     (productId) => loadedPrices[productId] ?? PRODUCTS.find((p) => p.id === productId)?.price ?? 0,
     [loadedPrices],
   );
 
-  useEffect(() => {
-    if (!db) return;
-    return onSnapshot(collection(db, 'customers'), (snap) => {
-      const map = {};
-      snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
-      setFsCustomers(map);
-    }, () => {});
-  }, []);
+  useEffect(() => subscribeCustomers(setFsCustomers, () => {}), []);
 
   useEffect(() => {
     fsAuthHeaders().then((h) => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
@@ -64,8 +49,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
   }, []);
 
   const loadOrders = useCallback(async () => {
-    const today = dateKeyBangkok();
-    const rows = await fsQueryLineOrders({ minDeliveryDate: today });
+    const rows = await fetchLineOrdersFromToday();
     setOrders(rows);
     setLoading(false);
   }, []);
@@ -83,11 +67,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
 
     setSavingId(order.id);
     try {
-      await fsPatch(`lineOrders/${order.id}`, {
-        status: 'cancelled',
-        cancelledAt: new Date().toISOString(),
-        cancelledBy: user?.name || 'พนักงาน',
-      });
+      await cancelLineOrderService(order.id, user?.name || 'พนักงาน');
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
       onOrderDone?.();
     } catch (err) {
@@ -122,7 +102,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
   };
 
   const confirmDeliveryLegacyDone = async (order) => {
-    await fsPatch(`lineOrders/${order.id}`, { status: 'done' });
+    await markLineOrderDoneOnly(order.id);
     setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'done' } : o)));
     onOrderDone?.();
   };
@@ -131,63 +111,17 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
     const order = deliverySheet?.order;
     if (!order) return;
 
-    const billNo = `LINE-${Date.now().toString().slice(-8)}`;
-    const dateKey = dateKeyBangkok();
-    const fulfilledItems = cartItems.map((i) => ({
-      productId: i.productId,
-      productName: i.productName,
-      orderedQty: i.orderedQty,
-      orderedUnit: i.orderedUnit,
-      actualQty: actualQtyOf(i),
-      lineTotal: i.total,
-    }));
-
     setSavingId(order.id);
     try {
-      const now = new Date().toISOString();
-      const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))]);
-
-      const salesId = await withTimeout(fsPost('sales', {
-        billNo,
-        dateKey,
-        customerName: customer.name,
-        customerId: customer.id,
-        zone: customer.zone || 'ทั่วไป',
-        items: cartItems.map((i) => ({
-          productId: i.productId,
-          productName: i.productName,
-          type: i.type,
-          weightKg: i.weight,
-          pricePerKg: i.pricePerKg,
-          lineTotal: i.total,
-          note: i.note || '',
-        })),
+      const { salesId, billNo } = await saveLineOrderDelivery({
+        order,
+        cartItems,
+        customer,
         total,
-        paymentType: 'cash',
-        paidAmount: total,
-        remainingAmount: 0,
-        photoUrl: null,
-        timestamp: new Date().toLocaleTimeString('th-TH'),
         recordedBy: user?.name || 'พนักงาน',
-        createdAt: now,
-        source: 'line-order',
-        lineOrderId: order.id,
-        lineRawText: order.rawText || '',
-        fulfilledItems,
-      }));
+      });
 
-      await withTimeout(updateMainStock(
-        Math.max(0, stock.live - liveKg),
-        Math.max(0, stock.dead - deadKg),
-      ));
-
-      await withTimeout(fsPatch(`lineOrders/${order.id}`, {
-        status: 'done',
-        salesId: salesId || null,
-        billNo,
-        completedAt: now,
-        fulfilledItems,
-      }));
+      await deductStockForSale(stock, liveKg, deadKg, updateMainStock);
 
       setOrders((prev) => prev.map((o) => (o.id === order.id
         ? { ...o, status: 'done', salesId, billNo }
@@ -211,24 +145,24 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
   // Group by deliveryDate — ซ่อนออเดอร์ที่ยกเลิกแล้ว
   const upcoming = orders.filter((o) => (o.deliveryDate || '') >= today && o.status !== 'cancelled');
   const isPending = (o) => o.status === 'pending';
-  const grouped  = upcoming.reduce((acc, o) => {
-    const k = o.deliveryDate || 'ไม่ระบุ';
-    (acc[k] = acc[k] || []).push(o);
-    return acc;
-  }, {});
+  const grouped  = upcoming.reduce((acc, o) => {
+    const k = o.deliveryDate || 'ไม่ระบุ';
+    (acc[k] = acc[k] || []).push(o);
+    return acc;
+  }, {});
 
-  if (loading) return <div className="flex items-center justify-center h-40 text-slate-400 text-sm">กำลังโหลด...</div>;
+  if (loading) return <div className="flex items-center justify-center h-40 text-slate-400 text-sm">กำลังโหลด...</div>;
 
-  if (upcoming.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-60 text-slate-300">
-      <Bell size={48} strokeWidth={1} className="mb-3" />
-      <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
-      <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
+  if (upcoming.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-60 text-slate-300">
+      <Bell size={48} strokeWidth={1} className="mb-3" />
+      <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
+      <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
       <p className="text-[10px] mt-2 text-slate-400 text-center px-6 leading-relaxed">
         Webhook กุ้ง: lineWebhook · ตัวอย่างข้อความ: &quot;กุ้งใหญ่ 2 กก&quot; หรือ &quot;2 กก กุ้งกลาง&quot;
       </p>
-    </div>
-  );
+    </div>
+  );
 
   return (
     <>
@@ -247,27 +181,27 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
       )}
     <div className="px-4 pt-4 pb-6 space-y-5">
       {Object.entries(grouped).sort().map(([date, items]) => (
-        <div key={date}>
-          <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-            📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
+        <div key={date}>
+          <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+            📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
             {items.filter(isPending).length > 0 && (
               <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                 {items.filter(isPending).length} รอ
               </span>
             )}
-          </p>
-          <div className="space-y-2">
-            {items.map(o => (
-              <div key={o.id}
-                className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 min-w-0 mr-2">
+          </p>
+          <div className="space-y-2">
+            {items.map(o => (
+              <div key={o.id}
+                className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0 mr-2">
                     {o.customerName && (
                       <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
                     )}
-                    <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
-                  </div>
+                    <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
+                  </div>
                   {o.status === 'done' ? (
                     <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
                       ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
@@ -292,7 +226,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
                       </button>
                     </div>
                   ) : null}
-                </div>
+                </div>
                 <div className="space-y-1">
                   {(o.items || []).map((item, i) => (
                     <div key={i} className="flex items-center gap-2 flex-wrap">
@@ -305,14 +239,12 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
     </>
   );
 }
-
-// ─── Admin: User Management ────────────────────────────────────────────────────

@@ -1,24 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Camera, CheckCircle, ChevronRight, Delete, Edit3, MapPin, Mic, MicOff, PlusCircle, X,
 } from 'lucide-react';
-import { db, storage, isFirebaseReady } from '../firebase';
-import { dateKeyBangkok } from '../lib/date';
+import { storage } from '../firebase';
 import {
   hasVoiceCommitCommand,
   isVoiceOrderComplete,
   parseShrimpVoice,
 } from '../lib/voiceParse';
 import { CUSTOMERS, PAY, PRODUCTS } from '../constants';
-import {
-  FS_BASE,
-  fsAuthHeaders,
-  fsIncrementDebt,
-  fsPost,
-} from '../lib/firestoreRest';
+import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { useVoice } from '../hooks/useVoice';
+import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
+import { saveBillWithCart as saveBillWithCartService } from '../services/salesService';
 
 export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
@@ -39,10 +34,7 @@ export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) 
   const photoCameraRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
-  const allCustomers = useMemo(() => [
-    ...CUSTOMERS.map(c => ({ ...c, ...(fsCustomers[c.id] || {}) })),
-    ...Object.values(fsCustomers).filter(c => !CUSTOMERS.find(b => b.id === c.id)),
-  ], [fsCustomers]);
+  const allCustomers = useMemo(() => mergeCustomerLists(fsCustomers), [fsCustomers]);
 
   const activeProduct    = PRODUCTS.find(p => p.id === selectedProduct);
   const isDeadShrimp     = activeProduct?.type === 'dead';
@@ -87,14 +79,7 @@ export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) 
     e.target.value = '';
   };
 
-  useEffect(() => {
-    if (!db) return;
-    return onSnapshot(collection(db, 'customers'), snap => {
-      const map = {};
-      snap.docs.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
-      setFsCustomers(map);
-    }, () => {});
-  }, []);
+  useEffect(() => subscribeCustomers(setFsCustomers, () => {}), []);
 
   useEffect(() => {
     fsAuthHeaders().then(h => fetch(`${FS_BASE}/productSettings/shrimp`, { headers: h }))
@@ -148,47 +133,26 @@ export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) 
   const saveBillWithCart = async (cartItems) => {
     if (cartItems.length === 0 || saving) return;
     if (paymentType === 'installment' && !paidAmount) { alert('ใส่จำนวนเงินที่ผ่อนมาด้วยครับ'); return; }
-    const liveKg = cartItems.reduce((s, i) => i.type !== 'dead' ? s + i.weight : s, 0);
-    const deadKg = cartItems.reduce((s, i) => i.type === 'dead' ? s + i.weight : s, 0);
-    if (liveKg > stock.live) { alert(`⚠️ กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
-    if (deadKg > stock.dead) { alert(`⚠️ กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`); return; }
-    const total = cartItems.reduce((s, i) => s + i.total, 0);
-    const paidA = paymentType === 'cash' || paymentType === 'transfer' ? total : paymentType === 'credit' ? 0 : (parseFloat(paidAmount) || 0);
-    const remain = total - paidA;
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
-    const dateKey = dateKeyBangkok();
-    const billData = {
-      billNo: billNoRef.current,
-      dateKey,
-      customerName: customer.name, customerId: selectedCustomer, zone: customer.zone,
-      items: cartItems, total,
-      paymentType, paidAmount: paidA, remainingAmount: remain,
-      photoUrl: photoUrl || null,
-      timestamp: new Date().toLocaleTimeString('th-TH'),
-      recordedBy: user.name,
-    };
     setSaving(true);
     try {
-      if (isFirebaseReady) {
-        const now = new Date().toISOString();
-        const withTimeout = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000))]);
-        await withTimeout(fsPost('sales', {
-          ...billData,
-          dateKey,
-          items: cartItems.map(i => ({
-            productId: i.productId, productName: i.productName, type: i.type,
-            weightKg: i.weight, pricePerKg: i.pricePerKg, lineTotal: i.total, note: i.note || '',
-          })),
-          createdAt: now, source: 'koseafood-pos',
-        }));
-        if (remain > 0) {
-          await withTimeout(fsIncrementDebt(selectedCustomer, {
-            customerId: selectedCustomer, customerName: customer.name, zone: customer.zone,
-            lastBillNo: billNoRef.current, lastUpdated: now,
-          }, remain));
-        }
+      const result = await saveBillWithCartService({
+        cartItems,
+        stock,
+        customer,
+        selectedCustomer,
+        paymentType,
+        paidAmount,
+        billNo: billNoRef.current,
+        recordedBy: user.name,
+        photoUrl,
+        updateMainStock,
+      });
+      if (!result.ok) {
+        alert(result.message);
+        return;
       }
-      updateMainStock(Math.max(0, stock.live - liveKg), Math.max(0, stock.dead - deadKg));
+      const { billData, total, remain } = result;
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
