@@ -201,34 +201,5 @@ exports.teaPushSummary = functions
     }
   });
 
-// ── สรุปชาอัตโนมัติวันละครั้ง (ปิด default ในแอป — เปิดที่แอดมิน → LINE) ─────
-exports.teaDailyScheduledSummary = functions
-  .region('asia-southeast1')
-  .pubsub.schedule('0 22 * * *')
-  .timeZone('Asia/Bangkok')
-  .onRun(async () => {
-    const config = await getTeaLineConfig(db());
-    if (config.autoSummaryEnabled === false) return null;
-
-    const hourNow = parseInt(
-      new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Bangkok' }),
-      10,
-    );
-    const targetHour = parseInt(config.autoSummaryHour, 10);
-    const hour = Number.isFinite(targetHour) ? targetHour : 22;
-    if (hourNow !== hour) return null;
-
-    const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
-    if (!token) {
-      console.warn('LINE_TEA_CHANNEL_ACCESS_TOKEN not set');
-      return null;
-    }
-
-    const dateKey = todayBKK();
-    const { targetCount, skipped } = await dispatchTeaSummary(db(), dateKey, token);
-    if (skipped) console.log('teaDailyScheduledSummary skipped:', skipped);
-    if (targetCount === 0) {
-      console.warn('teaDailyScheduledSummary: no notifyGroupId / notifyUserIds in config/teaLine');
-    }
-    return null;
-  });
+// สรุปอัตโนมัติ: ใช้ apps/webhook-core-scheduled (ต้องเปิด Cloud Scheduler API ใน GCP)
+// หรือส่งด้วยมือจากแอดมิน / พิมพ์ "สรุป" ในกลุ่ม LINE
