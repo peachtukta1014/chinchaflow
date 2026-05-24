@@ -129,7 +129,10 @@ export default function App() {
       <TabNav
         tabs={tabs}
         activeTab={tab}
-        onSelect={(id) => { setTab(id); if (id === 'admin') refreshCatalog(); }}
+        onSelect={(id) => {
+          setTab(id);
+          if (id === 'admin' || id === 'order') refreshCatalog();
+        }}
       />
 
       <main className="flex-1 overflow-y-auto z-10" style={{ scrollbarWidth: 'none' }}>
@@ -165,7 +168,9 @@ export default function App() {
           />
         )}
         {tab === 'restock' && <RestockTab member={member} t={t} />}
-        {tab === 'admin' && isAdmin && <AdminPanel t={t} onOrdersChanged={refreshOrders} />}
+        {tab === 'admin' && isAdmin && (
+          <AdminPanel t={t} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
+        )}
       </main>
 
       {cart.length > 0 && tab !== 'admin' && (
