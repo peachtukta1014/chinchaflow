@@ -1019,13 +1019,13 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
             </div>
             {effectiveCost > 0 && (
               <div className="flex justify-between text-sm text-emerald-600 font-bold">
-                <span>ต้นทุนจริง/กก. (FIFO)</span><span>฿{effectiveCost.toFixed(2)}</span>
+                <span>ต้นทุนเฉลี่ย/กก.</span><span>฿{effectiveCost.toFixed(2)}</span>
               </div>
             )}
           </div>
           <button onClick={handleReceive} disabled={saving}
             className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl disabled:opacity-60">
-            {saving ? 'กำลังบันทึก...' : 'บันทึกเข้าสต๊อก (FIFO)'}
+            {saving ? 'กำลังบันทึก...' : 'บันทึกเข้าสต๊อก'}
           </button>
         </div>
       )}
@@ -1243,7 +1243,7 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
 
       {/* Sub-tabs */}
       <div className="flex bg-slate-200 p-1.5 rounded-2xl">
-        {[['today','วันนี้'],['debts','บิลค้าง'],['fifo','สต๊อก FIFO']].map(([id, label]) => (
+        {[['today','วันนี้'],['debts','บิลค้าง'],['stock','ประวัติสต๊อก']].map(([id, label]) => (
           <button key={id} onClick={() => setDashTab(id)}
             className={`flex-1 py-2.5 font-bold text-xs rounded-xl transition-all ${dashTab === id ? 'bg-white text-blue-600' : 'text-slate-500'}`}>
             {label}
@@ -1386,26 +1386,46 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
         </div>
       )}
 
-      {/* FIFO Stock tab */}
-      {dashTab === 'fifo' && (
+      {/* Stock history tab */}
+      {dashTab === 'stock' && (
         <div className="space-y-4">
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-3">สต๊อกคงเหลือปัจจุบัน</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                <p className="text-xs text-blue-500 font-bold">กุ้งเป็น</p>
+                <p className="font-black text-blue-700 text-2xl">{displayStock.live.toFixed(1)} <span className="text-sm font-normal">กก.</span></p>
+              </div>
+              <div className="bg-red-50 rounded-2xl p-4 text-center">
+                <p className="text-xs text-red-500 font-bold">กุ้งตาย</p>
+                <p className="font-black text-red-700 text-2xl">{displayStock.dead.toFixed(1)} <span className="text-sm font-normal">กก.</span></p>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+              หน้านี้แสดงยอดคงเหลือจาก config/stock และประวัติรับเข้า ไม่ได้คำนวณหักรายล็อตแบบ FIFO
+            </p>
+          </div>
           {stockBatches.length === 0
             ? (
               <div className="bg-white p-8 rounded-[2rem] shadow-sm text-center text-slate-400">
-                <p className="font-bold">ยังไม่มีข้อมูล FIFO</p>
-                <p className="text-xs mt-1">รับกุ้งเข้าเพื่อสร้างล็อตแรก</p>
+                <p className="font-bold">ยังไม่มีประวัติรับสต๊อก</p>
+                <p className="text-xs mt-1">รับกุ้งเข้าเพื่อสร้างรายการแรก</p>
               </div>
             )
-            : stockBatches.map((b, i) => (
+            : stockBatches.map((b, i) => {
+              const purchaseLabel = typeof b.purchaseDate === 'string'
+                ? b.purchaseDate.slice(0, 10)
+                : b.purchaseDate?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) || '—';
+              return (
               <div key={b.id}
-                className={`bg-white p-5 rounded-[2rem] shadow-sm border-l-4 ${i === stockBatches.length - 1 ? 'border-amber-400' : 'border-blue-400'}`}>
+                className={`bg-white p-5 rounded-[2rem] shadow-sm border-l-4 ${i === 0 ? 'border-blue-400' : 'border-slate-200'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <p className="font-black text-slate-800 text-sm">
-                      {i === stockBatches.length - 1 ? '🟡 ล็อตเก่าสุด (ขายออกก่อน)' : i === 0 ? '🔵 ล็อตล่าสุด' : `ล็อต #${stockBatches.length - i}`}
+                      {i === 0 ? '🔵 รับเข้าล่าสุด' : `รายการรับเข้า #${stockBatches.length - i}`}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {b.purchaseDate?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) || '—'}
+                      {purchaseLabel}
                     </p>
                   </div>
                   <div className="text-right">
@@ -1425,7 +1445,8 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
                 </div>
                 {b.note && <p className="text-xs text-slate-500 mt-2">📝 {b.note}</p>}
               </div>
-            ))
+              );
+            })
           }
         </div>
       )}
