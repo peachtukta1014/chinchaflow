@@ -71,6 +71,9 @@ export function lineItemsToCartItems(lineItems, priceOf) {
         pricePerKg: 0,
         total: soldByBaht ? qty : 0,
         note: soldByBaht ? `เหมา ${qty} บาท` : '',
+        orderedQty: qty,
+        orderedUnit: unit,
+        lineKey: `line-${cartItems.length}`,
       });
     } else {
       const ppk = priceOf(productId);
@@ -82,6 +85,9 @@ export function lineItemsToCartItems(lineItems, priceOf) {
         pricePerKg: ppk,
         total: qty * ppk,
         note: '',
+        orderedQty: qty,
+        orderedUnit: unit,
+        lineKey: `line-${cartItems.length}`,
       });
     }
   }
@@ -94,4 +100,43 @@ export function cartStockKg(cartItems) {
   const deadKg = cartItems.reduce((s, i) => (i.type === 'dead' ? s + i.weight : s), 0);
   const total = cartItems.reduce((s, i) => s + i.total, 0);
   return { liveKg, deadKg, total };
+}
+
+/** ค่าที่ใช้บันทึกจริงต่อบรรทัด (กก. หรือบาทเหมา) */
+export function actualQtyOf(item) {
+  if (item.type === 'dead' && item.orderedUnit === 'บาท') return item.total;
+  return item.weight;
+}
+
+export function qtyDiffersFromOrder(item, actual = actualQtyOf(item)) {
+  const ordered = parseFloat(item.orderedQty);
+  const a = parseFloat(actual);
+  if (!Number.isFinite(ordered) || !Number.isFinite(a)) return false;
+  return Math.abs(ordered - a) > 0.001;
+}
+
+/** ปรับน้ำหนัก/ยอดส่งจริงแล้วคำนวณยอดใหม่ */
+export function applyActualToCartItem(item, rawActual, priceOf) {
+  const actual = parseFloat(rawActual);
+  if (!Number.isFinite(actual) || actual < 0) return item;
+
+  if (item.type === 'dead' && item.orderedUnit === 'บาท') {
+    const note = qtyDiffersFromOrder(item, actual)
+      ? `เหมา ${actual} บาท (สั่ง ${item.orderedQty} บาท)`
+      : `เหมา ${actual} บาท`;
+    return { ...item, weight: 0, total: actual, note };
+  }
+
+  if (item.type === 'dead') {
+    const note = qtyDiffersFromOrder(item, actual) ? `ส่ง ${actual} กก. (สั่ง ${item.orderedQty} กก.)` : '';
+    return { ...item, weight: actual, total: 0, note };
+  }
+
+  const ppk = item.pricePerKg ?? priceOf(item.productId);
+  const note = qtyDiffersFromOrder(item, actual) ? `ส่ง ${actual} กก. (สั่ง ${item.orderedQty} กก.)` : '';
+  return { ...item, weight: actual, pricePerKg: ppk, total: actual * ppk, note };
+}
+
+export function hasAnyQtyMismatch(cartItems) {
+  return cartItems.some((i) => qtyDiffersFromOrder(i));
 }
