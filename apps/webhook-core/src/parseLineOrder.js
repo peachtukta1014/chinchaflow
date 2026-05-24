@@ -95,7 +95,26 @@ function parseShrimpNatural(line) {
   return items;
 }
 
+/** ข้อความยาวในบรรทัดเดียว: ตาจุ้ยกุ้งเล็ก1โล ตาจุ้ยสองกุ้งเล็ก1โล ... */
+function parseGluedOrderLine(line) {
+  const normalized = normalizeOrderText(line);
+  const items = [];
+  const segmentRe = /([฀-๿0-9A-Za-z][฀-๿0-9A-Za-z\s]*?)?\s*(กุ้ง\s*(?:ใหญ่|กลาง|เล็ก|ตาย)|กุ้ง(?:ใหญ่|กลาง|เล็ก|ตาย))\s*([\d.]+)\s*(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)/gi;
+  let m;
+  while ((m = segmentRe.exec(normalized)) !== null) {
+    let customerName = (m[1] || '').trim().replace(/\s+/g, '') || null;
+    if (customerName && /^(สั่ง|จอง|order)$/i.test(customerName)) customerName = null;
+    const size = (m[2].match(/(ใหญ่|กลาง|เล็ก|ตาย)/i) || [])[0];
+    const product = /ตาย/.test(m[2]) ? 'กุ้งตาย' : `กุ้ง${size || 'เล็ก'}`;
+    pushItem(items, product, parseFloat(m[3]), m[4], customerName);
+  }
+  return items;
+}
+
 function parseLine(line) {
+  const glued = parseGluedOrderLine(line);
+  if (glued.length > 0) return glued;
+
   const natural = parseShrimpNatural(line);
   if (natural.length > 0) return natural;
 
@@ -124,7 +143,7 @@ function parseOrderItems(text) {
   const items = [];
 
   for (const line of lines.length ? lines : [raw]) {
-    items.push(...parseLine(normalizeOrderText(line)));
+    items.push(...parseLine(line));
   }
 
   const seen = new Set();
@@ -136,12 +155,29 @@ function parseOrderItems(text) {
   });
 }
 
+/** แยกรายการเป็นคนละออเดอร์ตามชื่อลูกค้า */
+function groupItemsByCustomer(items) {
+  const groups = new Map();
+  for (const it of items) {
+    const key = (it.customerName || '').trim() || '__none__';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  return groups;
+}
+
 const ORDER_FORMAT_HELP =
   'รูปแบบสั่งซื้อ (ตัวอย่าง):\n' +
   '• กุ้งใหญ่ 2 กก\n' +
   '• ตาจุ้ย กุ้งเล็ก 1 โล\n' +
+  '• ตาจุ้ยสอง กุ้งเล็ก 1 โล (หลายคนในข้อความเดียวได้)\n' +
   '• 2 กก กุ้งกลาง\n' +
   '• กุ้งตาย 500 บาท\n\n' +
-  'ส่งหลายบรรทัดได้ — แสดงในแอปแท็บ "ออเดอร์"';
+  'หลายลูกค้าในข้อความเดียว → แยกเป็นหลายออเดอร์ในแอป';
 
-module.exports = { parseOrderItems, ORDER_FORMAT_HELP, normalizeOrderText };
+module.exports = {
+  parseOrderItems,
+  groupItemsByCustomer,
+  ORDER_FORMAT_HELP,
+  normalizeOrderText,
+};

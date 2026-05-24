@@ -19,7 +19,7 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
-const { parseOrderItems, ORDER_FORMAT_HELP } = require('./parseLineOrder');
+const { parseOrderItems, groupItemsByCustomer, ORDER_FORMAT_HELP } = require('./parseLineOrder');
 const { claimLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const {
@@ -96,21 +96,44 @@ exports.lineWebhook = functions
       }
 
       const items = parseOrderItems(text);
-      const customerName = items.find((i) => i.customerName)?.customerName || null;
 
       if (items.length > 0) {
-        await db().collection('lineOrders').add({
-          source: 'line', lineUserId: userId, lineGroupId: groupId,
-          rawText: text, items, deliveryDate,
-          customerName,
-          status: 'pending',
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        const groups = groupItemsByCustomer(items);
+        const batch = db().batch();
+        const ts = admin.firestore.FieldValue.serverTimestamp();
+
+        for (const [key, groupItems] of groups) {
+          const customerName = key === '__none__' ? null : key;
+          const ref = db().collection('lineOrders').doc();
+          batch.set(ref, {
+            source: 'line',
+            lineUserId: userId,
+            lineGroupId: groupId,
+            rawText: text,
+            items: groupItems.map((i) => ({
+              product: i.product,
+              qty: i.qty,
+              unit: i.unit,
+              customerName: i.customerName || customerName,
+            })),
+            deliveryDate,
+            customerName,
+            status: 'pending',
+            createdAt: ts,
+          });
+        }
+        await batch.commit();
+
         const summary = items.map((i) => {
           const who = i.customerName ? `${i.customerName} · ` : '';
           return `• ${who}${i.product} ${i.qty} ${i.unit}`;
         }).join('\n');
-        await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
+        const orderCount = groups.size;
+        await lineReply(
+          replyToken,
+          `✅ รับออเดอร์แล้วครับ (${orderCount} ราย)\nส่งวันที่ ${deliveryDate}\n\n${summary}`,
+          token,
+        );
       } else {
         await lineReply(replyToken, `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`, token);
       }

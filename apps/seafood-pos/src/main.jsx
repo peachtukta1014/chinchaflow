@@ -1412,15 +1412,18 @@ function LineOrdersScreen() {
                       </button>
                   }
                 </div>
-                <div className="space-y-1">
-                  {(o.items || []).map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                      <p className="text-sm font-bold text-slate-700">{item.product}</p>
-                      <p className="text-sm text-slate-500 ml-auto">{item.qty} {item.unit}</p>
-                    </div>
-                  ))}
-                </div>
+                <div className="space-y-1">
+                  {(o.items || []).map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 flex-wrap">
+                      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                      {item.customerName && item.customerName !== o.customerName && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{item.customerName}</span>
+                      )}
+                      <p className="text-sm font-bold text-slate-700">{item.product}</p>
+                      <p className="text-sm text-slate-500 ml-auto">{item.qty} {item.unit}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
