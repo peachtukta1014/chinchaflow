@@ -19,7 +19,8 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
-const { parseOrderItems, ORDER_FORMAT_HELP } = require('./parseLineOrder');
+const { parseOrderItems, ORDER_FORMAT_HELP, looksLikeOrderAttempt } = require('./parseLineOrder');
+const { claimLineEvent } = require('./webhookDedup');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -59,34 +60,38 @@ exports.lineWebhook = functions
 
     for (const event of events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.deliveryContext?.isRedelivery) continue;
+      if (!(await claimLineEvent(db(), event))) continue;
 
       const text       = event.message.text.trim();
       const userId     = event.source.userId;
       const groupId    = event.source.groupId || event.source.roomId || null;
       const replyToken = event.replyToken;
       const items      = parseOrderItems(text);
+      const customerName = items.find((i) => i.customerName)?.customerName || null;
 
       if (items.length > 0) {
         await db().collection('lineOrders').add({
           source: 'line', lineUserId: userId, lineGroupId: groupId,
           rawText: text, items, deliveryDate,
+          customerName,
           status: 'pending',
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        const summary = items.map(i => `• ${i.product} ${i.qty} ${i.unit}`).join('\n');
+        const summary = items.map((i) => {
+          const who = i.customerName ? `${i.customerName} · ` : '';
+          return `• ${who}${i.product} ${i.qty} ${i.unit}`;
+        }).join('\n');
         await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
       } else if (/^(help|ช่วย|วิธี|สั่งยังไง)/i.test(text)) {
         await lineReply(replyToken, ORDER_FORMAT_HELP, token);
+      } else if (looksLikeOrderAttempt(text)) {
+        await lineReply(replyToken, `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`, token);
       } else {
         await db().collection('line_messages').add({
           userId, groupId, text,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        await lineReply(
-          replyToken,
-          `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`,
-          token,
-        );
       }
     }
 
@@ -116,6 +121,8 @@ exports.lineWebhookTea = functions
 
     for (const event of events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.deliveryContext?.isRedelivery) continue;
+      if (!(await claimLineEvent(db(), event))) continue;
 
       const text       = event.message.text.trim();
       const replyToken = event.replyToken;
@@ -132,10 +139,6 @@ exports.lineWebhookTea = functions
         try {
           const summary = await buildSummaryForDate(db(), dateKey);
           await lineReply(replyToken, summary, token);
-          const config = await getTeaLineConfig(db());
-          if (config.notifyGroupId && groupId && config.notifyGroupId !== groupId) {
-            await dispatchTeaSummary(db(), dateKey, token);
-          }
         } catch (err) {
           console.error('tea summary reply', err);
           await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
@@ -147,11 +150,6 @@ exports.lineWebhookTea = functions
         userId, groupId, text,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      await lineReply(
-        replyToken,
-        'พิมพ์ "สรุป" เพื่อดูยอดขายวันนี้\nพิมพ์ "help" ดูคำสั่ง',
-        token,
-      );
     }
 
     res.status(200).json({ status: 'ok' });
@@ -187,7 +185,7 @@ exports.teaPushSummary = functions
       const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
       if (!token) { res.status(500).json({ error: 'LINE token not configured' }); return; }
 
-      const { message, results, targetCount } = await dispatchTeaSummary(db(), dateKey, token);
+      const { message, results, targetCount } = await dispatchTeaSummary(db(), dateKey, token, { force: true });
       if (targetCount === 0) {
         res.status(400).json({
           error: 'no_targets',
@@ -201,4 +199,36 @@ exports.teaPushSummary = functions
       console.error('teaPushSummary', err);
       res.status(500).json({ error: err.message || 'failed' });
     }
+  });
+
+// ── สรุปชาอัตโนมัติวันละครั้ง (ปิด default ในแอป — เปิดที่แอดมิน → LINE) ─────
+exports.teaDailyScheduledSummary = functions
+  .region('asia-southeast1')
+  .pubsub.schedule('0 22 * * *')
+  .timeZone('Asia/Bangkok')
+  .onRun(async () => {
+    const config = await getTeaLineConfig(db());
+    if (config.autoSummaryEnabled === false) return null;
+
+    const hourNow = parseInt(
+      new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Bangkok' }),
+      10,
+    );
+    const targetHour = parseInt(config.autoSummaryHour, 10);
+    const hour = Number.isFinite(targetHour) ? targetHour : 22;
+    if (hourNow !== hour) return null;
+
+    const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
+    if (!token) {
+      console.warn('LINE_TEA_CHANNEL_ACCESS_TOKEN not set');
+      return null;
+    }
+
+    const dateKey = todayBKK();
+    const { targetCount, skipped } = await dispatchTeaSummary(db(), dateKey, token);
+    if (skipped) console.log('teaDailyScheduledSummary skipped:', skipped);
+    if (targetCount === 0) {
+      console.warn('teaDailyScheduledSummary: no notifyGroupId / notifyUserIds in config/teaLine');
+    }
+    return null;
   });

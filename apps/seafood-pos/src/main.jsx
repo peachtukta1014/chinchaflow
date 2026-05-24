@@ -1398,6 +1398,9 @@ function LineOrdersScreen() {
                 className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1 min-w-0 mr-2">
+                    {o.customerName && (
+                      <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
+                    )}
                     <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
                   </div>

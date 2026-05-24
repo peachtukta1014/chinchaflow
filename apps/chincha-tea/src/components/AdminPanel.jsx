@@ -21,7 +21,7 @@ const DEFAULT_LINE_CONFIG = {
   envToken: 'LINE_TEA_CHANNEL_ACCESS_TOKEN',
   notifyGroupId: '',
   notifyUserIds: '',
-  autoSummaryEnabled: true,
+  autoSummaryEnabled: false,
   autoSummaryHour: 22,
 };
 

@@ -8,7 +8,7 @@ const dbTea = getFirestore();
 
 exports.teaDailyScheduledSummary = functions
   .region('asia-southeast1')
-  .pubsub.schedule('0 * * * *')
+  .pubsub.schedule('0 22 * * *')
   .timeZone('Asia/Bangkok')
   .onRun(async () => {
     const config = await getTeaLineConfig(dbTea);

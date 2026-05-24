@@ -142,8 +142,14 @@ async function lineReply(replyToken, text, token) {
 }
 
 /** ส่งสรุปไปยังกลุ่ม/ผู้รับที่ตั้งใน config/teaLine */
-async function dispatchTeaSummary(db, dateKey, token) {
+async function dispatchTeaSummary(db, dateKey, token, { force = false } = {}) {
   const config = await getTeaLineConfig(db);
+  if (!force && config.autoSummaryEnabled === false) {
+    return { message: '', results: [], targetCount: 0, skipped: 'disabled' };
+  }
+  if (!force && config.lastAutoSummaryDateKey === dateKey) {
+    return { message: '', results: [], targetCount: 0, skipped: 'already_sent' };
+  }
   const message = await buildSummaryForDate(db, dateKey);
   const targets = new Set();
 
@@ -158,6 +164,12 @@ async function dispatchTeaSummary(db, dateKey, token) {
   const results = [];
   for (const to of targets) {
     results.push({ to, ok: await linePush(to, message, token) });
+  }
+  if (targets.size > 0 && results.some((r) => r.ok)) {
+    await db.collection('config').doc('teaLine').set(
+      { lastAutoSummaryDateKey: dateKey, lastAutoSummaryAt: new Date().toISOString() },
+      { merge: true },
+    );
   }
   return { message, results, targetCount: targets.size };
 }
