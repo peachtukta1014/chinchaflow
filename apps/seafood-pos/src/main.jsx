@@ -162,7 +162,7 @@ function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} active />}
+        {activeTab === 'home'           && <Dashboard stock={stock} updateMainStock={updateMainStock} localBills={transactions} refreshKey={salesRefresh} active />}
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
         {activeTab === 'members'        && <MembersScreen />}
@@ -1051,11 +1051,12 @@ const InventoryScreen = ({ stock, updateMainStock }) => {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) => {
+const Dashboard = ({ stock, updateMainStock, localBills = [], refreshKey = 0, active = true }) => {
   const [dashTab, setDashTab]       = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [debtBills, setDebtBills] = useState([]);
   const [debtSavingId, setDebtSavingId] = useState(null);
+  const [stockAdjusting, setStockAdjusting] = useState(null);
   const [stockBatches, setStockBatches]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const todayKey = dateKeyBangkok();
@@ -1215,6 +1216,38 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
     const raw = window.prompt(`รับชำระจาก ${bill.customerName || 'ลูกค้า'}\nยอดค้าง ฿${remaining.toLocaleString()}\nกรอกยอดที่รับชำระ`, String(remaining));
     if (raw === null) return;
     applyDebtPayment(bill, parseFloat(raw));
+  };
+
+  const promptStockAdjust = async (kind, direction) => {
+    if (!updateMainStock) {
+      alert('ยังไม่พร้อมปรับสต๊อก กรุณาลองใหม่ครับ');
+      return;
+    }
+
+    const label = kind === 'live' ? 'กุ้งเป็น' : 'กุ้งตาย';
+    const current = Number(displayStock[kind]) || 0;
+    const action = direction > 0 ? 'เพิ่ม' : 'ลด';
+    const raw = window.prompt(`${action}${label}\nยอดปัจจุบัน ${current.toFixed(1)} กก.\nกรอกจำนวนกิโลที่จะ${action}`, '');
+    if (raw === null) return;
+
+    const amount = parseFloat(raw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('กรุณากรอกจำนวนกิโลมากกว่า 0');
+      return;
+    }
+
+    const nextValue = Math.max(0, current + direction * amount);
+    const nextLive = kind === 'live' ? nextValue : (Number(displayStock.live) || 0);
+    const nextDead = kind === 'dead' ? nextValue : (Number(displayStock.dead) || 0);
+    setStockAdjusting(`${kind}-${direction}`);
+    try {
+      await updateMainStock(nextLive, nextDead);
+    } catch (e) {
+      console.error(e);
+      alert('⚠️ ปรับสต๊อกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+    } finally {
+      setStockAdjusting(null);
+    }
   };
 
   return (
@@ -1395,14 +1428,38 @@ const Dashboard = ({ stock, localBills = [], refreshKey = 0, active = true }) =>
               <div className="bg-blue-50 rounded-2xl p-4 text-center">
                 <p className="text-xs text-blue-500 font-bold">กุ้งเป็น</p>
                 <p className="font-black text-blue-700 text-2xl">{displayStock.live.toFixed(1)} <span className="text-sm font-normal">กก.</span></p>
+                <div className="grid grid-cols-2 gap-1.5 mt-3">
+                  <button type="button" disabled={Boolean(stockAdjusting)}
+                    onClick={() => promptStockAdjust('live', -1)}
+                    className="py-1.5 rounded-xl bg-white text-blue-600 text-xs font-black border border-blue-100 disabled:opacity-50">
+                    - ลด
+                  </button>
+                  <button type="button" disabled={Boolean(stockAdjusting)}
+                    onClick={() => promptStockAdjust('live', 1)}
+                    className="py-1.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50">
+                    + เพิ่ม
+                  </button>
+                </div>
               </div>
               <div className="bg-red-50 rounded-2xl p-4 text-center">
                 <p className="text-xs text-red-500 font-bold">กุ้งตาย</p>
                 <p className="font-black text-red-700 text-2xl">{displayStock.dead.toFixed(1)} <span className="text-sm font-normal">กก.</span></p>
+                <div className="grid grid-cols-2 gap-1.5 mt-3">
+                  <button type="button" disabled={Boolean(stockAdjusting)}
+                    onClick={() => promptStockAdjust('dead', -1)}
+                    className="py-1.5 rounded-xl bg-white text-red-600 text-xs font-black border border-red-100 disabled:opacity-50">
+                    - ลด
+                  </button>
+                  <button type="button" disabled={Boolean(stockAdjusting)}
+                    onClick={() => promptStockAdjust('dead', 1)}
+                    className="py-1.5 rounded-xl bg-red-500 text-white text-xs font-black disabled:opacity-50">
+                    + เพิ่ม
+                  </button>
+                </div>
               </div>
             </div>
             <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
-              หน้านี้แสดงยอดคงเหลือจาก config/stock และประวัติรับเข้า ไม่ได้คำนวณหักรายล็อตแบบ FIFO
+              ใช้ปุ่มเพิ่ม/ลดเพื่อปรับยอดคงเหลือจริงใน config/stock เมื่อมีการลงผิดหรือยอดหน้างานไม่ตรง
             </p>
           </div>
           {stockBatches.length === 0
