@@ -19,8 +19,13 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
-const { parseOrderItems, ORDER_FORMAT_HELP, looksLikeOrderAttempt } = require('./parseLineOrder');
+const { parseOrderItems, ORDER_FORMAT_HELP } = require('./parseLineOrder');
 const { claimLineEvent } = require('./webhookDedup');
+const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
+const {
+  buildShrimpSummaryForDate,
+  SHRIMP_HELP_TEXT,
+} = require('./shrimpDailySummary');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -67,7 +72,30 @@ exports.lineWebhook = functions
       const userId     = event.source.userId;
       const groupId    = event.source.groupId || event.source.roomId || null;
       const replyToken = event.replyToken;
-      const items      = parseOrderItems(text);
+      const intent     = classifyShrimpLineMessage(text);
+
+      if (intent === 'ignore') {
+        continue;
+      }
+
+      if (intent === 'help') {
+        await lineReply(replyToken, SHRIMP_HELP_TEXT, token);
+        continue;
+      }
+
+      if (intent === 'summary') {
+        try {
+          const dateKey = todayBKK();
+          const summary = await buildShrimpSummaryForDate(db(), dateKey);
+          await lineReply(replyToken, summary, token);
+        } catch (err) {
+          console.error('shrimp summary', err);
+          await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
+        }
+        continue;
+      }
+
+      const items = parseOrderItems(text);
       const customerName = items.find((i) => i.customerName)?.customerName || null;
 
       if (items.length > 0) {
@@ -83,15 +111,8 @@ exports.lineWebhook = functions
           return `• ${who}${i.product} ${i.qty} ${i.unit}`;
         }).join('\n');
         await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
-      } else if (/^(help|ช่วย|วิธี|สั่งยังไง)/i.test(text)) {
-        await lineReply(replyToken, ORDER_FORMAT_HELP, token);
-      } else if (looksLikeOrderAttempt(text)) {
-        await lineReply(replyToken, `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`, token);
       } else {
-        await db().collection('line_messages').add({
-          userId, groupId, text,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        await lineReply(replyToken, `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`, token);
       }
     }
 

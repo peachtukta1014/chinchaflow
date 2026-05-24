@@ -136,11 +136,6 @@ function parseOrderItems(text) {
   });
 }
 
-function looksLikeOrderAttempt(text) {
-  const t = normalizeOrderText(text);
-  return /กุ้ง|กก|โล|กิโล|บาท|฿|\d/.test(t);
-}
-
 const ORDER_FORMAT_HELP =
   'รูปแบบสั่งซื้อ (ตัวอย่าง):\n' +
   '• กุ้งใหญ่ 2 กก\n' +
@@ -149,4 +144,4 @@ const ORDER_FORMAT_HELP =
   '• กุ้งตาย 500 บาท\n\n' +
   'ส่งหลายบรรทัดได้ — แสดงในแอปแท็บ "ออเดอร์"';
 
-module.exports = { parseOrderItems, ORDER_FORMAT_HELP, looksLikeOrderAttempt, normalizeOrderText };
+module.exports = { parseOrderItems, ORDER_FORMAT_HELP, normalizeOrderText };
