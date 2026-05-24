@@ -1,0 +1,34 @@
+import { shiftDateKey } from '../lib/constants';
+
+export default function HistoryScreen({ orders, viewDateKey, setViewDateKey, todayKey, t }) {
+  return (
+    <div className="px-4 pt-3 pb-6 space-y-3">
+      <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 mb-2">
+        <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black text-stone-600">‹</button>
+        <p className="flex-1 text-center text-xs font-black text-stone-600">{viewDateKey === todayKey ? t('todaySales') : viewDateKey}</p>
+        <button type="button" disabled={viewDateKey >= todayKey} onClick={() => setViewDateKey(shiftDateKey(viewDateKey, 1))} className="w-9 h-9 rounded-xl bg-stone-100 font-black disabled:opacity-30">›</button>
+      </div>
+      {orders.length === 0 ? (
+        <p className="text-center text-stone-300 py-12">{t('noOrders')}</p>
+      ) : (
+        orders.map((o, i) => (
+          <div key={o.id || i} className="bg-white rounded-2xl p-4 border border-stone-200">
+            <div className="flex justify-between mb-2">
+              <p className="text-xs text-stone-400">
+                {(() => { try { return new Date(o.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }); } catch { return '—'; } })()}
+                {o.payType && <span className="ml-2 font-bold">{o.payType === 'cash' ? t('cash') : t('transfer')}</span>}
+              </p>
+              <p className="font-black" style={{ color: '#3d1f0f' }}>฿{(o.total || 0).toLocaleString()}</p>
+            </div>
+            {(o.items || []).map((it, j) => (
+              <p key={j} className="text-sm text-stone-600">
+                {it.emoji} {it.qty}× {it.nameSnapshot || it.nameEn}
+                {it.sweet ? ` · ${it.sweet}` : ''}
+              </p>
+            ))}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}

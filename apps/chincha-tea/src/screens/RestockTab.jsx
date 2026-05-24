@@ -46,30 +46,15 @@ export function RestockTab({ member, t }) {
   };
 
   const uploadOrderPhoto = async (file) => {
-    if (!file || !storage) {
-      alert(t('storageNotReady'));
-      return;
-    }
+    if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name?.split('.').pop() || 'jpg';
-      const path = `orders/${dateKey}/${member?.uid || 'anon'}_${Date.now()}.${ext}`;
-      const r = stRef(storage, path);
-      await uploadBytes(r, file, { contentType: file.type || 'image/jpeg' });
-      const url = await getDownloadURL(r);
-      await fsPost('orderSlips', {
-        dateKey,
-        storagePath: path,
-        downloadUrl: url,
-        uploadedBy: member?.name || member?.email || 'staff',
-        uid: member?.uid || '',
-        createdAt: new Date().toISOString(),
-      });
+      await uploadOrderSlip({ file, dateKey, member });
       setFlash(t('uploadOk'));
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
-      alert(t('uploadFailed'));
+      alert(e?.message === 'storage not ready' ? t('storageNotReady') : t('uploadFailed'));
     }
     setUploading(false);
   };

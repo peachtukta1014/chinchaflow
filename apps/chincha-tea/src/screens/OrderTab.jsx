@@ -3,8 +3,8 @@ import { DRINK_CATEGORIES, menuItemToCard } from '../lib/constants';
 import { burmeseToThai } from '../lib/burmeseToThai';
 import { categoryDisplayLabel, categoryDisplaySub } from '../lib/displayNames';
 import { parseTeaVoice, useVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
-import { MenuCard } from './MenuCard';
-import { CustomizeModal } from './CustomizeModal';
+import { MenuCard } from '../components/MenuCard';
+import { CustomizeModal } from '../components/CustomizeModal';
 
 export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoiceCommit, canVoiceCommit, setModalItem, modalItem }) {
   const [search, setSearch] = useState('');
