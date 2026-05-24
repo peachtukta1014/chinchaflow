@@ -1,0 +1,128 @@
+# Firebase Hosting — แยก deploy กุ้ง / ชา ตาม path ที่เปลี่ยน
+name: Deploy Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/seafood-pos/**'
+      - 'apps/chincha-tea/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/deploy-hosting.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_shrimp:
+        description: 'Deploy Shrimp POS hosting'
+        type: boolean
+        default: true
+      deploy_tea:
+        description: 'Deploy Chincha Tea hosting'
+        type: boolean
+        default: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  changes:
+    name: Detect changed apps
+    runs-on: ubuntu-latest
+    outputs:
+      shrimp: ${{ steps.filter.outputs.shrimp }}
+      tea: ${{ steps.filter.outputs.tea }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shrimp:
+              - 'apps/seafood-pos/**'
+            tea:
+              - 'apps/chincha-tea/**'
+            shared:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'firebase.json'
+              - '.firebaserc'
+
+  deploy_shrimp:
+    name: Deploy Shrimp POS
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.deploy_shrimp ||
+      github.event_name == 'push' && (needs.changes.outputs.shrimp == 'true' || needs.changes.outputs.shared == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build seafood-pos
+        run: npm run build --workspace=apps/seafood-pos
+        env:
+          VITE_FIREBASE_API_KEY:             ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:         ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_DATABASE_URL:        ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_PROJECT_ID:          ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:      ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:              ${{ secrets.VITE_FIREBASE_APP_ID_SHRIMP }}
+
+      - name: Deploy to Firebase Hosting (shrimp)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken:              ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId:              chincha-eeed6
+          target:                 shrimp
+          channelId:              live
+
+  deploy_tea:
+    name: Deploy Chincha Tea
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.deploy_tea ||
+      github.event_name == 'push' && (needs.changes.outputs.tea == 'true' || needs.changes.outputs.shared == 'true')
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build chincha-tea
+        run: npm run build --workspace=apps/chincha-tea
+        env:
+          VITE_FIREBASE_API_KEY:             ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN:         ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_DATABASE_URL:        ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
+          VITE_FIREBASE_PROJECT_ID:          ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET:      ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID:              ${{ secrets.VITE_FIREBASE_APP_ID_TEA }}
+
+      - name: Deploy to Firebase Hosting (tea)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken:              ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId:              chincha-eeed6
+          target:                 tea
+          channelId:              live
+        continue-on-error: true
