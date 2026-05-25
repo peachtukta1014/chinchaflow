@@ -20,27 +20,28 @@ export default function LoginScreen({ onLogin }) {
     setLoading(true); setError('');
     try {
       if (mode === 'register') {
-        const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
-        const grantAdmin = isAdminEmail;
+        const em = email.trim().toLowerCase();
+        const { user } = await createUserWithEmailAndPassword(auth, em, password);
+        const grantAdmin = em === ADMIN_EMAIL.toLowerCase();
         await fsSetShrimpUser(user.uid, {
           name: name.trim(),
-          email: email.trim(),
+          email: em,
           role: grantAdmin ? 'admin' : 'staff',
           approved: grantAdmin,
           createdAt: new Date().toISOString(),
         });
         if (!grantAdmin) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: grantAdmin ? 'admin' : 'staff' });
+        onLogin({ uid: user.uid, name: name.trim(), email: em, role: grantAdmin ? 'admin' : 'staff' });
       } else {
-        const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const em = email.trim().toLowerCase();
+        const { user } = await signInWithEmailAndPassword(auth, em, password);
         const token    = await user.getIdToken();
         const authH    = { Authorization: `Bearer ${token}` };
         const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
         if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: email.trim(), role: f.role?.stringValue || 'staff' });
+        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: f.role?.stringValue || 'staff' });
       }
     } catch (e) {
       const c = e.code || '';

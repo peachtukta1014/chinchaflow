@@ -42,10 +42,18 @@ service cloud.firestore {
       return isApprovedShrimp() && shrimpUserData().role == 'admin';
     }
 
-    function isShrimpBootstrapAdmin() {
+    function isChinchaBootstrapAdmin() {
       return signedIn()
         && request.auth.token.email != null
-        && request.auth.token.email == 'peach_admin@chincha.com';
+        && request.auth.token.email == 'gmc-peach@chincha.pos';
+    }
+
+    function isShrimpBootstrapAdmin() {
+      return isChinchaBootstrapAdmin();
+    }
+
+    function isTeaBootstrapAdmin() {
+      return isChinchaBootstrapAdmin();
     }
 
     // ─── Chincha Tea collections ───────────────────────────────────────────────
@@ -54,8 +62,12 @@ service cloud.firestore {
       allow get: if isOwner(uid) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(uid)
-        && request.resource.data.role == 'staff'
-        && request.resource.data.approved == false;
+        && (
+          (request.resource.data.role == 'staff' && request.resource.data.approved == false)
+          || (isTeaBootstrapAdmin()
+            && request.resource.data.role == 'admin'
+            && request.resource.data.approved == true)
+        );
       allow update: if isAdmin()
         || (isOwner(uid)
           && request.resource.data.role == resource.data.role

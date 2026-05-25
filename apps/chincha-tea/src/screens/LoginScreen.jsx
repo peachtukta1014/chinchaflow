@@ -10,7 +10,12 @@ import {
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
 import { fsGetDoc, fsSetUserProfile } from '../lib/firestoreRest';
+import { BOOTSTRAP_ADMIN_EMAIL } from '../lib/constants';
 import { T } from '../lib/i18n';
+
+function isBootstrapAdminEmail(email) {
+  return email.trim().toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+}
 
 function authErrorKey(code) {
   if (!code) return null;
@@ -37,11 +42,12 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const loadOrCreateProfile = async (uid, em) => {
     let profile = await fsGetDoc(`users/${uid}`);
     if (!profile) {
+      const bootstrap = isBootstrapAdminEmail(em);
       await fsSetUserProfile(uid, {
         name: em.split('@')[0],
         email: em,
-        role: 'staff',
-        approved: false,
+        role: bootstrap ? 'admin' : 'staff',
+        approved: bootstrap,
         uid,
         createdAt: new Date().toISOString(),
       });
@@ -63,14 +69,20 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await createUserWithEmailAndPassword(auth, em, pw);
+      const bootstrap = isBootstrapAdminEmail(em);
       await fsSetUserProfile(cred.user.uid, {
         name,
         email: em,
-        role: 'staff',
-        approved: false,
+        role: bootstrap ? 'admin' : 'staff',
+        approved: bootstrap,
         uid: cred.user.uid,
         createdAt: new Date().toISOString(),
       });
+      if (bootstrap) {
+        const profile = await fsGetDoc(`users/${cred.user.uid}`);
+        if (profile) onAuthed({ uid: cred.user.uid, ...profile });
+        return;
+      }
       setPending(true);
     } catch (e) {
       const code = e?.code || '';

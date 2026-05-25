@@ -1,3 +1,6 @@
+/** อีเมลแอดมินหลัก — สมัครครั้งแรกได้ role admin + อนุมัติทันที (ตรง firestore.rules) */
+export const BOOTSTRAP_ADMIN_EMAIL = 'gmc-peach@chincha.pos';
+
 /** หมวดเครื่องดื่ม — ร้านชงชา · กาแฟ · ผลไม้ปั่น (ไม่ใช่คาเฟ่) */
 export const DRINK_CATEGORIES = [
   { id: 'milk-tea', label: 'ชานม/ชงชา', labelMy: 'လက်ဖက်နို့', labelEn: 'MILK TEA', accent: '#c87941', accentBg: '#fff5eb', emoji: '🧋' },
