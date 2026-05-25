@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { compressImageFile } from '../lib/compressImage';
 import {
   Camera, CheckCircle, ChevronRight, Delete, Edit3, MapPin, Mic, MicOff, PlusCircle, X,
 } from 'lucide-react';
@@ -59,11 +60,9 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
     }
     setPhotoUploading(true);
     try {
-      const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop().toLowerCase() : 'jpg';
-      const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext) ? ext : 'jpg';
-      const r = stRef(storage, `billPhotos/${billNoRef.current}.${safeExt}`);
-      const contentType = file.type || (safeExt === 'png' ? 'image/png' : 'image/jpeg');
-      await uploadBytes(r, file, { contentType });
+      const compressed = await compressImageFile(file);
+      const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
+      await uploadBytes(r, compressed, { contentType: 'image/jpeg' });
       setPhotoUrl(await getDownloadURL(r));
     } catch (err) {
       console.error('uploadBillPhoto', err);
