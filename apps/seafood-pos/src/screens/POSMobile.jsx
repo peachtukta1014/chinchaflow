@@ -15,7 +15,7 @@ import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
 import { saveBillWithCart as saveBillWithCartService } from '../services/salesService';
 
-export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) {
+export default function POSMobile({ user, stock, stockBatches = [], updateMainStock, onSaveBill }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cart, setCart]             = useState([]);
@@ -139,6 +139,7 @@ export default function POSMobile({ user, stock, updateMainStock, onSaveBill }) 
       const result = await saveBillWithCartService({
         cartItems,
         stock,
+        stockBatches,
         customer,
         selectedCustomer,
         paymentType,

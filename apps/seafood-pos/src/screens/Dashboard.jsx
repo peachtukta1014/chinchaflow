@@ -10,6 +10,7 @@ import {
   mergeSalesDocs,
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
+import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
 import { getEffectiveStock } from '../services/stockService';
 
 function formatBatchPurchaseDate(value) {
@@ -115,6 +116,8 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
 
   const batchesForDisplay = stockBatchesProp?.length ? stockBatchesProp : stockBatches;
   const displayStock = getEffectiveStock(stock, batchesForDisplay);
+  const lotDays = groupBatchesByReceiveDay(batchesForDisplay);
+  const todayReceiveKey = dateKeyBangkok();
 
   const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
   const todaySales = mergeSalesDocs(firestoreSales, localToday);
@@ -160,7 +163,7 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
 
       {/* Sub-tabs */}
       <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
-        {[['today', 'วันนี้'], ['debts', 'ลูกหนี้'], ['fifo', 'สต๊อก FIFO']].map(([id, label]) => (
+        {[['today', 'วันนี้'], ['debts', 'ลูกหนี้'], ['fifo', 'ล็อตตามวัน']].map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -280,55 +283,81 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
         </div>
       )}
 
-      {/* FIFO Stock tab */}
-      {dashTab === 'fifo' && (
-        <div className="space-y-4">
-          {stockBatches.length === 0
-            ? (
-              <div className="bg-white p-8 rounded-[2rem] shadow-sm text-center text-slate-400">
-                <p className="font-bold">ยังไม่มีข้อมูล FIFO</p>
-                <p className="text-xs mt-1">รับกุ้งเข้าเพื่อสร้างล็อตแรก</p>
-              </div>
-            )
-            : stockBatches.map((b, i) => (
-              <div key={b.id}
-                className={`bg-white p-5 rounded-[2rem] shadow-sm border-l-4 ${i === stockBatches.length - 1 ? 'border-amber-400' : 'border-blue-400'}`}>
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className="font-black text-slate-800 text-sm">
-                      {i === stockBatches.length - 1 ? '🟡 ล็อตเก่าสุด (ขายออกก่อน)' : i === 0 ? '🔵 ล็อตล่าสุด' : `ล็อต #${stockBatches.length - i}`}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {formatBatchPurchaseDate(b.purchaseDate)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-blue-600 text-lg">฿{(b.effectiveCostPerKg || 0).toFixed(2)}/กก.</p>
-                    <p className="text-xs text-slate-400">ต้นทุน ฿{(b.totalCost || 0).toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-blue-50 rounded-2xl p-3 text-center">
-                    <p className="text-[10px] text-blue-500 font-bold">กุ้งสด</p>
-                    <p className="font-black text-blue-700 text-lg">
-                      {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(1)}
-                      <span className="text-xs font-normal"> กก.</span>
-                    </p>
+      {/* ล็อตตามวันรับเข้า */}
+      {dashTab === 'fifo' && (
+        <div className="space-y-4">
+          <p className="text-[11px] text-slate-500 px-1 leading-relaxed">
+            1 วัน = 1 ล็อต · บันทึกหลายครั้งในวันเดียว = หลายรายการ (ราคา/รถ) · ขายออกวันเก่าก่อน
+          </p>
+          {lotDays.length === 0
+            ? (
+              <div className="bg-white p-8 rounded-[2rem] shadow-sm text-center text-slate-400">
+                <p className="font-bold">ยังไม่มีล็อตรับเข้า</p>
+                <p className="text-xs mt-1">ไปแท็บรับสต๊อกเพื่อบันทึกรายการแรก</p>
+              </div>
+            )
+            : lotDays.map((day, dayIdx) => {
+              const isOldest = dayIdx === lotDays.length - 1;
+              const isToday = day.dateKey === todayReceiveKey;
+              return (
+                <div
+                  key={day.dateKey}
+                  className={`bg-white p-5 rounded-[2rem] shadow-sm border-l-4 ${
+                    isOldest ? 'border-amber-400' : isToday ? 'border-emerald-400' : 'border-blue-400'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-black text-slate-800">
+                        {isToday ? '📅 วันนี้' : '📅'} {day.label}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {day.itemCount} รายการรับเข้า
+                        {isOldest && ' · ขายออกก่อน (FIFO)'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-400">คงเหลือรวมวันนี้</p>
+                      <p className="font-black text-blue-700 text-sm">
+                        เป็น {day.remainingLive.toFixed(1)} · ตาย {day.remainingDead.toFixed(1)} กก.
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-red-50 rounded-2xl p-3 text-center">
-                    <p className="text-[10px] text-red-500 font-bold">กุ้งตาย</p>
-                    <p className="font-black text-red-700 text-lg">
-                      {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(1)}
-                      <span className="text-xs font-normal"> กก.</span>
-                    </p>
-                  </div>
-                </div>
-                {b.note && <p className="text-xs text-slate-500 mt-2">📝 {b.note}</p>}
-              </div>
-            ))
-          }
-        </div>
-      )}
+                  <div className="space-y-2">
+                    {day.items.map((b, idx) => (
+                      <div
+                        key={b.id}
+                        className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <p className="text-xs font-bold text-slate-600">
+                            รายการที่ {idx + 1}
+                            {b.note ? ` · ${b.note}` : ''}
+                          </p>
+                          <p className="text-xs font-black text-blue-600 shrink-0">
+                            ฿{(b.effectiveCostPerKg || 0).toFixed(2)}/กก.
+                          </p>
+                        </div>
+                        <div className="flex gap-3 mt-1.5 text-[11px] text-slate-600">
+                          <span>สด {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(1)} กก.</span>
+                          <span>ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(1)} กก.</span>
+                          <span className="text-slate-400">
+                            รับ {formatBatchPurchaseDate(b.purchaseDate)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          ซื้อ ฿{(b.costPerKg || 0).toLocaleString()}/กก.
+                          {b.transport > 0 && ` · ค่ารถ ฿${Number(b.transport).toLocaleString()}`}
+                          {' · '}ต้นทุนรวม ฿{(b.totalCost || 0).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }

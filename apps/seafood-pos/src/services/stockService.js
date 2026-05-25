@@ -1,6 +1,8 @@
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../firebase';
-import { fsPost, fsSetStockDoc } from '../lib/firestoreRest';
+import { dateKeyBangkok } from '../lib/date';
+import { fsPatch, fsPost, fsSetStockDoc } from '../lib/firestoreRest';
+import { sortBatchesFifoOrder } from '../lib/stockBatchUtils';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -9,7 +11,69 @@ function withTimeout(promise, ms = 10000) {
   ]);
 }
 
-export async function deductStockForSale(stock, liveKg, deadKg, updateMainStock) {
+/** ตัดคงเหลือทีละรายการในล็อต (วันเก่า → รายการเก่า) */
+export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
+  let liveLeft = liveKg;
+  let deadLeft = deadKg;
+  const patches = [];
+
+  for (const b of sortBatchesFifoOrder(batches)) {
+    if (liveLeft <= 0 && deadLeft <= 0) break;
+    let remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+    let remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+    let newLive = remLive;
+    let newDead = remDead;
+
+    if (liveLeft > 0 && remLive > 0) {
+      const take = Math.min(liveLeft, remLive);
+      newLive = remLive - take;
+      liveLeft -= take;
+    }
+    if (deadLeft > 0 && remDead > 0) {
+      const take = Math.min(deadLeft, remDead);
+      newDead = remDead - take;
+      deadLeft -= take;
+    }
+
+    if (newLive !== remLive || newDead !== remDead) {
+      patches.push({
+        id: b.id,
+        remainingLiveKg: normalizeStockValues(newLive, 0).live,
+        remainingDeadKg: normalizeStockValues(0, newDead).dead,
+      });
+    }
+  }
+
+  if (liveLeft > 0.001 || deadLeft > 0.001) {
+    throw new Error(
+      `สต๊อกในล็อตไม่พอ (ขาดเป็น ${liveLeft.toFixed(2)} กก. / ตาย ${deadLeft.toFixed(2)} กก.)`,
+    );
+  }
+
+  for (const p of patches) {
+    await fsPatch(`stockBatches/${p.id}`, {
+      remainingLiveKg: p.remainingLiveKg,
+      remainingDeadKg: p.remainingDeadKg,
+    });
+  }
+
+  return patches;
+}
+
+export async function deductStockForSale(stock, liveKg, deadKg, updateMainStock, batches = []) {
+  if (batches.length > 0) {
+    const patches = await deductFifoFromBatches(batches, { liveKg, deadKg });
+    const patchById = Object.fromEntries(patches.map((p) => [p.id, p]));
+    const summed = sumStockFromBatches(
+      batches.map((b) => {
+        const p = patchById[b.id];
+        return p
+          ? { ...b, remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg }
+          : b;
+      }),
+    );
+    return updateMainStock(summed.live, summed.dead);
+  }
   return updateMainStock(
     Math.max(0, stock.live - liveKg),
     Math.max(0, stock.dead - deadKg),
@@ -35,13 +99,15 @@ export function sumStockFromBatches(batches = []) {
 }
 
 /**
- * ยอดขายได้จริง — ใช้ค่าสูงสุดระหว่าง config/stock กับผลรวมล็อต
- * (กรณีรับเข้าแล้วล็อตมีข้อมูลแต่ config ยังเป็น 0 จะไม่บล็อกขาย)
+ * ยอดขายได้จริง — ถ้ามีล็อตรับเข้าใช้ผลรวมคงเหลือตามวัน/รายการ
+ * ไม่มีล็อตค่อยใช้ config/stock
  */
 export function getEffectiveStock(configStock, batches = []) {
-  const cfg = normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
-  const bat = sumStockFromBatches(batches);
-  return normalizeStockValues(Math.max(cfg.live, bat.live), Math.max(cfg.dead, bat.dead));
+  if (batches.length > 0) {
+    const bat = sumStockFromBatches(batches);
+    return normalizeStockValues(bat.live, bat.dead);
+  }
+  return normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
 }
 
 /** บันทึก config/stock (REST + SDK fallback) */
@@ -83,7 +149,9 @@ export async function createStockBatchRecord({
   if (!isFirebaseReady) {
     throw new Error('Firebase config ไม่ครบ — บันทึกล็อต FIFO ไม่ได้');
   }
+  const receiveDateKey = dateKeyBangkok();
   await withTimeout(fsPost('stockBatches', {
+    receiveDateKey,
     purchaseDate: new Date().toISOString(),
     liveKg,
     deadKg,
