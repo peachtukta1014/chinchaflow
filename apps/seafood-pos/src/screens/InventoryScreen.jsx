@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
 import { countReceivesOnDate } from '../lib/stockBatchUtils';
-import { createStockBatchRecord } from '../services/stockService';
+import { createStockBatchRecord, transferPondDeath } from '../services/stockService';
 
-export default function InventoryScreen({ stock, stockBatches = [], updateMainStock, onReceived }) {
+export default function InventoryScreen({ stock, stockBatches = [], updateMainStock, onReceived, onStockMoved }) {
   const [tab, setTab]           = useState('receive');
   const [rcvLive, setRcvLive]   = useState('');
   const [rcvDead, setRcvDead]   = useState('');
@@ -50,13 +50,24 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
     }
   };
 
-  const handleDead = () => {
-    if (!deadWeight) return;
-    const w = parseFloat(deadWeight);
-    if (w > stock.live) return alert('ยอดกุ้งตายมากกว่ากุ้งเป็นครับ');
-    updateMainStock(stock.live - w, stock.dead + w);
-    alert('ย้ายยอดกุ้งตายสำเร็จ!'); setDeadWeight('');
-  };
+  const handleDead = async () => {
+    if (!deadWeight) return;
+    const w = parseFloat(deadWeight);
+    if (!Number.isFinite(w) || w <= 0) return alert('ใส่น้ำหนักกุ้งตายที่ย้ายครับ');
+    if (w > stock.live) return alert('ยอดมากกว่ากุ้งเป็นคงเหลือครับ');
+    setSaving(true);
+    try {
+      await transferPondDeath(stock, w, updateMainStock, stockBatches);
+      alert(`ย้าย ${w} กก. จากกุ้งเป็น → กุ้งตายแล้ว`);
+      setDeadWeight('');
+      onStockMoved?.();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'ย้ายสต๊อกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="p-5 space-y-5">
@@ -149,9 +160,9 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
           <input type="number" inputMode="decimal" value={deadWeight}
             onChange={e => setDeadWeight(e.target.value)} placeholder="0.0"
             className="w-full p-5 bg-white border-2 border-red-200 text-red-600 font-black text-3xl text-center rounded-2xl outline-none" />
-          <button onClick={handleDead}
-            className="w-full mt-4 bg-red-500 text-white font-bold py-5 rounded-2xl">
-            ย้ายสต๊อกไปกุ้งตาย
+          <button onClick={handleDead} disabled={saving}
+            className="w-full mt-4 bg-red-500 text-white font-bold py-5 rounded-2xl disabled:opacity-60">
+            {saving ? 'กำลังบันทึก...' : 'ย้ายสต๊อกไปกุ้งตาย'}
           </button>
         </div>
       )}

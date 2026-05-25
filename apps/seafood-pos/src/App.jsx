@@ -174,7 +174,15 @@ export default function App() {
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'home'           && <Dashboard stock={stock} stockBatches={stockBatches} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
-        {activeTab === 'stock'          && <InventoryScreen stock={effectiveStock} stockBatches={stockBatches} updateMainStock={updateMainStock} onReceived={() => setStockRefresh((n) => n + 1)} />}
+        {activeTab === 'stock'          && (
+          <InventoryScreen
+            stock={effectiveStock}
+            stockBatches={stockBatches}
+            updateMainStock={updateMainStock}
+            onReceived={() => setStockRefresh((n) => n + 1)}
+            onStockMoved={() => setStockRefresh((n) => n + 1)}
+          />
+        )}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen

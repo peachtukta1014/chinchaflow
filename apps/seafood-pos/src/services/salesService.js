@@ -159,7 +159,7 @@ export async function persistSaleBill({
     createdAt: now,
     source: 'koseafood-pos',
   }));
-  if (remain > 0 && selectedCustomer && selectedCustomer !== 'general') {
+  if (remain > 0) {
     await withTimeout(incrementCustomerDebt(selectedCustomer, {
       customerId: selectedCustomer,
       customerName: customer.name,
@@ -186,10 +186,9 @@ export async function updateSalePayment(sale, newPaymentType, paidAmountInput = 
     remainingAmount,
   });
   const delta = remainingAmount - oldRemain;
-  const customerId = sale.customerId;
-  if (delta !== 0 && customerId && customerId !== 'general') {
-    await incrementCustomerDebt(customerId, {
-      customerId,
+  if (delta !== 0) {
+    await incrementCustomerDebt(sale.customerId, {
+      customerId: sale.customerId,
       customerName: sale.customerName || '',
       zone: sale.zone || 'ทั่วไป',
       lastBillNo: sale.billNo || sale.id,

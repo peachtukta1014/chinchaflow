@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsQuerySales, fsQueryStockBatches } from '../lib/firestoreRest';
+import { fsListCollection, fsQuerySales, fsQueryStockBatches } from '../lib/firestoreRest';
 import {
   aggregateDailySales,
   billAmount,
@@ -11,6 +11,7 @@ import {
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
 import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
+import { reconcileDebtsFromSales } from '../services/debtService';
 import { updateSalePayment } from '../services/salesService';
 import { getEffectiveStock } from '../services/stockService';
 
@@ -116,9 +117,18 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
     if (!db) { return undefined; }
     const unsubs = [];
 
+    const loadDebtsRest = async () => {
+      try {
+        const rows = await fsListCollection('customerDebts', 200);
+        setCustomerDebts(rows.filter((d) => (parseFloat(d.totalDebt) || 0) > 0));
+      } catch (e) {
+        console.warn('customerDebts REST', e);
+      }
+    };
     unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
-      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (d.totalDebt || 0) > 0));
-    }, () => {}));
+      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (parseFloat(d.totalDebt) || 0) > 0));
+    }, () => { loadDebtsRest(); }));
+    loadDebtsRest();
 
     const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
     unsubs.push(onSnapshot(batchQ, snap => {
@@ -146,6 +156,14 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
   const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
   const todaySales = mergeSalesDocs(firestoreSales, localToday);
   const salesSummary = aggregateDailySales(todaySales);
+
+  useEffect(() => {
+    if (!active || dashTab !== 'debts') return undefined;
+    reconcileDebtsFromSales([...firestoreSales, ...localToday]).catch((e) => {
+      console.warn('reconcileDebtsFromSales', e);
+    });
+    return undefined;
+  }, [active, dashTab, firestoreSales, localToday]);
 
   const todayTotal  = salesSummary.revenueTotal;
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);

@@ -60,6 +60,58 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
   return patches;
 }
 
+/** กุ้งตายในบ่อ — ย้ายจากเป็น→ตายในล็อตเดียวกัน (FIFO วันเก่าก่อน) */
+export async function transferLiveToDeadInBatches(batches, transferKg) {
+  let left = transferKg;
+  const patches = [];
+
+  for (const b of sortBatchesFifoOrder(batches)) {
+    if (left <= 0) break;
+    const remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+    const remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+    if (remLive <= 0) continue;
+    const take = Math.min(left, remLive);
+    patches.push({
+      id: b.id,
+      remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
+      remainingDeadKg: normalizeStockValues(0, remDead + take).dead,
+    });
+    left -= take;
+  }
+
+  if (left > 0.001) {
+    throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(transferKg - left).toFixed(2)} กก. (ต้องการ ${transferKg} กก.)`);
+  }
+
+  for (const p of patches) {
+    await fsPatch(`stockBatches/${p.id}`, {
+      remainingLiveKg: p.remainingLiveKg,
+      remainingDeadKg: p.remainingDeadKg,
+    });
+  }
+  return patches;
+}
+
+export async function transferPondDeath(stock, transferKg, updateMainStock, batches = []) {
+  if (batches.length > 0) {
+    const patches = await transferLiveToDeadInBatches(batches, transferKg);
+    const patchById = Object.fromEntries(patches.map((p) => [p.id, p]));
+    const summed = sumStockFromBatches(
+      batches.map((b) => {
+        const p = patchById[b.id];
+        return p
+          ? { ...b, remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg }
+          : b;
+      }),
+    );
+    return updateMainStock(summed.live, summed.dead);
+  }
+  return updateMainStock(
+    Math.max(0, stock.live - transferKg),
+    Math.max(0, stock.dead + transferKg),
+  );
+}
+
 export async function deductStockForSale(stock, liveKg, deadKg, updateMainStock, batches = []) {
   if (batches.length > 0) {
     const patches = await deductFifoFromBatches(batches, { liveKg, deadKg });
