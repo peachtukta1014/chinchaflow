@@ -82,7 +82,7 @@ export async function saveLineOrderDelivery({
     fulfilledItems,
   }));
 
-  if (total > 0 && customer.id && customer.id !== 'general') {
+  if (total > 0) {
     await withTimeout(incrementCustomerDebt(customer.id, {
       customerId: customer.id,
       customerName: customer.name,

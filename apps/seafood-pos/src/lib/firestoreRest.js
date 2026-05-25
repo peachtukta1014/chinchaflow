@@ -259,16 +259,45 @@ export async function fsQuerySales(dateKey) {
 }
 
 export async function fsIncrementDebt(customerId, meta, delta) {
+  if (!FS_BASE || !customerId) return;
+  const deltaN = parseFloat(delta) || 0;
+  if (deltaN === 0) return;
+
+  const path = `customerDebts/${customerId}`;
+  const headers = await fsAuthHeaders();
   let current = 0;
-  try {
-    const r = await fetch(`${FS_BASE}/customerDebts/${customerId}`, { headers: await fsAuthHeaders() });
-    if (r.ok) {
-      const j = await r.json();
-      const fv = j.fields?.totalDebt;
-      current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
-    }
-  } catch {
-    /* best-effort read */
+  const r = await fetch(`${FS_BASE}/${path}`, { headers });
+  if (r.ok) {
+    const j = await r.json();
+    const fv = j.fields?.totalDebt;
+    current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
+  } else if (r.status !== 404) {
+    throw new Error(`GET ${path} HTTP ${r.status}`);
   }
-  return fsPatch(`customerDebts/${customerId}`, { ...meta, totalDebt: current + delta });
+
+  const totalDebt = current + deltaN;
+  const fields = fsObj({
+    customerId,
+    customerName: meta.customerName || '',
+    zone: meta.zone || 'ทั่วไป',
+    lastBillNo: meta.lastBillNo || '',
+    lastUpdated: meta.lastUpdated || new Date().toISOString(),
+    totalDebt,
+  });
+
+  if (r.ok) {
+    return fsPatch(path, {
+      customerName: meta.customerName,
+      zone: meta.zone,
+      lastBillNo: meta.lastBillNo,
+      lastUpdated: meta.lastUpdated,
+      totalDebt,
+    });
+  }
+
+  const create = await fetch(
+    `${FS_BASE}/customerDebts?documentId=${encodeURIComponent(customerId)}`,
+    { method: 'POST', headers, body: JSON.stringify({ fields }) },
+  );
+  if (!create.ok) throw new Error(`สร้างลูกหนี้ไม่สำเร็จ HTTP ${create.status}`);
 }
