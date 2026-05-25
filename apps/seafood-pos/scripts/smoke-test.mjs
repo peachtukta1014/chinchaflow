@@ -14,23 +14,8 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
   const paid = parseFloat(paidAmountInput) || 0;
   return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
 }
-function getBillTemplateUrl() {
-  return 'template-empty.jpg';
-}
-
-function normalizeLineItem(item) {
-  return {
-    productName: item.productName || '',
-    weight: parseFloat(item.weightKg ?? item.weight ?? 0) || 0,
-    total: parseFloat(item.lineTotal ?? item.total ?? 0) || 0,
-  };
-}
 import { billAmount } from '../src/lib/salesAggregate.js';
-import {
-  resolveBillRowIndex,
-  groupBillItemsByRow,
-  BILL_PRINTED_ROWS,
-} from '../src/lib/billRowMap.js';
+import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,11 +59,19 @@ try {
 }
 
 try {
-  assert(getBillTemplateUrl() === 'template-empty.jpg', 'template empty only');
-  const fromFs = normalizeLineItem({ productName: 'กุ้งใหญ่', weightKg: 2, lineTotal: 500, pricePerKg: 250 });
-  assert(fromFs.weight === 2 && fromFs.total === 500, 'normalizeLineItem Firestore shape');
+  assert(resolveTemplateRowName({ productId: 'medium' }) === TEMPLATE_ROW_NAMES.medium, 'กุ้งกลาง → แถว B');
+  const data = saleToBillData({
+    billNo: 'B001',
+    customerName: 'ปุ้ย',
+    dateKey: '2026-05-25',
+    items: [{ productId: 'medium', weightKg: 2, lineTotal: 2200, pricePerKg: 1100 }],
+    total: 2200,
+  });
+  assert(data.items[0].name === 'กุ้งแม่น้ำ B', 'บิลดิจิทัลมีรายการแถว B');
+  assert(data.totalAmount === 2200, 'ยอดรวมไม่หักส่วนลด');
+  assert(data.customerName === 'ปุ้ย', 'ชื่อลูกค้าถูกต้อง');
 } catch (e) {
-  fail('billTemplateConfig', e);
+  fail('billDataFromSale', e);
 }
 
 try {
@@ -87,37 +80,11 @@ try {
   fail('billAmount', e);
 }
 
-try {
-  assert(resolveBillRowIndex({ productId: 'large' }) === BILL_PRINTED_ROWS.large, 'แถว A = กุ้งใหญ่');
-  assert(resolveBillRowIndex({ productId: 'medium' }) === BILL_PRINTED_ROWS.medium, 'แถว B = กุ้งกลาง');
-  assert(resolveBillRowIndex({ productId: 'small' }) === BILL_PRINTED_ROWS.small, 'แถว C = กุ้งเล็ก');
-  const grouped = groupBillItemsByRow([
-    { productId: 'medium', weightKg: 2, lineTotal: 2200, pricePerKg: 1100 },
-    { productId: 'small', weightKg: 1, lineTotal: 850, pricePerKg: 850 },
-  ]);
-  assert(grouped.byRow.get(BILL_PRINTED_ROWS.medium)?.productId === 'medium', 'จัดกลุ่มแถว B');
-  assert(grouped.overflow.length === 0, 'ไม่มี overflow สำหรับ A/B/C');
-} catch (e) {
-  fail('billRowMap', e);
-}
-
 const assetsDir = path.join(root, 'public/bill-assets');
-for (const f of ['template-empty.jpg', 'template-cash.jpg', 'template-credit.jpg', 'line-oa-qr.png']) {
+for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
   if (fs.existsSync(p) && fs.statSync(p).size > 1000) ok(`asset ${f}`);
   else fail(`asset ${f}`, new Error('missing or too small'));
 }
-try {
-  const empty = path.join(assetsDir, 'template-empty.jpg');
-  const credit = path.join(assetsDir, 'template-credit.jpg');
-  const cash = path.join(assetsDir, 'template-cash.jpg');
-  assert(
-    fs.readFileSync(empty).compare(fs.readFileSync(credit)) !== 0,
-    'template-empty ≠ template-credit (ไม่ใช่ไฟล์ซ้ำ)',
-  );
-} catch (e) {
-  fail('template assets distinct', e);
-}
-
 console.log(failed ? `\nFAILED: ${failed}\n` : '\nAll smoke tests passed.\n');
 process.exit(failed ? 1 : 0);

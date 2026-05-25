@@ -58,7 +58,7 @@ export default function BillImageSheet({ bill, customer, onClose }) {
       <div className="bg-white rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div>
-            <p className="font-black text-slate-800">ภาพบิล (เทมเพลต)</p>
+            <p className="font-black text-slate-800">ภาพบิล (ฟอร์มดิจิทัล)</p>
             <p className="text-xs text-slate-400">
               {bill.billNo} · ลูกค้า: <span className="font-bold text-slate-700">{bill.customerName}</span>
               {' · '}
