@@ -1,6 +1,6 @@
 /**
  * แยกวันส่งจากข้อความ LINE (เวลาไทย Bangkok)
- * รองรับ 25/5/69, 25-5-2569, ออเดอร์?25/5/69, วันนี้, พรุ่งนี้
+ * รองรับ 25/5/69, 25-5-2569, ออเดอร์?25/5/69, วันนี้, พรุ่งนี้ (ทุกตำแหน่งในข้อความ)
  */
 
 function todayBKK() {
@@ -51,7 +51,27 @@ function dateKeyFromParts(day, month, yearPart) {
   return dateKey;
 }
 
-const DATE_INLINE_RE = /(?:ออเดอร์|จอง|ส่ง|วันที่|ส่งวัน)?\s*[?]?\s*(\d{1,2})\s*[/.-]\s*(\d{1,2})(?:\s*[/.-]\s*(\d{2,4}))?/i;
+const ORDER_WORD = '(?:ออร์?เดอร์|ออเดอร์|จอง|สั่ง|ส่ง)';
+const DATE_INLINE_RE = new RegExp(
+  `(?:${ORDER_WORD}|วันที่|ส่งวัน)?\\s*[?]?\\s*(\\d{1,2})\\s*[/.-]\\s*(\\d{1,2})(?:\\s*[/.-]\\s*(\\d{2,4}))?`,
+  'i',
+);
+
+const ORDER_PREFIX_RE = new RegExp(`^${ORDER_WORD}\\s*[?]?\\s*`, 'i');
+
+function stripOrderPrefix(text) {
+  return String(text || '').replace(ORDER_PREFIX_RE, '').trim();
+}
+
+function stripRelativeDateTokens(text) {
+  const beforeRel = new RegExp(`${ORDER_WORD}\\s*(?=พรุ่งนี้|tomorrow|วันนี้|today)`, 'gi');
+  return String(text || '')
+    .replace(beforeRel, ' ')
+    .replace(/พรุ่งนี้|tomorrow/gi, ' ')
+    .replace(/วันนี้|today/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /**
  * @returns {{ dateKey: string|null, textWithoutDate: string }}
@@ -60,26 +80,34 @@ function parseDeliveryDateFromText(text) {
   const raw = String(text || '').trim();
   if (!raw) return { dateKey: null, textWithoutDate: raw };
 
-  if (/^(วันนี้|today)(\s|$)/i.test(raw)) {
-    return { dateKey: todayBKK(), textWithoutDate: raw.replace(/^(วันนี้|today)\s*/i, '').trim() };
-  }
-  if (/^(พรุ่งนี้|tomorrow)(\s|$)/i.test(raw)) {
-    return { dateKey: tomorrowBKK(), textWithoutDate: raw.replace(/^(พรุ่งนี้|tomorrow)\s*/i, '').trim() };
-  }
-
   const m = raw.match(DATE_INLINE_RE);
-  if (!m) return { dateKey: null, textWithoutDate: raw };
+  if (m) {
+    const dateKey = dateKeyFromParts(m[1], m[2], m[3]);
+    if (dateKey) {
+      const textWithoutDate = stripOrderPrefix(
+        raw
+          .replace(m[0], ' ')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      );
+      return { dateKey, textWithoutDate };
+    }
+  }
 
-  const dateKey = dateKeyFromParts(m[1], m[2], m[3]);
-  if (!dateKey) return { dateKey: null, textWithoutDate: raw };
+  if (/(พรุ่งนี้|tomorrow)/i.test(raw)) {
+    return {
+      dateKey: tomorrowBKK(),
+      textWithoutDate: stripOrderPrefix(stripRelativeDateTokens(raw)),
+    };
+  }
+  if (/(วันนี้|today)/i.test(raw)) {
+    return {
+      dateKey: todayBKK(),
+      textWithoutDate: stripOrderPrefix(stripRelativeDateTokens(raw)),
+    };
+  }
 
-  const textWithoutDate = raw
-    .replace(m[0], ' ')
-    .replace(/^(ออเดอร์|จอง|ส่ง)\s*[?]?\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return { dateKey, textWithoutDate };
+  return { dateKey: null, textWithoutDate: raw };
 }
 
 function formatDateThai(dateKey) {

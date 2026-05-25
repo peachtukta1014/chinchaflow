@@ -1,7 +1,8 @@
 import { isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { billAmount } from '../lib/salesAggregate';
-import { fsPatch, fsPost } from '../lib/firestoreRest';
+import { debtCustomerKey } from '../lib/debtCustomerKey';
+import { fsGetDoc, fsListCollection, fsPatch, fsPost } from '../lib/firestoreRest';
 import { incrementCustomerDebt } from './debtService';
 import { deductStockForSale, getEffectiveStock } from './stockService';
 
@@ -196,4 +197,34 @@ export async function updateSalePayment(sale, newPaymentType, paidAmountInput = 
     }, delta);
   }
   return { paymentType: newPaymentType, paidAmount, remainingAmount };
+}
+
+/** ปิดยอดลูกค้า — ตั้งบิลค้างทั้งหมดเป็นชำระแล้ว + ปรับลูกหนี้ */
+export async function clearCustomerDebtAll(customerId, customerName, paymentType = 'transfer') {
+  const key = debtCustomerKey(customerId, customerName);
+  if (!key) throw new Error('ไม่พบลูกค้า');
+
+  const sales = await fsListCollection('sales', 300);
+  const open = sales.filter((s) => {
+    if ((parseFloat(s.remainingAmount) || 0) <= 0) return false;
+    return debtCustomerKey(s.customerId, s.customerName) === key;
+  });
+
+  for (const sale of open) {
+    if (!sale.id) continue;
+    await updateSalePayment(sale, paymentType);
+  }
+
+  const debtDoc = await fsGetDoc(`customerDebts/${key}`).catch(() => null);
+  const remain = parseFloat(debtDoc?.totalDebt) || 0;
+  if (remain > 0) {
+    await incrementCustomerDebt(key, {
+      customerName: customerName || debtDoc?.customerName || '',
+      zone: debtDoc?.zone || 'ทั่วไป',
+      lastBillNo: debtDoc?.lastBillNo || '',
+      lastUpdated: new Date().toISOString(),
+    }, -remain);
+  }
+
+  return { clearedBills: open.length, paymentType };
 }

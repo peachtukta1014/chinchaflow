@@ -258,6 +258,25 @@ export async function fsQuerySales(dateKey) {
   return sortSalesDesc(all.filter((d) => saleMatchesDateKey(d, dateKey)));
 }
 
+/** บิลขายของลูกค้า (ย้อนหลัง) — ใช้ในแท็บบัญชี */
+export async function fsQuerySalesByCustomer(customerId, limit = 120) {
+  if (!customerId) return [];
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'customerId' },
+        op: 'EQUAL',
+        value: { stringValue: customerId },
+      },
+    },
+    limit,
+  });
+  if (docs.length > 0) return sortSalesDesc(docs);
+  const all = await fsListCollection('sales', limit);
+  return sortSalesDesc(all.filter((d) => d.customerId === customerId));
+}
+
 export async function fsIncrementDebt(customerId, meta, delta) {
   if (!FS_BASE || !customerId) return;
   const deltaN = parseFloat(delta) || 0;
