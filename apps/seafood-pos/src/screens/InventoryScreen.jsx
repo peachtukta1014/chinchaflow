@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { dateKeyBangkok } from '../lib/date';
+import { countReceivesOnDate } from '../lib/stockBatchUtils';
 import { createStockBatchRecord } from '../services/stockService';
 
-export default function InventoryScreen({ stock, updateMainStock, onReceived }) {
+export default function InventoryScreen({ stock, stockBatches = [], updateMainStock, onReceived }) {
   const [tab, setTab]           = useState('receive');
   const [rcvLive, setRcvLive]   = useState('');
   const [rcvDead, setRcvDead]   = useState('');
@@ -17,7 +19,12 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
   const transport = parseFloat(rcvTransport) || 0;
   const shrimpCost = (liveKg + deadKg) * costPerKg;
   const grandTotal = shrimpCost + transport;
-  const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
+  const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
+  const todayKey = dateKeyBangkok();
+  const todayReceiveCount = useMemo(
+    () => countReceivesOnDate(stockBatches, todayKey),
+    [stockBatches, todayKey],
+  );
 
   const handleReceive = async () => {
     if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
@@ -32,7 +39,7 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
         note: rcvNote,
       });
       await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
-      alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
+      alert(`✅ บันทึกรายการรับเข้าแล้ว (ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ)\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
       onReceived?.();
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
@@ -66,7 +73,15 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
 
       {tab === 'receive' && (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h2 className="font-black text-slate-800 text-xl">บันทึกรับกุ้งเข้าบ่อ</h2>
+          <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า (วันนี้)</h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            แต่ละครั้งที่กดบันทึก = 1 รายการ (ราคา/รถต่างกัน) รวมอยู่ล็อตวันที่เดียวกัน
+            {todayReceiveCount > 0 && (
+              <span className="block mt-1 font-bold text-blue-600">
+                วันนี้บันทึกแล้ว {todayReceiveCount} รายการ
+              </span>
+            )}
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งสด (กก.)</label>
@@ -120,7 +135,7 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
           </div>
           <button onClick={handleReceive} disabled={saving}
             className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl disabled:opacity-60">
-            {saving ? 'กำลังบันทึก...' : 'บันทึกเข้าสต๊อก (FIFO)'}
+            {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
           </button>
         </div>
       )}

@@ -14,7 +14,7 @@ import {
 import { deductStockForSale } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 
-export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleRecorded, onOrderDone }) {
+export default function LineOrdersScreen({ user, stock, stockBatches = [], updateMainStock, onSaleRecorded, onOrderDone }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
@@ -113,7 +113,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
 
     setSavingId(order.id);
     try {
-      await deductStockForSale(stock, liveKg, deadKg, updateMainStock);
+      await deductStockForSale(stock, liveKg, deadKg, updateMainStock, stockBatches);
 
       const { salesId, billNo } = await saveLineOrderDelivery({
         order,

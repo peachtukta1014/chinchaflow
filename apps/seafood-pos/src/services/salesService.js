@@ -2,6 +2,7 @@ import { isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { fsPost } from '../lib/firestoreRest';
 import { incrementCustomerDebt } from './debtService';
+import { deductStockForSale } from './stockService';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -81,6 +82,7 @@ export function buildBillData({
 export async function saveBillWithCart({
   cartItems,
   stock,
+  stockBatches = [],
   customer,
   selectedCustomer,
   paymentType,
@@ -103,10 +105,7 @@ export async function saveBillWithCart({
     recordedBy,
     photoUrl,
   });
-  await updateMainStock(
-    Math.max(0, stock.live - liveKg),
-    Math.max(0, stock.dead - deadKg),
-  );
+  await deductStockForSale(stock, liveKg, deadKg, updateMainStock, stockBatches);
   await persistSaleBill({
     billData,
     cartItems,
