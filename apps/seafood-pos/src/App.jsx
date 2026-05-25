@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users } from 'lucide-react';
+import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users, Wallet } from 'lucide-react';
 import { auth, db } from './firebase';
 import { FS_BASE, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
@@ -19,6 +19,7 @@ import POSMobile from './screens/POSMobile';
 import InventoryScreen from './screens/InventoryScreen';
 import MembersScreen from './screens/MembersScreen';
 import LineOrdersScreen from './screens/LineOrdersScreen';
+import CustomerAccountsScreen from './screens/CustomerAccountsScreen';
 import AdminUsersScreen from './screens/AdminUsersScreen';
 import ProductSettingsScreen from './screens/ProductSettingsScreen';
 
@@ -205,6 +206,7 @@ export default function App() {
           />
         )}
         {activeTab === 'members'        && <MembersScreen />}
+        {activeTab === 'accounts'        && <CustomerAccountsScreen refreshKey={salesRefresh} />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
             user={member}
@@ -231,6 +233,7 @@ export default function App() {
         <NavButton icon={<Package />}      label="รับสต๊อก" isActive={activeTab === 'stock'}   onClick={() => setActiveTab('stock')} />
         <NavButton icon={<Bell />}         label="ออเดอร์"   isActive={activeTab === 'orders'}  onClick={() => setActiveTab('orders')} badge={pendingOrders} />
         <NavButton icon={<Users />}        label="ลูกค้า"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
+        <NavButton icon={<Wallet />}       label="บัญชี"    isActive={activeTab === 'accounts'} onClick={() => setActiveTab('accounts')} />
       </div>
 
       <style>{`
