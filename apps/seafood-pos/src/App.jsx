@@ -20,6 +20,7 @@ import InventoryScreen from './screens/InventoryScreen';
 import MembersScreen from './screens/MembersScreen';
 import LineOrdersScreen from './screens/LineOrdersScreen';
 import CustomerAccountsScreen from './screens/CustomerAccountsScreen';
+import LiveStockStickyBar from './components/LiveStockStickyBar';
 import AdminUsersScreen from './screens/AdminUsersScreen';
 import ProductSettingsScreen from './screens/ProductSettingsScreen';
 
@@ -193,8 +194,10 @@ export default function App() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} stockBatches={stockBatches} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
+      <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} />
+
+      <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
+        {activeTab === 'home'           && <Dashboard localBills={transactions} refreshKey={salesRefresh} active={activeTab === 'home'} />}
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && (
           <InventoryScreen

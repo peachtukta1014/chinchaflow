@@ -15,6 +15,9 @@ import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
 import { saveBillWithCart as saveBillWithCartService } from '../services/salesService';
+import { buildPreviewBill } from '../lib/buildPreviewBill';
+import BillImageSheet from '../components/BillImageSheet';
+import LineShareButton from '../components/LineShareButton';
 
 export default function POSMobile({ user, stock, stockBatches = [], updateMainStock, onSaveBill }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
@@ -30,8 +33,9 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
   const [paymentType, setPaymentType] = useState(DEFAULT_PAYMENT_TYPE);
   const [paidAmount, setPaidAmount] = useState('');
   const [photoUrl, setPhotoUrl]     = useState(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const photoGalleryRef = useRef(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [billSheet, setBillSheet] = useState(null);
+  const photoGalleryRef = useRef(null);
   const photoCameraRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
@@ -156,6 +160,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
+      setBillSheet({ bill: billData, customer });
       setCart([]); setSelectedCustomer('general');
       setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
       setPhotoUrl(null);
@@ -257,16 +262,40 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
 
   const { listening: voiceListen, toggle: toggleVoice, liveText } = useVoice(onVoiceText);
 
-  const groupedCustomers = allCustomers.reduce((acc, c) => {
-    const zone = c.zone || 'อื่นๆ';
-    if (!acc[zone]) acc[zone] = [];
-    acc[zone].push(c);
-    return acc;
-  }, {});
+  const groupedCustomers = allCustomers.reduce((acc, c) => {
+    const zone = c.zone || 'อื่นๆ';
+    if (!acc[zone]) acc[zone] = [];
+    acc[zone].push(c);
+    return acc;
+  }, {});
 
-  return (
-    <div className="flex flex-col bg-slate-100" style={{ minHeight: 'calc(100vh - 120px)' }}>
-      <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
+  const activeCustomer =
+    allCustomers.find((c) => c.id === selectedCustomer) ||
+    CUSTOMERS.find((c) => c.id === selectedCustomer);
+
+  const previewBill =
+    cart.length > 0
+      ? buildPreviewBill({
+          cartItems: cart,
+          customer: activeCustomer,
+          selectedCustomer,
+          paymentType,
+          paidAmount,
+          billNo: billNoRef.current,
+          recordedBy: user.name,
+        })
+      : null;
+
+  return (
+    <div className="flex flex-col bg-slate-100" style={{ minHeight: 'calc(100vh - 120px)' }}>
+      {billSheet && (
+        <BillImageSheet
+          bill={billSheet.bill}
+          customer={billSheet.customer}
+          onClose={() => setBillSheet(null)}
+        />
+      )}
+      <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
         {/* Customer selector */}
         <div className="flex items-center bg-slate-50 rounded-2xl p-2 border border-slate-200 mb-3">
           <MapPin className="text-blue-500 ml-2 shrink-0" size={20} />
@@ -320,13 +349,27 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
                 onChange={e => setPaidAmount(e.target.value)} placeholder="จ่ายมาแล้ว (฿)"
                 className="w-full p-3 bg-purple-50 border border-purple-200 rounded-2xl text-base font-bold outline-none" />
             )}
-            {remaining > 0 && (
-              <p className="text-xs text-orange-500 font-bold text-right">ค้างจ่าย ฿{remaining.toLocaleString()}</p>
-            )}
-          </div>
-        )}
+            {remaining > 0 && (
+              <p className="text-xs text-orange-500 font-bold text-right">ค้างจ่าย ฿{remaining.toLocaleString()}</p>
+            )}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setBillSheet({ bill: previewBill, customer: activeCustomer })}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold"
+              >
+                ดูภาพบิล
+              </button>
+              <LineShareButton
+                bill={previewBill}
+                customer={activeCustomer}
+                className="flex-1"
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Total + camera + save */}
+        {/* Total + camera + save */}
         <div className="flex justify-between items-end border-t border-slate-100 pt-3">
           <div>
             <p className="text-slate-400 text-[11px] font-bold tracking-wide">ยอดรวมบิล ({cart.length} รายการ)</p>
