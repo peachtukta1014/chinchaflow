@@ -23,6 +23,27 @@ export function normalizeStockValues(live, dead) {
   };
 }
 
+/** รวมคงเหลือจากล็อต FIFO */
+export function sumStockFromBatches(batches = []) {
+  return batches.reduce(
+    (acc, b) => ({
+      live: acc.live + (parseFloat(b.remainingLiveKg ?? b.liveKg) || 0),
+      dead: acc.dead + (parseFloat(b.remainingDeadKg ?? b.deadKg) || 0),
+    }),
+    { live: 0, dead: 0 },
+  );
+}
+
+/**
+ * ยอดขายได้จริง — ใช้ค่าสูงสุดระหว่าง config/stock กับผลรวมล็อต
+ * (กรณีรับเข้าแล้วล็อตมีข้อมูลแต่ config ยังเป็น 0 จะไม่บล็อกขาย)
+ */
+export function getEffectiveStock(configStock, batches = []) {
+  const cfg = normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
+  const bat = sumStockFromBatches(batches);
+  return normalizeStockValues(Math.max(cfg.live, bat.live), Math.max(cfg.dead, bat.dead));
+}
+
 /** บันทึก config/stock (REST + SDK fallback) */
 export async function persistStock(val) {
   const payload = { ...val, updatedAt: new Date().toISOString() };

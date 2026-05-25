@@ -10,6 +10,7 @@ import {
   mergeSalesDocs,
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
+import { getEffectiveStock } from '../services/stockService';
 
 function formatBatchPurchaseDate(value) {
   if (!value) return '—';
@@ -21,7 +22,7 @@ function formatBatchPurchaseDate(value) {
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 }
 
-export default function Dashboard({ stock, localBills = [], refreshKey = 0, stockRefreshKey = 0, active = true }) {
+export default function Dashboard({ stock, stockBatches: stockBatchesProp, localBills = [], refreshKey = 0, stockRefreshKey = 0, active = true }) {
   const [dashTab, setDashTab] = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [customerDebts, setCustomerDebts] = useState([]);
@@ -112,15 +113,8 @@ export default function Dashboard({ stock, localBills = [], refreshKey = 0, stoc
     return () => clearInterval(iv);
   }, [active, stockRefreshKey, loadStockBatches]);
 
-  const displayStock = (() => {
-    const live = Number(stock?.live) || 0;
-    const dead = Number(stock?.dead) || 0;
-    if (live > 0 || dead > 0) return { live, dead };
-    return stockBatches.reduce((acc, b) => ({
-      live: acc.live + (parseFloat(b.remainingLiveKg ?? b.liveKg) || 0),
-      dead: acc.dead + (parseFloat(b.remainingDeadKg ?? b.deadKg) || 0),
-    }), { live: 0, dead: 0 });
-  })();
+  const batchesForDisplay = stockBatchesProp?.length ? stockBatchesProp : stockBatches;
+  const displayStock = getEffectiveStock(stock, batchesForDisplay);
 
   const localToday = localBills.filter((b) => billMatchesDateKey(b, todayKey));
   const todaySales = mergeSalesDocs(firestoreSales, localToday);
