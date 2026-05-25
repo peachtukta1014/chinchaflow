@@ -4,6 +4,16 @@
       "target": "shrimp",
       "public": "apps/seafood-pos/dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/index.html",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+        },
+        {
+          "source": "/manifest.json",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+        }
+      ],
       "rewrites": [
         { "source": "**", "destination": "/index.html" }
       ]
@@ -12,6 +22,16 @@
       "target": "tea",
       "public": "apps/chincha-tea/dist",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/index.html",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+        },
+        {
+          "source": "/manifest.json",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+        }
+      ],
       "rewrites": [
         { "source": "**", "destination": "/index.html" }
       ]
