@@ -159,7 +159,7 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
       <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
       <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
       <p className="text-[10px] mt-2 text-slate-400 text-center px-6 leading-relaxed">
-        Webhook กุ้ง: lineWebhook · ตัวอย่างข้อความ: &quot;กุ้งใหญ่ 2 กก&quot; หรือ &quot;2 กก กุ้งกลาง&quot;
+        ตัวอย่าง LINE: &quot;25/5/69&quot; แล้ว &quot;ปุ้ย 2&quot; + &quot;กลาง&quot; · หรือ &quot;กุ้งใหญ่ 2 กก&quot;
       </p>
     </div>
   );

@@ -19,9 +19,9 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
-const { parseOrderItems, groupItemsByCustomer, ORDER_FORMAT_HELP } = require('./parseLineOrder');
 const { claimLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
+const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
@@ -39,12 +39,6 @@ function verifySignature(rawBody, signature, secret) {
   return hash === signature;
 }
 
-function tomorrowBKK() {
-  const bkk = new Date(Date.now() + 7 * 3600000);
-  bkk.setUTCDate(bkk.getUTCDate() + 1);
-  return bkk.toISOString().split('T')[0];
-}
-
 // ── LINE Webhook — ร้านกุ้ง (seafood) — รับออเดอร์ลูกค้า ───────────────────
 exports.lineWebhook = functions
   .region('asia-southeast1')
@@ -59,9 +53,8 @@ exports.lineWebhook = functions
       res.status(401).send('Invalid signature'); return;
     }
 
-    const events       = req.body.events || [];
-    const deliveryDate = tomorrowBKK();
-    const token        = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const events = req.body.events || [];
+    const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     for (const event of events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
@@ -95,48 +88,8 @@ exports.lineWebhook = functions
         continue;
       }
 
-      const items = parseOrderItems(text);
-
-      if (items.length > 0) {
-        const groups = groupItemsByCustomer(items);
-        const batch = db().batch();
-        const ts = admin.firestore.FieldValue.serverTimestamp();
-
-        for (const [key, groupItems] of groups) {
-          const customerName = key === '__none__' ? null : key;
-          const ref = db().collection('lineOrders').doc();
-          batch.set(ref, {
-            source: 'line',
-            lineUserId: userId,
-            lineGroupId: groupId,
-            rawText: text,
-            items: groupItems.map((i) => ({
-              product: i.product,
-              qty: i.qty,
-              unit: i.unit,
-              customerName: i.customerName || customerName,
-            })),
-            deliveryDate,
-            customerName,
-            status: 'pending',
-            createdAt: ts,
-          });
-        }
-        await batch.commit();
-
-        const summary = items.map((i) => {
-          const who = i.customerName ? `${i.customerName} · ` : '';
-          return `• ${who}${i.product} ${i.qty} ${i.unit}`;
-        }).join('\n');
-        const orderCount = groups.size;
-        await lineReply(
-          replyToken,
-          `✅ รับออเดอร์แล้วครับ (${orderCount} ราย)\nส่งวันที่ ${deliveryDate}\n\n${summary}`,
-          token,
-        );
-      } else {
-        await lineReply(replyToken, `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}`, token);
-      }
+      const result = await processShrimpLineOrder(db(), admin, { text, userId, groupId });
+      await lineReply(replyToken, result.reply, token);
     }
 
     res.status(200).json({ status: 'ok' });
