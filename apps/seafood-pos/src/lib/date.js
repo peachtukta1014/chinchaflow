@@ -22,6 +22,15 @@ export function formatDateThaiShort(dateKey) {
   return `${d}/${mo}/${(y + 543) % 100}`;
 }
 
+/** ป้ายวันสำหรับตัวเลื่อนวัน (วันนี้ / เมื่อวาน / พรุ่งนี้ / วันที่สั้น) */
+export function formatViewDateLabel(dateKey) {
+  const today = dateKeyBangkok();
+  if (dateKey === today) return 'วันนี้';
+  if (dateKey === shiftDateKey(today, -1)) return 'เมื่อวาน';
+  if (dateKey === shiftDateKey(today, 1)) return 'พรุ่งนี้';
+  return formatDateThaiShort(dateKey);
+}
+
 if (typeof window !== 'undefined') {
   window.dateKeyBangkok = dateKeyBangkok;
   window.tomorrowDateKeyBangkok = tomorrowDateKeyBangkok;

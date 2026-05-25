@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../firebase';
 import { PAY } from '../constants';
-import { dateKeyBangkok, formatDateThaiShort, shiftDateKey } from '../lib/date';
+import { dateKeyBangkok, formatDateThaiShort } from '../lib/date';
+import DateNavBar from '../components/DateNavBar';
+import BillImageSheet from '../components/BillImageSheet';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
 import { fsListCollection, fsQuerySales } from '../lib/firestoreRest';
@@ -13,14 +14,6 @@ import {
   clearCustomerDebtAll,
   updateSalePayment,
 } from '../services/salesService';
-
-function formatViewDate(dateKey) {
-  const today = dateKeyBangkok();
-  if (dateKey === today) return 'วันนี้';
-  if (dateKey === shiftDateKey(today, 1)) return 'พรุ่งนี้';
-  if (dateKey === shiftDateKey(today, -1)) return 'เมื่อวาน';
-  return formatDateThaiShort(dateKey);
-}
 
 function CustomerFifoPanel({
   row,
@@ -225,6 +218,7 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState(null);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
+  const [billSheet, setBillSheet] = useState(null);
 
   const loadDebtsRest = useCallback(async () => {
     try {
@@ -364,6 +358,13 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
 
   return (
     <div className="p-5 space-y-4 pb-8">
+      {billSheet && (
+        <BillImageSheet
+          bill={billSheet.bill}
+          customer={billSheet.customer}
+          onClose={() => setBillSheet(null)}
+        />
+      )}
       <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white">
         <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
         <p className="text-3xl font-black">฿{totalDebt.toLocaleString()}</p>
@@ -372,37 +373,18 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl p-3 flex items-center justify-between shadow-sm">
-        <button
-          type="button"
-          onClick={() => setViewDate((d) => shiftDateKey(d, -1))}
-          className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95"
-          aria-label="วันก่อนหน้า"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <div className="text-center min-w-0 flex-1 px-2">
-          <p className="font-black text-slate-800">{formatViewDate(viewDate)}</p>
-          <p className="text-[10px] text-slate-400">
-            {viewDate}
-            {loading ? ' · โหลด...' : ` · ${sortedDaySales.length} บิล · ฿${dayTotal.toLocaleString()}`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setViewDate((d) => shiftDateKey(d, 1))}
-          disabled={viewDate >= dateKeyBangkok()}
-          className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 disabled:opacity-30"
-          aria-label="วันถัดไป"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
+      <DateNavBar
+        dateKey={viewDate}
+        onDateChange={setViewDate}
+        subtitle={
+          loading
+            ? 'โหลด...'
+            : `${sortedDaySales.length} บิล · ฿${dayTotal.toLocaleString()}`
+        }
+      />
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-1">
-          บิลทั้งหมด — {formatViewDate(viewDate)}
-        </h3>
+        <h3 className="font-bold text-slate-800 mb-1">บิลทั้งหมด</h3>
         <p className="text-[10px] text-slate-400 mb-3">
           สด · โอน · ค้าง · ผ่อน — เลื่อนวันดูประวัติย้อนหลัง
         </p>
@@ -465,6 +447,16 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setBillSheet({
+                      bill: tx,
+                      customer: { zone: tx.zone, phone: tx.phone },
+                    })}
+                    className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
+                  >
+                    ดูภาพบิล / แชร์ LINE
+                  </button>
                 </div>
               );
             })}

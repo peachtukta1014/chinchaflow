@@ -71,16 +71,28 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
 
   return (
     <div className="p-5 space-y-5">
-      <div className="flex bg-slate-200 p-1.5 rounded-2xl">
-        <button onClick={() => setTab('receive')}
-          className={`flex-1 py-3 font-bold text-sm rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}>
-          รับกุ้งเข้า
-        </button>
-        <button onClick={() => setTab('dead')}
-          className={`flex-1 py-3 font-bold text-sm rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}>
-          กุ้งตายจากบ่อ
-        </button>
-      </div>
+      <div className="flex bg-slate-200 p-1.5 rounded-2xl gap-1">
+        <button type="button" onClick={() => setTab('receive')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}>
+          รับกุ้งเข้า
+        </button>
+        <button type="button" onClick={() => setTab('lots')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>
+          ล็อตรับเข้า
+        </button>
+        <button type="button" onClick={() => setTab('dead')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}>
+          กุ้งตายบ่อ
+        </button>
+      </div>
+
+      {tab === 'lots' && (
+        <StockLotTimeline
+          stockBatches={stockBatches}
+          viewDate={lotViewDate}
+          onViewDateChange={setLotViewDate}
+        />
+      )}
 
       {tab === 'receive' && (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
