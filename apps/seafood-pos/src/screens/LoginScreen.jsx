@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
 import { ADMIN_EMAIL } from '../constants';
-import { FS_BASE, fsSetShrimpUser } from '../lib/firestoreRest';
+import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('');
@@ -40,8 +40,16 @@ export default function LoginScreen({ onLogin }) {
         const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
-        if (!f.approved?.booleanValue) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: f.role?.stringValue || 'staff' });
+        const role = f.role?.stringValue || 'staff';
+        const approved = f.approved?.booleanValue === true;
+        const isBootstrap = em === ADMIN_EMAIL.toLowerCase();
+        if (isBootstrap && (role !== 'admin' || !approved)) {
+          await fsPatch(`shrimp_users/${user.uid}`, { role: 'admin', approved: true });
+          onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: 'admin' });
+          return;
+        }
+        if (!approved) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role });
       }
     } catch (e) {
       const c = e.code || '';

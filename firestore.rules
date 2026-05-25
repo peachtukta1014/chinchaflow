@@ -71,7 +71,10 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isOwner(uid)
           && request.resource.data.role == resource.data.role
-          && request.resource.data.approved == resource.data.approved);
+          && request.resource.data.approved == resource.data.approved)
+        || (isOwner(uid) && isTeaBootstrapAdmin()
+          && request.resource.data.role == 'admin'
+          && request.resource.data.approved == true);
       allow delete: if false;
     }
 
@@ -136,7 +139,10 @@ service cloud.firestore {
       allow update: if isAdminShrimp()
         || (signedIn() && request.auth.uid == uid
           && request.resource.data.role == resource.data.role
-          && request.resource.data.approved == resource.data.approved);
+          && request.resource.data.approved == resource.data.approved)
+        || (signedIn() && request.auth.uid == uid && isShrimpBootstrapAdmin()
+          && request.resource.data.role == 'admin'
+          && request.resource.data.approved == true);
       allow delete: if isAdminShrimp();
     }
 
