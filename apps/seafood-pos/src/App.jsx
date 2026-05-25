@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { Bell, Home, LogOut, Package, ShoppingCart, Users } from 'lucide-react';
+import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users } from 'lucide-react';
 import { auth, db } from './firebase';
 import { FS_BASE, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
@@ -11,6 +11,7 @@ import {
   persistStock,
   syncMainStockFromBatches,
 } from './services/stockService';
+import { hardReloadApp } from './lib/reloadApp';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import Dashboard from './screens/Dashboard';
@@ -113,6 +114,11 @@ export default function App() {
     if (auth) await signOut(auth).catch(() => {});
   };
 
+  const handleReloadApp = () => {
+    if (!window.confirm('รีเฟรชแอปเพื่อโหลดเวอร์ชันล่าสุด?\n(ข้อมูลบนเซิร์ฟเวอร์ยังอยู่ครบ)')) return;
+    hardReloadApp();
+  };
+
   const updateMainStock = async (live, dead) => {
     const val = normalizeStockValues(live, dead);
     setStock(val);
@@ -153,10 +159,25 @@ export default function App() {
               </p>
             </div>
           </div>
-          <button onClick={handleLogout}
-            className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-400 active:scale-95">
-            <LogOut size={18} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleReloadApp}
+              title="รีเฟรชแอป"
+              aria-label="รีเฟรชแอป"
+              className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-cyan-400 active:scale-95"
+            >
+              <RefreshCw size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="ออกจากระบบ"
+              className="w-10 h-10 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-400 active:scale-95"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
         {/* Admin tabs row */}
         {isAdmin && (
