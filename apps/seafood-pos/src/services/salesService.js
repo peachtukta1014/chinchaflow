@@ -2,7 +2,7 @@ import { isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { fsPost } from '../lib/firestoreRest';
 import { incrementCustomerDebt } from './debtService';
-import { deductStockForSale } from './stockService';
+import { deductStockForSale, getEffectiveStock } from './stockService';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -17,18 +17,19 @@ export function sumCartStockKg(cartItems) {
   return { liveKg, deadKg };
 }
 
-export function validateStockForSale(cartItems, stock) {
+export function validateStockForSale(cartItems, stock, stockBatches = []) {
+  const avail = getEffectiveStock(stock, stockBatches);
   const { liveKg, deadKg } = sumCartStockKg(cartItems);
-  if (liveKg > stock.live) {
+  if (liveKg > avail.live) {
     return {
       ok: false,
-      message: `⚠️ กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ กุ้งเป็นในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
-  if (deadKg > stock.dead) {
+  if (deadKg > avail.dead) {
     return {
       ok: false,
-      message: `⚠️ กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ กุ้งตายในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
   return { ok: true, liveKg, deadKg };
@@ -92,7 +93,8 @@ export async function saveBillWithCart({
   photoUrl,
   updateMainStock,
 }) {
-  const stockCheck = validateStockForSale(cartItems, stock);
+  const avail = getEffectiveStock(stock, stockBatches);
+  const stockCheck = validateStockForSale(cartItems, stock, stockBatches);
   if (!stockCheck.ok) return { ok: false, message: stockCheck.message };
   const { liveKg, deadKg } = stockCheck;
   const { billData, total, remain, dateKey } = buildBillData({
@@ -105,7 +107,7 @@ export async function saveBillWithCart({
     recordedBy,
     photoUrl,
   });
-  await deductStockForSale(stock, liveKg, deadKg, updateMainStock, stockBatches);
+  await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
   await persistSaleBill({
     billData,
     cartItems,

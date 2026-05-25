@@ -8,12 +8,14 @@ import {
   qtyDiffersFromOrder,
   resolveLineCustomer,
 } from '../lib/lineOrderToSale';
+import { getEffectiveStock } from '../services/stockService';
 
 export function LineDeliveryConfirmSheet({
   order,
   cartItems: initialCart,
   unknownProducts,
   stock,
+  stockBatches = [],
   priceOf,
   allCustomers,
   saving,
@@ -31,6 +33,7 @@ export function LineDeliveryConfirmSheet({
   }, [initialCart, order?.id]);
 
   const customer = resolveLineCustomer(order.customerName, allCustomers);
+  const avail = getEffectiveStock(stock, stockBatches);
   const { liveKg, deadKg, total } = cartStockKg(lines);
   const mismatch = hasAnyQtyMismatch(lines);
 
@@ -61,12 +64,12 @@ export function LineDeliveryConfirmSheet({
       alert('น้ำหนักส่งจริงไม่ตรงกับที่สั่ง — กรุณาติ๊กยืนยันด้านล่างก่อนบันทึก');
       return;
     }
-    if (liveKg > stock.live) {
-      alert(`กุ้งเป็นในสต๊อกมีแค่ ${stock.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+    if (liveKg > avail.live) {
+      alert(`กุ้งเป็นในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
       return;
     }
-    if (deadKg > stock.dead) {
-      alert(`กุ้งตายในสต๊อกมีแค่ ${stock.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+    if (deadKg > avail.dead) {
+      alert(`กุ้งตายในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
       return;
     }
     onConfirm({ cartItems: lines, customer, total, liveKg, deadKg });
