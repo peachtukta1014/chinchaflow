@@ -149,7 +149,8 @@ service cloud.firestore {
     // Sales — approved staff can read/create; admin can update/delete
     match /sales/{docId} {
       allow read, create: if isApprovedShrimp();
-      allow update, delete: if isAdminShrimp();
+      allow update: if isApprovedShrimp();
+      allow delete: if isAdminShrimp();
     }
 
     // Customer debts — staff read/create/update; admin delete

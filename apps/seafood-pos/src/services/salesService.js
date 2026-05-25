@@ -1,6 +1,7 @@
 import { isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsPost } from '../lib/firestoreRest';
+import { billAmount } from '../lib/salesAggregate';
+import { fsPatch, fsPost } from '../lib/firestoreRest';
 import { incrementCustomerDebt } from './debtService';
 import { deductStockForSale, getEffectiveStock } from './stockService';
 
@@ -35,6 +36,18 @@ export function validateStockForSale(cartItems, stock, stockBatches = []) {
   return { ok: true, liveKg, deadKg };
 }
 
+export function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
+  const t = parseFloat(total) || 0;
+  if (paymentType === 'cash' || paymentType === 'transfer') {
+    return { paidAmount: t, remainingAmount: 0 };
+  }
+  if (paymentType === 'credit') {
+    return { paidAmount: 0, remainingAmount: t };
+  }
+  const paid = parseFloat(paidAmountInput) || 0;
+  return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
+}
+
 export function buildBillData({
   cartItems,
   customer,
@@ -46,12 +59,11 @@ export function buildBillData({
   photoUrl,
 }) {
   const total = cartItems.reduce((s, i) => s + i.total, 0);
-  const paidA = paymentType === 'cash' || paymentType === 'transfer'
-    ? total
-    : paymentType === 'credit'
-      ? 0
-      : (parseFloat(paidAmount) || 0);
-  const remain = total - paidA;
+  const { paidAmount: paidA, remainingAmount: remain } = computePaymentAmounts(
+    total,
+    paymentType,
+    paidAmount,
+  );
   const dateKey = dateKeyBangkok();
   return {
     billData: {
@@ -147,7 +159,7 @@ export async function persistSaleBill({
     createdAt: now,
     source: 'koseafood-pos',
   }));
-  if (remain > 0) {
+  if (remain > 0 && selectedCustomer && selectedCustomer !== 'general') {
     await withTimeout(incrementCustomerDebt(selectedCustomer, {
       customerId: selectedCustomer,
       customerName: customer.name,
@@ -156,4 +168,33 @@ export async function persistSaleBill({
       lastUpdated: now,
     }, remain));
   }
+}
+
+/** แก้สถานะชำระบิลในภาพรวม — ปรับลูกหนี้ตามผลต่างค้างจ่าย */
+export async function updateSalePayment(sale, newPaymentType, paidAmountInput = 0) {
+  if (!sale?.id) throw new Error('ไม่พบบิล');
+  const total = billAmount(sale);
+  const oldRemain = parseFloat(sale.remainingAmount) || 0;
+  const { paidAmount, remainingAmount } = computePaymentAmounts(
+    total,
+    newPaymentType,
+    paidAmountInput,
+  );
+  await fsPatch(`sales/${sale.id}`, {
+    paymentType: newPaymentType,
+    paidAmount,
+    remainingAmount,
+  });
+  const delta = remainingAmount - oldRemain;
+  const customerId = sale.customerId;
+  if (delta !== 0 && customerId && customerId !== 'general') {
+    await incrementCustomerDebt(customerId, {
+      customerId,
+      customerName: sale.customerName || '',
+      zone: sale.zone || 'ทั่วไป',
+      lastBillNo: sale.billNo || sale.id,
+      lastUpdated: new Date().toISOString(),
+    }, delta);
+  }
+  return { paymentType: newPaymentType, paidAmount, remainingAmount };
 }

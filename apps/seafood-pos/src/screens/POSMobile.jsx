@@ -9,7 +9,7 @@ import {
   isVoiceOrderComplete,
   parseShrimpVoice,
 } from '../lib/voiceParse';
-import { CUSTOMERS, PAY, PRODUCTS } from '../constants';
+import { CUSTOMERS, DEFAULT_PAYMENT_TYPE, PAY, PRODUCTS } from '../constants';
 import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
@@ -26,7 +26,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
   const [note, setNote]             = useState('');
   const [inputMode, setInputMode]   = useState('weight');
   const [saving, setSaving]         = useState(false);
-  const [paymentType, setPaymentType] = useState('cash');
+  const [paymentType, setPaymentType] = useState(DEFAULT_PAYMENT_TYPE);
   const [paidAmount, setPaidAmount] = useState('');
   const [photoUrl, setPhotoUrl]     = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -158,7 +158,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
       setCart([]); setSelectedCustomer('general');
-      setPaymentType('cash'); setPaidAmount('');
+      setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
       setPhotoUrl(null);
       billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
     } catch (err) {
