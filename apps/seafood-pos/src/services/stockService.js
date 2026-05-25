@@ -47,7 +47,9 @@ export async function createStockBatchRecord({
   const shrimpCost = (liveKg + deadKg) * costPerKg;
   const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
-  if (!isFirebaseReady) return { grandTotal, effectiveCost };
+  if (!isFirebaseReady) {
+    throw new Error('Firebase config ไม่ครบ — บันทึกล็อต FIFO ไม่ได้');
+  }
   await withTimeout(fsPost('stockBatches', {
     purchaseDate: new Date().toISOString(),
     liveKg,

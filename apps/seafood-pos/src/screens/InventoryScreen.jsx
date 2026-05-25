@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createStockBatchRecord } from '../services/stockService';
 
-export default function InventoryScreen({ stock, updateMainStock }) {
+export default function InventoryScreen({ stock, updateMainStock, onReceived }) {
   const [tab, setTab]           = useState('receive');
   const [rcvLive, setRcvLive]   = useState('');
   const [rcvDead, setRcvDead]   = useState('');
@@ -33,7 +33,8 @@ export default function InventoryScreen({ stock, updateMainStock }) {
         note: rcvNote,
       });
       alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
-      setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
+      onReceived?.();
+      setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
     } catch (err) {
       console.error(err);
       alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');

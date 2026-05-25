@@ -171,6 +171,27 @@ export async function fsQueryLineOrders({ pendingOnly = false, minDeliveryDate }
     });
 }
 
+function sortStockBatchesDesc(docs) {
+  return [...docs].sort((a, b) => {
+    const ta = String(a.purchaseDate || a.createdAt || '');
+    const tb = String(b.purchaseDate || b.createdAt || '');
+    return tb.localeCompare(ta);
+  });
+}
+
+/** โหลดล็อต FIFO — query แล้ว fallback list ทั้ง collection */
+export async function fsQueryStockBatches(limit = 30) {
+  const rows = await fsRunQuery({
+    from: [{ collectionId: 'stockBatches' }],
+    orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
+    limit,
+  });
+  if (rows.length > 0) return sortStockBatchesDesc(rows).slice(0, limit);
+
+  const all = await fsListCollection('stockBatches', 200);
+  return sortStockBatchesDesc(all).slice(0, limit);
+}
+
 export async function fsListCollection(col, pageSize = 200) {
   const r = await fetch(`${FS_BASE}/${col}?pageSize=${pageSize}`, { headers: await fsAuthHeaders() });
   if (!r.ok) return [];
