@@ -3,6 +3,7 @@ import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
 import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
+import { uploadOrderSlip } from '../lib/orderSlipService';
 import {
   canManageRestock,
   canMarkRestockPurchased,
@@ -77,6 +78,7 @@ export function RestockTab({ member, t }) {
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
+      alert(t('saveFailed'));
     }
     setSaving(false);
   };

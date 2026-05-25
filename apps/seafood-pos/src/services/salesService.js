@@ -103,6 +103,10 @@ export async function saveBillWithCart({
     recordedBy,
     photoUrl,
   });
+  await updateMainStock(
+    Math.max(0, stock.live - liveKg),
+    Math.max(0, stock.dead - deadKg),
+  );
   await persistSaleBill({
     billData,
     cartItems,
@@ -112,10 +116,6 @@ export async function saveBillWithCart({
     billNo,
     dateKey,
   });
-  await updateMainStock(
-    Math.max(0, stock.live - liveKg),
-    Math.max(0, stock.dead - deadKg),
-  );
   return { ok: true, billData, total, remain, liveKg, deadKg };
 }
 
@@ -129,7 +129,7 @@ export async function persistSaleBill({
   billNo,
   dateKey,
 }) {
-  if (!isFirebaseReady) return;
+  if (!isFirebaseReady) throw new Error('Firebase config ไม่ครบ — บันทึกบิลไม่ได้');
   const now = new Date().toISOString();
   await withTimeout(fsPost('sales', {
     ...billData,

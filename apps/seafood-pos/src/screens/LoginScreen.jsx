@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
 import { ADMIN_EMAIL } from '../constants';
-import { FS_BASE } from '../lib/firestoreRest';
+import { FS_BASE, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('');
@@ -21,24 +21,17 @@ export default function LoginScreen({ onLogin }) {
     try {
       if (mode === 'register') {
         const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        const token    = await user.getIdToken();
-        const authH    = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-        const listJson = await fetch(`${FS_BASE}/shrimp_users?pageSize=1`, { headers: authH }).then(r => r.json());
-        const isFirst  = !listJson.documents?.length;
         const isAdminEmail = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
-        const grantAdmin   = isFirst || isAdminEmail;
-        await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, {
-          method: 'PATCH', headers: authH,
-          body: JSON.stringify({ fields: {
-            name:      { stringValue: name.trim() },
-            email:     { stringValue: email.trim() },
-            role:      { stringValue: grantAdmin ? 'admin' : 'staff' },
-            approved:  { booleanValue: grantAdmin },
-            createdAt: { stringValue: new Date().toISOString() },
-          }}),
-        });
-        if (!grantAdmin) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: 'admin' });
+        const grantAdmin = isAdminEmail;
+        await fsSetShrimpUser(user.uid, {
+          name: name.trim(),
+          email: email.trim(),
+          role: grantAdmin ? 'admin' : 'staff',
+          approved: grantAdmin,
+          createdAt: new Date().toISOString(),
+        });
+        if (!grantAdmin) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: name.trim(), email: email.trim(), role: grantAdmin ? 'admin' : 'staff' });
       } else {
         const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
         const token    = await user.getIdToken();

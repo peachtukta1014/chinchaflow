@@ -42,13 +42,24 @@ service cloud.firestore {
       return isApprovedShrimp() && shrimpUserData().role == 'admin';
     }
 
+    function isShrimpBootstrapAdmin() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email == 'peach_admin@chincha.com';
+    }
+
     // ─── Chincha Tea collections ───────────────────────────────────────────────
 
     match /users/{uid} {
       allow get: if isOwner(uid) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.role == 'staff'
+        && request.resource.data.approved == false;
+      allow update: if isAdmin()
+        || (isOwner(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.approved == resource.data.approved);
       allow delete: if false;
     }
 
@@ -102,8 +113,19 @@ service cloud.firestore {
     // Shrimp user profiles — own doc read/write; list for first-user/approval check
     match /shrimp_users/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
-      allow list: if signedIn();
-      allow write: if signedIn() && (request.auth.uid == uid || isAdminShrimp());
+      allow list: if isAdminShrimp();
+      allow create: if signedIn() && request.auth.uid == uid
+        && (
+          (request.resource.data.role == 'staff' && request.resource.data.approved == false)
+          || (isShrimpBootstrapAdmin()
+            && request.resource.data.role == 'admin'
+            && request.resource.data.approved == true)
+        );
+      allow update: if isAdminShrimp()
+        || (signedIn() && request.auth.uid == uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.approved == resource.data.approved);
+      allow delete: if isAdminShrimp();
     }
 
     // Sales — approved staff can read/create; admin can update/delete

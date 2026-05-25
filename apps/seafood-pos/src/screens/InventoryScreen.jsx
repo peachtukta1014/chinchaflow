@@ -24,7 +24,6 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     setSaving(true);
     try {
-      await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
       const { grandTotal: savedTotal, effectiveCost: savedCost } = await createStockBatchRecord({
         liveKg,
         deadKg,
@@ -32,6 +31,7 @@ export default function InventoryScreen({ stock, updateMainStock, onReceived }) 
         transport,
         note: rcvNote,
       });
+      await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
       alert(`✅ รับกุ้งเข้าสำเร็จ!\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
       onReceived?.();
       setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');

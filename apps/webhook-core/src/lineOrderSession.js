@@ -4,8 +4,11 @@
 
 const SESSION_TTL_MS = 36 * 60 * 60 * 1000;
 
+/** แยก session ต่อคนในกลุ่ม — ไม่ปน pending ระหว่างสมาชิก */
 function sessionDocId(groupId, userId) {
-  return groupId || `user:${userId || 'unknown'}`;
+  const g = groupId || 'dm';
+  const u = userId || 'unknown';
+  return `${g}__${u}`;
 }
 
 async function getLineOrderSession(db, groupId, userId) {

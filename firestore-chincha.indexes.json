@@ -12,8 +12,8 @@
       "collectionGroup": "lineOrders",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "deliveryDate", "order": "ASCENDING" },
-        { "fieldPath": "status",       "order": "ASCENDING" }
+        { "fieldPath": "status",       "order": "ASCENDING" },
+        { "fieldPath": "deliveryDate", "order": "ASCENDING" }
       ]
     }
   ],

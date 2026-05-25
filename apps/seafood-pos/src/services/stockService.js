@@ -26,14 +26,26 @@ export function normalizeStockValues(live, dead) {
 /** บันทึก config/stock (REST + SDK fallback) */
 export async function persistStock(val) {
   const payload = { ...val, updatedAt: new Date().toISOString() };
+  let lastErr;
   try {
-    if (isFirebaseReady) await fsSetStockDoc(payload);
+    if (isFirebaseReady) {
+      await fsSetStockDoc(payload);
+      return;
+    }
   } catch (e) {
+    lastErr = e;
     console.warn('fsSetStockDoc', e);
-    if (db) {
-      setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }, { merge: true }).catch(console.error);
+  }
+  if (db) {
+    try {
+      await setDoc(doc(db, 'config', 'stock'), { ...val, updatedAt: serverTimestamp() }, { merge: true });
+      return;
+    } catch (e) {
+      lastErr = e;
+      console.error('persistStock SDK', e);
     }
   }
+  throw lastErr || new Error('บันทึกสต๊อกไม่สำเร็จ');
 }
 
 /** รับกุ้งเข้า — บันทึกล็อต FIFO (เรียกหลังอัปเดตสต๊อกแล้ว) */

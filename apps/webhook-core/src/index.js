@@ -19,7 +19,7 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
-const { claimLineEvent } = require('./webhookDedup');
+const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const {
@@ -61,35 +61,44 @@ exports.lineWebhook = functions
       if (event.deliveryContext?.isRedelivery) continue;
       if (!(await claimLineEvent(db(), event))) continue;
 
-      const text       = event.message.text.trim();
-      const userId     = event.source.userId;
-      const groupId    = event.source.groupId || event.source.roomId || null;
-      const replyToken = event.replyToken;
-      const intent     = classifyShrimpLineMessage(text);
+      try {
+        const text       = event.message.text.trim();
+        const userId     = event.source.userId;
+        const groupId    = event.source.groupId || event.source.roomId || null;
+        const replyToken = event.replyToken;
+        const intent     = classifyShrimpLineMessage(text);
 
-      if (intent === 'ignore') {
-        continue;
-      }
-
-      if (intent === 'help') {
-        await lineReply(replyToken, SHRIMP_HELP_TEXT, token);
-        continue;
-      }
-
-      if (intent === 'summary') {
-        try {
-          const dateKey = todayBKK();
-          const summary = await buildShrimpSummaryForDate(db(), dateKey);
-          await lineReply(replyToken, summary, token);
-        } catch (err) {
-          console.error('shrimp summary', err);
-          await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
+        if (intent === 'ignore') {
+          await completeLineEvent(db(), event);
+          continue;
         }
-        continue;
-      }
 
-      const result = await processShrimpLineOrder(db(), admin, { text, userId, groupId });
-      await lineReply(replyToken, result.reply, token);
+        if (intent === 'help') {
+          await lineReply(replyToken, SHRIMP_HELP_TEXT, token);
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'summary') {
+          try {
+            const dateKey = todayBKK();
+            const summary = await buildShrimpSummaryForDate(db(), dateKey);
+            await lineReply(replyToken, summary, token);
+          } catch (err) {
+            console.error('shrimp summary', err);
+            await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        const result = await processShrimpLineOrder(db(), admin, { text, userId, groupId });
+        await lineReply(replyToken, result.reply, token);
+        await completeLineEvent(db(), event);
+      } catch (err) {
+        await releaseLineEvent(db(), event);
+        throw err;
+      }
     }
 
     res.status(200).json({ status: 'ok' });
@@ -121,32 +130,40 @@ exports.lineWebhookTea = functions
       if (event.deliveryContext?.isRedelivery) continue;
       if (!(await claimLineEvent(db(), event))) continue;
 
-      const text       = event.message.text.trim();
-      const replyToken = event.replyToken;
-      const userId     = event.source.userId;
-      const groupId    = event.source.groupId || event.source.roomId || null;
+      try {
+        const text       = event.message.text.trim();
+        const replyToken = event.replyToken;
+        const userId     = event.source.userId;
+        const groupId    = event.source.groupId || event.source.roomId || null;
 
-      if (HELP_CMD.test(text)) {
-        await lineReply(replyToken, HELP_TEXT, token);
-        continue;
-      }
-
-      if (SUMMARY_CMD.test(text)) {
-        const dateKey = todayBKK();
-        try {
-          const summary = await buildSummaryForDate(db(), dateKey);
-          await lineReply(replyToken, summary, token);
-        } catch (err) {
-          console.error('tea summary reply', err);
-          await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
+        if (HELP_CMD.test(text)) {
+          await lineReply(replyToken, HELP_TEXT, token);
+          await completeLineEvent(db(), event);
+          continue;
         }
-        continue;
-      }
 
-      await db().collection('line_messages').add({
-        userId, groupId, text,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+        if (SUMMARY_CMD.test(text)) {
+          const dateKey = todayBKK();
+          try {
+            const summary = await buildSummaryForDate(db(), dateKey);
+            await lineReply(replyToken, summary, token);
+          } catch (err) {
+            console.error('tea summary reply', err);
+            await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        await db().collection('line_messages').add({
+          userId, groupId, text,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await completeLineEvent(db(), event);
+      } catch (err) {
+        await releaseLineEvent(db(), event);
+        throw err;
+      }
     }
 
     res.status(200).json({ status: 'ok' });
