@@ -14,12 +14,16 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
   const paid = parseFloat(paidAmountInput) || 0;
   return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
 }
-function getBillTemplateUrl(paymentType, remainingAmount = 0) {
-  const paid =
-    paymentType === 'cash' ||
-    paymentType === 'transfer' ||
-    (paymentType === 'installment' && (parseFloat(remainingAmount) || 0) <= 0);
-  return paid ? 'template-cash.jpg' : 'template-credit.jpg';
+function getBillTemplateUrl() {
+  return 'template-empty.jpg';
+}
+
+function normalizeLineItem(item) {
+  return {
+    productName: item.productName || '',
+    weight: parseFloat(item.weightKg ?? item.weight ?? 0) || 0,
+    total: parseFloat(item.lineTotal ?? item.total ?? 0) || 0,
+  };
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
 import fs from 'node:fs';
@@ -79,10 +83,21 @@ try {
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');
-for (const f of ['template-cash.jpg', 'template-credit.jpg', 'line-oa-qr.png']) {
+for (const f of ['template-empty.jpg', 'template-cash.jpg', 'template-credit.jpg', 'line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
   if (fs.existsSync(p) && fs.statSync(p).size > 1000) ok(`asset ${f}`);
   else fail(`asset ${f}`, new Error('missing or too small'));
+}
+try {
+  const empty = path.join(assetsDir, 'template-empty.jpg');
+  const credit = path.join(assetsDir, 'template-credit.jpg');
+  const cash = path.join(assetsDir, 'template-cash.jpg');
+  assert(
+    fs.readFileSync(empty).compare(fs.readFileSync(credit)) !== 0,
+    'template-empty ≠ template-credit (ไม่ใช่ไฟล์ซ้ำ)',
+  );
+} catch (e) {
+  fail('template assets distinct', e);
 }
 
 console.log(failed ? `\nFAILED: ${failed}\n` : '\nAll smoke tests passed.\n');
