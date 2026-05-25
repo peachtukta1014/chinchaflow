@@ -78,8 +78,12 @@ service cloud.firestore {
     }
 
     match /restocks/{docId} {
-      allow read, create: if isApproved();
-      allow update, delete: if isAdmin();
+      allow read: if isApproved();
+      allow create: if isApproved()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.items is list;
+      allow update, delete: if isAdmin()
+        || (isApproved() && resource.data.uid == request.auth.uid);
     }
 
     match /orderSlips/{docId} {
@@ -144,7 +148,8 @@ service cloud.firestore {
     match /lineOrders/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow create: if isApprovedShrimp();
-      allow update, delete: if isAdmin() || isAdminShrimp();
+      allow update: if isApprovedShrimp();
+      allow delete: if isAdmin() || isAdminShrimp();
     }
 
     // Deny everything else

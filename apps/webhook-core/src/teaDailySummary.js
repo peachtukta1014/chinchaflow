@@ -47,15 +47,23 @@ function aggregateDay({ orders, expenses, restocks }) {
   const allItems = orders.flatMap((o) => o.items || []);
   const totalCups = allItems.reduce((s, i) => s + (i.qty || 1), 0);
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const net = totalSales - totalExpenses;
-
+  let totalRestockPurchased = 0;
   const restockLines = [];
+  const restockPurchasedLines = [];
   for (const req of restocks) {
+    const bought = req.purchaseStatus === 'purchased' && Number(req.purchaseTotal) > 0;
+    if (bought) {
+      totalRestockPurchased += Math.round(Number(req.purchaseTotal));
+      const names = (req.items || []).map((it) => it.name).filter(Boolean).join(', ') || 'รายการ';
+      restockPurchasedLines.push(`• ${names} ${formatMoney(req.purchaseTotal)}`);
+    }
     for (const it of req.items || []) {
       const st = STATUS_LABEL[it.status] || it.status || '';
-      restockLines.push(`• ${it.name} ×${it.qty || 1}${st ? ` (${st})` : ''}`);
+      const price = bought ? '' : '';
+      restockLines.push(`• ${it.name} ×${it.qty || 1}${st ? ` (${st})` : ''}${price}`);
     }
   }
+  const net = totalSales - totalExpenses - totalRestockPurchased;
 
   return {
     orderCount: orders.length,
@@ -64,9 +72,11 @@ function aggregateDay({ orders, expenses, restocks }) {
     cashTotal,
     transferTotal,
     totalExpenses,
+    totalRestockPurchased,
     net,
     expenseLines: expenses.map((e) => `• ${e.description} ${formatMoney(e.amount)}`),
     restockLines,
+    restockPurchasedLines,
   };
 }
 
@@ -91,10 +101,17 @@ function formatSummaryMessage(dateKey, agg) {
   }
 
   lines.push('');
-  lines.push(`✅ เงินขายสุทธิ: ${formatMoney(agg.net)}`);
-  lines.push('   (ยอดขาย − ค่าใช้จ่ายร้าน)');
+  lines.push(`📦 ซื้อของเข้าร้าน (ซื้อแล้ว): ${formatMoney(agg.totalRestockPurchased)}`);
+  if (agg.restockPurchasedLines.length) {
+    lines.push(...agg.restockPurchasedLines.slice(0, 12));
+  } else {
+    lines.push('   (ยังไม่บันทึกยอดซื้อในแอป)');
+  }
   lines.push('');
-  lines.push('📋 รายการสั่งของเข้าร้าน:');
+  lines.push(`✅ กำไรคร่าวๆ: ${formatMoney(agg.net)}`);
+  lines.push('   (ยอดขาย − ค่าใช้จ่าย − ซื้อของที่ซื้อแล้ว)');
+  lines.push('');
+  lines.push('📋 รายการสั่งของ (ทั้งหมด):');
 
   if (agg.restockLines.length) {
     lines.push(...agg.restockLines.slice(0, 20));
@@ -142,8 +159,14 @@ async function lineReply(replyToken, text, token) {
 }
 
 /** ส่งสรุปไปยังกลุ่ม/ผู้รับที่ตั้งใน config/teaLine */
-async function dispatchTeaSummary(db, dateKey, token) {
+async function dispatchTeaSummary(db, dateKey, token, { force = false } = {}) {
   const config = await getTeaLineConfig(db);
+  if (!force && config.autoSummaryEnabled === false) {
+    return { message: '', results: [], targetCount: 0, skipped: 'disabled' };
+  }
+  if (!force && config.lastAutoSummaryDateKey === dateKey) {
+    return { message: '', results: [], targetCount: 0, skipped: 'already_sent' };
+  }
   const message = await buildSummaryForDate(db, dateKey);
   const targets = new Set();
 
@@ -158,6 +181,12 @@ async function dispatchTeaSummary(db, dateKey, token) {
   const results = [];
   for (const to of targets) {
     results.push({ to, ok: await linePush(to, message, token) });
+  }
+  if (targets.size > 0 && results.some((r) => r.ok)) {
+    await db.collection('config').doc('teaLine').set(
+      { lastAutoSummaryDateKey: dateKey, lastAutoSummaryAt: new Date().toISOString() },
+      { merge: true },
+    );
   }
   return { message, results, targetCount: targets.size };
 }

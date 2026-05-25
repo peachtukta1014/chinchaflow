@@ -82,6 +82,10 @@ export async function fsPost(col, data) {
     body: JSON.stringify({ fields: fsObj(data) }),
   });
   if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
+  const json = await r.json().catch(() => null);
+  if (!json?.name) return null;
+  const parts = json.name.split('/');
+  return parts[parts.length - 1];
 }
 
 export async function fsPatch(path, data) {
@@ -114,9 +118,78 @@ export async function fsRunQuery(structuredQuery) {
     headers: await fsAuthHeaders(),
     body: JSON.stringify({ structuredQuery }),
   });
-  if (!r.ok) return [];
+  if (!r.ok) {
+    console.warn('fsRunQuery failed', r.status, await r.text().catch(() => ''));
+    return [];
+  }
   const rows = await r.json();
   return rows.filter((row) => row.document).map(docFromRow);
+}
+
+/** โหลดออเดอร์ LINE — มี fallback ถ้า index ยังไม่พร้อม */
+export async function fsQueryLineOrders({ pendingOnly = false, minDeliveryDate } = {}) {
+  if (pendingOnly && minDeliveryDate) {
+    const filtered = await fsRunQuery({
+      from: [{ collectionId: 'lineOrders' }],
+      where: {
+        compositeFilter: {
+          op: 'AND',
+          filters: [
+            {
+              fieldFilter: {
+                field: { fieldPath: 'deliveryDate' },
+                op: 'GREATER_THAN_OR_EQUAL',
+                value: { stringValue: minDeliveryDate },
+              },
+            },
+            {
+              fieldFilter: {
+                field: { fieldPath: 'status' },
+                op: 'EQUAL',
+                value: { stringValue: 'pending' },
+              },
+            },
+          ],
+        },
+      },
+      limit: 100,
+    });
+    if (filtered.length > 0) return filtered;
+  }
+
+  const all = await fsListCollection('lineOrders', 200);
+  return all
+    .filter((o) => {
+      if (minDeliveryDate && (o.deliveryDate || '') < minDeliveryDate) return false;
+      if (pendingOnly && o.status !== 'pending') return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const ta = a.createdAt?.timestampValue || a.createdAt || '';
+      const tb = b.createdAt?.timestampValue || b.createdAt || '';
+      return String(tb).localeCompare(String(ta));
+    });
+}
+
+function sortStockBatchesDesc(docs) {
+  return [...docs].sort((a, b) => {
+    const ta = String(a.purchaseDate || a.createdAt || '');
+    const tb = String(b.purchaseDate || b.createdAt || '');
+    return tb.localeCompare(ta);
+  });
+}
+
+/** โหลดล็อต FIFO — query แล้ว fallback list ทั้ง collection */
+export async function fsQueryStockBatches(limit = 30) {
+  const rows = await fsRunQuery({
+    from: [{ collectionId: 'stockBatches' }],
+    orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
+    limit,
+  });
+  if (rows.length > 0) return sortStockBatchesDesc(rows).slice(0, limit);
+
+  const all = await fsListCollection('stockBatches', 200);
+  return sortStockBatchesDesc(all).slice(0, limit);
 }
 
 export async function fsListCollection(col, pageSize = 200) {

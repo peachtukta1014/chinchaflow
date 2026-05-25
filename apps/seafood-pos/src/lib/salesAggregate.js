@@ -1,3 +1,8 @@
+/** แปลงยอดเงินให้เป็นตัวเลขเสมอ (กัน NaN บน Dashboard) */
+export function billAmount(bill) {
+  return parseFloat(bill?.total) || 0;
+}
+
 /** รวมยอดขายจากบิล sales — รองรับทั้งรูปแบบ SDK และ REST */
 export function normalizeBillItems(bill) {
   return (bill.items || []).map((i) => ({
@@ -30,7 +35,7 @@ export function aggregateDailySales(bills) {
 
   return {
     billCount: bills.length,
-    revenueTotal: bills.reduce((s, b) => s + (parseFloat(b.total) || 0), 0),
+    revenueTotal: bills.reduce((s, b) => s + billAmount(b), 0),
     liveKg,
     liveRevenue,
     deadKg,

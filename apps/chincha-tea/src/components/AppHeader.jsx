@@ -1,0 +1,38 @@
+export default function AppHeader({ member, lang, setLang, onLogout, t }) {
+  return (
+    <header className="z-10 shrink-0 px-4 pt-6 pb-3 flex items-center justify-between" style={{ background: '#3d1f0f' }}>
+      <div className="flex items-center gap-3 min-w-0">
+        <img src="/chincha-logo.jpg" alt="" className="w-10 h-10 rounded-full border-2 border-amber-300 shrink-0 object-cover" />
+        <div className="min-w-0">
+          <p className="font-black text-amber-300 leading-none">{t('appName')}</p>
+          <p className="text-amber-700 text-[10px] truncate">{member.name}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex rounded-xl overflow-hidden border border-amber-800" style={{ background: '#5a2d14' }}>
+          {['th', 'my', 'en'].map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              className={`px-2 py-1.5 text-[10px] font-bold ${lang === l ? 'bg-amber-300 text-amber-900' : 'text-amber-500'}`}
+            >
+              {l === 'th' ? 'TH' : l === 'my' ? 'MY' : 'EN'}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-9 h-9 rounded-full border border-amber-800 text-amber-500 flex items-center justify-center"
+          style={{ background: '#5a2d14' }}
+          aria-label={t('logout')}
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" d="M17 16l4-4m0 0l-4-4m4 4H7" />
+          </svg>
+        </button>
+      </div>
+    </header>
+  );
+}

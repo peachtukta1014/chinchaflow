@@ -1,0 +1,57 @@
+name: Shrimp Stock Reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run only (no writes)'
+        type: boolean
+        default: true
+      full_reset:
+        description: 'Full reset (sales, debts, batches, line orders, stock=0)'
+        type: boolean
+        default: false
+      clear_batches:
+        description: 'Also delete stockBatches (ignored if full_reset)'
+        type: boolean
+        default: false
+      clear_line_orders:
+        description: 'Also delete lineOrders (ignored if full_reset)'
+        type: boolean
+        default: false
+      clear_sales:
+        description: 'Also delete sales (ignored if full_reset)'
+        type: boolean
+        default: false
+      clear_debts:
+        description: 'Also delete customerDebts (ignored if full_reset)'
+        type: boolean
+        default: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin
+
+      - name: Run shrimp reset
+        env:
+          FIREBASE_PROJECT_ID: chincha-eeed6
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          ARGS="--confirm"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          if [ "${{ inputs.full_reset }}" = "true" ]; then ARGS="$ARGS --full"; fi
+          if [ "${{ inputs.clear_batches }}" = "true" ]; then ARGS="$ARGS --clear-batches"; fi
+          if [ "${{ inputs.clear_line_orders }}" = "true" ]; then ARGS="$ARGS --clear-line-orders"; fi
+          if [ "${{ inputs.clear_sales }}" = "true" ]; then ARGS="$ARGS --clear-sales"; fi
+          if [ "${{ inputs.clear_debts }}" = "true" ]; then ARGS="$ARGS --clear-debts"; fi
+          node scripts/shrimp-stock-reset.mjs $ARGS

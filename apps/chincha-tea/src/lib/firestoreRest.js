@@ -143,6 +143,11 @@ export async function fsQueryRestocks(limit = 50) {
   return sortByCreatedAtDesc(docs).slice(0, limit);
 }
 
+export async function fsQueryRestocksByDate(dateKey) {
+  const docs = await fsListCollection('restocks', 200);
+  return sortByCreatedAtDesc(docs.filter((d) => d.dateKey === dateKey));
+}
+
 export async function fsQueryExpenses(dateKey) {
   const docs = await fsRunQuery({
     from: [{ collectionId: 'dailyExpenses' }],

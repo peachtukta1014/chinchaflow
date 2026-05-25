@@ -24,7 +24,7 @@ function compact(s) {
 }
 
 /** จับคู่ชื่อลูกค้าแบบยืดหยุ่น (รองรับ STT ผิดเล็กน้อย) */
-function findCustomersInText(text, customers) {
+export function findCustomersInText(text, customers) {
   const found = [];
   const tCompact = compact(text);
   for (const c of customers) {

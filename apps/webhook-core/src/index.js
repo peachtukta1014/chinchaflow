@@ -19,6 +19,13 @@ const {
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
+const { claimLineEvent } = require('./webhookDedup');
+const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
+const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
+const {
+  buildShrimpSummaryForDate,
+  SHRIMP_HELP_TEXT,
+} = require('./shrimpDailySummary');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -30,27 +37,6 @@ function verifySignature(rawBody, signature, secret) {
   if (!secret) return true;
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
   return hash === signature;
-}
-
-// ── Parse Thai seafood order text ─────────────────────────────────────────────
-function parseOrderItems(text) {
-  const items = [];
-  const re = /([฀-๿][฀-๿\s]*?)\s+([\d.]+)\s*(กก\.?|กิโล|กิโลกรัม|kg|บาท|฿)/gi;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    items.push({
-      product: m[1].trim(),
-      qty:     parseFloat(m[2]),
-      unit:    m[3].replace('.', '').replace('กิโลกรัม', 'กก').replace('กิโล', 'กก').replace('kg', 'กก').replace('฿', 'บาท'),
-    });
-  }
-  return items;
-}
-
-function tomorrowBKK() {
-  const bkk = new Date(Date.now() + 7 * 3600000);
-  bkk.setUTCDate(bkk.getUTCDate() + 1);
-  return bkk.toISOString().split('T')[0];
 }
 
 // ── LINE Webhook — ร้านกุ้ง (seafood) — รับออเดอร์ลูกค้า ───────────────────
@@ -67,34 +53,43 @@ exports.lineWebhook = functions
       res.status(401).send('Invalid signature'); return;
     }
 
-    const events       = req.body.events || [];
-    const deliveryDate = tomorrowBKK();
-    const token        = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const events = req.body.events || [];
+    const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     for (const event of events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.deliveryContext?.isRedelivery) continue;
+      if (!(await claimLineEvent(db(), event))) continue;
 
       const text       = event.message.text.trim();
       const userId     = event.source.userId;
       const groupId    = event.source.groupId || event.source.roomId || null;
       const replyToken = event.replyToken;
-      const items      = parseOrderItems(text);
+      const intent     = classifyShrimpLineMessage(text);
 
-      if (items.length > 0) {
-        await db().collection('lineOrders').add({
-          source: 'line', lineUserId: userId, lineGroupId: groupId,
-          rawText: text, items, deliveryDate,
-          status: 'pending',
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        const summary = items.map(i => `• ${i.product} ${i.qty} ${i.unit}`).join('\n');
-        await lineReply(replyToken, `✅ รับออเดอร์แล้วครับ\nส่งวันที่ ${deliveryDate}\n\n${summary}`, token);
-      } else {
-        await db().collection('line_messages').add({
-          userId, groupId, text,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+      if (intent === 'ignore') {
+        continue;
       }
+
+      if (intent === 'help') {
+        await lineReply(replyToken, SHRIMP_HELP_TEXT, token);
+        continue;
+      }
+
+      if (intent === 'summary') {
+        try {
+          const dateKey = todayBKK();
+          const summary = await buildShrimpSummaryForDate(db(), dateKey);
+          await lineReply(replyToken, summary, token);
+        } catch (err) {
+          console.error('shrimp summary', err);
+          await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
+        }
+        continue;
+      }
+
+      const result = await processShrimpLineOrder(db(), admin, { text, userId, groupId });
+      await lineReply(replyToken, result.reply, token);
     }
 
     res.status(200).json({ status: 'ok' });
@@ -123,6 +118,8 @@ exports.lineWebhookTea = functions
 
     for (const event of events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.deliveryContext?.isRedelivery) continue;
+      if (!(await claimLineEvent(db(), event))) continue;
 
       const text       = event.message.text.trim();
       const replyToken = event.replyToken;
@@ -139,10 +136,6 @@ exports.lineWebhookTea = functions
         try {
           const summary = await buildSummaryForDate(db(), dateKey);
           await lineReply(replyToken, summary, token);
-          const config = await getTeaLineConfig(db());
-          if (config.notifyGroupId && groupId && config.notifyGroupId !== groupId) {
-            await dispatchTeaSummary(db(), dateKey, token);
-          }
         } catch (err) {
           console.error('tea summary reply', err);
           await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
@@ -154,11 +147,6 @@ exports.lineWebhookTea = functions
         userId, groupId, text,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      await lineReply(
-        replyToken,
-        'พิมพ์ "สรุป" เพื่อดูยอดขายวันนี้\nพิมพ์ "help" ดูคำสั่ง',
-        token,
-      );
     }
 
     res.status(200).json({ status: 'ok' });
@@ -194,7 +182,7 @@ exports.teaPushSummary = functions
       const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
       if (!token) { res.status(500).json({ error: 'LINE token not configured' }); return; }
 
-      const { message, results, targetCount } = await dispatchTeaSummary(db(), dateKey, token);
+      const { message, results, targetCount } = await dispatchTeaSummary(db(), dateKey, token, { force: true });
       if (targetCount === 0) {
         res.status(400).json({
           error: 'no_targets',
@@ -209,3 +197,6 @@ exports.teaPushSummary = functions
       res.status(500).json({ error: err.message || 'failed' });
     }
   });
+
+// สรุปอัตโนมัติ: ใช้ apps/webhook-core-scheduled (ต้องเปิด Cloud Scheduler API ใน GCP)
+// หรือส่งด้วยมือจากแอดมิน / พิมพ์ "สรุป" ในกลุ่ม LINE

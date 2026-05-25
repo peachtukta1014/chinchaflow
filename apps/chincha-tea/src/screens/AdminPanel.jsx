@@ -12,6 +12,7 @@ import {
   fsSetConfig,
 } from '../lib/firestoreRest';
 import { validateTeaLineTargets } from '../lib/lineIds';
+import { saveProduct, saveTopping, updateProductPrice } from '../lib/productService';
 
 const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
 const DEFAULT_LINE_CONFIG = {
@@ -21,12 +22,12 @@ const DEFAULT_LINE_CONFIG = {
   envToken: 'LINE_TEA_CHANNEL_ACCESS_TOKEN',
   notifyGroupId: '',
   notifyUserIds: '',
-  autoSummaryEnabled: true,
+  autoSummaryEnabled: false,
   autoSummaryHour: 22,
 };
 
-export function AdminPanel({ t, onOrdersChanged }) {
-  const [section, setSection] = useState('members');
+export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
+  const [section, setSection] = useState('products');
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [toppings, setToppings] = useState([]);
@@ -59,37 +60,25 @@ export function AdminPanel({ t, onOrdersChanged }) {
     showFlash('✅ อัปเดตสมาชิกแล้ว');
   };
 
-  const saveProduct = async (form, id) => {
-    const data = {
-      nameTh: form.nameTh.trim(),
-      nameEn: form.nameEn.trim(),
-      key: form.key.trim() || form.nameEn.toLowerCase().replace(/\s+/g, '-'),
-      basePrice: parseInt(form.basePrice, 10) || 0,
-      category: form.category,
-      tag: form.tag || '',
-      emoji: form.emoji || '☕',
-      star: !!form.star,
-      active: form.active !== false,
-    };
-    if (id) {
-      await fsPatch(`products/${id}`, data);
-    } else {
-      await fsPost('products', data);
-    }
+  const saveProductHandler = async (form, id) => {
+    await saveProduct(form, id);
     await refresh();
-    showFlash('✅ บันทึกสินค้าแล้ว');
+    onCatalogChanged?.();
+    showFlash(t('productSaved'));
   };
 
-  const saveTopping = async (form, id) => {
-    const data = {
-      label: form.label.trim(),
-      price: parseInt(form.price, 10) || 0,
-      active: form.active !== false,
-    };
-    if (id) await fsPatch(`toppings/${id}`, data);
-    else await fsPost('toppings', data);
+  const saveToppingHandler = async (form, id) => {
+    await saveTopping(form, id);
     await refresh();
-    showFlash('✅ บันทึกท็อปปิ้งแล้ว');
+    onCatalogChanged?.();
+    showFlash(t('toppingSaved'));
+  };
+
+  const quickPriceHandler = async (id, basePrice) => {
+    await updateProductPrice(id, basePrice);
+    await refresh();
+    onCatalogChanged?.();
+    showFlash(t('priceUpdated'));
   };
 
   return (
@@ -119,10 +108,11 @@ export function AdminPanel({ t, onOrdersChanged }) {
           products={products}
           toppings={toppings}
           t={t}
-          onSaveProduct={saveProduct}
-          onSaveTopping={saveTopping}
-          onDeleteProduct={(id) => fsDelete(`products/${id}`).then(refresh)}
-          onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(refresh)}
+          onSaveProduct={saveProductHandler}
+          onSaveTopping={saveToppingHandler}
+          onQuickPrice={quickPriceHandler}
+          onDeleteProduct={(id) => fsDelete(`products/${id}`).then(() => { refresh(); onCatalogChanged?.(); })}
+          onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(() => { refresh(); onCatalogChanged?.(); })}
         />
       ) : section === 'orders' ? (
         <OrdersSection t={t} onChanged={onOrdersChanged} />
@@ -175,17 +165,33 @@ function MembersSection({ users, t, onUpdate }) {
   );
 }
 
-function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, onDeleteProduct, onDeleteTopping }) {
+function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, onQuickPrice, onDeleteProduct, onDeleteTopping }) {
   const [prodForm, setProdForm] = useState(null);
   const [topForm, setTopForm] = useState(null);
+  const [priceEditId, setPriceEditId] = useState(null);
+  const [priceDraft, setPriceDraft] = useState('');
 
   const emptyProduct = () => ({
-    nameTh: '', nameEn: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true,
+    nameTh: '', nameEn: '', nameMy: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true,
   });
   const emptyTopping = () => ({ label: '', price: 10, active: true });
 
+  const startPriceEdit = (p) => {
+    setPriceEditId(p.id);
+    setPriceDraft(String(p.basePrice ?? 0));
+  };
+
+  const commitPriceEdit = async (id) => {
+    await onQuickPrice(id, priceDraft);
+    setPriceEditId(null);
+    setPriceDraft('');
+  };
+
   return (
     <div className="space-y-4">
+      <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
+        {t('adminProductsHint')}
+      </p>
       <div className="flex justify-between items-center">
         <p className="font-black text-stone-700 text-sm">{t('products')}</p>
         <button
@@ -207,15 +213,45 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
             </div>
             <div className="divide-y divide-stone-100 bg-white">
               {items.map((p) => (
-                <div key={p.id} className="p-3 flex justify-between items-center gap-2">
-                  <div>
-                    <p className="font-bold text-sm text-stone-800">{p.nameTh || p.nameEn}</p>
-                    <p className="text-xs text-stone-400">฿{p.basePrice} · {p.active === false ? 'ปิด' : 'เปิด'}</p>
+                <div key={p.id} className="p-3 flex flex-col gap-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-stone-800">{p.nameTh || p.nameEn}</p>
+                      <p className="text-[10px] text-stone-400 truncate">{p.nameEn}{p.nameMy ? ` · ${p.nameMy}` : ''}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">
+                        {p.active === false ? t('productOff') : t('productOn')}
+                        {p.tag ? ` · ${p.tag}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 shrink-0 justify-end">
+                      <button type="button" onClick={() => setProdForm({ ...p })} className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">{t('edit')}</button>
+                      <button type="button" onClick={() => onDeleteProduct(p.id)} className="text-xs font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded-lg">{t('delete')}</button>
+                    </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button type="button" onClick={() => setProdForm({ ...p })} className="text-xs font-bold text-amber-700 px-2 py-1">{t('edit')}</button>
-                    <button type="button" onClick={() => onDeleteProduct(p.id)} className="text-xs font-bold text-red-500 px-2 py-1">{t('delete')}</button>
-                  </div>
+                  {priceEditId === p.id ? (
+                    <div className="flex gap-2 items-center">
+                      <span className="text-sm font-bold text-stone-500">฿</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={priceDraft}
+                        onChange={(e) => setPriceDraft(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 px-3 py-2 rounded-xl border-2 border-amber-300 text-sm font-bold outline-none"
+                        autoFocus
+                      />
+                      <button type="button" onClick={() => commitPriceEdit(p.id)} className="text-xs font-black text-white px-3 py-2 rounded-xl" style={{ background: '#3d1f0f' }}>{t('save')}</button>
+                      <button type="button" onClick={() => setPriceEditId(null)} className="text-xs font-bold text-stone-400 px-2">✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startPriceEdit(p)}
+                      className="text-left text-lg font-black text-stone-800 active:opacity-70"
+                    >
+                      ฿{(p.basePrice ?? 0).toLocaleString()}
+                      <span className="text-[10px] font-bold text-amber-700 ml-2">{t('tapToEditPrice')}</span>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -249,6 +285,7 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
       {prodForm && (
         <ProductFormModal
           form={prodForm}
+          isNew={!!prodForm._new}
           t={t}
           onClose={() => setProdForm(null)}
           onSave={(f) => onSaveProduct(f, prodForm._new ? null : prodForm.id).then(() => setProdForm(null))}
@@ -266,19 +303,29 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
   );
 }
 
-function ProductFormModal({ form, t, onClose, onSave }) {
+function ProductFormModal({ form, isNew, t, onClose, onSave }) {
   const [f, setF] = useState(form);
   return (
-    <ModalShell title={t('addProduct')} onClose={onClose}>
+    <ModalShell title={isNew ? t('addProduct') : t('editProduct')} onClose={onClose}>
       <div className="space-y-2">
-        <input className="field" placeholder="ชื่อไทย" value={f.nameTh} onChange={(e) => setF({ ...f, nameTh: e.target.value })} />
-        <input className="field" placeholder="ชื่อ EN" value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} />
-        <input className="field" placeholder="key (i18n)" value={f.key} onChange={(e) => setF({ ...f, key: e.target.value })} />
-        <input className="field" type="number" placeholder="ราคา" value={f.basePrice} onChange={(e) => setF({ ...f, basePrice: e.target.value })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('nameThLabel')}</label>
+        <input className="field" value={f.nameTh} onChange={(e) => setF({ ...f, nameTh: e.target.value })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('nameEnLabel')}</label>
+        <input className="field" value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('nameMyLabel')}</label>
+        <input className="field" value={f.nameMy || ''} onChange={(e) => setF({ ...f, nameMy: e.target.value })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('priceLabel')}</label>
+        <input className="field" type="tel" inputMode="numeric" value={f.basePrice} onChange={(e) => setF({ ...f, basePrice: e.target.value.replace(/\D/g, '') })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('categoryLabel')}</label>
         <select className="field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>
           {DRINK_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
+        <input className="field" placeholder={t('tagPlaceholder')} value={f.tag || ''} onChange={(e) => setF({ ...f, tag: e.target.value })} />
         <input className="field" placeholder="emoji" value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} />
+        <label className="flex items-center gap-2 text-sm font-bold text-stone-600">
+          <input type="checkbox" checked={f.active !== false} onChange={(e) => setF({ ...f, active: e.target.checked })} />
+          {t('productOn')}
+        </label>
         <button type="button" onClick={() => onSave(f)} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
       </div>
     </ModalShell>

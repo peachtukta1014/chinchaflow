@@ -13,7 +13,11 @@
     "build": "npm run build --workspaces --if-present",
     "tea:db-reset": "node scripts/tea-db-reset.mjs --confirm",
     "tea:db-reset:dry": "node scripts/tea-db-reset.mjs --dry-run",
-    "tea:db-reset:all": "node scripts/tea-db-reset.mjs --confirm --chincha-db"
+    "tea:db-reset:all": "node scripts/tea-db-reset.mjs --confirm --chincha-db",
+    "shrimp:stock-reset": "node scripts/shrimp-stock-reset.mjs --confirm",
+    "shrimp:stock-reset:dry": "node scripts/shrimp-stock-reset.mjs --dry-run",
+    "shrimp:stock-reset:full": "node scripts/shrimp-stock-reset.mjs --confirm --full",
+    "shrimp:full-reset:dry": "node scripts/shrimp-stock-reset.mjs --dry-run --full"
   },
   "devDependencies": {
     "firebase-admin": "^13.0.0"
