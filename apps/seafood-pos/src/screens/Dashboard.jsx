@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsQuerySales, fsRunQuery } from '../lib/firestoreRest';
+import { fsQuerySales, fsQueryStockBatches } from '../lib/firestoreRest';
 import {
   aggregateDailySales,
   billAmount,
@@ -21,7 +21,7 @@ function formatBatchPurchaseDate(value) {
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 }
 
-export default function Dashboard({ stock, localBills = [], refreshKey = 0, active = true }) {
+export default function Dashboard({ stock, localBills = [], refreshKey = 0, stockRefreshKey = 0, active = true }) {
   const [dashTab, setDashTab] = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [customerDebts, setCustomerDebts] = useState([]);
@@ -77,6 +77,16 @@ export default function Dashboard({ stock, localBills = [], refreshKey = 0, acti
     );
   }, [todayKey, refreshKey, salesRetry, active]);
 
+  const loadStockBatches = useCallback(async () => {
+    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
+    try {
+      const rows = await fsQueryStockBatches(30);
+      setStockBatches(rows);
+    } catch (e) {
+      console.warn('fsQueryStockBatches', e);
+    }
+  }, []);
+
   useEffect(() => {
     if (!db) { return undefined; }
     const unsubs = [];
@@ -89,15 +99,18 @@ export default function Dashboard({ stock, localBills = [], refreshKey = 0, acti
     unsubs.push(onSnapshot(batchQ, snap => {
       setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, () => {
-      fsRunQuery({
-        from: [{ collectionId: 'stockBatches' }],
-        orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
-        limit: 30,
-      }).then((rows) => setStockBatches(rows)).catch(() => {});
+      loadStockBatches();
     }));
 
     return () => { unsubs.forEach(u => u()); };
-  }, []);
+  }, [loadStockBatches]);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    loadStockBatches();
+    const iv = setInterval(loadStockBatches, 20000);
+    return () => clearInterval(iv);
+  }, [active, stockRefreshKey, loadStockBatches]);
 
   const displayStock = (() => {
     const live = Number(stock?.live) || 0;

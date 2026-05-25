@@ -22,6 +22,7 @@ export default function App() {
   const [stock, setStock]           = useState({ live: 0, dead: 0 });
   const [transactions, setTransactions] = useState([]);
   const [salesRefresh, setSalesRefresh] = useState(0);
+  const [stockRefresh, setStockRefresh] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
 
   // Session restore via Firebase Auth persistence
@@ -123,9 +124,9 @@ export default function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} active />}
+        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
-        {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} />}
+        {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} onReceived={() => setStockRefresh((n) => n + 1)} />}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
