@@ -2,8 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
 import { countReceivesOnDate } from '../lib/stockBatchUtils';
 import { createStockBatchRecord, transferPondDeath } from '../services/stockService';
+import StockLotTimeline from '../components/StockLotTimeline';
 
 export default function InventoryScreen({ stock, stockBatches = [], updateMainStock, onReceived, onStockMoved }) {
+  const todayKey = dateKeyBangkok();
+  const [lotViewDate, setLotViewDate] = useState(todayKey);
   const [tab, setTab]           = useState('receive');
   const [rcvLive, setRcvLive]   = useState('');
   const [rcvDead, setRcvDead]   = useState('');
@@ -20,7 +23,6 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
   const shrimpCost = (liveKg + deadKg) * costPerKg;
   const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
-  const todayKey = dateKeyBangkok();
   const todayReceiveCount = useMemo(
     () => countReceivesOnDate(stockBatches, todayKey),
     [stockBatches, todayKey],
