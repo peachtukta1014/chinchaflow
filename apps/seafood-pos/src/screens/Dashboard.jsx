@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsListCollection, fsQuerySales, fsQueryStockBatches } from '../lib/firestoreRest';
+import { fsQuerySales, fsQueryStockBatches } from '../lib/firestoreRest';
 import {
   aggregateDailySales,
   billAmount,
@@ -11,7 +11,6 @@ import {
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
 import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
-import { reconcileDebtsFromSales } from '../services/debtService';
 import { updateSalePayment } from '../services/salesService';
 import { getEffectiveStock } from '../services/stockService';
 
@@ -28,7 +27,6 @@ function formatBatchPurchaseDate(value) {
 export default function Dashboard({ stock, stockBatches: stockBatchesProp, localBills = [], refreshKey = 0, stockRefreshKey = 0, active = true }) {
   const [dashTab, setDashTab] = useState('today');
   const [firestoreSales, setFirestoreSales] = useState([]);
-  const [customerDebts, setCustomerDebts] = useState([]);
   const [stockBatches, setStockBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [salesLoadError, setSalesLoadError] = useState(false);
@@ -117,19 +115,6 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
     if (!db) { return undefined; }
     const unsubs = [];
 
-    const loadDebtsRest = async () => {
-      try {
-        const rows = await fsListCollection('customerDebts', 200);
-        setCustomerDebts(rows.filter((d) => (parseFloat(d.totalDebt) || 0) > 0));
-      } catch (e) {
-        console.warn('customerDebts REST', e);
-      }
-    };
-    unsubs.push(onSnapshot(collection(db, 'customerDebts'), snap => {
-      setCustomerDebts(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => (parseFloat(d.totalDebt) || 0) > 0));
-    }, () => { loadDebtsRest(); }));
-    loadDebtsRest();
-
     const batchQ = query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(30));
     unsubs.push(onSnapshot(batchQ, snap => {
       setStockBatches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -157,22 +142,13 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
   const todaySales = mergeSalesDocs(firestoreSales, localToday);
   const salesSummary = aggregateDailySales(todaySales);
 
-  useEffect(() => {
-    if (!active || dashTab !== 'debts') return undefined;
-    reconcileDebtsFromSales([...firestoreSales, ...localToday]).catch((e) => {
-      console.warn('reconcileDebtsFromSales', e);
-    });
-    return undefined;
-  }, [active, dashTab, firestoreSales, localToday]);
-
-  const todayTotal  = salesSummary.revenueTotal;
+  const todayTotal = salesSummary.revenueTotal;
   const todayCash   = todaySales.filter(s => s.paymentType === 'cash').reduce((s, t) => s + t.total, 0);
   const todayTransfer = todaySales.filter(s => s.paymentType === 'transfer').reduce((s, t) => s + t.total, 0);
   const todayCredit = todaySales.filter(s => s.paymentType === 'credit').reduce((s, t) => s + t.total, 0);
-  const todayInstall = todaySales.filter(s => s.paymentType === 'installment').reduce((s, t) => s + t.total, 0);
-  const totalDebt   = customerDebts.reduce((s, c) => s + (c.totalDebt || 0), 0);
+  const todayInstall = todaySales.filter(s => s.paymentType === 'installment').reduce((s, t) => s + t.total, 0);
 
-  const payBreakdown = [
+  const payBreakdown = [
     { ...PAY[0], amount: todayCash,     count: todaySales.filter(s => s.paymentType === 'cash').length },
     { ...PAY[1], amount: todayTransfer, count: todaySales.filter(s => s.paymentType === 'transfer').length },
     { ...PAY[2], amount: todayCredit,   count: todaySales.filter(s => s.paymentType === 'credit').length },
@@ -195,17 +171,12 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
         <div className="bg-gradient-to-br from-red-400 to-orange-500 rounded-[2rem] p-5 text-white">
           <p className="text-red-100 text-xs font-bold mb-1">กุ้งตาย</p>
           <p className="text-2xl font-black">{displayStock.dead.toFixed(1)}<span className="text-sm font-normal"> กก.</span></p>
-        </div>
-        <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white col-span-2">
-          <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
-          <p className="text-3xl font-black">฿{totalDebt.toLocaleString()}</p>
-          <p className="text-orange-100 text-xs mt-1">{customerDebts.length} ราย</p>
-        </div>
-      </div>
+        </div>
+      </div>
 
       {/* Sub-tabs */}
       <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
-        {[['today', 'วันนี้'], ['debts', 'ลูกหนี้'], ['fifo', 'ล็อตตามวัน']].map(([id, label]) => (
+        {[['today', 'วันนี้'], ['fifo', 'ล็อตตามวัน']].map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -311,32 +282,7 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
               )}
           </div>
         </>
-      )}
-
-      {/* Debts (AR) tab */}
-      {dashTab === 'debts' && (
-        <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-1">ลูกหนี้ทั้งหมด</h3>
-          <p className="text-sm text-slate-500 mb-5">รวม ฿{totalDebt.toLocaleString()} ({customerDebts.length} ราย)</p>
-          {customerDebts.length === 0
-            ? <p className="text-center text-emerald-500 font-bold py-8">ไม่มีลูกหนี้ 🎉</p>
-            : (
-              <div className="space-y-3">
-                {[...customerDebts].sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0)).map(c => (
-                  <div key={c.id} className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <div>
-                      <p className="font-bold text-slate-800">{c.customerName}</p>
-                      <p className="text-xs text-slate-400">{c.zone} • บิล {c.lastBillNo || '—'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-orange-500 text-lg">฿{(c.totalDebt || 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-        </div>
-      )}
+      )}
 
       {/* ล็อตตามวันรับเข้า */}
       {dashTab === 'fifo' && (
