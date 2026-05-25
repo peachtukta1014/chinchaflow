@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
-import { fsGetDoc, fsSetUserProfile } from '../lib/firestoreRest';
+import { fsGetDoc, fsPatch, fsSetUserProfile } from '../lib/firestoreRest';
 import { BOOTSTRAP_ADMIN_EMAIL } from '../lib/constants';
 import { T } from '../lib/i18n';
 
@@ -54,7 +54,16 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       profile = await fsGetDoc(`users/${uid}`);
     }
     if (!profile) throw new Error('authCreateFailed');
-    return { uid, ...profile };
+    return ensureBootstrapAdmin(uid, em, { uid, ...profile });
+  };
+
+  /** บัญชีที่สมัครก่อน PR #48 อาจยังเป็น staff/รออนุมัติ — อัปเกรดเมื่อล็อกอินด้วยเมล bootstrap */
+  const ensureBootstrapAdmin = async (uid, em, profile) => {
+    if (!isBootstrapAdminEmail(em)) return profile;
+    if (profile.role === 'admin' && profile.approved === true) return profile;
+    await fsPatch(`users/${uid}`, { role: 'admin', approved: true });
+    const updated = await fsGetDoc(`users/${uid}`);
+    return updated ? { uid, ...updated } : { ...profile, role: 'admin', approved: true };
   };
 
   const handleRegister = async () => {
