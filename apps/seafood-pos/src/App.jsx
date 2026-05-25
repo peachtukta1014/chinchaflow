@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import React, { useEffect, useMemo, useState } from 'react';
+import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, ShoppingCart, Users } from 'lucide-react';
 import { auth, db } from './firebase';
 import { FS_BASE } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
-import { normalizeStockValues, persistStock } from './services/stockService';
+import { getEffectiveStock, normalizeStockValues, persistStock } from './services/stockService';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import Dashboard from './screens/Dashboard';
@@ -20,6 +20,7 @@ export default function App() {
   const [member, setMember]         = useState(undefined);
   const [activeTab, setActiveTab]   = useState('pos');
   const [stock, setStock]           = useState({ live: 0, dead: 0 });
+  const [stockBatches, setStockBatches] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [salesRefresh, setSalesRefresh] = useState(0);
   const [stockRefresh, setStockRefresh] = useState(0);
@@ -42,11 +43,26 @@ export default function App() {
     });
   }, []);
 
-  // Real-time shared stock
+  // Real-time shared stock + FIFO batches (สำหรับยอดขายได้จริง)
   useEffect(() => {
     if (!db || !member) return;
-    return onSnapshot(doc(db, 'config', 'stock'), snap => { if (snap.exists()) setStock(snap.data()); }, () => {});
+    const unsubs = [
+      onSnapshot(doc(db, 'config', 'stock'), (snap) => {
+        if (snap.exists()) setStock(snap.data());
+      }, () => {}),
+      onSnapshot(
+        query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(50)),
+        (snap) => setStockBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {},
+      ),
+    ];
+    return () => unsubs.forEach((u) => u());
   }, [member]);
+
+  const effectiveStock = useMemo(
+    () => getEffectiveStock(stock, stockBatches),
+    [stock, stockBatches],
+  );
 
   // Badge: pending LINE orders
   useEffect(() => {
@@ -124,14 +140,14 @@ export default function App() {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard stock={stock} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
-        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
-        {activeTab === 'stock'          && <InventoryScreen stock={stock} updateMainStock={updateMainStock} onReceived={() => setStockRefresh((n) => n + 1)} />}
+        {activeTab === 'home'           && <Dashboard stock={stock} stockBatches={stockBatches} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
+        {activeTab === 'pos'            && <POSMobile user={member} stock={effectiveStock} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
+        {activeTab === 'stock'          && <InventoryScreen stock={effectiveStock} updateMainStock={updateMainStock} onReceived={() => setStockRefresh((n) => n + 1)} />}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
             user={member}
-            stock={stock}
+            stock={effectiveStock}
             updateMainStock={updateMainStock}
             onSaleRecorded={() => setSalesRefresh((n) => n + 1)}
             onOrderDone={() => {
