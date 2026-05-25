@@ -166,18 +166,103 @@ function groupItemsByCustomer(items) {
   return groups;
 }
 
+const SIZE_TO_PRODUCT = {
+  ใหญ่: 'กุ้งใหญ่',
+  กลาง: 'กุ้งกลาง',
+  เล็ก: 'กุ้งเล็ก',
+  ตาย: 'กุ้งตาย',
+  a: 'กุ้งใหญ่',
+  b: 'กุ้งกลาง',
+  c: 'กุ้งเล็ก',
+};
+
+const DEFAULT_SIMPLE_PRODUCT = 'กุ้งกลาง';
+
+function sizeWordToProduct(word) {
+  const w = (word || '').trim().toLowerCase();
+  return SIZE_TO_PRODUCT[w] || null;
+}
+
+/** ข้อความสั้น: ปุ้ย 2 | จะเขียด6 | ตาจุ้ย กลาง 2 */
+function parseSimpleOrderLine(line) {
+  const raw = String(line || '').trim();
+  if (!raw || /กุ้ง/.test(raw)) return null;
+
+  const sizeOnly = raw.match(/^(ใหญ่|กลาง|เล็ก|ตาย|a|b|c)$/i);
+  if (sizeOnly) {
+    return { kind: 'size_only', product: sizeWordToProduct(sizeOnly[1]) };
+  }
+
+  let t = normalizeOrderText(raw);
+  t = t.replace(/^(ออเดอร์|จอง|สั่ง|order)\s*/i, '').trim();
+  if (!t) return null;
+
+  let m = t.match(/^([฀-๿][฀-๿\s]{0,24}?)\s+(ใหญ่|กลาง|เล็ก|ตาย)\s*([\d.]+)\s*(กก|โล|kg|บาท|฿)?$/i);
+  if (m) {
+    const product = sizeWordToProduct(m[2]);
+    if (!product) return null;
+    return {
+      kind: 'item',
+      customerName: m[1].trim(),
+      product,
+      qty: parseFloat(m[3]),
+      unit: m[4] || 'กก',
+    };
+  }
+
+  m = t.match(/^([฀-๿][฀-๿\s]{0,24}?)\s+([\d.]+)\s*(กก|โล|kg|บาท|฿)?$/);
+  if (m && m[1].trim().length >= 2) {
+    return {
+      kind: 'pending',
+      customerName: m[1].trim(),
+      qty: parseFloat(m[2]),
+      unit: m[3] || 'กก',
+    };
+  }
+
+  m = t.match(/^([฀-๿]{2,24})([\d.]+)\s*(กก|โล|kg|บาท|฿)?$/);
+  if (m) {
+    return {
+      kind: 'pending',
+      customerName: m[1].trim(),
+      qty: parseFloat(m[2]),
+      unit: m[3] || 'กก',
+    };
+  }
+
+  return null;
+}
+
+function simpleToOrderItem(simple) {
+  if (!simple || simple.kind !== 'item') return null;
+  const items = [];
+  pushItem(items, simple.product, simple.qty, simple.unit, simple.customerName);
+  return items[0] || null;
+}
+
+function pendingToItems(pending, productName) {
+  if (!pending?.customerName || !pending.qty) return [];
+  const items = [];
+  pushItem(items, productName, pending.qty, pending.unit || 'กก', pending.customerName);
+  return items;
+}
+
 const ORDER_FORMAT_HELP =
   'รูปแบบสั่งซื้อ (ตัวอย่าง):\n' +
-  '• กุ้งใหญ่ 2 กก\n' +
-  '• ตาจุ้ย กุ้งเล็ก 1 โล\n' +
-  '• ตาจุ้ยสอง กุ้งเล็ก 1 โล (หลายคนในข้อความเดียวได้)\n' +
-  '• 2 กก กุ้งกลาง\n' +
-  '• กุ้งตาย 500 บาท\n\n' +
+  '• ออเดอร์ 25/5/69 หรือ 25/5/69 → ตั้งวันส่งก่อน\n' +
+  '• ปุ้ย 2 หรือ จะเขียด กลาง 6\n' +
+  '• กุ้งใหญ่ 2 กก · ตาจุ้ย กุ้งเล็ก 1 โล\n' +
+  '• 2 กก กุ้งกลาง\n\n' +
   'หลายลูกค้าในข้อความเดียว → แยกเป็นหลายออเดอร์ในแอป';
 
 module.exports = {
   parseOrderItems,
+  parseSimpleOrderLine,
+  simpleToOrderItem,
+  pendingToItems,
+  sizeWordToProduct,
   groupItemsByCustomer,
   ORDER_FORMAT_HELP,
   normalizeOrderText,
+  DEFAULT_SIMPLE_PRODUCT,
 };
