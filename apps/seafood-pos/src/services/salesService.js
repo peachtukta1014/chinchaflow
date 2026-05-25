@@ -2,6 +2,7 @@ import { isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { billAmount } from '../lib/salesAggregate';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
+import { openSalesForCustomer, sortSalesFifoAsc } from '../lib/saleFifo';
 import { fsGetDoc, fsListCollection, fsPatch, fsPost } from '../lib/firestoreRest';
 import { incrementCustomerDebt } from './debtService';
 import { deductStockForSale, getEffectiveStock } from './stockService';
@@ -199,16 +200,91 @@ export async function updateSalePayment(sale, newPaymentType, paidAmountInput = 
   return { paymentType: newPaymentType, paidAmount, remainingAmount };
 }
 
+/** ใส่ยอดชำระเข้าบิลเดียว (ผ่อนจนกว่าครบ → โอน) */
+export async function applyPaymentToSale(sale, paymentAmount) {
+  if (!sale?.id) throw new Error('ไม่พบบิล');
+  const total = billAmount(sale);
+  const add = Math.min(parseFloat(paymentAmount) || 0, parseFloat(sale.remainingAmount) || 0);
+  if (add <= 0) return { applied: 0, paymentType: sale.paymentType, paidAmount: sale.paidAmount, remainingAmount: sale.remainingAmount };
+
+  const oldPaid = parseFloat(sale.paidAmount) || 0;
+  const oldRemain = parseFloat(sale.remainingAmount) || 0;
+  const newPaid = Math.min(total, oldPaid + add);
+  const newRemain = Math.max(0, total - newPaid);
+  const paymentType = newRemain <= 0 ? 'transfer' : 'installment';
+  const paidAmount = newRemain <= 0 ? total : newPaid;
+
+  await fsPatch(`sales/${sale.id}`, {
+    paymentType,
+    paidAmount,
+    remainingAmount: newRemain,
+  });
+
+  const delta = newRemain - oldRemain;
+  if (delta !== 0) {
+    await incrementCustomerDebt(sale.customerId, {
+      customerId: sale.customerId,
+      customerName: sale.customerName || '',
+      zone: sale.zone || 'ทั่วไป',
+      lastBillNo: sale.billNo || sale.id,
+      lastUpdated: new Date().toISOString(),
+    }, delta);
+  }
+
+  return { applied: add, paymentType, paidAmount, remainingAmount: newRemain };
+}
+
+/** รับชำระลูกค้าแบบ FIFO — หักบิลเก่าก่อน */
+export async function applyFifoCustomerPayment(customerId, customerName, paymentAmount, allSales = null) {
+  const amount = parseFloat(paymentAmount) || 0;
+  if (amount <= 0) throw new Error('ใส่ยอดที่รับชำระ');
+
+  const sales = allSales || await fsListCollection('sales', 300);
+  const queue = openSalesForCustomer(sales, customerId, customerName);
+  if (queue.length === 0) throw new Error('ไม่มีบิลค้าง');
+
+  let left = amount;
+  const allocations = [];
+
+  for (const sale of queue) {
+    if (left <= 0) break;
+    const remain = parseFloat(sale.remainingAmount) || 0;
+    if (remain <= 0) continue;
+    const slice = Math.min(left, remain);
+    const result = await applyPaymentToSale(sale, slice);
+    allocations.push({
+      billNo: sale.billNo || sale.id,
+      dateKey: sale.dateKey,
+      applied: result.applied,
+      closed: (result.remainingAmount || 0) <= 0,
+    });
+    left -= result.applied;
+    Object.assign(sale, {
+      paidAmount: result.paidAmount,
+      remainingAmount: result.remainingAmount,
+      paymentType: result.paymentType,
+    });
+  }
+
+  return {
+    requested: amount,
+    applied: amount - left,
+    unallocated: left,
+    allocations,
+    billsTouched: allocations.length,
+  };
+}
+
 /** ปิดยอดลูกค้า — ตั้งบิลค้างทั้งหมดเป็นชำระแล้ว + ปรับลูกหนี้ */
 export async function clearCustomerDebtAll(customerId, customerName, paymentType = 'transfer') {
   const key = debtCustomerKey(customerId, customerName);
   if (!key) throw new Error('ไม่พบลูกค้า');
 
   const sales = await fsListCollection('sales', 300);
-  const open = sales.filter((s) => {
+  const open = sortSalesFifoAsc(sales.filter((s) => {
     if ((parseFloat(s.remainingAmount) || 0) <= 0) return false;
     return debtCustomerKey(s.customerId, s.customerName) === key;
-  });
+  }));
 
   for (const sale of open) {
     if (!sale.id) continue;

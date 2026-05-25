@@ -5,9 +5,14 @@ import { db } from '../firebase';
 import { PAY } from '../constants';
 import { dateKeyBangkok, formatDateThaiShort, shiftDateKey } from '../lib/date';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
+import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
 import { fsListCollection, fsQuerySales } from '../lib/firestoreRest';
 import { billAmount } from '../lib/salesAggregate';
-import { clearCustomerDebtAll, updateSalePayment } from '../services/salesService';
+import {
+  applyFifoCustomerPayment,
+  clearCustomerDebtAll,
+  updateSalePayment,
+} from '../services/salesService';
 
 function formatViewDate(dateKey) {
   const today = dateKeyBangkok();
@@ -17,14 +22,208 @@ function formatViewDate(dateKey) {
   return formatDateThaiShort(dateKey);
 }
 
+function CustomerFifoPanel({
+  row,
+  allSales,
+  debtByKey,
+  onRefresh,
+  expandedKey,
+  setExpandedKey,
+}) {
+  const [payInput, setPayInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [billBusy, setBillBusy] = useState(null);
+  const open = expandedKey === row.key;
+
+  const fifoBills = useMemo(
+    () => openSalesForCustomer(allSales, row.customerId, row.customerName),
+    [allSales, row.customerId, row.customerName],
+  );
+
+  const debt = debtByKey.get(row.key);
+  const totalOwed = debt?.totalDebt ?? fifoBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0);
+
+  const handleFifoPay = async () => {
+    const amt = parseFloat(payInput);
+    if (!amt || amt <= 0) {
+      alert('ใส่ยอดที่รับชำระ');
+      return;
+    }
+    if (!window.confirm(`รับชำระ ฿${amt.toLocaleString()} จาก "${row.customerName}"\nหักบิลเก่าก่อน (FIFO)?`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await applyFifoCustomerPayment(row.customerId, row.customerName, amt, allSales);
+      await onRefresh();
+      setPayInput('');
+      const lines = res.allocations.map((a, i) => (
+        `${i + 1}. ${a.billNo} (${formatDateThaiShort(a.dateKey)}) ฿${a.applied.toLocaleString()}${a.closed ? ' ✓ปิดบิล' : ''}`
+      )).join('\n');
+      alert(
+        `✅ รับชำระ ฿${res.applied.toLocaleString()}\n${lines || '—'}${res.unallocated > 0 ? `\nเหลือไม่ได้หัก ฿${res.unallocated.toLocaleString()}` : ''}`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert(e.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!totalOwed || totalOwed <= 0) {
+      alert('ไม่มียอดค้าง');
+      return;
+    }
+    if (!window.confirm(`ปิดยอดทั้งหมด "${row.customerName}" ฿${Number(totalOwed).toLocaleString()}?\n(หักตาม FIFO จนครบ)`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await clearCustomerDebtAll(row.customerId, row.customerName, 'transfer');
+      await onRefresh();
+      alert(`✅ ปิดยอดแล้ว ${res.clearedBills} บิล`);
+      setExpandedKey(null);
+    } catch (e) {
+      console.error(e);
+      alert('ปิดยอดไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePaymentChange = async (tx, newType) => {
+    if (!tx.id || billBusy || tx.paymentType === newType) return;
+    setBillBusy(tx.id);
+    try {
+      await updateSalePayment(tx, newType);
+      await onRefresh();
+    } catch (e) {
+      console.error(e);
+      alert('แก้สถานะไม่สำเร็จ');
+    } finally {
+      setBillBusy(null);
+    }
+  };
+
+  return (
+    <div className="border border-slate-100 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpandedKey(open ? null : row.key)}
+        className="w-full flex justify-between items-center p-4 text-left active:bg-slate-50"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-slate-800 truncate">{row.customerName}</p>
+          <p className="text-xs text-slate-400">
+            {row.zone}
+            {' · '}
+            {fifoBills.length} บิลค้าง (FIFO)
+          </p>
+        </div>
+        <p className="font-black text-orange-500 ml-2 shrink-0">฿{Number(totalOwed).toLocaleString()}</p>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/80 space-y-3">
+          <p className="text-[10px] text-purple-700 font-bold pt-2">
+            รับชำระผ่อนแบบ FIFO — หักบิลเก่าสุดก่อนเสมอ
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              value={payInput}
+              onChange={(e) => setPayInput(e.target.value)}
+              placeholder="ยอดที่รับวันนี้ (฿)"
+              className="flex-1 p-3 bg-white border border-purple-200 rounded-xl text-base font-bold outline-none"
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleFifoPay}
+              className="px-4 py-3 rounded-xl bg-purple-600 text-white font-bold text-sm shrink-0 disabled:opacity-50"
+            >
+              {busy ? '...' : 'บันทึก'}
+            </button>
+          </div>
+
+          {fifoBills.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm py-4">ไม่มีบิลค้าง</p>
+          ) : (
+            fifoBills.map((tx, idx) => {
+              const total = billAmount(tx);
+              const paid = parseFloat(tx.paidAmount) || 0;
+              const remain = parseFloat(tx.remainingAmount) || 0;
+              const isOldest = idx === 0;
+              return (
+                <div
+                  key={tx.id}
+                  className={`bg-white rounded-xl p-3 border-l-4 ${isOldest ? 'border-amber-400' : 'border-slate-200'}`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-amber-600">
+                        FIFO #{idx + 1}
+                        {isOldest ? ' · เก่าสุด' : ''}
+                        {' · '}
+                        {formatDateThaiShort(tx.dateKey)}
+                      </p>
+                      <p className="font-bold text-sm text-slate-700 truncate">{tx.billNo || tx.id}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      tx.paymentType === 'installment' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
+                    }`}
+                    >
+                      {paymentTypeLabel(tx)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    ยอดบิล ฿{total.toLocaleString()}
+                    {paid > 0 ? ` · จ่ายแล้ว ฿${paid.toLocaleString()}` : ''}
+                  </p>
+                  <p className="text-[10px] text-orange-500 font-bold">ค้าง ฿{remain.toLocaleString()}</p>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {PAY.filter((p) => p.id !== 'installment').map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={billBusy === tx.id || !tx.id}
+                        onClick={() => handlePaymentChange(tx, p.id)}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                          tx.paymentType === p.id ? `${p.cls} text-white` : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleClearAll}
+            className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm disabled:opacity-50"
+          >
+            ปิดยอดทั้งหมด (รับชำระครบ)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CustomerAccountsScreen({ refreshKey = 0 }) {
   const [viewDate, setViewDate] = useState(() => dateKeyBangkok());
   const [customerDebts, setCustomerDebts] = useState([]);
+  const [allSales, setAllSales] = useState([]);
   const [daySales, setDaySales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState(null);
-  const [busyId, setBusyId] = useState(null);
-  const [clearingKey, setClearingKey] = useState(null);
 
   const loadDebtsRest = useCallback(async () => {
     try {
@@ -35,11 +234,19 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
     }
   }, []);
 
+  const loadAllSales = useCallback(async () => {
+    try {
+      const docs = await fsListCollection('sales', 300);
+      setAllSales(docs);
+    } catch (e) {
+      console.warn('fsListCollection sales', e);
+    }
+  }, [refreshKey]);
+
   const loadDaySales = useCallback(async () => {
     setLoading(true);
     try {
-      const docs = await fsQuerySales(viewDate);
-      setDaySales(docs);
+      setDaySales(await fsQuerySales(viewDate));
     } catch (e) {
       console.warn('fsQuerySales', e);
       setDaySales([]);
@@ -47,6 +254,10 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
       setLoading(false);
     }
   }, [viewDate, refreshKey]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadDebtsRest(), loadAllSales(), loadDaySales()]);
+  }, [loadDebtsRest, loadAllSales, loadDaySales]);
 
   useEffect(() => {
     loadDebtsRest();
@@ -61,37 +272,12 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
   }, [loadDebtsRest, refreshKey]);
 
   useEffect(() => {
-    loadDaySales();
-    const iv = setInterval(loadDaySales, 25000);
+    refreshAll();
+    const iv = setInterval(refreshAll, 25000);
     return () => clearInterval(iv);
-  }, [loadDaySales]);
+  }, [refreshAll]);
 
   const totalDebt = customerDebts.reduce((s, c) => s + (parseFloat(c.totalDebt) || 0), 0);
-
-  const dayCreditSales = useMemo(
-    () => daySales.filter((s) => (parseFloat(s.remainingAmount) || 0) > 0),
-    [daySales],
-  );
-
-  const dayByCustomer = useMemo(() => {
-    const map = new Map();
-    for (const s of dayCreditSales) {
-      const key = debtCustomerKey(s.customerId, s.customerName);
-      if (!key) continue;
-      const prev = map.get(key) || {
-        key,
-        customerId: s.customerId,
-        customerName: s.customerName || 'ลูกค้า',
-        zone: s.zone || 'ทั่วไป',
-        bills: [],
-        dayRemain: 0,
-      };
-      prev.bills.push(s);
-      prev.dayRemain += parseFloat(s.remainingAmount) || 0;
-      map.set(key, prev);
-    }
-    return [...map.values()].sort((a, b) => b.dayRemain - a.dayRemain);
-  }, [dayCreditSales]);
 
   const debtByKey = useMemo(() => {
     const m = new Map();
@@ -99,54 +285,45 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
     return m;
   }, [customerDebts]);
 
-  const handlePaymentChange = async (tx, newType, customerKey) => {
-    if (!tx.id || busyId || tx.paymentType === newType) return;
-    setBusyId(tx.id);
-    try {
-      await updateSalePayment(tx, newType);
-      await loadDaySales();
-      await loadDebtsRest();
-      setExpandedKey(customerKey);
-    } catch (e) {
-      console.error(e);
-      alert('แก้สถานะไม่สำเร็จ ลองอีกครั้งครับ');
-    } finally {
-      setBusyId(null);
+  const customerRows = useMemo(() => {
+    const map = new Map();
+    for (const d of customerDebts) {
+      map.set(d.id, {
+        key: d.id,
+        customerId: d.customerId || d.id,
+        customerName: d.customerName || 'ลูกค้า',
+        zone: d.zone || 'ทั่วไป',
+        totalDebt: d.totalDebt || 0,
+      });
     }
-  };
+    for (const s of allSales) {
+      if ((parseFloat(s.remainingAmount) || 0) <= 0) continue;
+      const key = debtCustomerKey(s.customerId, s.customerName);
+      if (!key || map.has(key)) continue;
+      map.set(key, {
+        key,
+        customerId: s.customerId,
+        customerName: s.customerName || 'ลูกค้า',
+        zone: s.zone || 'ทั่วไป',
+        totalDebt: parseFloat(s.remainingAmount) || 0,
+      });
+    }
+    return [...map.values()].sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0));
+  }, [customerDebts, allSales]);
 
-  const handleClearAll = async (row) => {
-    const debt = debtByKey.get(row.key);
-    const amount = debt?.totalDebt ?? row.dayRemain;
-    if (!amount || amount <= 0) {
-      alert('ไม่มียอดค้างสำหรับลูกค้านี้');
-      return;
-    }
-    const label = row.customerName || debt?.customerName || 'ลูกค้า';
-    if (!window.confirm(`ปิดยอดลูกค้า "${label}" ฿${Number(amount).toLocaleString()}?\n(ตั้งบิลค้างทั้งหมดเป็นโอนแล้ว)`)) {
-      return;
-    }
-    setClearingKey(row.key);
-    try {
-      const res = await clearCustomerDebtAll(row.customerId, label, 'transfer');
-      await loadDaySales();
-      await loadDebtsRest();
-      alert(`✅ ปิดยอดแล้ว ${res.clearedBills} บิล`);
-      setExpandedKey(null);
-    } catch (e) {
-      console.error(e);
-      alert('ปิดยอดไม่สำเร็จ — ลองอีกครั้ง');
-    } finally {
-      setClearingKey(null);
-    }
-  };
+  const dayFifoCount = useMemo(
+    () => daySales.filter((s) => (parseFloat(s.remainingAmount) || 0) > 0).length,
+    [daySales],
+  );
 
   return (
     <div className="p-5 space-y-4 pb-8">
       <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-[2rem] p-5 text-white">
         <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
         <p className="text-3xl font-black">฿{totalDebt.toLocaleString()}</p>
-        <p className="text-orange-100 text-xs mt-1">{customerDebts.length} ราย · แท็บบัญชีสำหรับฝ่ายบัญชี</p>
+        <p className="text-orange-100 text-xs mt-1">
+          {customerDebts.length} ราย · รับชำระผ่อนแบบ FIFO
+        </p>
       </div>
 
       <div className="bg-white rounded-2xl p-3 flex items-center justify-between shadow-sm">
@@ -160,7 +337,10 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
         </button>
         <div className="text-center min-w-0 flex-1 px-2">
           <p className="font-black text-slate-800">{formatViewDate(viewDate)}</p>
-          <p className="text-[10px] text-slate-400">{viewDate}</p>
+          <p className="text-[10px] text-slate-400">
+            {viewDate}
+            {loading ? ' · โหลด...' : ` · บิลค้างวันนี้ ${dayFifoCount}`}
+          </p>
         </div>
         <button
           type="button"
@@ -174,104 +354,25 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-1">บิลค้างตามวันที่เลือก</h3>
+        <h3 className="font-bold text-slate-800 mb-1">ลูกหนี้ — รับชำระผ่อน (FIFO)</h3>
         <p className="text-[10px] text-slate-400 mb-4">
-          {loading ? 'กำลังโหลด...' : `${dayCreditSales.length} บิล · รวม ฿${dayCreditSales.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0).toLocaleString()}`}
+          แตะลูกค้า → ใส่ยอดที่รับ → ระบบหักบิลเก่าสุดก่อน (ค้าง/ผ่อน)
         </p>
-        {dayByCustomer.length === 0 && !loading ? (
-          <p className="text-center text-slate-400 py-6 text-sm">ไม่มีบิลค้างในวันนี้</p>
+        {customerRows.length === 0 ? (
+          <p className="text-center text-emerald-500 font-bold py-8">ไม่มีลูกหนี้ 🎉</p>
         ) : (
           <div className="space-y-3">
-            {dayByCustomer.map((row) => {
-              const debt = debtByKey.get(row.key);
-              const totalOwed = debt?.totalDebt ?? row.dayRemain;
-              const open = expandedKey === row.key;
-              return (
-                <div key={row.key} className="border border-slate-100 rounded-2xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedKey(open ? null : row.key)}
-                    className="w-full flex justify-between items-center p-4 text-left active:bg-slate-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-800 truncate">{row.customerName}</p>
-                      <p className="text-xs text-slate-400">
-                        {row.zone}
-                        {' · '}
-                        วันนี้ค้าง ฿{row.dayRemain.toLocaleString()}
-                        {debt && debt.totalDebt > row.dayRemain ? ` · รวมทั้งหมด ฿${Number(debt.totalDebt).toLocaleString()}` : ''}
-                      </p>
-                    </div>
-                    <p className="font-black text-orange-500 ml-2 shrink-0">฿{Number(totalOwed).toLocaleString()}</p>
-                  </button>
-                  {open && (
-                    <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/80 space-y-3">
-                      {row.bills.map((tx) => (
-                        <div key={tx.id} className="bg-white rounded-xl p-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="font-bold text-slate-700 truncate">{tx.billNo || tx.id}</span>
-                            <span className="font-black text-emerald-600 shrink-0 ml-2">฿{billAmount(tx).toLocaleString()}</span>
-                          </div>
-                          <p className="text-[10px] text-orange-500 font-bold mt-1">
-                            ค้าง ฿{Number(tx.remainingAmount || 0).toLocaleString()}
-                          </p>
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            {PAY.filter((p) => p.id !== 'installment').map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                disabled={busyId === tx.id || !tx.id}
-                                onClick={() => handlePaymentChange(tx, p.id, row.key)}
-                                className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                                  tx.paymentType === p.id ? `${p.cls} text-white` : 'bg-slate-100 text-slate-500'
-                                }`}
-                              >
-                                {p.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        disabled={clearingKey === row.key}
-                        onClick={() => handleClearAll(row)}
-                        className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm active:scale-[0.98] disabled:opacity-50"
-                      >
-                        {clearingKey === row.key ? 'กำลังปิดยอด...' : 'ปิดยอดลูกค้าทั้งหมด (รับชำระแล้ว)'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-1">ลูกหนี้ทั้งหมด (ยอดคงค้าง)</h3>
-        <p className="text-[10px] text-slate-400 mb-4">แตะรายการด้านบนเพื่อดูบิลตามวัน · ปิดยอดได้จากรายละเอียดลูกค้า</p>
-        {customerDebts.length === 0 ? (
-          <p className="text-center text-emerald-500 font-bold py-6">ไม่มีลูกหนี้ 🎉</p>
-        ) : (
-          <div className="space-y-3">
-            {[...customerDebts]
-              .sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0))
-              .map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setExpandedKey(c.id)}
-                  className="w-full flex justify-between items-center border-b border-slate-100 pb-3 text-left active:opacity-80"
-                >
-                  <div>
-                    <p className="font-bold text-slate-800">{c.customerName}</p>
-                    <p className="text-xs text-slate-400">{c.zone} · บิล {c.lastBillNo || '—'}</p>
-                  </div>
-                  <p className="font-black text-orange-500 text-lg shrink-0 ml-2">฿{(c.totalDebt || 0).toLocaleString()}</p>
-                </button>
-              ))}
+            {customerRows.map((row) => (
+              <CustomerFifoPanel
+                key={row.key}
+                row={row}
+                allSales={allSales}
+                debtByKey={debtByKey}
+                onRefresh={refreshAll}
+                expandedKey={expandedKey}
+                setExpandedKey={setExpandedKey}
+              />
+            ))}
           </div>
         )}
       </div>
