@@ -113,6 +113,8 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
 
     setSavingId(order.id);
     try {
+      await deductStockForSale(stock, liveKg, deadKg, updateMainStock);
+
       const { salesId, billNo } = await saveLineOrderDelivery({
         order,
         cartItems,
@@ -120,8 +122,6 @@ export default function LineOrdersScreen({ user, stock, updateMainStock, onSaleR
         total,
         recordedBy: user?.name || 'พนักงาน',
       });
-
-      await deductStockForSale(stock, liveKg, deadKg, updateMainStock);
 
       setOrders((prev) => prev.map((o) => (o.id === order.id
         ? { ...o, status: 'done', salesId, billNo }

@@ -86,6 +86,25 @@ export async function fsPatch(path, data) {
   if (!r.ok) throw new Error(`PATCH ${path} HTTP ${r.status}`);
 }
 
+/** สร้าง/อัปเดตเอกสาร users/{uid} — ใช้ตอนสมัคร (ไม่อนุญาตตั้ง admin จาก client) */
+export async function fsSetUserProfile(uid, data) {
+  if (!FS_BASE) throw new Error('Firestore not configured');
+  const fields = fsObj(data);
+  const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  let r = await fetch(`${FS_BASE}/users/${uid}?${qs}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return;
+  r = await fetch(`${FS_BASE}/users?documentId=${encodeURIComponent(uid)}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`users/${uid} HTTP ${r.status}`);
+}
+
 export async function fsDelete(path) {
   const r = await fetch(`${FS_BASE}/${path}`, { method: 'DELETE', headers: await authHeaders() });
   if (!r.ok && r.status !== 404) throw new Error(`DELETE ${path} HTTP ${r.status}`);

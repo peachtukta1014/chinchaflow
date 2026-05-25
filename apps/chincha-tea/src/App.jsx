@@ -64,7 +64,7 @@ export default function App() {
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
   const saveOrder = async () => {
-    if (!cart.length) return;
+    if (!cart.length) return false;
     setSaving(true);
     try {
       await saveTeaOrder({
@@ -78,11 +78,14 @@ export default function App() {
       await refreshOrders();
       setCart([]);
       alert(t('saved'));
+      return true;
     } catch (e) {
       console.error(e);
       alert(`⚠️ ${t('saveFailed')}`);
+      return false;
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   if (member === undefined && fbReady) {
@@ -145,6 +148,10 @@ export default function App() {
             onAddToCart={addToCart}
             setModalItem={setModalItem}
             modalItem={modalItem}
+            canVoiceCommit={cart.length > 0}
+            onVoiceCommit={async () => {
+              if (cart.length) await saveOrder();
+            }}
           />
         )}
         {tab === 'history' && (
@@ -196,7 +203,10 @@ export default function App() {
         setPayType={setPayType}
         removeCart={removeCart}
         saving={saving}
-        onSave={() => { saveOrder(); setShowCart(false); }}
+        onSave={async () => {
+          const ok = await saveOrder();
+          if (ok) setShowCart(false);
+        }}
         t={t}
       />
 

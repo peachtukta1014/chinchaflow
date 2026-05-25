@@ -88,6 +88,30 @@ export async function fsPost(col, data) {
   return parts[parts.length - 1];
 }
 
+/** สร้างโปรไฟล์ shrimp_users/{uid} */
+export async function fsSetShrimpUser(uid, data) {
+  const fields = fsObj(data);
+  let r = await fetch(`${FS_BASE}/shrimp_users/${uid}`, {
+    method: 'PATCH',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return;
+  const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  r = await fetch(`${FS_BASE}/shrimp_users/${uid}?${qs}`, {
+    method: 'PATCH',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return;
+  r = await fetch(`${FS_BASE}/shrimp_users?documentId=${encodeURIComponent(uid)}`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`shrimp_users/${uid} HTTP ${r.status}`);
+}
+
 export async function fsPatch(path, data) {
   const fields = fsObj(data);
   const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');

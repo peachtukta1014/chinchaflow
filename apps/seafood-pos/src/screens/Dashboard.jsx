@@ -63,7 +63,7 @@ export default function Dashboard({ stock, localBills = [], refreshKey = 0, stoc
       salesQ,
       (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setFirestoreSales((prev) => (docs.length > 0 ? mergeSalesDocs(docs, prev) : prev));
+        setFirestoreSales(mergeSalesDocs(docs, []));
         setSalesLoadError(false);
         setLoading(false);
       },

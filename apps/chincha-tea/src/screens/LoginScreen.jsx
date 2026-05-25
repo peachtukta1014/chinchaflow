@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
-import { fsGetDoc, fsPatch, fsListCollection } from '../lib/firestoreRest';
+import { fsGetDoc, fsSetUserProfile } from '../lib/firestoreRest';
 import { T } from '../lib/i18n';
 
 function authErrorKey(code) {
@@ -37,13 +37,11 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const loadOrCreateProfile = async (uid, em) => {
     let profile = await fsGetDoc(`users/${uid}`);
     if (!profile) {
-      const existing = await fsListCollection('users', 1);
-      const isFirst = existing.length === 0;
-      await fsPatch(`users/${uid}`, {
+      await fsSetUserProfile(uid, {
         name: em.split('@')[0],
         email: em,
-        role: isFirst ? 'admin' : 'staff',
-        approved: isFirst,
+        role: 'staff',
+        approved: false,
         uid,
         createdAt: new Date().toISOString(),
       });
@@ -65,21 +63,15 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await createUserWithEmailAndPassword(auth, em, pw);
-      const existing = await fsListCollection('users', 1);
-      const isFirst = existing.length === 0;
-      await fsPatch(`users/${cred.user.uid}`, {
+      await fsSetUserProfile(cred.user.uid, {
         name,
         email: em,
-        role: isFirst ? 'admin' : 'staff',
-        approved: isFirst,
+        role: 'staff',
+        approved: false,
         uid: cred.user.uid,
         createdAt: new Date().toISOString(),
       });
-      if (isFirst) {
-        onAuthed({ uid: cred.user.uid, name, email: em, role: 'admin', approved: true });
-      } else {
-        setPending(true);
-      }
+      setPending(true);
     } catch (e) {
       const code = e?.code || '';
       const key = authErrorKey(code);

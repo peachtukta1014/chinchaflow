@@ -79,6 +79,7 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
       setTimeout(() => setExpFlash(''), 2000);
     } catch (e) {
       console.error(e);
+      alert(t('saveFailed'));
     }
     setSavingExp(false);
   };
