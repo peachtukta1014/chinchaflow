@@ -1,4 +1,10 @@
+import { hardReloadApp } from '../lib/reloadApp';
+
 export default function AppHeader({ member, lang, setLang, onLogout, t }) {
+  const handleReload = () => {
+    if (!window.confirm('รีเฟรชแอปเพื่อโหลดเวอร์ชันล่าสุด?\n(ข้อมูลบนเซิร์ฟเวอร์ยังอยู่ครบ)')) return;
+    hardReloadApp();
+  };
   return (
     <header className="z-10 shrink-0 px-4 pt-6 pb-3 flex items-center justify-between" style={{ background: '#3d1f0f' }}>
       <div className="flex items-center gap-3 min-w-0">
@@ -21,6 +27,18 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={handleReload}
+          className="w-9 h-9 rounded-full border border-amber-800 text-cyan-300 flex items-center justify-center"
+          style={{ background: '#5a2d14' }}
+          aria-label="รีเฟรชแอป"
+          title="รีเฟรชแอป"
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0014-7M19 5a9 9 0 00-14 7" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={onLogout}
