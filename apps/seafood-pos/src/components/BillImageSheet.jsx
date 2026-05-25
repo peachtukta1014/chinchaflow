@@ -59,7 +59,11 @@ export default function BillImageSheet({ bill, customer, onClose }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div>
             <p className="font-black text-slate-800">ภาพบิล (เทมเพลต)</p>
-            <p className="text-xs text-slate-400">{bill.billNo} · {bill.customerName}</p>
+            <p className="text-xs text-slate-400">
+              {bill.billNo} · ลูกค้า: <span className="font-bold text-slate-700">{bill.customerName}</span>
+              {' · '}
+              {(bill.items || []).length} รายการ
+            </p>
           </div>
           <button type="button" onClick={onClose} className="p-2 rounded-xl bg-slate-100">
             <X size={20} />

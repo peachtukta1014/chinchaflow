@@ -65,8 +65,9 @@ try {
 }
 
 try {
-  assert(getBillTemplateUrl('cash') === 'template-cash.jpg', 'template cash');
-  assert(getBillTemplateUrl('credit') === 'template-credit.jpg', 'template credit');
+  assert(getBillTemplateUrl() === 'template-empty.jpg', 'template empty only');
+  const fromFs = normalizeLineItem({ productName: 'กุ้งใหญ่', weightKg: 2, lineTotal: 500, pricePerKg: 250 });
+  assert(fromFs.weight === 2 && fromFs.total === 500, 'normalizeLineItem Firestore shape');
 } catch (e) {
   fail('billTemplateConfig', e);
 }

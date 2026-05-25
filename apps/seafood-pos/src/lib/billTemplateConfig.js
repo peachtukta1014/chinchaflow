@@ -1,11 +1,7 @@
-export function getBillTemplateUrl(paymentType, remainingAmount = 0) {
-  const paid =
-    paymentType === 'cash' ||
-    paymentType === 'transfer' ||
-    (paymentType === 'installment' && (parseFloat(remainingAmount) || 0) <= 0);
-  const file = paid ? 'template-cash.jpg' : 'template-credit.jpg';
+/** พื้นหลังบิลเปล่าเท่านั้น — ไม่ใช้ภาพตัวอย่างที่มีชื่อลูกค้า/รายการค้าง */
+export function getBillTemplateUrl() {
   const base = import.meta.env.BASE_URL || '/';
-  return `${base}bill-assets/${file}`;
+  return `${base}bill-assets/template-empty.jpg`;
 }
 
 export const BILL_QR_URL = `${import.meta.env.BASE_URL || '/'}bill-assets/line-oa-qr.png`;
