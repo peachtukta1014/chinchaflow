@@ -1,7 +1,7 @@
 {
-  "name": "ชินชา — ชาชง กาแฟ ผลไม้ปั่น",
-  "short_name": "CHINCHA",
-  "description": "บันทึกยอดขายรายวัน ร้านชงชา กาแฟ น้ำผลไม้สดปั่น",
+  "name": "ร้านน้ำชินชา",
+  "short_name": "ร้านน้ำชินชา",
+  "description": "บันทึกยอดขายรายวัน ร้านน้ำชินชา",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#3d1f0f",

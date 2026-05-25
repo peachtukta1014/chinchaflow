@@ -1,7 +1,7 @@
 {
-  "name": "โกอ้วน คลังซีฟู้ด",
-  "short_name": "KOSEAFOOD",
-  "description": "ระบบจัดการสต๊อกและจุดขาย KOSEAFOOD",
+  "name": "โกอ้วนคลังซีฟู๊ด",
+  "short_name": "โกอ้วนคลังซีฟู๊ด",
+  "description": "ระบบจัดการสต๊อกและจุดขาย โกอ้วนคลังซีฟู๊ด",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e293b",
