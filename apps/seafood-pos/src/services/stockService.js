@@ -103,11 +103,30 @@ export function sumStockFromBatches(batches = []) {
  * ไม่มีล็อตค่อยใช้ config/stock
  */
 export function getEffectiveStock(configStock, batches = []) {
+  const cfg = normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
   if (batches.length > 0) {
     const bat = sumStockFromBatches(batches);
-    return normalizeStockValues(bat.live, bat.dead);
+    return normalizeStockValues(
+      Math.max(cfg.live, bat.live),
+      Math.max(cfg.dead, bat.dead),
+    );
   }
-  return normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
+  return cfg;
+}
+
+/** ซิงก์ config/stock ให้ตรงผลรวมล็อต (กรณีรับเข้าแล้วแต่ config ยังเป็น 0) */
+export async function syncMainStockFromBatches(configStock, batches = []) {
+  if (!batches.length) return null;
+  const eff = sumStockFromBatches(batches);
+  const cfg = normalizeStockValues(configStock?.live ?? 0, configStock?.dead ?? 0);
+  const needsSync =
+    eff.live > cfg.live + 0.001
+    || eff.dead > cfg.dead + 0.001
+    || ((cfg.live < 0.001 && cfg.dead < 0.001) && (eff.live > 0 || eff.dead > 0));
+  if (!needsSync) return null;
+  const val = normalizeStockValues(eff.live, eff.dead);
+  await persistStock(val);
+  return val;
 }
 
 /** บันทึก config/stock (REST + SDK fallback) */

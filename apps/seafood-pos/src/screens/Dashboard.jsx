@@ -114,7 +114,8 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
     return () => clearInterval(iv);
   }, [active, stockRefreshKey, loadStockBatches]);
 
-  const batchesForDisplay = stockBatchesProp?.length ? stockBatchesProp : stockBatches;
+  const batchesForDisplay =
+    stockBatchesProp && stockBatchesProp.length > 0 ? stockBatchesProp : stockBatches;
   const displayStock = getEffectiveStock(stock, batchesForDisplay);
   const lotDays = groupBatchesByReceiveDay(batchesForDisplay);
   const todayReceiveKey = dateKeyBangkok();

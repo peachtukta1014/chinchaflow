@@ -11,7 +11,7 @@ import {
   markLineOrderDoneOnly,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
-import { deductStockForSale } from '../services/stockService';
+import { deductStockForSale, getEffectiveStock } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 
 export default function LineOrdersScreen({ user, stock, stockBatches = [], updateMainStock, onSaleRecorded, onOrderDone }) {
@@ -113,7 +113,8 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
 
     setSavingId(order.id);
     try {
-      await deductStockForSale(stock, liveKg, deadKg, updateMainStock, stockBatches);
+      const avail = getEffectiveStock(stock, stockBatches);
+      await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
 
       const { salesId, billNo } = await saveLineOrderDelivery({
         order,
@@ -172,6 +173,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
           cartItems={deliverySheet.cartItems}
           unknownProducts={deliverySheet.unknownProducts}
           stock={stock}
+          stockBatches={stockBatches}
           priceOf={priceOf}
           allCustomers={allCustomers}
           saving={savingId === deliverySheet.order.id}

@@ -1,11 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, ShoppingCart, Users } from 'lucide-react';
 import { auth, db } from './firebase';
-import { FS_BASE } from './lib/firestoreRest';
+import { FS_BASE, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
-import { getEffectiveStock, normalizeStockValues, persistStock } from './services/stockService';
+import {
+  getEffectiveStock,
+  normalizeStockValues,
+  persistStock,
+  syncMainStockFromBatches,
+} from './services/stockService';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import Dashboard from './screens/Dashboard';
@@ -43,9 +48,26 @@ export default function App() {
     });
   }, []);
 
-  // Real-time shared stock + FIFO batches (สำหรับยอดขายได้จริง)
+  const loadStockBatchesRest = useCallback(async () => {
+    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID || !member) return;
+    try {
+      const rows = await fsQueryStockBatches(50);
+      if (rows.length > 0) setStockBatches(rows);
+    } catch (e) {
+      console.warn('fsQueryStockBatches', e);
+    }
+  }, [member]);
+
+  // Real-time shared stock + ล็อต (REST + snapshot — หน้าขายต้องเห็นล็อตเหมือนภาพรวม)
   useEffect(() => {
-    if (!db || !member) return;
+    if (!member) return undefined;
+    loadStockBatchesRest();
+    const iv = setInterval(loadStockBatchesRest, 20000);
+    return () => clearInterval(iv);
+  }, [member, stockRefresh, loadStockBatchesRest]);
+
+  useEffect(() => {
+    if (!db || !member) return undefined;
     const unsubs = [
       onSnapshot(doc(db, 'config', 'stock'), (snap) => {
         if (snap.exists()) setStock(snap.data());
@@ -53,11 +75,21 @@ export default function App() {
       onSnapshot(
         query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(50)),
         (snap) => setStockBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-        () => {},
+        (err) => {
+          console.warn('stockBatches snapshot', err);
+          loadStockBatchesRest();
+        },
       ),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [member]);
+  }, [member, loadStockBatchesRest]);
+
+  useEffect(() => {
+    if (!member || stockBatches.length === 0) return;
+    syncMainStockFromBatches(stock, stockBatches)
+      .then((val) => { if (val) setStock(val); })
+      .catch(() => {});
+  }, [member, stockBatches]);
 
   const effectiveStock = useMemo(
     () => getEffectiveStock(stock, stockBatches),
@@ -141,13 +173,13 @@ export default function App() {
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'home'           && <Dashboard stock={stock} stockBatches={stockBatches} localBills={transactions} refreshKey={salesRefresh} stockRefreshKey={stockRefresh} active={activeTab === 'home'} />}
-        {activeTab === 'pos'            && <POSMobile user={member} stock={effectiveStock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
+        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && <InventoryScreen stock={effectiveStock} stockBatches={stockBatches} updateMainStock={updateMainStock} onReceived={() => setStockRefresh((n) => n + 1)} />}
         {activeTab === 'members'        && <MembersScreen />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
             user={member}
-            stock={effectiveStock}
+            stock={stock}
             stockBatches={stockBatches}
             updateMainStock={updateMainStock}
             onSaleRecorded={() => {
