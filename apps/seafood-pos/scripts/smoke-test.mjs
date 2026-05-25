@@ -26,6 +26,11 @@ function normalizeLineItem(item) {
   };
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
+import {
+  resolveBillRowIndex,
+  groupBillItemsByRow,
+  BILL_PRINTED_ROWS,
+} from '../src/lib/billRowMap.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +85,20 @@ try {
   assert(billAmount({ total: 500 }) === 500, 'billAmount');
 } catch (e) {
   fail('billAmount', e);
+}
+
+try {
+  assert(resolveBillRowIndex({ productId: 'large' }) === BILL_PRINTED_ROWS.large, 'แถว A = กุ้งใหญ่');
+  assert(resolveBillRowIndex({ productId: 'medium' }) === BILL_PRINTED_ROWS.medium, 'แถว B = กุ้งกลาง');
+  assert(resolveBillRowIndex({ productId: 'small' }) === BILL_PRINTED_ROWS.small, 'แถว C = กุ้งเล็ก');
+  const grouped = groupBillItemsByRow([
+    { productId: 'medium', weightKg: 2, lineTotal: 2200, pricePerKg: 1100 },
+    { productId: 'small', weightKg: 1, lineTotal: 850, pricePerKg: 850 },
+  ]);
+  assert(grouped.byRow.get(BILL_PRINTED_ROWS.medium)?.productId === 'medium', 'จัดกลุ่มแถว B');
+  assert(grouped.overflow.length === 0, 'ไม่มี overflow สำหรับ A/B/C');
+} catch (e) {
+  fail('billRowMap', e);
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');

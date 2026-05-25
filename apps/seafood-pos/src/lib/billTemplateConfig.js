@@ -6,4 +6,5 @@ export function getBillTemplateUrl() {
 
 export const BILL_QR_URL = `${import.meta.env.BASE_URL || '/'}bill-assets/line-oa-qr.png`;
 
-export const MEMBER_DISCOUNT_RATE = 0.1;
+/** ไม่หักส่วนลดสมาชิกในภาพบิล */
+export const MEMBER_DISCOUNT_RATE = 0;

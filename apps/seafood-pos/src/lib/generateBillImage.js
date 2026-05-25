@@ -1,4 +1,5 @@
-import { BILL_QR_URL, getBillTemplateUrl, MEMBER_DISCOUNT_RATE } from './billTemplateConfig';
+import { BILL_QR_URL, getBillTemplateUrl } from './billTemplateConfig';
+import { groupBillItemsByRow, isPreprintedProductRow, normalizeLineItem } from './billRowMap';
 import { formatDateThaiShort, shiftDateKey } from './date';
 
 const REF_W = 2683;
@@ -15,8 +16,6 @@ const LAYOUT = {
   phone: { x: 0.58, y: 0.354, w: 0.32, h: 0.024, size: 34 },
   rowStart: 0.403,
   rowHeight: 0.0262,
-  tableTop: 0.398,
-  tableBottom: 0.858,
   colName: 0.08,
   colNameW: 0.44,
   colQty: 0.53,
@@ -25,14 +24,14 @@ const LAYOUT = {
   colPriceW: 0.1,
   colAmount: 0.78,
   colAmountW: 0.12,
-  subtotal: { x: 0.72, y: 0.862, w: 0.2, h: 0.024, size: 34 },
+  net: { x: 0.68, y: 0.936, w: 0.24, h: 0.032, size: 40, weight: '700' },
   member: { x: 0.72, y: 0.886, w: 0.2, h: 0.024, size: 34 },
   deduct: { x: 0.72, y: 0.910, w: 0.2, h: 0.024, size: 34 },
-  net: { x: 0.68, y: 0.936, w: 0.24, h: 0.032, size: 40, weight: '700' },
   qr: { x: 0.048, y: 0.192, size: 0.155 },
 };
 
-const MAX_ROWS = 14;
+const OVERFLOW_ROW_START = 7;
+const MAX_OVERFLOW_ROWS = 6;
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -48,21 +47,7 @@ function scale(size, canvasW) {
   return Math.round(size * (canvasW / REF_W));
 }
 
-/** รองรับทั้ง cart (weight/total) และ Firestore (weightKg/lineTotal) */
-export function normalizeLineItem(item) {
-  const weight = parseFloat(item.weightKg ?? item.weight ?? 0) || 0;
-  const total = parseFloat(item.lineTotal ?? item.total ?? 0) || 0;
-  const pricePerKg = parseFloat(item.pricePerKg ?? 0) || 0;
-  const type = item.type || (item.productId === 'dead' ? 'dead' : 'live');
-  return {
-    productName: item.productName || '',
-    type,
-    weight,
-    total,
-    pricePerKg,
-    note: item.note || '',
-  };
-}
+export { normalizeLineItem } from './billRowMap';
 
 function fillMask(ctx, W, H, rect) {
   ctx.fillStyle = '#ffffff';
@@ -98,11 +83,11 @@ function formatTimeLabel(ts) {
   return m ? `${m[1].padStart(2, '0')}.${m[2]}` : '';
 }
 
-function itemRowDisplay(item) {
+function itemRowDisplay(item, { includeName = true } = {}) {
   const row = normalizeLineItem(item);
   if (row.type === 'dead') {
     return {
-      name: row.productName,
+      name: includeName ? row.productName : '',
       qty: '',
       price: '',
       amount: formatMoney(row.total),
@@ -110,11 +95,60 @@ function itemRowDisplay(item) {
   }
   const name = row.note ? `${row.productName} ${row.note}` : row.productName;
   return {
-    name,
+    name: includeName ? name : '',
     qty: row.weight > 0 ? String(row.weight) : '',
     price: row.pricePerKg > 0 ? String(row.pricePerKg) : '',
     amount: formatMoney(row.total),
   };
+}
+
+function rowY(rowIndex) {
+  return LAYOUT.rowStart + rowIndex * LAYOUT.rowHeight;
+}
+
+function drawBillTableRow(ctx, W, H, rowIndex, display, { skipName = false } = {}) {
+  const y = rowY(rowIndex);
+  const h = LAYOUT.rowHeight;
+
+  if (!skipName && display.name) {
+    fillMask(ctx, W, H, { x: LAYOUT.colName, y: y - 0.002, w: LAYOUT.colNameW, h });
+    drawTextMasked(ctx, display.name, W, H, {
+      x: LAYOUT.colName,
+      y,
+      w: LAYOUT.colNameW,
+      h,
+      size: 30,
+    });
+  }
+
+  if (display.qty) {
+    drawTextMasked(ctx, display.qty, W, H, {
+      x: LAYOUT.colQty,
+      y,
+      w: LAYOUT.colQtyW,
+      h,
+      size: 30,
+    });
+  }
+  if (display.price) {
+    drawTextMasked(ctx, display.price, W, H, {
+      x: LAYOUT.colPrice,
+      y,
+      w: LAYOUT.colPriceW,
+      h,
+      size: 30,
+    });
+  }
+  if (display.amount) {
+    drawTextMasked(ctx, display.amount, W, H, {
+      x: LAYOUT.colAmount,
+      y,
+      w: LAYOUT.colAmountW,
+      h,
+      size: 30,
+      align: 'right',
+    });
+  }
 }
 
 export async function generateBillImage(bill, customer = {}) {
@@ -141,19 +175,10 @@ export async function generateBillImage(bill, customer = {}) {
   ctx.fillRect(qx - 6, qy - 6, qSize + 12, qSize + 12);
   if (qr) ctx.drawImage(qr, qx, qy, qSize, qSize);
 
-  fillMask(ctx, W, H, {
-    x: LAYOUT.tableTop,
-    y: LAYOUT.tableTop,
-    w: 0.9,
-    h: LAYOUT.tableBottom - LAYOUT.tableTop,
-  });
-
   const dateKey = bill.dateKey || '';
   const deliveryKey = bill.deliveryDateKey || shiftDateKey(dateKey, 1);
-  const items = (bill.items || []).map(normalizeLineItem);
-  const subtotal = parseFloat(bill.total) || items.reduce((s, i) => s + i.total, 0);
-  const memberOff = subtotal * MEMBER_DISCOUNT_RATE;
-  const net = subtotal - memberOff;
+  const items = bill.items || [];
+  const subtotal = parseFloat(bill.total) || items.map(normalizeLineItem).reduce((s, i) => s + i.total, 0);
 
   const customerName = bill.customerName || customer.name || '';
 
@@ -165,45 +190,20 @@ export async function generateBillImage(bill, customer = {}) {
   drawTextMasked(ctx, customer.zone || bill.zone || '', W, H, LAYOUT.address);
   drawTextMasked(ctx, customer.phone || bill.phone || '', W, H, LAYOUT.phone);
 
-  items.slice(0, MAX_ROWS).forEach((item, i) => {
-    const row = itemRowDisplay(item);
-    const y = LAYOUT.rowStart + i * LAYOUT.rowHeight;
-    fillMask(ctx, W, H, { x: LAYOUT.colName, y: y - 0.002, w: 0.86, h: LAYOUT.rowHeight });
-    drawTextMasked(ctx, row.name, W, H, {
-      x: LAYOUT.colName,
-      y,
-      w: LAYOUT.colNameW,
-      h: LAYOUT.rowHeight,
-      size: 30,
-    });
-    drawTextMasked(ctx, row.qty, W, H, {
-      x: LAYOUT.colQty,
-      y,
-      w: LAYOUT.colQtyW,
-      h: LAYOUT.rowHeight,
-      size: 30,
-    });
-    drawTextMasked(ctx, row.price, W, H, {
-      x: LAYOUT.colPrice,
-      y,
-      w: LAYOUT.colPriceW,
-      h: LAYOUT.rowHeight,
-      size: 30,
-    });
-    drawTextMasked(ctx, row.amount, W, H, {
-      x: LAYOUT.colAmount,
-      y,
-      w: LAYOUT.colAmountW,
-      h: LAYOUT.rowHeight,
-      size: 30,
-      align: 'right',
-    });
+  const { byRow, overflow } = groupBillItemsByRow(items);
+
+  for (const [rowIndex, item] of byRow.entries()) {
+    const skipName = isPreprintedProductRow(rowIndex);
+    drawBillTableRow(ctx, W, H, rowIndex, itemRowDisplay(item, { includeName: !skipName }), { skipName });
+  }
+
+  overflow.slice(0, MAX_OVERFLOW_ROWS).forEach((item, i) => {
+    drawBillTableRow(ctx, W, H, OVERFLOW_ROW_START + i, itemRowDisplay(item, { includeName: true }));
   });
 
-  drawTextMasked(ctx, formatMoney(subtotal), W, H, { ...LAYOUT.subtotal, align: 'right' });
-  drawTextMasked(ctx, formatMoney(memberOff), W, H, { ...LAYOUT.member, align: 'right' });
-  drawTextMasked(ctx, formatMoney(memberOff), W, H, { ...LAYOUT.deduct, align: 'right' });
-  drawTextMasked(ctx, formatMoney(net), W, H, { ...LAYOUT.net, align: 'right', weight: '700' });
+  fillMask(ctx, W, H, LAYOUT.member);
+  fillMask(ctx, W, H, LAYOUT.deduct);
+  drawTextMasked(ctx, formatMoney(subtotal), W, H, { ...LAYOUT.net, align: 'right', weight: '700' });
 
   const blob = await new Promise((resolve, reject) => {
     canvas.toBlob(
