@@ -1,3 +1,6 @@
+/** ค่าเริ่มต้น — ลูกค้าส่วนใหญ่โอนทีหลัง */
+export const DEFAULT_PAYMENT_TYPE = 'credit';
+
 /** วิธีชำระเงิน POS */
 export const PAY = [
   { id: 'cash', label: 'สด', cls: 'bg-emerald-500' },

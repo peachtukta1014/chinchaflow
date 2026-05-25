@@ -1,6 +1,8 @@
+import { DEFAULT_PAYMENT_TYPE } from '../constants/payments';
 import { dateKeyBangkok } from '../lib/date';
 import { fsPatch, fsPost, fsQueryLineOrders } from '../lib/firestoreRest';
 import { actualQtyOf } from '../lib/lineOrderToSale';
+import { incrementCustomerDebt } from './debtService';
 
 function withTimeout(promise, ms = 12000) {
   return Promise.race([
@@ -67,9 +69,9 @@ export async function saveLineOrderDelivery({
       note: i.note || '',
     })),
     total,
-    paymentType: 'cash',
-    paidAmount: total,
-    remainingAmount: 0,
+    paymentType: DEFAULT_PAYMENT_TYPE,
+    paidAmount: 0,
+    remainingAmount: total,
     photoUrl: null,
     timestamp: new Date().toLocaleTimeString('th-TH'),
     recordedBy,
@@ -79,6 +81,16 @@ export async function saveLineOrderDelivery({
     lineRawText: order.rawText || '',
     fulfilledItems,
   }));
+
+  if (total > 0 && customer.id && customer.id !== 'general') {
+    await withTimeout(incrementCustomerDebt(customer.id, {
+      customerId: customer.id,
+      customerName: customer.name,
+      zone: customer.zone || 'ทั่วไป',
+      lastBillNo: billNo,
+      lastUpdated: now,
+    }, total));
+  }
 
   await withTimeout(fsPatch(`lineOrders/${order.id}`, {
     status: 'done',

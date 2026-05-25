@@ -11,6 +11,7 @@ import {
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
 import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
+import { updateSalePayment } from '../services/salesService';
 import { getEffectiveStock } from '../services/stockService';
 
 function formatBatchPurchaseDate(value) {
@@ -31,7 +32,29 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
   const [loading, setLoading] = useState(true);
   const [salesLoadError, setSalesLoadError] = useState(false);
   const [salesRetry, setSalesRetry] = useState(0);
+  const [payUpdatingId, setPayUpdatingId] = useState(null);
   const todayKey = dateKeyBangkok();
+
+  const handlePaymentChange = async (tx, newType) => {
+    if (!tx.id || payUpdatingId || tx.paymentType === newType) return;
+    if (newType === 'installment') {
+      alert('ผ่อนชำระ — แก้จากหน้าขายของตอนบันทึกบิลครับ');
+      return;
+    }
+    setPayUpdatingId(tx.id);
+    try {
+      const next = await updateSalePayment(tx, newType);
+      setFirestoreSales((prev) => prev.map((b) => (
+        b.id === tx.id ? { ...b, ...next } : b
+      )));
+    } catch (e) {
+      console.error(e);
+      alert('แก้สถานะไม่สำเร็จ ลองอีกครั้งครับ');
+      setSalesRetry((c) => c + 1);
+    } finally {
+      setPayUpdatingId(null);
+    }
+  };
 
   const loadSalesRest = useCallback(async () => {
     if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) {
@@ -227,29 +250,42 @@ export default function Dashboard({ stock, stockBatches: stockBatchesProp, local
           </div>
 
           <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">บิลล่าสุดวันนี้</h3>
+            <h3 className="font-bold text-slate-800 mb-1">บิลล่าสุดวันนี้</h3>
+            <p className="text-[10px] text-slate-400 mb-3">แตะปุ่มสถานะด้านล่างบิลเพื่อเปลี่ยน (สด/โอน/ค้าง)</p>
             {todaySales.length === 0
               ? <p className="text-center text-slate-400 py-6">ยังไม่มีรายการวันนี้</p>
               : (
                 <div className="space-y-3">
                   {todaySales.slice(0, 15).map((tx, i) => {
-                    const pt = PAY.find(p => p.id === tx.paymentType);
+                    const busy = payUpdatingId === tx.id;
                     return (
-                      <div key={tx.id || i} className="flex justify-between items-start border-b border-slate-100 pb-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-slate-700 truncate">{tx.customerName}</p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className={`text-[10px] font-bold text-white px-2 py-0.5 rounded-full shrink-0 ${pt?.cls || 'bg-slate-400'}`}>
-                              {pt?.label || tx.paymentType}
-                            </span>
-                            {(tx.remainingAmount || 0) > 0 && (
-                              <span className="text-[10px] text-orange-500 font-bold">
-                                ค้าง ฿{tx.remainingAmount.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <p className="font-black text-emerald-600 ml-2 shrink-0">฿{billAmount(tx).toLocaleString()}</p>
+                      <div key={tx.id || i} className="border-b border-slate-100 pb-3 last:border-0">
+                        <div className="flex justify-between items-start">
+                          <p className="font-bold text-sm text-slate-700 truncate flex-1">{tx.customerName}</p>
+                          <p className="font-black text-emerald-600 ml-2 shrink-0">฿{billAmount(tx).toLocaleString()}</p>
+                        </div>
+                        <div className="flex gap-1 mt-2 flex-wrap">
+                          {PAY.filter((p) => p.id !== 'installment').map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={busy || !tx.id}
+                              onClick={() => handlePaymentChange(tx, p.id)}
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-all ${
+                                tx.paymentType === p.id
+                                  ? `${p.cls} text-white`
+                                  : 'bg-slate-100 text-slate-500'
+                              } ${busy ? 'opacity-50' : 'active:scale-95'}`}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                        {(tx.remainingAmount || 0) > 0 && (
+                          <p className="text-[10px] text-orange-500 font-bold mt-1">
+                            ค้างจ่าย ฿{Number(tx.remainingAmount).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
