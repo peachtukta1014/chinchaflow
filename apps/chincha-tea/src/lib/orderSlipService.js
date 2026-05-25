@@ -1,5 +1,6 @@
 import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
+import { compressImageFile } from './compressImage';
 import { fsPost } from './firestoreRest';
 
 /**
@@ -9,10 +10,10 @@ export async function uploadOrderSlip({ file, dateKey, member, storageFolder = '
   if (!file) throw new Error('no file');
   if (!storage) throw new Error('storage not ready');
 
-  const ext = file.name?.split('.').pop() || 'jpg';
-  const path = `${storageFolder}/${dateKey}/${member?.uid || 'anon'}_${Date.now()}.${ext}`;
+  const compressed = await compressImageFile(file);
+  const path = `${storageFolder}/${dateKey}/${member?.uid || 'anon'}_${Date.now()}.jpg`;
   const r = stRef(storage, path);
-  await uploadBytes(r, file, { contentType: file.type || 'image/jpeg' });
+  await uploadBytes(r, compressed, { contentType: 'image/jpeg' });
   const downloadUrl = await getDownloadURL(r);
 
   await fsPost('orderSlips', {
