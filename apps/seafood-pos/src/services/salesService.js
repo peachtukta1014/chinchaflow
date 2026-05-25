@@ -73,6 +73,7 @@ export function buildBillData({
       dateKey,
       customerName: customer.name,
       customerId: selectedCustomer,
+      customerLineUserId: customer.lineUserId || null,
       zone: customer.zone,
       items: cartItems,
       total,
