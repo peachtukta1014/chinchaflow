@@ -15,6 +15,7 @@ import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
 import { saveBillWithCart as saveBillWithCartService } from '../services/salesService';
+import BillImageSheet from '../components/BillImageSheet';
 
 export default function POSMobile({ user, stock, stockBatches = [], updateMainStock, onSaveBill }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
@@ -30,8 +31,10 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
   const [paymentType, setPaymentType] = useState(DEFAULT_PAYMENT_TYPE);
   const [paidAmount, setPaidAmount] = useState('');
   const [photoUrl, setPhotoUrl]     = useState(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const photoGalleryRef = useRef(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [billForImage, setBillForImage] = useState(null);
+  const [billForImageCustomer, setBillForImageCustomer] = useState(null);
+  const photoGalleryRef = useRef(null);
   const photoCameraRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
@@ -156,6 +159,8 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
+      setBillForImage(billData);
+      setBillForImageCustomer(customer);
       setCart([]); setSelectedCustomer('general');
       setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
       setPhotoUrl(null);
@@ -264,9 +269,19 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
     return acc;
   }, {});
 
-  return (
-    <div className="flex flex-col bg-slate-100" style={{ minHeight: 'calc(100vh - 120px)' }}>
-      <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
+  return (
+    <div className="flex flex-col bg-slate-100" style={{ minHeight: 'calc(100vh - 120px)' }}>
+      {billForImage && (
+        <BillImageSheet
+          bill={billForImage}
+          customer={billForImageCustomer}
+          onClose={() => {
+            setBillForImage(null);
+            setBillForImageCustomer(null);
+          }}
+        />
+      )}
+      <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
         {/* Customer selector */}
         <div className="flex items-center bg-slate-50 rounded-2xl p-2 border border-slate-200 mb-3">
           <MapPin className="text-blue-500 ml-2 shrink-0" size={20} />
