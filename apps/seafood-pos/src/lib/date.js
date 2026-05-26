@@ -23,6 +23,18 @@ export function formatDateThaiShort(dateKey) {
 }
 
 /** ป้ายวันสำหรับตัวเลื่อนวัน (วันนี้ / เมื่อวาน / พรุ่งนี้ / วันที่สั้น) */
+/** รายการ dateKey จาก start ถึง end (รวมปลายทาง) */
+export function dateKeysBetween(startKey, endKey, maxDays = 90) {
+  if (!startKey || !endKey || startKey > endKey) return [];
+  const keys = [];
+  let k = startKey;
+  while (k <= endKey && keys.length < maxDays) {
+    keys.push(k);
+    k = shiftDateKey(k, 1);
+  }
+  return keys;
+}
+
 export function formatViewDateLabel(dateKey) {
   const today = dateKeyBangkok();
   if (dateKey === today) return 'วันนี้';

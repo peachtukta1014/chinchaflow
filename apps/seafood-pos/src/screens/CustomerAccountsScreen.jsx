@@ -279,10 +279,6 @@ export default function CustomerAccountsScreen({
     }
   }, [viewDate, refreshKey]);
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([loadDebtsRest(), loadOpenSalesIndex(), loadDaySales()]);
-  }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales]);
-
   useEffect(() => {
     loadDebtsRest();
     if (!db) return undefined;
@@ -296,8 +292,12 @@ export default function CustomerAccountsScreen({
   }, [loadDebtsRest, refreshKey]);
 
   useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
+    loadOpenSalesIndex();
+  }, [loadOpenSalesIndex]);
+
+  useEffect(() => {
+    loadDaySales();
+  }, [loadDaySales]);
 
   useEffect(() => {
     if (!db) return undefined;

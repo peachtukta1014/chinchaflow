@@ -338,16 +338,23 @@ export async function fsQuerySales(dateKey) {
   return docs;
 }
 
-/** บิลขายช่วงวัน (สรุปล็อต) — ดึงรายการล่าสุดแล้วกรองตาม dateKey */
+/** บิลขายช่วงวัน (สรุปล็อต) — query รายวัน ไม่ดึง sales ทั้งก้อน */
 export async function fsQuerySalesBetween(startKey, endKey) {
   if (!startKey || !endKey || startKey > endKey) return [];
-  const all = await fsListCollection('sales', 400);
-  return sortSalesDesc(
-    all.filter((d) => {
-      const dk = saleDateKeyOf(d);
-      return dk >= startKey && dk <= endKey;
-    }),
-  );
+  const keys = dateKeysBetween(startKey, endKey, 60);
+  if (keys.length === 0) return [];
+  const chunks = await Promise.all(keys.map((dk) => fsQuerySales(dk)));
+  const seen = new Set();
+  const merged = [];
+  for (const docs of chunks) {
+    for (const d of docs) {
+      const id = d.id || d.billNo;
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      merged.push(d);
+    }
+  }
+  return sortSalesDesc(merged);
 }
 
 /** ประวัติปรับสต๊อก (ย้ายบ่อ / เสียหาย / ชั่งปิด) */

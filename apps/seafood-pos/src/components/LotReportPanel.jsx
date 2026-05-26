@@ -28,7 +28,7 @@ function MetricRow({ label, value, sub, accent }) {
   );
 }
 
-export default function LotReportPanel({ stockBatches = [] }) {
+export default function LotReportPanel({ stockBatches = [], active = true }) {
   const todayKey = dateKeyBangkok();
   const lotDays = useMemo(() => groupBatchesByReceiveDay(stockBatches), [stockBatches]);
   const defaultLotKey = lotDays.length ? lotDays[lotDays.length - 1].dateKey : todayKey;
@@ -71,8 +71,9 @@ export default function LotReportPanel({ stockBatches = [] }) {
   }, [lotDateKey, endDateKey]);
 
   useEffect(() => {
+    if (!active) return;
     loadReportData();
-  }, [loadReportData]);
+  }, [loadReportData, active]);
 
   const report = useMemo(() => {
     const cLive = countedLive === '' ? null : parseFloat(countedLive);

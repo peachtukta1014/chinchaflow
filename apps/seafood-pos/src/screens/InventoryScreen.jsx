@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
 import { fsQueryStockAdjustments } from '../lib/firestoreRest';
 import { countReceivesOnDate, formatReceiveDayLabel } from '../lib/stockBatchUtils';
@@ -8,9 +8,16 @@ import {
   transferPondDeath,
 } from '../services/stockService';
 import DateNavBar from '../components/DateNavBar';
-import LotReportPanel from '../components/LotReportPanel';
-import StockCountPanel from '../components/StockCountPanel';
 import StockLotTimeline from '../components/StockLotTimeline';
+
+const LotReportPanel = lazy(() => import('../components/LotReportPanel'));
+const StockCountPanel = lazy(() => import('../components/StockCountPanel'));
+
+function AdminPanelLoading() {
+  return (
+    <div className="py-10 text-center text-slate-400 text-sm font-medium">กำลังโหลด...</div>
+  );
+}
 
 const ADJUST_LABELS = {
   pond_to_dead: { title: 'ย้ายเป็นขายได้', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
@@ -208,17 +215,21 @@ export default function InventoryScreen({
       </div>
 
       {tab === 'lotReport' && isAdmin && (
-        <LotReportPanel stockBatches={stockBatches} />
+        <Suspense fallback={<AdminPanelLoading />}>
+          <LotReportPanel stockBatches={stockBatches} active />
+        </Suspense>
       )}
 
       {tab === 'stockCount' && isAdmin && (
-        <StockCountPanel
-          stock={stock}
-          stockBatches={stockBatches}
-          updateMainStock={updateMainStock}
-          member={member}
-          onDone={onStockMoved}
-        />
+        <Suspense fallback={<AdminPanelLoading />}>
+          <StockCountPanel
+            stock={stock}
+            stockBatches={stockBatches}
+            updateMainStock={updateMainStock}
+            member={member}
+            onDone={onStockMoved}
+          />
+        </Suspense>
       )}
 
       {tab === 'lots' && (
