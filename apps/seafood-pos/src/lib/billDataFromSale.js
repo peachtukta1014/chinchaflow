@@ -1,4 +1,4 @@
-import { formatDateThaiShort, shiftDateKey } from './date.js';
+import { dateKeyBangkok, formatDateThaiShort } from './date.js';
 import { normalizeLineItem } from './billRowMap.js';
 
 export const TEMPLATE_ROW_NAMES = {
@@ -67,9 +67,10 @@ function lineToBillItem(raw) {
 /** @returns {import('../components/BillTemplate').BillData} */
 export function saleToBillData(bill, customer = {}) {
   const dateKey = bill.dateKey || '';
+  /** วันที่ส่งบนบิล = วันจัดส่งจริง (ไม่บวก +1 อัตโนมัติ) */
   const deliveryKey =
     bill.deliveryDateKey ||
-    (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? shiftDateKey(dateKey, 1) : dateKey);
+    (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : dateKeyBangkok());
   const items = bill.items || [];
   const byTemplate = new Map();
   const extraLines = [];

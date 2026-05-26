@@ -123,26 +123,39 @@ export default function BillTemplate({ data }) {
         ใบส่งของ
       </div>
 
-      <div className="text-xs space-y-1.5 mb-4 font-medium -mt-0.5">
-        <div className="flex w-full gap-4 items-end">
-          <div className="flex-grow flex min-w-0">
-            <span className="whitespace-nowrap">นามลูกค้า</span>
-            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold truncate leading-tight">
-              {data.customerName}
-            </span>
+      <div className="text-xs space-y-2 mb-4 font-medium -mt-1">
+        <div className="flex w-full gap-4">
+          <div className="flex-grow min-w-0">
+            <div className="flex gap-1.5 items-start">
+              <span className="whitespace-nowrap pt-0.5 shrink-0">นามลูกค้า</span>
+              <div className="flex-grow min-w-0 relative pb-1">
+                <p className="text-black font-semibold truncate leading-snug mb-1 relative z-10">
+                  {data.customerName}
+                </p>
+                <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
+              </div>
+            </div>
           </div>
-          <div className="w-44 flex shrink-0 items-end">
-            <span className="whitespace-nowrap">วันที่</span>
-            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold leading-tight">
-              {data.date}
-            </span>
+          <div className="w-40 shrink-0">
+            <div className="flex gap-1.5 items-start">
+              <span className="whitespace-nowrap pt-0.5 shrink-0">วันที่ส่ง</span>
+              <div className="flex-grow min-w-0 relative pb-1">
+                <p className="text-black font-semibold leading-snug mb-1 relative z-10 whitespace-nowrap">
+                  {data.date}
+                </p>
+                <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex w-full">
-          <span className="whitespace-nowrap">ที่อยู่</span>
-          <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black">
-            {data.address || ''}
-          </span>
+        <div className="flex w-full gap-1.5 items-start">
+          <span className="whitespace-nowrap pt-0.5 shrink-0">ที่อยู่</span>
+          <div className="flex-grow min-w-0 relative pb-1">
+            <p className="text-black leading-snug mb-1 min-h-[1rem] relative z-10">
+              {data.address || '\u00a0'}
+            </p>
+            <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
+          </div>
         </div>
       </div>
 

@@ -63,11 +63,11 @@ try {
   const data = saleToBillData({
     billNo: 'B001',
     customerName: 'ปุ้ย',
-    dateKey: '2026-05-25',
+    dateKey: '2026-05-26',
     items: [{ productId: 'medium', weightKg: 2, lineTotal: 2200, pricePerKg: 1100 }],
     total: 2200,
   });
-  assert(data.date === '26/5/69', 'วันที่บิล = วันจัดส่ง (26 ไม่ใช่ 25)');
+  assert(data.date === '26/5/69', 'วันที่บิล = วันจัดส่ง (ตรง dateKey ไม่บวกวัน)');
   assert(data.items[0].name === 'กุ้งแม่น้ำ B', 'บิลดิจิทัลมีรายการแถว B');
   assert(data.totalAmount === 2200, 'ยอดรวมไม่หักส่วนลด');
   assert(data.customerName === 'ปุ้ย', 'ชื่อลูกค้าถูกต้อง');
