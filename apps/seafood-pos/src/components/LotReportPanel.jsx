@@ -238,8 +238,19 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
         <p className="text-xs font-bold text-slate-600 mb-2">การเคลื่อนไหวในล็อต (ที่บันทึกแล้ว)</p>
-        <MetricRow label="ย้ายบ่อ → ตายขายได้" value={fmtKg(report.pondToDeadKg)} />
-        <MetricRow label="ตัดทิ้ง / เสียหาย (จดแล้ว)" value={fmtKg(report.spoilageKg)} sub={fmtBaht(report.spoilageBaht)} />
+        <p className="text-[10px] text-slate-400 mb-2 leading-relaxed">
+          ย้ายบ่อ→ตาย = ยังอยู่ในกองทุน (รอขายตาย) · ตัดทิ้ง/เสียหาย = ขาดทุนทุนล็อต (ไม่ใช่ยอดขาย)
+        </p>
+        <MetricRow
+          label="ย้ายบ่อ → ตาย (รอขาย)"
+          value={fmtKg(report.pondToDeadKg)}
+          sub="ไม่นับขาดทุน — ตัดขาดทุนตอนขายตายหรือของเสียเท่านั้น"
+        />
+        <MetricRow
+          label="เสียหาย / ตัดทิ้ง (จดแล้ว)"
+          value={fmtKg(report.spoilageKg)}
+          sub="รวมใน「ของเสียล็อต」ด้านล่าง"
+        />
         <MetricRow
           label="คงเหลือในล็อต (ระบบ)"
           value={fmtKg(report.remainingTotalKg)}
@@ -248,16 +259,28 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
       </div>
 
       <div className="bg-red-50 border border-red-100 p-5 rounded-[2rem] shadow-sm">
-        <p className="text-xs font-bold text-red-700 mb-2">ของเสีย / หายจากล็อต (ตัดขาดทุนเต็มต้นทุน)</p>
+        <p className="text-xs font-bold text-red-700 mb-2">กุ้งเสียหาย / หายจากล็อต (ขาดทุนทุนรับเข้า)</p>
         <p className="text-[10px] text-red-600/80 mb-3 leading-relaxed">
-          คำนวณจาก: รับเข้า − ขาย − คงเหลือ = กก. ที่ไม่ออกเป็นยอดขาย (ปูกิน, เน่าไม่จด ฯลฯ)
+          กก. ที่ไม่กลายเป็นรายได้ขาย — ทั้งที่จด「เสียหาย」และที่หายเอง (ปูกิน / เน่าไม่จด)
+          {' '}
+          · สมดุล: รับเข้า − ขาย − คงเหลือ
         </p>
-        <MetricRow label="น้ำหนักของเสีย" value={fmtKg(report.shrinkageKg)} accent="text-red-700" />
-        <MetricRow label="มูลค่าขาดทุน (ประมาณ)" value={fmtBaht(report.shrinkageBaht)} accent="text-red-700" />
+        <MetricRow label="น้ำหนักขาดทุนรวม" value={fmtKg(report.shrinkageKg)} accent="text-red-700" />
+        <MetricRow label="มูลค่าขาดทุน (ทุนล็อต/กก.)" value={fmtBaht(report.shrinkageBaht)} accent="text-red-700" />
+        {report.stockCountBaht > 0 && (
+          <MetricRow
+            label="จากชั่งปิดสต๊อก (บันทึกแล้ว)"
+            value={fmtBaht(report.stockCountBaht)}
+            accent="text-red-700"
+          />
+        )}
       </div>
 
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-2">
-        <p className="text-xs font-bold text-cyan-300">ผลการทำงานล็อต (สุทธิ)</p>
+        <p className="text-xs font-bold text-cyan-300">ผลล็อตสุทธิ (คำนวณในแอป)</p>
+        <p className="text-[10px] text-slate-400 leading-relaxed">
+          รายได้ขาย − ต้นทุนขาย (ตายใช้ทุนแบบเป็น) − ของเสีย/หาย = สุทธิล็อต · ลูกค้าค้างดูแท็บบัญชี
+        </p>
         <MetricRow
           label="ต้นทุนของที่ขาย (ประมาณ)"
           value={fmtBaht(report.cogsSold)}
@@ -269,18 +292,19 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           accent={report.grossProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}
         />
         <MetricRow
-          label="หักของเสียล็อต"
+          label="หักของเสีย / เสียหายล็อต"
           value={`−${fmtBaht(report.totalLossBaht)}`}
           accent="text-red-300"
         />
         <div className="pt-3 mt-2 border-t border-slate-700 flex justify-between items-center">
-          <p className="font-bold text-sm">สุทธิล็อต</p>
+          <p className="font-bold text-sm">สุทธิล็อต (กุ้งล็อตนี้)</p>
           <p className={`text-2xl font-black ${report.netLotProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtBaht(report.netLotProfit)}
           </p>
         </div>
         <p className="text-[10px] text-slate-400 leading-relaxed pt-1">
-          นำตัวเลขสุทธิล็อตไปบวก/ลบกับค่าใช้จ่ายอื่น (ค่าแรง, ค่ารถ ฯลฯ) เพื่อดูผลประกอบการรวม
+          พนักงานแค่บันทึกขาย/รับเข้า/ย้ายบ่อ/เสียหาย — แอปสรุปสุทธิให้ · ถ้ามีค่าแรงหรือค่าใช้จ่ายนอกล็อต
+          จะเพิ่มบันทึกในแอปภายหลังได้
         </p>
       </div>
 
