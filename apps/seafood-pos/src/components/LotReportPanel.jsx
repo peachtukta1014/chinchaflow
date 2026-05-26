@@ -236,39 +236,6 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         )}
       </div>
 
-      <div className="bg-amber-50 border border-amber-100 p-5 rounded-[2rem] shadow-sm">
-        <p className="text-xs font-bold text-amber-900 mb-1">จุดเชื่อม เป็น → ตาย (ต้นทุน vs ราคาขาย)</p>
-        <p className="text-[10px] text-amber-800/90 mb-3 leading-relaxed">
-          กุ้งตายที่ขาย ใช้
-          <strong> ต้นทุนต่อกก. ของล็อต (จากรับเข้า) </strong>
-          เหมือนกุ้งเป็น — รายได้ใช้ราคาขายตายจริง กำไรตาย = รายได้ตาย − (กก.ตายขาย × ต้นทุนล็อต)
-        </p>
-        <MetricRow
-          label="ต้นทุน/กก. ล็อต (ใช้กับทั้งเป็นและตาย)"
-          value={`฿${report.avgCostPerKg.toFixed(2)}`}
-        />
-        <MetricRow
-          label="ย้ายบ่อ → สต๊อกตาย (ยังไม่ขาย)"
-          value={fmtKg(report.pondToDeadKg)}
-          sub={
-            report.pondToDeadKg > 0
-              ? `มูลค่าทุนเดิม ~${fmtBaht(report.pondToDeadCostBaht)} (ยังอยู่ในกองทุน)`
-              : '—'
-          }
-        />
-        <MetricRow
-          label="ต้นทุนขายกุ้งเป็น"
-          value={fmtBaht(report.liveCogs)}
-          sub={`รายได้ ${fmtBaht(report.liveRevenue)} · กำไรขั้นต้น ${fmtBaht(report.liveGrossProfit)}`}
-        />
-        <MetricRow
-          label="ต้นทุนขายกุ้งตาย (นับเป็นต้นทุนเป็น)"
-          value={fmtBaht(report.deadCogs)}
-          sub={`รายได้ ${fmtBaht(report.deadRevenue)} · กำไรขั้นต้น ${fmtBaht(report.deadGrossProfit)}`}
-          accent={report.deadGrossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}
-        />
-      </div>
-
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
         <p className="text-xs font-bold text-slate-600 mb-2">การเคลื่อนไหวในล็อต (ที่บันทึกแล้ว)</p>
         <MetricRow label="ย้ายบ่อ → ตายขายได้" value={fmtKg(report.pondToDeadKg)} />
