@@ -12,7 +12,7 @@ function fmtBaht(n) {
   return `฿${Math.round(parseFloat(n) || 0).toLocaleString()}`;
 }
 
-function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, noteHint, notePlaceholder, accent }) {
+function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, noteItems, notePlaceholder, accent }) {
   return (
     <div className={`rounded-2xl border p-4 space-y-3 ${accent}`}>
       {title && <p className="text-xs font-bold text-slate-800">{title}</p>}
@@ -30,11 +30,14 @@ function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, note
       </div>
       <div>
         <label className="text-xs font-bold text-slate-700 mb-1 block">หมายเหตุ</label>
-        {noteHint && (
-          <p className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2 mb-2 leading-relaxed">
-            {noteHint}
-          </p>
-        )}
+        <div className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-2 space-y-1.5">
+          <p>กรุณาระบุในช่องหมายเหตุให้ชัด เช่น</p>
+          <ul className="list-disc list-inside font-semibold text-amber-800 space-y-0.5">
+            {noteItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
         <input
           type="text"
           value={note}
@@ -182,8 +185,8 @@ export default function LotExpensesPanel({
         note={pondNote}
         onAmount={setPondAmt}
         onNote={setPondNote}
-        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าน้ำมัน · ค่าจ้างลูกน้ำ · อื่นๆ ****"
-        notePlaceholder="เช่น จ้าง 600 น้ำมัน 400 ลูกน้ำ 2 ก้อน"
+        noteItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+        notePlaceholder="เช่น จ้าง 600 · น้ำมัน 400 · น้ำแข็ง 2 ก้อน 80"
         accent="border-blue-200 bg-blue-50/80"
       />
 
@@ -194,8 +197,8 @@ export default function LotExpensesPanel({
         note={marketNote}
         onAmount={setMarketAmt}
         onNote={setMarketNote}
-        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าจ้างลูกน้ำ · อื่นๆ ****"
-        notePlaceholder="เช่น จ้างแผง 500 ลูกน้ำ 3 ก้อน"
+        noteItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+        notePlaceholder="เช่น จ้างแผง 500 · น้ำแข็ง 3 ก้อน 120"
         accent="border-orange-200 bg-orange-50/80"
       />
 

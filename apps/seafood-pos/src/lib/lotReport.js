@@ -1,4 +1,5 @@
 import { saleDateKeyFromBill } from './date.js';
+import { computeLotCostTotals } from './lotCostSplit.js';
 import { receiveDateKeyOf, groupBatchesByReceiveDay } from './stockBatchUtils';
 import { aggregateDailySales } from './salesAggregate';
 
@@ -21,7 +22,8 @@ export function listLotDateKeys(batches = []) {
 
 function sumAdjustmentsForLot(adjustments = [], batchIds) {
   let pondToDeadKg = 0;
-  let spoilageKg = 0;
+  let spoilageLiveKg = 0;
+  let spoilageDeadKg = 0;
   let stockCountKg = 0;
   let stockCountBaht = 0;
 
@@ -32,17 +34,27 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
     if (adj.type === 'pond_to_dead') {
       for (const a of allocs) pondToDeadKg += kg(a.deadAdded ?? a.liveTaken);
     } else if (adj.type === 'spoilage_loss') {
-      for (const a of allocs) spoilageKg += kg(a.liveTaken);
+      for (const a of allocs) spoilageLiveKg += kg(a.liveTaken);
     } else if (adj.type === 'stock_count') {
       for (const a of allocs) {
-        spoilageKg += kg(a.liveTaken) + kg(a.deadTaken);
+        spoilageLiveKg += kg(a.liveTaken);
+        spoilageDeadKg += kg(a.deadTaken);
       }
       stockCountKg += kg(adj.weightKg);
       stockCountBaht += baht(adj.estimatedLossBaht);
     }
   }
 
-  return { pondToDeadKg, spoilageKg, stockCountKg, stockCountBaht };
+  const spoilageKg = spoilageLiveKg + spoilageDeadKg;
+
+  return {
+    pondToDeadKg,
+    spoilageKg,
+    spoilageLiveKg,
+    spoilageDeadKg,
+    stockCountKg,
+    stockCountBaht,
+  };
 }
 
 /**
@@ -64,22 +76,27 @@ export function computeLotReport({
   const lotBatches = batchesForLot(batches, lotDateKey);
   const batchIds = new Set(lotBatches.map((b) => b.id));
 
-  let receivedLive = 0;
-  let receivedDead = 0;
-  let totalCost = 0;
   let remainingLive = 0;
   let remainingDead = 0;
 
-  let transportTotal = 0;
-
   for (const b of lotBatches) {
-    receivedLive += kg(b.liveKg);
-    receivedDead += kg(b.deadKg);
-    totalCost += baht(b.totalCost);
-    transportTotal += baht(b.transport);
     remainingLive += kg(b.remainingLiveKg ?? b.liveKg);
     remainingDead += kg(b.remainingDeadKg ?? b.deadKg);
   }
+
+  const costTotals = computeLotCostTotals(lotBatches);
+  const {
+    receivedLive,
+    receivedDead,
+    totalCost,
+    transportTotal,
+    shrimpPurchaseCost,
+    liveCostBaht,
+    deadCostBaht,
+    liveCostPerKg,
+    deadCostPerKg,
+    deadCostPerKgForCogs,
+  } = costTotals;
 
   const receivedTotalKg = receivedLive + receivedDead;
   const remainingTotalKg = remainingLive + remainingDead;
@@ -102,25 +119,44 @@ export function computeLotReport({
     0,
     receivedTotalKg - soldTotalKg - remainingTotalKg,
   );
-  const shrinkageBaht = shrinkageKg * avgCostPerKg;
-  const spoilageBaht = adj.spoilageKg * avgCostPerKg;
+  const shrinkageLiveKg = Math.max(0, receivedLive - soldLiveKg - remainingLive);
+  const shrinkageDeadKg = Math.max(0, receivedDead - soldDeadKg - remainingDead);
+  const shrinkageBaht = shrinkageLiveKg * liveCostPerKg + shrinkageDeadKg * deadCostPerKgForCogs;
+  const spoilageBaht = adj.spoilageKg * liveCostPerKg;
 
-  /** ต้นทุนขาย — กก.ตายใช้ต้นทุนเดียวกับกุ้งเป็น (ทุนล็อต) ไม่ใช่ราคาขายตาย */
-  const liveCogs = soldLiveKg * avgCostPerKg;
-  const deadCogs = soldDeadKg * avgCostPerKg;
+  const liveCogs = soldLiveKg * liveCostPerKg;
+  const deadCogs = soldDeadKg * deadCostPerKgForCogs;
   const cogsSold = liveCogs + deadCogs;
   const liveGrossProfit = salesAgg.liveRevenue - liveCogs;
   const deadGrossProfit = salesAgg.deadRevenue - deadCogs;
   const grossProfit = revenue - cogsSold;
-  const pondToDeadCostBaht = adj.pondToDeadKg * avgCostPerKg;
+  const pondToDeadCostBaht = adj.pondToDeadKg * liveCostPerKg;
   const totalLossBaht = shrinkageBaht + adj.stockCountBaht;
   const netLotProfit = grossProfit - totalLossBaht;
   const marketExpensesBaht = baht(marketExpenses);
   const pondExpensesBaht = baht(pondExpenses);
   const miscFromSplit = marketExpensesBaht + pondExpensesBaht;
   const miscExpensesBaht = miscFromSplit > 0 ? miscFromSplit : baht(miscExpenses);
+
+  /** สายกุ้งเป็น / ตาย — ทุนรับเข้า − รายจ่ายสาย (มุมทุน) */
+  const liveCapitalAfterExpenses = liveCostBaht - pondExpensesBaht;
+  const deadCapitalAfterExpenses = deadCostBaht - marketExpensesBaht;
+
+  /** ขาดทุนน้ำหนักแยกสาย (รับ − ขาย − คงเหลือ) */
+  const liveWeightLossKg = shrinkageLiveKg;
+  const deadWeightLossKg = shrinkageDeadKg;
+  const liveWeightLossBaht = liveWeightLossKg * liveCostPerKg;
+  const deadWeightLossBaht = deadWeightLossKg * deadCostPerKgForCogs;
+  const totalWeightLossKg = liveWeightLossKg + deadWeightLossKg;
+
+  /**
+   * สุทธิสาย (มุมกำไร): รายได้ขาย − ต้นทุนขาย − รายจ่ายสาย − มูลค่ากุ้งหาย (กก.)
+   */
+  const liveLineNetBaht = liveGrossProfit - pondExpensesBaht - liveWeightLossBaht;
+  const deadLineNetBaht = deadGrossProfit - marketExpensesBaht - deadWeightLossBaht;
+  const combinedLineNetBaht = liveLineNetBaht + deadLineNetBaht;
+
   const netAfterMisc = netLotProfit - miscExpensesBaht;
-  const shrimpPurchaseCost = Math.max(0, totalCost - transportTotal);
 
   let countVarianceKg = null;
   let countVarianceBaht = null;
@@ -131,7 +167,10 @@ export function computeLotReport({
     const cDead = countedDead != null ? kg(countedDead) : 0;
     const countedTotal = cLive + cDead;
     countVarianceKg = remainingTotalKg - countedTotal;
-    countVarianceBaht = countVarianceKg * avgCostPerKg;
+    const blendCost = remainingTotalKg > 0.001
+      ? (liveCostPerKg * remainingLive + deadCostPerKgForCogs * remainingDead) / remainingTotalKg
+      : avgCostPerKg;
+    countVarianceBaht = countVarianceKg * blendCost;
     countVarianceLiveKg = remainingLive - cLive;
     countVarianceDeadKg = remainingDead - cDead;
   }
@@ -155,7 +194,14 @@ export function computeLotReport({
     totalCost,
     transportTotal,
     shrimpPurchaseCost,
+    liveCostBaht,
+    deadCostBaht,
+    liveCostPerKg,
+    deadCostPerKg,
+    deadCostPerKgForCogs,
     avgCostPerKg,
+    shrinkageLiveKg,
+    shrinkageDeadKg,
     remainingLive,
     remainingDead,
     remainingTotalKg,
@@ -186,6 +232,16 @@ export function computeLotReport({
     pondExpensesBaht,
     miscExpensesBaht,
     netAfterMisc,
+    liveCapitalAfterExpenses,
+    deadCapitalAfterExpenses,
+    liveLineNetBaht,
+    deadLineNetBaht,
+    combinedLineNetBaht,
+    liveWeightLossKg,
+    deadWeightLossKg,
+    liveWeightLossBaht,
+    deadWeightLossBaht,
+    totalWeightLossKg,
     countVarianceKg,
     countVarianceBaht,
     countVarianceLiveKg,

@@ -92,6 +92,16 @@ try {
 }
 
 try {
+  const liveGross = 10000 - 7000;
+  const deadGross = 4000 - 1500;
+  const liveNet = liveGross - 500 - 0;
+  const deadNet = deadGross - 200 - 0;
+  assert(liveNet + deadNet === 4800, 'two-line net = sum of (gross − expenses) per line');
+} catch (e) {
+  fail('two-line net formula', e);
+}
+
+try {
   const totalCost = 30000;
   const receivedKg = 100;
   const soldDeadKg = 5;
