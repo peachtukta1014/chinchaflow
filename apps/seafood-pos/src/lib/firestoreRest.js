@@ -252,6 +252,28 @@ function sortStockBatchesDesc(docs) {
 }
 
 /** โหลดล็อต FIFO — query แล้ว fallback list ทั้ง collection */
+/** ประวัติย้ายบ่อ / เสียหาย ตามวัน */
+export async function fsQueryStockAdjustments(dateKey, limit = 80) {
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'stockAdjustments' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'dateKey' },
+        op: 'EQUAL',
+        value: { stringValue: dateKey },
+      },
+    },
+    limit,
+  });
+  if (docs.length > 0) {
+    return docs.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  }
+  const recent = await fsListCollection('stockAdjustments', 40);
+  return recent
+    .filter((d) => d.dateKey === dateKey)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
 export async function fsQueryStockBatches(limit = 30) {
   const rows = await fsRunQuery({
     from: [{ collectionId: 'stockBatches' }],

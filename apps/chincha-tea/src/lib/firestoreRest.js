@@ -152,9 +152,9 @@ export async function fsQueryOrders(dateKey) {
     limit: 200,
   });
   if (docs.length > 0) return sortByCreatedAtDesc(docs);
-  // ออเดอร์เก่าที่ไม่มี dateKey — ดึงรายการแล้วกรองจาก createdAt
-  const all = await fsListCollection('teaOrders', 200);
-  return sortByCreatedAtDesc(all.filter((d) => orderMatchesDateKey(d, dateKey)));
+  // fallback เล็ก — ออเดอร์เก่าไม่มี dateKey (ไม่ดึงทั้ง collection)
+  const recent = await fsListCollection('teaOrders', 80);
+  return sortByCreatedAtDesc(recent.filter((d) => orderMatchesDateKey(d, dateKey)));
 }
 
 export async function fsQueryRestocks(limit = 50) {
@@ -163,8 +163,20 @@ export async function fsQueryRestocks(limit = 50) {
 }
 
 export async function fsQueryRestocksByDate(dateKey) {
-  const docs = await fsListCollection('restocks', 200);
-  return sortByCreatedAtDesc(docs.filter((d) => d.dateKey === dateKey));
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'restocks' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'dateKey' },
+        op: 'EQUAL',
+        value: { stringValue: dateKey },
+      },
+    },
+    limit: 100,
+  });
+  if (docs.length > 0) return sortByCreatedAtDesc(docs);
+  const recent = await fsListCollection('restocks', 60);
+  return sortByCreatedAtDesc(recent.filter((d) => d.dateKey === dateKey));
 }
 
 export async function fsQueryExpenses(dateKey) {

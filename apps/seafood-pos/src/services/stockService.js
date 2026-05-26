@@ -2,7 +2,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { fsPatch, fsPost, fsSetStockDoc } from '../lib/firestoreRest';
-import { sortBatchesFifoOrder } from '../lib/stockBatchUtils';
+import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -64,6 +64,7 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
 export async function transferLiveToDeadInBatches(batches, transferKg) {
   let left = transferKg;
   const patches = [];
+  const allocations = [];
 
   for (const b of sortBatchesFifoOrder(batches)) {
     if (left <= 0) break;
@@ -71,10 +72,17 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
     const remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
     if (remLive <= 0) continue;
     const take = Math.min(left, remLive);
-    patches.push({
-      id: b.id,
+    const next = {
       remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
       remainingDeadKg: normalizeStockValues(0, remDead + take).dead,
+    };
+    patches.push({ id: b.id, ...next });
+    allocations.push({
+      batchId: b.id,
+      receiveDateKey: receiveDateKeyOf(b),
+      batchNote: b.note || '',
+      liveTaken: take,
+      deadAdded: take,
     });
     left -= take;
   }
@@ -89,13 +97,80 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
       remainingDeadKg: p.remainingDeadKg,
     });
   }
-  return patches;
+  return { patches, allocations };
 }
 
-export async function transferPondDeath(stock, transferKg, updateMainStock, batches = []) {
+/** เสียหาย/ตัดทิ้ง — หักเฉพาะกุ้งเป็น ไม่เพิ่มกุ้งตายขาย */
+export async function deductSpoilageFromBatches(batches, lossKg) {
+  let left = lossKg;
+  const patches = [];
+  const allocations = [];
+
+  for (const b of sortBatchesFifoOrder(batches)) {
+    if (left <= 0) break;
+    const remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+    const remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+    if (remLive <= 0) continue;
+    const take = Math.min(left, remLive);
+    patches.push({
+      id: b.id,
+      remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
+      remainingDeadKg: remDead,
+    });
+    allocations.push({
+      batchId: b.id,
+      receiveDateKey: receiveDateKeyOf(b),
+      batchNote: b.note || '',
+      liveTaken: take,
+      deadAdded: 0,
+    });
+    left -= take;
+  }
+
+  if (left > 0.001) {
+    throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
+  }
+
+  for (const p of patches) {
+    await fsPatch(`stockBatches/${p.id}`, {
+      remainingLiveKg: p.remainingLiveKg,
+      remainingDeadKg: p.remainingDeadKg,
+    });
+  }
+  return { patches, allocations };
+}
+
+async function logStockAdjustment({
+  type,
+  weightKg,
+  note = '',
+  recordedBy = '',
+  allocations = [],
+}) {
+  if (!isFirebaseReady) return;
+  await fsPost('stockAdjustments', {
+    type,
+    dateKey: dateKeyBangkok(),
+    weightKg: normalizeStockValues(weightKg, 0).live,
+    note: String(note || '').trim(),
+    recordedBy,
+    allocations,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function transferPondDeath(
+  stock,
+  transferKg,
+  updateMainStock,
+  batches = [],
+  meta = {},
+) {
+  let allocations = [];
   if (batches.length > 0) {
-    const patches = await transferLiveToDeadInBatches(batches, transferKg);
-    const patchById = Object.fromEntries(patches.map((p) => [p.id, p]));
+    const result = await transferLiveToDeadInBatches(batches, transferKg);
+    allocations = result.allocations;
+    const patchById = Object.fromEntries(result.patches.map((p) => [p.id, p]));
     const summed = sumStockFromBatches(
       batches.map((b) => {
         const p = patchById[b.id];
@@ -104,12 +179,57 @@ export async function transferPondDeath(stock, transferKg, updateMainStock, batc
           : b;
       }),
     );
-    return updateMainStock(summed.live, summed.dead);
+    await updateMainStock(summed.live, summed.dead);
+  } else {
+    await updateMainStock(
+      Math.max(0, stock.live - transferKg),
+      Math.max(0, stock.dead + transferKg),
+    );
   }
-  return updateMainStock(
-    Math.max(0, stock.live - transferKg),
-    Math.max(0, stock.dead + transferKg),
-  );
+  await logStockAdjustment({
+    type: 'pond_to_dead',
+    weightKg: transferKg,
+    note: meta.note,
+    recordedBy: meta.recordedBy,
+    allocations,
+  });
+  return allocations;
+}
+
+/** บันทึกกุ้งเสียหาย (ไม่นำไปขาย) — หักน้ำหนักจากล็อตเก่าก่อน */
+export async function recordSpoilageLoss(
+  stock,
+  lossKg,
+  updateMainStock,
+  batches = [],
+  meta = {},
+) {
+  let allocations = [];
+  if (batches.length > 0) {
+    const result = await deductSpoilageFromBatches(batches, lossKg);
+    allocations = result.allocations;
+    const patchById = Object.fromEntries(result.patches.map((p) => [p.id, p]));
+    const summed = sumStockFromBatches(
+      batches.map((b) => {
+        const p = patchById[b.id];
+        return p ? { ...b, remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg } : b;
+      }),
+    );
+    await updateMainStock(summed.live, summed.dead);
+  } else {
+    await updateMainStock(
+      Math.max(0, stock.live - lossKg),
+      stock.dead,
+    );
+  }
+  await logStockAdjustment({
+    type: 'spoilage_loss',
+    weightKg: lossKg,
+    note: meta.note,
+    recordedBy: meta.recordedBy,
+    allocations,
+  });
+  return allocations;
 }
 
 export async function deductStockForSale(stock, liveKg, deadKg, updateMainStock, batches = []) {

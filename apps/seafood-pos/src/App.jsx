@@ -259,6 +259,7 @@ export default function App() {
               stock={effectiveStock}
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
+              member={member}
               onReceived={() => setStockRefresh((n) => n + 1)}
               onStockMoved={() => setStockRefresh((n) => n + 1)}
             />

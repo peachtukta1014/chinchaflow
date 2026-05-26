@@ -1,32 +1,80 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
-import { countReceivesOnDate } from '../lib/stockBatchUtils';
-import { createStockBatchRecord, transferPondDeath } from '../services/stockService';
+import { fsQueryStockAdjustments } from '../lib/firestoreRest';
+import { countReceivesOnDate, formatReceiveDayLabel } from '../lib/stockBatchUtils';
+import {
+  createStockBatchRecord,
+  recordSpoilageLoss,
+  transferPondDeath,
+} from '../services/stockService';
+import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
 
-export default function InventoryScreen({ stock, stockBatches = [], updateMainStock, onReceived, onStockMoved }) {
+const ADJUST_LABELS = {
+  pond_to_dead: { title: 'ย้ายเป็นขายได้', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
+  spoilage_loss: { title: 'เสียหายตัดทิ้ง', emoji: '⚠️', cls: 'text-amber-800 bg-amber-50' },
+};
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
+}
+
+export default function InventoryScreen({
+  stock,
+  stockBatches = [],
+  updateMainStock,
+  onReceived,
+  onStockMoved,
+  member,
+}) {
   const todayKey = dateKeyBangkok();
   const [lotViewDate, setLotViewDate] = useState(todayKey);
-  const [tab, setTab]           = useState('receive');
-  const [rcvLive, setRcvLive]   = useState('');
-  const [rcvDead, setRcvDead]   = useState('');
-  const [rcvCost, setRcvCost]   = useState('');
-  const [rcvTransport, setRcvTransport] = useState('');
-  const [rcvNote, setRcvNote]   = useState('');
-  const [deadWeight, setDeadWeight] = useState('');
-  const [saving, setSaving]     = useState(false);
+  const [deadViewDate, setDeadViewDate] = useState(todayKey);
+  const [tab, setTab] = useState('receive');
+  const [rcvLive, setRcvLive] = useState('');
+  const [rcvDead, setRcvDead] = useState('');
+  const [rcvCost, setRcvCost] = useState('');
+  const [rcvTransport, setRcvTransport] = useState('');
+  const [rcvNote, setRcvNote] = useState('');
+  const [deadMode, setDeadMode] = useState('pond_to_dead');
+  const [deadWeight, setDeadWeight] = useState('');
+  const [deadNote, setDeadNote] = useState('');
+  const [deadHistory, setDeadHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const liveKg    = parseFloat(rcvLive) || 0;
-  const deadKg    = parseFloat(rcvDead) || 0;
-  const costPerKg = parseFloat(rcvCost) || 0;
-  const transport = parseFloat(rcvTransport) || 0;
-  const shrimpCost = (liveKg + deadKg) * costPerKg;
-  const grandTotal = shrimpCost + transport;
+  const liveKg = parseFloat(rcvLive) || 0;
+  const deadKg = parseFloat(rcvDead) || 0;
+  const costPerKg = parseFloat(rcvCost) || 0;
+  const transport = parseFloat(rcvTransport) || 0;
+  const shrimpCost = (liveKg + deadKg) * costPerKg;
+  const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
   const todayReceiveCount = useMemo(
     () => countReceivesOnDate(stockBatches, todayKey),
     [stockBatches, todayKey],
   );
+
+  const loadDeadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      setDeadHistory(await fsQueryStockAdjustments(deadViewDate));
+    } catch (e) {
+      console.warn('fsQueryStockAdjustments', e);
+      setDeadHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [deadViewDate]);
+
+  useEffect(() => {
+    if (tab === 'dead') loadDeadHistory();
+  }, [tab, loadDeadHistory]);
 
   const handleReceive = async () => {
     if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
@@ -41,49 +89,93 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
         note: rcvNote,
       });
       await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
-      alert(`✅ บันทึกรายการรับเข้าแล้ว (ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ)\nต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`);
+      alert(
+        `✅ บันทึกรายการรับเข้าแล้ว (ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ)\n` +
+          `ต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`,
+      );
       onReceived?.();
-      setRcvLive(''); setRcvDead(''); setRcvCost(''); setRcvTransport(''); setRcvNote('');
-    } catch (err) {
-      console.error(err);
-      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDead = async () => {
-    if (!deadWeight) return;
-    const w = parseFloat(deadWeight);
-    if (!Number.isFinite(w) || w <= 0) return alert('ใส่น้ำหนักกุ้งตายที่ย้ายครับ');
-    if (w > stock.live) return alert('ยอดมากกว่ากุ้งเป็นคงเหลือครับ');
-    setSaving(true);
-    try {
-      await transferPondDeath(stock, w, updateMainStock, stockBatches);
-      alert(`ย้าย ${w} กก. จากกุ้งเป็น → กุ้งตายแล้ว`);
-      setDeadWeight('');
-      onStockMoved?.();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || 'ย้ายสต๊อกไม่สำเร็จ');
+      setRcvLive('');
+      setRcvDead('');
+      setRcvCost('');
+      setRcvTransport('');
+      setRcvNote('');
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="p-5 space-y-5">
+  const formatAllocationLines = (allocations = []) => {
+    if (!allocations.length) return '— ไม่มีล็อต (อัปเดตยอดรวมอย่างเดียว)';
+    return allocations
+      .map((a, i) => {
+        const day = formatReceiveDayLabel(a.receiveDateKey);
+        const note = a.batchNote ? ` · ${a.batchNote}` : '';
+        if (a.deadAdded > 0) {
+          return `${i + 1}. ล็อตรับ ${day}${note}: เป็น −${a.liveTaken.toFixed(2)} → ตาย +${a.deadAdded.toFixed(2)} กก.`;
+        }
+        return `${i + 1}. ล็อตรับ ${day}${note}: ตัดทิ้ง ${a.liveTaken.toFixed(2)} กก.`;
+      })
+      .join('\n');
+  };
+
+  const handleDeadSave = async () => {
+    if (!deadWeight) return;
+    const w = parseFloat(deadWeight);
+    if (!Number.isFinite(w) || w <= 0) return alert('ใส่น้ำหนักครับ');
+    if (w > stock.live) return alert('ยอดมากกว่ากุ้งเป็นคงเหลือครับ');
+
+    const meta = { note: deadNote, recordedBy: member?.name || '' };
+    setSaving(true);
+    try {
+      let allocations = [];
+      if (deadMode === 'pond_to_dead') {
+        allocations = await transferPondDeath(stock, w, updateMainStock, stockBatches, meta);
+        alert(
+          `✅ ย้าย ${w} กก. จากกุ้งเป็น → กุ้งตาย (ขายได้)\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+        );
+      } else {
+        allocations = await recordSpoilageLoss(stock, w, updateMainStock, stockBatches, meta);
+        alert(
+          `✅ บันทึกเสียหาย ${w} กก. (ไม่เพิ่มกุ้งตายขาย)\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+        );
+      }
+      setDeadWeight('');
+      setDeadNote('');
+      onStockMoved?.();
+      await loadDeadHistory();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-5 space-y-5">
       <div className="flex bg-slate-200 p-1.5 rounded-2xl gap-1">
-        <button type="button" onClick={() => setTab('receive')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}>
+        <button
+          type="button"
+          onClick={() => setTab('receive')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}
+        >
           รับกุ้งเข้า
         </button>
-        <button type="button" onClick={() => setTab('lots')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}>
+        <button
+          type="button"
+          onClick={() => setTab('lots')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}
+        >
           ล็อตรับเข้า
         </button>
-        <button type="button" onClick={() => setTab('dead')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}>
+        <button
+          type="button"
+          onClick={() => setTab('dead')}
+          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}
+        >
           กุ้งตายบ่อ
         </button>
       </div>
@@ -96,9 +188,9 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
         />
       )}
 
-      {tab === 'receive' && (
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า (วันนี้)</h2>
+      {tab === 'receive' && (
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
+          <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า (วันนี้)</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
             แต่ละครั้งที่กดบันทึก = 1 รายการ (ราคา/รถต่างกัน) รวมอยู่ล็อตวันที่เดียวกัน
             {todayReceiveCount > 0 && (
@@ -107,79 +199,215 @@ export default function InventoryScreen({ stock, stockBatches = [], updateMainSt
               </span>
             )}
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งสด (กก.)</label>
-              <input type="number" inputMode="decimal" value={rcvLive}
-                onChange={e => setRcvLive(e.target.value)} placeholder="0.000"
-                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งตาย (กก.)</label>
-              <input type="number" inputMode="decimal" value={rcvDead}
-                onChange={e => setRcvDead(e.target.value)} placeholder="0.000"
-                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
-            <input type="number" inputMode="decimal" value={rcvCost}
-              onChange={e => setRcvCost(e.target.value)} placeholder="0"
-              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">ค่ารถ (฿)</label>
-            <input type="number" inputMode="decimal" value={rcvTransport}
-              onChange={e => setRcvTransport(e.target.value)} placeholder="0"
-              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">หมายเหตุ</label>
-            <input type="text" value={rcvNote} onChange={e => setRcvNote(e.target.value)}
-              placeholder="เช่น รถทะเบียน กข-1234"
-              className="w-full p-3 bg-slate-50 rounded-2xl outline-none" />
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>น้ำหนักรวม</span><span className="font-bold">{(liveKg+deadKg).toFixed(3)} กก.</span>
-            </div>
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>ค่ากุ้ง</span><span className="font-bold">฿{shrimpCost.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>ค่ารถ</span><span className="font-bold">฿{transport.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between font-black text-slate-800 text-base border-t border-slate-200 pt-2">
-              <span>ต้นทุนทั้งหมด</span><span className="text-blue-600">฿{grandTotal.toLocaleString()}</span>
-            </div>
-            {effectiveCost > 0 && (
-              <div className="flex justify-between text-sm text-emerald-600 font-bold">
-                <span>ต้นทุนจริง/กก. (FIFO)</span><span>฿{effectiveCost.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-          <button onClick={handleReceive} disabled={saving}
-            className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl disabled:opacity-60">
-            {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
-          </button>
-        </div>
-      )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งสด (กก.)</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={rcvLive}
+                onChange={(e) => setRcvLive(e.target.value)}
+                placeholder="0.000"
+                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งตาย (กก.)</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={rcvDead}
+                onChange={(e) => setRcvDead(e.target.value)}
+                placeholder="0.000"
+                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={rcvCost}
+              onChange={(e) => setRcvCost(e.target.value)}
+              placeholder="0"
+              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">ค่ารถ (฿)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={rcvTransport}
+              onChange={(e) => setRcvTransport(e.target.value)}
+              placeholder="0"
+              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">หมายเหตุ</label>
+            <input
+              type="text"
+              value={rcvNote}
+              onChange={(e) => setRcvNote(e.target.value)}
+              placeholder="เช่น รถทะเบียน กข-1234"
+              className="w-full p-3 bg-slate-50 rounded-2xl outline-none"
+            />
+          </div>
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>น้ำหนักรวม</span>
+              <span className="font-bold">{(liveKg + deadKg).toFixed(3)} กก.</span>
+            </div>
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>ค่ากุ้ง</span>
+              <span className="font-bold">฿{shrimpCost.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>ค่ารถ</span>
+              <span className="font-bold">฿{transport.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-black text-slate-800 text-base border-t border-slate-200 pt-2">
+              <span>ต้นทุนทั้งหมด</span>
+              <span className="text-blue-600">฿{grandTotal.toLocaleString()}</span>
+            </div>
+            {effectiveCost > 0 && (
+              <div className="flex justify-between text-sm text-emerald-600 font-bold">
+                <span>ต้นทุนจริง/กก. (FIFO)</span>
+                <span>฿{effectiveCost.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleReceive}
+            disabled={saving}
+            className="w-full bg-slate-800 text-white font-bold py-5 rounded-2xl disabled:opacity-60"
+          >
+            {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
+          </button>
+        </div>
+      )}
 
-      {tab === 'dead' && (
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm">
-          <h2 className="font-black text-red-600 text-xl mb-4">บันทึกกุ้งตาย</h2>
-          <div className="bg-red-50 p-4 rounded-2xl mb-4">
-            <span className="text-sm text-red-800">กุ้งเป็นคงเหลือ: <span className="font-black text-xl">{stock.live.toFixed(1)} กก.</span></span>
-          </div>
-          <input type="number" inputMode="decimal" value={deadWeight}
-            onChange={e => setDeadWeight(e.target.value)} placeholder="0.0"
-            className="w-full p-5 bg-white border-2 border-red-200 text-red-600 font-black text-3xl text-center rounded-2xl outline-none" />
-          <button onClick={handleDead} disabled={saving}
-            className="w-full mt-4 bg-red-500 text-white font-bold py-5 rounded-2xl disabled:opacity-60">
-            {saving ? 'กำลังบันทึก...' : 'ย้ายสต๊อกไปกุ้งตาย'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+      {tab === 'dead' && (
+        <div className="space-y-4">
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
+            <h2 className="font-black text-red-600 text-xl">บันทึกกุ้งจากบ่อ</h2>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              ระบบหักจาก<strong>ล็อตรับเข้าเก่าก่อน</strong> (FIFO) แล้วบันทึกประวัติว่าหักวันรับไหน — ไม่ต้องเดาว่ามาจากล็อตไหน
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeadMode('pond_to_dead')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 ${
+                  deadMode === 'pond_to_dead'
+                    ? 'border-red-400 bg-red-50 text-red-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                ย้ายเป็นขายได้
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeadMode('spoilage_loss')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 ${
+                  deadMode === 'spoilage_loss'
+                    ? 'border-amber-400 bg-amber-50 text-amber-800'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                เสียหายตัดทิ้ง
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {deadMode === 'pond_to_dead'
+                ? 'กุ้งเป็นลด · กุ้งตายเพิ่ม (นำไปขายได้)'
+                : 'กุ้งเป็นลดเท่านั้น · ไม่เพิ่มกุ้งตายขาย (เน่า/เสียหาย)'}
+            </p>
+            <div className="bg-red-50 p-4 rounded-2xl">
+              <span className="text-sm text-red-800">
+                กุ้งเป็นคงเหลือ:{' '}
+                <span className="font-black text-xl">{stock.live.toFixed(1)} กก.</span>
+              </span>
+            </div>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={deadWeight}
+              onChange={(e) => setDeadWeight(e.target.value)}
+              placeholder="0.000"
+              className="w-full p-5 bg-white border-2 border-red-200 text-red-600 font-black text-3xl text-center rounded-2xl outline-none"
+            />
+            <input
+              type="text"
+              value={deadNote}
+              onChange={(e) => setDeadNote(e.target.value)}
+              placeholder="หมายเหตุ เช่น บ่อ 2 / เน่าหลังรับเข้า"
+              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleDeadSave}
+              disabled={saving}
+              className={`w-full font-bold py-5 rounded-2xl text-white disabled:opacity-60 ${
+                deadMode === 'pond_to_dead' ? 'bg-red-500' : 'bg-amber-600'
+              }`}
+            >
+              {saving ? 'กำลังบันทึก...' : deadMode === 'pond_to_dead' ? 'บันทึกย้ายเป็นขายได้' : 'บันทึกเสียหายตัดทิ้ง'}
+            </button>
+          </div>
+
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-2">ประวัติรายการ — ตามวัน</h3>
+            <DateNavBar
+              dateKey={deadViewDate}
+              onDateChange={setDeadViewDate}
+              subtitle={historyLoading ? 'โหลด...' : `${deadHistory.length} รายการ`}
+            />
+            {historyLoading ? (
+              <p className="text-center text-slate-400 py-6 text-sm">กำลังโหลด...</p>
+            ) : deadHistory.length === 0 ? (
+              <p className="text-center text-slate-400 py-6 text-sm">ไม่มีรายการวันนี้</p>
+            ) : (
+              <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                {deadHistory.map((row) => {
+                  const info = ADJUST_LABELS[row.type] || ADJUST_LABELS.pond_to_dead;
+                  return (
+                    <div key={row.id} className="border border-slate-100 rounded-xl p-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${info.cls}`}>
+                          {info.emoji} {info.title}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{formatTime(row.createdAt)}</span>
+                      </div>
+                      <p className="font-black text-red-600 text-lg mt-1">
+                        {(parseFloat(row.weightKg) || 0).toFixed(2)} กก.
+                      </p>
+                      {row.note && <p className="text-xs text-slate-500 mt-0.5">{row.note}</p>}
+                      {(row.allocations || []).length > 0 && (
+                        <ul className="mt-2 space-y-1 text-[10px] text-slate-600">
+                          {row.allocations.map((a, idx) => (
+                            <li key={`${row.id}-${idx}`}>
+                              · ล็อตรับ {formatReceiveDayLabel(a.receiveDateKey)}
+                              {a.batchNote ? ` (${a.batchNote})` : ''}
+                              {' — '}
+                              {a.deadAdded > 0
+                                ? `เป็น −${a.liveTaken?.toFixed?.(2) ?? a.liveTaken} → ตาย +${a.deadAdded?.toFixed?.(2) ?? a.deadAdded} กก.`
+                                : `ตัดทิ้ง ${a.liveTaken?.toFixed?.(2) ?? a.liveTaken} กก.`}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

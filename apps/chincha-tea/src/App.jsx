@@ -135,6 +135,7 @@ export default function App() {
         onSelect={(id) => {
           setTab(id);
           if (id === 'admin' || id === 'order') refreshCatalog();
+          if (id === 'history' || id === 'summary') refreshOrders();
         }}
       />
 

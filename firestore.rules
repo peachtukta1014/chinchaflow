@@ -159,8 +159,14 @@ service cloud.firestore {
       allow delete: if isAdminShrimp();
     }
 
-    // Stock batches — staff read/create; admin update/delete
+    // Stock batches — พนักงานอัปเดตคงเหลือตอนขาย/ย้ายบ่อ (FIFO)
     match /stockBatches/{docId} {
+      allow read, create, update: if isApprovedShrimp();
+      allow delete: if isAdminShrimp();
+    }
+
+    // บันทึกกุ้งตายบ่อ / เสียหาย — ประวัติรายครั้ง
+    match /stockAdjustments/{docId} {
       allow read, create: if isApprovedShrimp();
       allow update, delete: if isAdminShrimp();
     }
