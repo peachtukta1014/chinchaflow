@@ -31,14 +31,16 @@ function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, note
       <div>
         <label className="text-xs font-bold text-slate-700 mb-1 block">หมายเหตุ</label>
         {noteHint && (
-          <p className="text-[10px] text-slate-500 mb-1.5 leading-relaxed">{noteHint}</p>
+          <p className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-2 mb-2 leading-relaxed">
+            {noteHint}
+          </p>
         )}
         <input
           type="text"
           value={note}
           onChange={(e) => onNote(e.target.value)}
           placeholder={notePlaceholder}
-          className="w-full p-3 bg-white rounded-xl text-sm text-slate-800 outline-none border border-slate-100"
+          className="w-full p-3 bg-white rounded-xl text-sm text-slate-800 outline-none border border-slate-100 placeholder:text-slate-400"
         />
       </div>
     </div>
@@ -180,8 +182,8 @@ export default function LotExpensesPanel({
         note={pondNote}
         onAmount={setPondAmt}
         onNote={setPondNote}
-        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวัน · ค่าน้ำมันรถ · ลูกส่งของเป็น"
-        notePlaceholder="เช่น น้ำมันรถ 400 · จ้างส่งของ 600 · ลูก 2 ก้อน"
+        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าน้ำมัน · ลูก · อื่นๆ ****"
+        notePlaceholder="เช่น จ้าง 600 น้ำมัน 400 ลูก 2 ก้อน"
         accent="border-blue-200 bg-blue-50/80"
       />
 
@@ -192,8 +194,8 @@ export default function LotExpensesPanel({
         note={marketNote}
         onAmount={setMarketAmt}
         onNote={setMarketNote}
-        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวันแผง · ลูกน้ำแข็งแผง"
-        notePlaceholder="เช่น จ้างพนักงานแผง 500 · ลูก 3 ก้อน"
+        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ลูก · อื่นๆ ****"
+        notePlaceholder="เช่น จ้างแผง 500 ลูก 3 ก้อน"
         accent="border-orange-200 bg-orange-50/80"
       />
 
