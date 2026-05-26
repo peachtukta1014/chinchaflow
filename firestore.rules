@@ -171,6 +171,12 @@ service cloud.firestore {
       allow update, delete: if isAdminShrimp();
     }
 
+    // ค่าใช้จ่ายจิปาถะต่อล็อต (สรุปล็อต) — แอดมินบันทึก
+    match /lotExpenses/{lotDateKey} {
+      allow read: if isApprovedShrimp();
+      allow create, update, delete: if isAdminShrimp();
+    }
+
     // Customers list — staff CRUD ลูกค้าที่เพิ่มเอง (cx_*); แอดมินลบได้ทุก doc
     match /customers/{docId} {
       allow read, create, update: if isApprovedShrimp();

@@ -57,6 +57,7 @@ export function computeLotReport({
   adjustments = [],
   countedLive = null,
   countedDead = null,
+  miscExpenses = 0,
 }) {
   const lotBatches = batchesForLot(batches, lotDateKey);
   const batchIds = new Set(lotBatches.map((b) => b.id));
@@ -67,10 +68,13 @@ export function computeLotReport({
   let remainingLive = 0;
   let remainingDead = 0;
 
+  let transportTotal = 0;
+
   for (const b of lotBatches) {
     receivedLive += kg(b.liveKg);
     receivedDead += kg(b.deadKg);
     totalCost += baht(b.totalCost);
+    transportTotal += baht(b.transport);
     remainingLive += kg(b.remainingLiveKg ?? b.liveKg);
     remainingDead += kg(b.remainingDeadKg ?? b.deadKg);
   }
@@ -109,6 +113,9 @@ export function computeLotReport({
   const pondToDeadCostBaht = adj.pondToDeadKg * avgCostPerKg;
   const totalLossBaht = shrinkageBaht + adj.stockCountBaht;
   const netLotProfit = grossProfit - totalLossBaht;
+  const miscExpensesBaht = baht(miscExpenses);
+  const netAfterMisc = netLotProfit - miscExpensesBaht;
+  const shrimpPurchaseCost = Math.max(0, totalCost - transportTotal);
 
   let countVarianceKg = null;
   let countVarianceBaht = null;
@@ -141,6 +148,8 @@ export function computeLotReport({
     receivedDead,
     receivedTotalKg,
     totalCost,
+    transportTotal,
+    shrimpPurchaseCost,
     avgCostPerKg,
     remainingLive,
     remainingDead,
@@ -168,6 +177,8 @@ export function computeLotReport({
     grossProfit,
     totalLossBaht,
     netLotProfit,
+    miscExpensesBaht,
+    netAfterMisc,
     countVarianceKg,
     countVarianceBaht,
     countVarianceLiveKg,

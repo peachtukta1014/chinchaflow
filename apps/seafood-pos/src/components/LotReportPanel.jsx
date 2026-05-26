@@ -6,6 +6,7 @@ import {
   fsListStockAdjustments,
   fsQuerySalesBetween,
 } from '../lib/firestoreRest';
+import { fetchLotExpenses, saveLotExpenses } from '../services/lotExpenseService';
 import DateNavBar from './DateNavBar';
 
 function fmtKg(n) {
@@ -41,6 +42,10 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   const [countedLive, setCountedLive] = useState('');
   const [countedDead, setCountedDead] = useState('');
   const [salesLoadNote, setSalesLoadNote] = useState('');
+  const [miscExpenses, setMiscExpenses] = useState('');
+  const [miscNote, setMiscNote] = useState('');
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseLoaded, setExpenseLoaded] = useState(false);
 
   useEffect(() => {
     if (lotDays.some((d) => d.dateKey === lotDateKey)) return;
@@ -87,6 +92,31 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     loadReportData();
   }, [loadReportData, active]);
 
+  useEffect(() => {
+    if (!active || !lotDateKey) return undefined;
+    let cancelled = false;
+    setExpenseLoaded(false);
+    fetchLotExpenses(lotDateKey)
+      .then(({ miscExpenses: amt, miscNote: note }) => {
+        if (cancelled) return;
+        setMiscExpenses(amt > 0 ? String(amt) : '');
+        setMiscNote(note || '');
+      })
+      .catch((e) => {
+        console.warn('fetchLotExpenses', e);
+        if (!cancelled) {
+          setMiscExpenses('');
+          setMiscNote('');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setExpenseLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, [lotDateKey, active]);
+
+  const miscExpensesNum = parseFloat(miscExpenses) || 0;
+
   const report = useMemo(() => {
     const cLive = countedLive === '' ? null : parseFloat(countedLive);
     const cDead = countedDead === '' ? null : parseFloat(countedDead);
@@ -98,8 +128,34 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
       adjustments,
       countedLive: Number.isFinite(cLive) ? cLive : null,
       countedDead: Number.isFinite(cDead) ? cDead : null,
+      miscExpenses: miscExpensesNum,
     });
-  }, [lotDateKey, endDateKey, stockBatches, sales, adjustments, countedLive, countedDead]);
+  }, [
+    lotDateKey,
+    endDateKey,
+    stockBatches,
+    sales,
+    adjustments,
+    countedLive,
+    countedDead,
+    miscExpensesNum,
+  ]);
+
+  const handleSaveMiscExpenses = async () => {
+    setExpenseSaving(true);
+    try {
+      await saveLotExpenses(lotDateKey, {
+        miscExpenses: miscExpensesNum,
+        miscNote: miscNote,
+      });
+      alert('✅ บันทึกค่าใช้จ่ายอื่นๆ แล้ว');
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
 
   const lotLabel = formatReceiveDayLabel(lotDateKey);
 
@@ -199,7 +255,20 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           value={fmtKg(report.receivedTotalKg)}
           sub={`เป็น ${report.receivedLive.toFixed(2)} · ตายมากับรถ ${report.receivedDead.toFixed(2)}`}
         />
-        <MetricRow label="ต้นทุนรวมล็อต" value={fmtBaht(report.totalCost)} sub={`เฉลี่ย ${report.avgCostPerKg.toFixed(2)} บ./กก.`} />
+        <MetricRow
+          label="ต้นทุนรวมล็อต"
+          value={fmtBaht(report.totalCost)}
+          sub={`เฉลี่ย ${report.avgCostPerKg.toFixed(2)} บ./กก.`}
+        />
+        <MetricRow
+          label="ค่ารถ (ตอนรับเข้า)"
+          value={report.transportTotal > 0 ? fmtBaht(report.transportTotal) : '—'}
+          sub={
+            report.transportTotal > 0
+              ? `รวมในต้นทุนล็อตแล้ว · ซื้อกุ้ง ~${fmtBaht(report.shrimpPurchaseCost)}`
+              : 'ใส่ช่องค่ารถตอนบันทึกรับเข้า (แท็บรับสต๊อก)'
+          }
+        />
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
@@ -276,10 +345,48 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         )}
       </div>
 
+      <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
+        <p className="text-xs font-bold text-slate-700">ค่าใช้จ่ายอื่นๆ (จิปาถะ)</p>
+        <p className="text-[10px] text-slate-400 leading-relaxed">
+          ค่ารถใส่ตอน「รับเข้า」ด้านบนแล้ว (รวมในต้นทุนล็อต) · ช่องนี้สำหรับค่าลูก น้ำมัน ค่าแรงน้อง
+          หรือจ่ายอื่นๆ ของล็อตนี้
+        </p>
+        <div>
+          <label className="text-xs font-bold text-slate-500 mb-1 block">ยอดรวม (฿)</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={miscExpenses}
+            onChange={(e) => setMiscExpenses(e.target.value)}
+            placeholder="0"
+            className="w-full p-3 bg-slate-50 rounded-2xl font-bold text-slate-800 outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-bold text-slate-500 mb-1 block">หมายเหตุ (ไม่บังคับ)</label>
+          <input
+            type="text"
+            value={miscNote}
+            onChange={(e) => setMiscNote(e.target.value)}
+            placeholder="เช่น ค่าลูก น้ำมัน ค่าแรงตลาด"
+            className="w-full p-3 bg-slate-50 rounded-2xl text-sm text-slate-800 outline-none"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveMiscExpenses}
+          disabled={expenseSaving || !expenseLoaded}
+          className="w-full py-3 rounded-2xl bg-purple-600 text-white font-bold text-sm disabled:opacity-60"
+        >
+          {expenseSaving ? 'กำลังบันทึก...' : 'บันทึกค่าใช้จ่ายอื่นๆ'}
+        </button>
+      </div>
+
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-2">
         <p className="text-xs font-bold text-cyan-300">ผลล็อตสุทธิ (คำนวณในแอป)</p>
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          รายได้ขาย − ต้นทุนขาย (ตายใช้ทุนแบบเป็น) − ของเสีย/หาย = สุทธิล็อต · ลูกค้าค้างดูแท็บบัญชี
+          รายได้ − ต้นทุนขาย − ของเสีย = กำไรล็อต · หักค่าใช้จ่ายอื่นๆ = สุทธิสุดท้าย
         </p>
         <MetricRow
           label="ต้นทุนของที่ขาย (ประมาณ)"
@@ -296,15 +403,27 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           value={`−${fmtBaht(report.totalLossBaht)}`}
           accent="text-red-300"
         />
+        <MetricRow
+          label="กำไรล็อต (ก่อนหักจิปาถะ)"
+          value={fmtBaht(report.netLotProfit)}
+          accent={report.netLotProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}
+        />
+        {report.miscExpensesBaht > 0 && (
+          <MetricRow
+            label="หักค่าใช้จ่ายอื่นๆ"
+            value={`−${fmtBaht(report.miscExpensesBaht)}`}
+            sub={miscNote.trim() || undefined}
+            accent="text-orange-300"
+          />
+        )}
         <div className="pt-3 mt-2 border-t border-slate-700 flex justify-between items-center">
-          <p className="font-bold text-sm">สุทธิล็อต (กุ้งล็อตนี้)</p>
-          <p className={`text-2xl font-black ${report.netLotProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {fmtBaht(report.netLotProfit)}
+          <p className="font-bold text-sm">สุทธิสุดท้าย (ล็อตนี้)</p>
+          <p className={`text-2xl font-black ${report.netAfterMisc >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {fmtBaht(report.netAfterMisc)}
           </p>
         </div>
         <p className="text-[10px] text-slate-400 leading-relaxed pt-1">
-          พนักงานแค่บันทึกขาย/รับเข้า/ย้ายบ่อ/เสียหาย — แอปสรุปสุทธิให้ · ถ้ามีค่าแรงหรือค่าใช้จ่ายนอกล็อต
-          จะเพิ่มบันทึกในแอปภายหลังได้
+          พนักงานบันทึกขาย/รับเข้า/ย้ายบ่อ/เสียหาย · แอดมินใส่ค่าใช้จ่ายอื่นๆ · ลูกค้าค้างดูแท็บบัญชี
         </p>
       </div>
 
