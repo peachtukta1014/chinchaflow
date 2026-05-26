@@ -105,10 +105,16 @@ export function computeLotReport({
 
   let countVarianceKg = null;
   let countVarianceBaht = null;
-  if (countedLive != null && countedDead != null) {
-    const countedTotal = kg(countedLive) + kg(countedDead);
+  let countVarianceLiveKg = null;
+  let countVarianceDeadKg = null;
+  if (countedLive != null || countedDead != null) {
+    const cLive = countedLive != null ? kg(countedLive) : 0;
+    const cDead = countedDead != null ? kg(countedDead) : 0;
+    const countedTotal = cLive + cDead;
     countVarianceKg = remainingTotalKg - countedTotal;
     countVarianceBaht = countVarianceKg * avgCostPerKg;
+    countVarianceLiveKg = remainingLive - cLive;
+    countVarianceDeadKg = remainingDead - cDead;
   }
 
   const otherLotsWithStock = batches.filter(
@@ -152,6 +158,8 @@ export function computeLotReport({
     netLotProfit,
     countVarianceKg,
     countVarianceBaht,
+    countVarianceLiveKg,
+    countVarianceDeadKg,
     warnings: {
       hasOtherLotStock: otherLotsWithStock.length > 0,
       hasNewerLot: newerLots.length > 0,

@@ -250,9 +250,17 @@ export default function LotReportPanel({ stockBatches = [] }) {
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
-        <p className="text-xs font-bold text-slate-600">ชั่งปิดจริง (ตอนหมดบ่อ / ก่อนล็อตใหม่)</p>
+        <p className="text-xs font-bold text-slate-600">ชั่งปิดจริง (เหลือล็อตนี้ ก่อนรับล็อตใหม่)</p>
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          ใส่ยอดชั่งจริงเทียบกับระบบ — ส่วนต่างจะช่วยยืนยันของเสียก่อนปิดรอบ
+          ชั่งของที่เหลือจากล็อตนี้ทั้งหมดก่อนเอากุ้งล็อตถัดไปเข้าบ่อ
+          {' '}
+          — ถ้าในบ่อไม่เหลือกุ้งเป็นแล้ว ใส่
+          {' '}
+          <strong>เป็น 0</strong>
+          {' '}
+          (หรือเว้นว่าง) แล้วใส่แค่น้ำหนัก
+          <strong>กุ้งตาย</strong>
+          ที่เหลือ
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -262,7 +270,7 @@ export default function LotReportPanel({ stockBatches = [] }) {
               inputMode="decimal"
               value={countedLive}
               onChange={(e) => setCountedLive(e.target.value)}
-              placeholder={report.remainingLive.toFixed(2)}
+              placeholder={report.remainingLive > 0.01 ? report.remainingLive.toFixed(2) : '0'}
               className="w-full mt-1 p-3 bg-slate-50 rounded-xl font-bold"
             />
           </div>
@@ -279,9 +287,9 @@ export default function LotReportPanel({ stockBatches = [] }) {
           </div>
         </div>
         {report.countVarianceKg != null && (
-          <div className="bg-amber-50 rounded-xl p-3 text-xs text-amber-900">
+          <div className="bg-amber-50 rounded-xl p-3 text-xs text-amber-900 space-y-1">
             <p>
-              ระบบมากกว่าชั่งจริง
+              ส่วนต่างรวม (ระบบ − ชั่งจริง)
               {' '}
               <strong>{report.countVarianceKg.toFixed(2)} กก.</strong>
               {' '}
@@ -289,7 +297,14 @@ export default function LotReportPanel({ stockBatches = [] }) {
               {fmtBaht(report.countVarianceBaht)}
               )
             </p>
-            <p className="text-[10px] mt-1 opacity-80">ถ้าชั่งจริงน้อยกว่าในแอป = ของหายที่ยังไม่ได้จดในรอบนี้</p>
+            {(Math.abs(report.countVarianceLiveKg) > 0.01 || Math.abs(report.countVarianceDeadKg) > 0.01) && (
+              <p className="text-[10px] opacity-90">
+                เป็น {report.countVarianceLiveKg.toFixed(2)} กก. · ตาย {report.countVarianceDeadKg.toFixed(2)} กก.
+              </p>
+            )}
+            <p className="text-[10px] mt-1 opacity-80">
+              ชั่งจริงน้อยกว่าในแอป = ของหายที่ยังไม่ได้จด · แล้วดู「ของเสียล็อต」ด้านบนเพื่อปิดรอบ
+            </p>
           </div>
         )}
       </div>
