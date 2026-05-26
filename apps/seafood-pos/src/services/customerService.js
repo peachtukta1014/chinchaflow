@@ -1,6 +1,4 @@
-import { collection, onSnapshot } from 'firebase/firestore';
 import { CUSTOMERS } from '../constants';
-import { db } from '../firebase';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { fsDelete, fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
 import { exactCustomerNameMatch } from '../lib/customerNameMatch';
@@ -16,24 +14,26 @@ function withTimeout(promise, ms = 15000) {
   ]);
 }
 
-/** subscribe รายชื่อลูกค้า Firestore */
+/** โหลดรายชื่อลูกค้าครั้งเดียว (REST) — ไม่ฟัง real-time */
+export async function refreshCustomersMap() {
+  return fetchCustomersMap();
+}
+
+/**
+ * @deprecated ใช้ refreshCustomersMap — คงชื่อเดิมให้หน้าจอเก่าเรียกได้
+ * คืน unsubscribe เปล่า (โหลดครั้งเดียวตอน mount)
+ */
 export function subscribeCustomers(onData, onError) {
-  if (!db) {
-    onError?.();
-    return () => {};
-  }
-  return onSnapshot(
-    collection(db, 'customers'),
-    (snap) => {
-      const map = {};
-      snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
-      onData(map);
-    },
-    (err) => {
+  let cancelled = false;
+  refreshCustomersMap()
+    .then((map) => {
+      if (!cancelled) onData(map);
+    })
+    .catch((err) => {
       console.warn('subscribeCustomers', err);
-      onError?.();
-    },
-  );
+      if (!cancelled) onError?.(err);
+    });
+  return () => { cancelled = true; };
 }
 
 /** โหลด customers จาก REST (ใช้หลังบันทึก — ไม่รอ listener) */

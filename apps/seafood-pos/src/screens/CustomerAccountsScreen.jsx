@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
 import { PAY } from '../constants';
 import { dateKeyBangkok, formatDateThaiShort, formatViewDateLabel } from '../lib/date';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
+import { coalesceFirestoreRows } from '../lib/coalesceFirestoreRows';
 import { fsListCollection, fsQueryOpenSales, fsQuerySales } from '../lib/firestoreRest';
 import { billAmount } from '../lib/salesAggregate';
+import { useIntervalWhen } from '../lib/useIntervalWhen';
 import {
   applyFifoCustomerPayment,
   clearCustomerDebtAll,
@@ -258,37 +258,29 @@ export default function CustomerAccountsScreen({
     }
   }, []);
 
-  const loadOpenSalesIndex = useCallback(async () => {
+  const loadOpenSalesIndex = useCallback(async ({ background = false } = {}) => {
     try {
       setOpenSalesIndex(await fsQueryOpenSales(120));
     } catch (e) {
       console.warn('fsQueryOpenSales', e);
-      setOpenSalesIndex([]);
+      if (!background) setOpenSalesIndex((prev) => prev);
     }
   }, [refreshKey]);
 
-  const loadDaySales = useCallback(async () => {
-    setLoading(true);
+  const loadDaySales = useCallback(async ({ background = false } = {}) => {
+    if (!background) setLoading(true);
     try {
       setDaySales(await fsQuerySales(viewDate));
     } catch (e) {
       console.warn('fsQuerySales', e);
-      setDaySales([]);
+      if (!background) setDaySales((prev) => prev);
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [viewDate, refreshKey]);
 
   useEffect(() => {
     loadDebtsRest();
-    if (!db) return undefined;
-    return onSnapshot(collection(db, 'customerDebts'), (snap) => {
-      setCustomerDebts(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((d) => (parseFloat(d.totalDebt) || 0) > 0),
-      );
-    }, () => { loadDebtsRest(); });
   }, [loadDebtsRest, refreshKey]);
 
   const refreshAll = useCallback(async () => {
@@ -303,18 +295,11 @@ export default function CustomerAccountsScreen({
     loadDaySales();
   }, [loadDaySales]);
 
-  useEffect(() => {
-    if (!db) return undefined;
-    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', viewDate));
-    return onSnapshot(
-      salesQ,
-      (snap) => {
-        setDaySales(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      () => { loadDaySales(); },
-    );
-  }, [viewDate, loadDaySales, refreshKey]);
+  useIntervalWhen(true, () => {
+    loadDebtsRest();
+    loadOpenSalesIndex();
+    loadDaySales({ background: true });
+  }, 45000);
 
   const totalDebt = customerDebts.reduce((s, c) => s + (parseFloat(c.totalDebt) || 0), 0);
 

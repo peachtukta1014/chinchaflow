@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { FileImage, Trash2 } from 'lucide-react';
-import { db } from '../firebase';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQuerySales } from '../lib/firestoreRest';
 import {
@@ -10,6 +8,7 @@ import {
   billMatchesDateKey,
   mergeSalesDocs,
 } from '../lib/salesAggregate';
+import { useIntervalWhen } from '../lib/useIntervalWhen';
 import { PAY } from '../constants';
 import { deleteSaleBill, updateSalePayment } from '../services/salesService';
 import DateNavBar from '../components/DateNavBar';
@@ -29,17 +28,16 @@ export default function Dashboard({
   const [firestoreSales, setFirestoreSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [salesLoadError, setSalesLoadError] = useState(false);
-  const [salesRetry, setSalesRetry] = useState(0);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
 
-  const loadSalesRest = useCallback(async () => {
+  const loadSalesRest = useCallback(async ({ background = false } = {}) => {
     if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!background) setLoading(true);
     try {
       const docs = await fsQuerySales(viewDate);
       setFirestoreSales(docs);
@@ -47,40 +45,21 @@ export default function Dashboard({
     } catch (e) {
       console.warn('fsQuerySales', e);
       setSalesLoadError(true);
+      if (!background) {
+        setFirestoreSales((prev) => prev);
+      }
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
-  }, [viewDate, refreshKey, salesRetry]);
+  }, [viewDate, refreshKey]);
 
   useEffect(() => {
     if (!active) return undefined;
     loadSalesRest();
-    if (!db) return undefined;
+    return undefined;
+  }, [viewDate, refreshKey, active, loadSalesRest]);
 
-    const salesQ = query(collection(db, 'sales'), where('dateKey', '==', viewDate));
-    return onSnapshot(
-      salesQ,
-      (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setFirestoreSales(mergeSalesDocs(docs, []));
-        setSalesLoadError(false);
-        setLoading(false);
-      },
-      () => {
-        setSalesLoadError(true);
-        loadSalesRest();
-        if (salesRetry < 3) {
-          setTimeout(() => setSalesRetry((c) => c + 1), 5000);
-        }
-      },
-    );
-  }, [viewDate, refreshKey, salesRetry, active, loadSalesRest]);
-
-  useEffect(() => {
-    if (!active || !loading) return undefined;
-    const t = setTimeout(() => loadSalesRest(), 8000);
-    return () => clearTimeout(t);
-  }, [active, loading, loadSalesRest, viewDate]);
+  useIntervalWhen(active, () => loadSalesRest({ background: true }), 45000);
 
   const localForDay = localBills.filter((b) => billMatchesDateKey(b, viewDate));
   const daySales = mergeSalesDocs(firestoreSales, localForDay);
@@ -106,7 +85,7 @@ export default function Dashboard({
     } catch (e) {
       console.error(e);
       alert('แก้สถานะไม่สำเร็จ ลองอีกครั้งครับ');
-      setSalesRetry((c) => c + 1);
+      loadSalesRest({ background: true });
     } finally {
       setPayUpdatingId(null);
     }
@@ -127,7 +106,7 @@ export default function Dashboard({
       alert('✅ ลบบิลแล้ว — บันทึกใหม่ได้ที่ออเดอร์ LINE หรือขายของ');
     } catch (e) {
       alert(e?.message || 'ลบบิลไม่สำเร็จ');
-      setSalesRetry((c) => c + 1);
+      loadSalesRest({ background: true });
     } finally {
       setDeleteBusyId(null);
     }

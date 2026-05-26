@@ -1,8 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users, Wallet } from 'lucide-react';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 import { FS_BASE, fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
 import {
@@ -78,7 +77,7 @@ export default function App() {
     }
   }, [member]);
 
-  // โหลดสต๊อกทันที (REST) + realtime — บางเครือข่ายมือถือ listen ไม่ติด
+  // สต๊อก: REST เท่านั้น — โหลดตอนล็อกอิน / หลังบันทึก / โพลเบาๆ (ไม่ใช้ real-time listener)
   useEffect(() => {
     if (!member) return;
     loadStockFromRest();
@@ -90,26 +89,6 @@ export default function App() {
   }, [member, stockRefresh, loadStockFromRest]);
 
   useIntervalWhen(Boolean(member), loadStockFromRest, 60000);
-
-  useEffect(() => {
-    if (!db || !member) return undefined;
-    const unsubs = [
-      onSnapshot(doc(db, 'config', 'stock'), (snap) => {
-        if (snap.exists()) setStock(snap.data());
-      }, () => {
-        loadStockFromRest();
-      }),
-      onSnapshot(
-        query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(80)),
-        (snap) => setStockBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-        (err) => {
-          console.warn('stockBatches snapshot', err);
-          loadStockFromRest();
-        },
-      ),
-    ];
-    return () => unsubs.forEach((u) => u());
-  }, [member, loadStockFromRest]);
 
   useEffect(() => {
     if (!member || stockBatches.length === 0) return;
@@ -252,7 +231,19 @@ export default function App() {
           </Suspense>
         )}
 
-        {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
+        {activeTab === 'pos' && (
+          <POSMobile
+            user={member}
+            stock={stock}
+            stockBatches={stockBatches}
+            updateMainStock={updateMainStock}
+            onSaveBill={(b) => {
+              setTransactions((prev) => [b, ...prev]);
+              setSalesRefresh((n) => n + 1);
+              setStockRefresh((n) => n + 1);
+            }}
+          />
+        )}
         {activeTab === 'stock'          && (
           <Suspense fallback={<TabLoading />}>
             <InventoryScreen
