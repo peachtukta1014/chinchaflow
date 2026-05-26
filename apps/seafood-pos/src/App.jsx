@@ -3,7 +3,7 @@ import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/fir
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users, Wallet } from 'lucide-react';
 import { auth, db } from './firebase';
-import { FS_BASE, fsQueryStockBatches } from './lib/firestoreRest';
+import { FS_BASE, fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
 import {
   getEffectiveStock,
@@ -62,39 +62,54 @@ export default function App() {
     });
   }, []);
 
-  const loadStockBatchesRest = useCallback(async () => {
+  const loadStockFromRest = useCallback(async () => {
     if (!import.meta.env.VITE_FIREBASE_PROJECT_ID || !member) return;
     try {
-      const rows = await fsQueryStockBatches(50);
-      if (rows.length > 0) setStockBatches(rows);
+      const [cfg, rows] = await Promise.all([
+        fsGetDoc('config/stock'),
+        fsQueryStockBatches(50),
+      ]);
+      if (cfg) {
+        setStock(normalizeStockValues(cfg.live, cfg.dead));
+      }
+      setStockBatches(rows);
     } catch (e) {
-      console.warn('fsQueryStockBatches', e);
+      console.warn('loadStockFromRest', e);
     }
   }, [member]);
 
-  // สต๊อก + ล็อต: realtime เท่านั้น (REST เฉพาะตอน snapshot พัง หรือหลังรับเข้า/ย้ายล็อต)
+  // โหลดสต๊อกทันที (REST) + realtime — บางเครือข่ายมือถือ listen ไม่ติด
+  useEffect(() => {
+    if (!member) return;
+    loadStockFromRest();
+  }, [member, loadStockFromRest]);
+
   useEffect(() => {
     if (!member || stockRefresh === 0) return;
-    loadStockBatchesRest();
-  }, [member, stockRefresh, loadStockBatchesRest]);
+    loadStockFromRest();
+  }, [member, stockRefresh, loadStockFromRest]);
+
+  useIntervalWhen(Boolean(member), loadStockFromRest, 60000);
 
   useEffect(() => {
     if (!db || !member) return undefined;
     const unsubs = [
       onSnapshot(doc(db, 'config', 'stock'), (snap) => {
         if (snap.exists()) setStock(snap.data());
-      }, () => {}),
+      }, () => {
+        loadStockFromRest();
+      }),
       onSnapshot(
         query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(50)),
         (snap) => setStockBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
         (err) => {
           console.warn('stockBatches snapshot', err);
-          loadStockBatchesRest();
+          loadStockFromRest();
         },
       ),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [member, loadStockBatchesRest]);
+  }, [member, loadStockFromRest]);
 
   useEffect(() => {
     if (!member || stockBatches.length === 0) return;

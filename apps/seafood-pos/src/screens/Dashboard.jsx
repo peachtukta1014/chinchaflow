@@ -54,11 +54,9 @@ export default function Dashboard({
 
   useEffect(() => {
     if (!active) return undefined;
-    if (!db) {
-      loadSalesRest();
-      return undefined;
-    }
-    setLoading(true);
+    loadSalesRest();
+    if (!db) return undefined;
+
     const salesQ = query(collection(db, 'sales'), where('dateKey', '==', viewDate));
     return onSnapshot(
       salesQ,
@@ -77,6 +75,12 @@ export default function Dashboard({
       },
     );
   }, [viewDate, refreshKey, salesRetry, active, loadSalesRest]);
+
+  useEffect(() => {
+    if (!active || !loading) return undefined;
+    const t = setTimeout(() => loadSalesRest(), 8000);
+    return () => clearTimeout(t);
+  }, [active, loading, loadSalesRest, viewDate]);
 
   const localForDay = localBills.filter((b) => billMatchesDateKey(b, viewDate));
   const daySales = mergeSalesDocs(firestoreSales, localForDay);
