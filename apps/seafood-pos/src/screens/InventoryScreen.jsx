@@ -15,6 +15,7 @@ import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
 
 const LotReportPanel = lazy(() => import('../components/LotReportPanel'));
+const LotExpensesPanel = lazy(() => import('../components/LotExpensesPanel'));
 const StockCountPanel = lazy(() => import('../components/StockCountPanel'));
 
 function AdminPanelLoading() {
@@ -64,7 +65,9 @@ export default function InventoryScreen({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin && (tab === 'lotReport' || tab === 'stockCount')) setTab('receive');
+    if (!isAdmin && (tab === 'lotReport' || tab === 'stockCount' || tab === 'expenses')) {
+      setTab('receive');
+    }
   }, [isAdmin, tab]);
 
   const liveKg = parseFloat(rcvLive) || 0;
@@ -263,6 +266,14 @@ export default function InventoryScreen({
           <>
             <button
               type="button"
+              onClick={() => setTab('expenses')}
+              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'expenses' ? 'bg-white text-violet-600' : 'text-slate-500'}`}
+              title="รายจ่ายล็อต — แอดมิน"
+            >
+              รายจ่าย
+            </button>
+            <button
+              type="button"
               onClick={() => setTab('lotReport')}
               className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'lotReport' ? 'bg-white text-purple-600' : 'text-slate-500'}`}
               title="สรุปล็อต — แอดมินเท่านั้น"
@@ -280,6 +291,12 @@ export default function InventoryScreen({
           </>
         )}
       </div>
+
+      {tab === 'expenses' && isAdmin && (
+        <Suspense fallback={<AdminPanelLoading />}>
+          <LotExpensesPanel stockBatches={stockBatches} standalone />
+        </Suspense>
+      )}
 
       {tab === 'lotReport' && isAdmin && (
         <Suspense fallback={<AdminPanelLoading />}>

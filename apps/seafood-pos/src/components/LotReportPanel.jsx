@@ -6,8 +6,8 @@ import {
   fsListStockAdjustments,
   fsQuerySalesBetween,
 } from '../lib/firestoreRest';
-import { fetchLotExpenses, saveLotExpenses } from '../services/lotExpenseService';
 import DateNavBar from './DateNavBar';
+import LotExpensesPanel from './LotExpensesPanel';
 
 function fmtKg(n) {
   return `${(parseFloat(n) || 0).toFixed(2)} กก.`;
@@ -42,10 +42,12 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   const [countedLive, setCountedLive] = useState('');
   const [countedDead, setCountedDead] = useState('');
   const [salesLoadNote, setSalesLoadNote] = useState('');
-  const [miscExpenses, setMiscExpenses] = useState('');
-  const [miscNote, setMiscNote] = useState('');
-  const [expenseSaving, setExpenseSaving] = useState(false);
-  const [expenseLoaded, setExpenseLoaded] = useState(false);
+  const [lotExpenses, setLotExpenses] = useState({
+    marketExpenses: 0,
+    marketNote: '',
+    pondExpenses: 0,
+    pondNote: '',
+  });
 
   useEffect(() => {
     if (lotDays.some((d) => d.dateKey === lotDateKey)) return;
@@ -92,31 +94,6 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     loadReportData();
   }, [loadReportData, active]);
 
-  useEffect(() => {
-    if (!active || !lotDateKey) return undefined;
-    let cancelled = false;
-    setExpenseLoaded(false);
-    fetchLotExpenses(lotDateKey)
-      .then(({ miscExpenses: amt, miscNote: note }) => {
-        if (cancelled) return;
-        setMiscExpenses(amt > 0 ? String(amt) : '');
-        setMiscNote(note || '');
-      })
-      .catch((e) => {
-        console.warn('fetchLotExpenses', e);
-        if (!cancelled) {
-          setMiscExpenses('');
-          setMiscNote('');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setExpenseLoaded(true);
-      });
-    return () => { cancelled = true; };
-  }, [lotDateKey, active]);
-
-  const miscExpensesNum = parseFloat(miscExpenses) || 0;
-
   const report = useMemo(() => {
     const cLive = countedLive === '' ? null : parseFloat(countedLive);
     const cDead = countedDead === '' ? null : parseFloat(countedDead);
@@ -128,7 +105,8 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
       adjustments,
       countedLive: Number.isFinite(cLive) ? cLive : null,
       countedDead: Number.isFinite(cDead) ? cDead : null,
-      miscExpenses: miscExpensesNum,
+      marketExpenses: lotExpenses.marketExpenses,
+      pondExpenses: lotExpenses.pondExpenses,
     });
   }, [
     lotDateKey,
@@ -138,24 +116,8 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     adjustments,
     countedLive,
     countedDead,
-    miscExpensesNum,
+    lotExpenses,
   ]);
-
-  const handleSaveMiscExpenses = async () => {
-    setExpenseSaving(true);
-    try {
-      await saveLotExpenses(lotDateKey, {
-        miscExpenses: miscExpensesNum,
-        miscNote: miscNote,
-      });
-      alert('✅ บันทึกค่าใช้จ่ายอื่นๆ แล้ว');
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || 'บันทึกไม่สำเร็จ');
-    } finally {
-      setExpenseSaving(false);
-    }
-  };
 
   const lotLabel = formatReceiveDayLabel(lotDateKey);
 
@@ -345,43 +307,12 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         )}
       </div>
 
-      <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
-        <p className="text-xs font-bold text-slate-700">ค่าใช้จ่ายอื่นๆ (จิปาถะ)</p>
-        <p className="text-[10px] text-slate-400 leading-relaxed">
-          ค่ารถใส่ตอน「รับเข้า」ด้านบนแล้ว (รวมในต้นทุนล็อต) · ช่องนี้สำหรับค่าลูก น้ำมัน ค่าแรงน้อง
-          หรือจ่ายอื่นๆ ของล็อตนี้
-        </p>
-        <div>
-          <label className="text-xs font-bold text-slate-500 mb-1 block">ยอดรวม (฿)</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={miscExpenses}
-            onChange={(e) => setMiscExpenses(e.target.value)}
-            placeholder="0"
-            className="w-full p-3 bg-slate-50 rounded-2xl font-bold text-slate-800 outline-none"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-bold text-slate-500 mb-1 block">หมายเหตุ (ไม่บังคับ)</label>
-          <input
-            type="text"
-            value={miscNote}
-            onChange={(e) => setMiscNote(e.target.value)}
-            placeholder="เช่น ค่าลูก น้ำมัน ค่าแรงตลาด"
-            className="w-full p-3 bg-slate-50 rounded-2xl text-sm text-slate-800 outline-none"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={handleSaveMiscExpenses}
-          disabled={expenseSaving || !expenseLoaded}
-          className="w-full py-3 rounded-2xl bg-purple-600 text-white font-bold text-sm disabled:opacity-60"
-        >
-          {expenseSaving ? 'กำลังบันทึก...' : 'บันทึกค่าใช้จ่ายอื่นๆ'}
-        </button>
-      </div>
+      <LotExpensesPanel
+        stockBatches={stockBatches}
+        lotDateKey={lotDateKey}
+        onLotDateKeyChange={setLotDateKey}
+        onExpensesChange={setLotExpenses}
+      />
 
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-2">
         <p className="text-xs font-bold text-cyan-300">ผลล็อตสุทธิ (คำนวณในแอป)</p>
@@ -408,11 +339,28 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           value={fmtBaht(report.netLotProfit)}
           accent={report.netLotProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}
         />
-        {report.miscExpensesBaht > 0 && (
+        {report.marketExpensesBaht > 0 && (
           <MetricRow
-            label="หักค่าใช้จ่ายอื่นๆ"
+            label="หักรายจ่ายแผงตลาด"
+            value={`−${fmtBaht(report.marketExpensesBaht)}`}
+            sub={lotExpenses.marketNote || undefined}
+            accent="text-orange-300"
+          />
+        )}
+        {report.pondExpensesBaht > 0 && (
+          <MetricRow
+            label="หักรายจ่ายบ่อ/ส่งเป็น"
+            value={`−${fmtBaht(report.pondExpensesBaht)}`}
+            sub={lotExpenses.pondNote || undefined}
+            accent="text-blue-300"
+          />
+        )}
+        {report.miscExpensesBaht > 0
+          && report.marketExpensesBaht <= 0
+          && report.pondExpensesBaht <= 0 && (
+          <MetricRow
+            label="หักรายจ่ายอื่นๆ"
             value={`−${fmtBaht(report.miscExpensesBaht)}`}
-            sub={miscNote.trim() || undefined}
             accent="text-orange-300"
           />
         )}

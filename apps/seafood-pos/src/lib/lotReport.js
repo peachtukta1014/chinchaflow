@@ -58,6 +58,8 @@ export function computeLotReport({
   countedLive = null,
   countedDead = null,
   miscExpenses = 0,
+  marketExpenses = 0,
+  pondExpenses = 0,
 }) {
   const lotBatches = batchesForLot(batches, lotDateKey);
   const batchIds = new Set(lotBatches.map((b) => b.id));
@@ -113,7 +115,10 @@ export function computeLotReport({
   const pondToDeadCostBaht = adj.pondToDeadKg * avgCostPerKg;
   const totalLossBaht = shrinkageBaht + adj.stockCountBaht;
   const netLotProfit = grossProfit - totalLossBaht;
-  const miscExpensesBaht = baht(miscExpenses);
+  const marketExpensesBaht = baht(marketExpenses);
+  const pondExpensesBaht = baht(pondExpenses);
+  const miscFromSplit = marketExpensesBaht + pondExpensesBaht;
+  const miscExpensesBaht = miscFromSplit > 0 ? miscFromSplit : baht(miscExpenses);
   const netAfterMisc = netLotProfit - miscExpensesBaht;
   const shrimpPurchaseCost = Math.max(0, totalCost - transportTotal);
 
@@ -177,6 +182,8 @@ export function computeLotReport({
     grossProfit,
     totalLossBaht,
     netLotProfit,
+    marketExpensesBaht,
+    pondExpensesBaht,
     miscExpensesBaht,
     netAfterMisc,
     countVarianceKg,
