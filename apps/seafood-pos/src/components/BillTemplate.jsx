@@ -1,4 +1,5 @@
 import React from 'react';
+import { BILL_PAID_THANK_YOU_MESSAGE } from '../lib/billPaymentDisplay';
 import { BILL_QR_URL } from '../lib/billTemplateConfig';
 
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
@@ -134,43 +135,9 @@ export default function BillTemplate({ data }) {
         จำหน่าย : ซีฟู้ดของสดของเป็น เน้นกุ้งแม่น้ำธรรมชาติเป็นๆ พร้อมส่ง
       </p>
 
-      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-1">
+      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-3">
         ใบส่งของ
       </div>
-      {data.paymentNote ? (
-        <p className="text-center text-red-600 font-black text-2xl mb-3 tracking-wide leading-tight">
-          {data.paymentNote}
-        </p>
-      ) : data.creditTransfer ? (
-        <div className="mb-3 rounded-lg border-2 border-red-500 bg-red-50 px-3 py-2.5 text-center">
-          <p className="text-red-600 font-black text-xl leading-tight">
-            ค้างชำระ ฿{formatCellMoney(data.creditTransfer.unpaidAmount)}
-          </p>
-          <p className="text-red-700 font-bold text-sm mt-2">โอนชำระเข้าบัญชี (เลือกบัญชีใดบัญชีหนึ่ง)</p>
-          <div className="mt-2 space-y-2 text-left">
-            {(data.creditTransfer.accounts || []).map((acc) => (
-              <div
-                key={`${acc.label}-${acc.accountNo}`}
-                className="bg-white/80 rounded-md px-2.5 py-1.5 border border-red-200"
-              >
-                {acc.label && (
-                  <p className="text-red-800 font-black text-sm">{acc.label}</p>
-                )}
-                <p className="text-red-700 font-bold text-xs">
-                  {acc.holder}
-                  {' · '}
-                  {acc.bank}
-                </p>
-                <p className="text-red-600 font-black text-base tracking-wide mt-0.5">
-                  {acc.accountNo}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3" />
-      )}
 
       <div className="text-xs space-y-3 mb-4 font-medium">
         <div className="flex w-full gap-4">
@@ -223,6 +190,46 @@ export default function BillTemplate({ data }) {
           </tr>
         </tbody>
       </table>
+
+      {data.paymentNote ? (
+        <div className="mt-3 rounded-lg border-2 border-green-500 bg-green-50 px-3 py-2.5 text-center">
+          <p className="text-green-600 font-black text-xl leading-tight tracking-wide">
+            {data.paymentNote}
+          </p>
+          <p className="text-green-800 font-semibold text-sm mt-2 leading-snug">
+            {BILL_PAID_THANK_YOU_MESSAGE}
+          </p>
+        </div>
+      ) : data.creditTransfer ? (
+        <div className="mt-3 rounded-lg border-2 border-red-500 bg-red-50 px-3 py-2.5 text-center">
+          <p className="text-red-600 font-black text-xl leading-tight">
+            ค้างชำระ ฿{formatCellMoney(data.creditTransfer.unpaidAmount)}
+          </p>
+          <p className="text-red-700 font-bold text-sm mt-2">
+            โอนชำระเข้าบัญชี (เลือกบัญชีใดบัญชีหนึ่ง)
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-left">
+            {(data.creditTransfer.accounts || []).map((acc) => (
+              <div
+                key={`${acc.label}-${acc.accountNo}`}
+                className="bg-white/80 rounded-md px-2 py-1.5 border border-red-200 min-w-0"
+              >
+                {acc.label && (
+                  <p className="text-red-800 font-black text-xs leading-tight">{acc.label}</p>
+                )}
+                <p className="text-red-700 font-bold text-[10px] leading-tight mt-0.5">
+                  {acc.holder}
+                  {' · '}
+                  {acc.bank}
+                </p>
+                <p className="text-red-600 font-black text-sm tracking-wide mt-0.5 break-all">
+                  {acc.accountNo}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex justify-between items-end text-[10px] mt-8 font-medium px-2 text-[#1e3a8a] gap-6">
         <div className="flex items-end flex-1 min-w-0 gap-1">
