@@ -277,10 +277,8 @@ export default function CustomerAccountsScreen({
   }, [loadDebtsRest, refreshKey]);
 
   useEffect(() => {
-    refreshAll();
-    const iv = setInterval(refreshAll, 25000);
-    return () => clearInterval(iv);
-  }, [refreshAll]);
+    loadAllSales();
+  }, [loadAllSales]);
 
   useEffect(() => {
     if (!db) return undefined;

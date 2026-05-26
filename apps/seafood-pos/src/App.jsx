@@ -13,6 +13,7 @@ import {
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
 import { getAppBuildLabel } from './lib/appBuildInfo';
+import { useIntervalWhen } from './lib/useIntervalWhen';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
@@ -71,16 +72,14 @@ export default function App() {
     }
   }, [member]);
 
-  // Real-time shared stock + ล็อต (REST + snapshot — หน้าขายต้องเห็นล็อตเหมือนภาพรวม)
-  useEffect(() => {
-    if (!member) return undefined;
+  // สต๊อก + ล็อต: realtime เท่านั้น (REST เฉพาะตอน snapshot พัง หรือหลังรับเข้า/ย้ายล็อต)
+  useEffect(() => {
+    if (!member || stockRefresh === 0) return;
     loadStockBatchesRest();
-    const iv = setInterval(loadStockBatchesRest, 20000);
-    return () => clearInterval(iv);
   }, [member, stockRefresh, loadStockBatchesRest]);
 
-  useEffect(() => {
-    if (!db || !member) return undefined;
+  useEffect(() => {
+    if (!db || !member) return undefined;
     const unsubs = [
       onSnapshot(doc(db, 'config', 'stock'), (snap) => {
         if (snap.exists()) setStock(snap.data());
@@ -109,16 +108,23 @@ export default function App() {
     [stock, stockBatches],
   );
 
-  // Badge: pending LINE orders
+  // Badge ออเดอร์: โหลดครั้งแรก + poll เมื่อไม่อยู่หน้าออเดอร์ (หน้าออเดอร์มี refresh ของตัวเอง)
+  const pollOrderBadge = Boolean(
+    member && import.meta.env.VITE_FIREBASE_PROJECT_ID && activeTab !== 'orders',
+  );
+
   useEffect(() => {
     if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
-    const load = async () => {
-      setPendingOrders(await fetchPendingLineOrderCount());
-    };
-    load();
-    const t = setInterval(load, 30000);
-    return () => clearInterval(t);
-  }, [member]);
+    fetchPendingLineOrderCount().then(setPendingOrders);
+  }, [member, activeTab]);
+
+  useIntervalWhen(
+    pollOrderBadge,
+    () => {
+      fetchPendingLineOrderCount().then(setPendingOrders);
+    },
+    45000,
+  );
 
   const handleLogin  = (m) => setMember(m);
   const handleLogout = async () => {

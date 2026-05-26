@@ -13,6 +13,7 @@ import {
 } from '../services/lineOrderService';
 import { deductStockForSale, getEffectiveStock } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
+import { useIntervalWhen } from '../lib/useIntervalWhen';
 
 export default function LineOrdersScreen({ user, stock, stockBatches = [], updateMainStock, onSaleRecorded, onOrderDone }) {
   const [orders, setOrders] = useState([]);
@@ -54,11 +55,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    loadOrders();
-    const t = setInterval(loadOrders, 20000);
-    return () => clearInterval(t);
-  }, [loadOrders]);
+  useIntervalWhen(true, loadOrders, 30000);
 
   const cancelLineOrder = async (order) => {
     if (!order || order.status !== 'pending' || savingId) return;
