@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, PlusCircle, Trash2, Users } from 'lucide-react';
 import {
-  createCustomer,
-  deleteCustomer,
+  createCustomerVerified,
+  deleteCustomerVerified,
   hideCustomerFromList,
   isBuiltinCustomer,
   isDeletableCustomer,
   mergeCustomerLists,
+  saveCustomerVerified,
   suggestLineUserIdFromOrders,
   subscribeCustomers,
-  updateCustomer,
 } from '../services/customerService';
 import { isValidLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
@@ -43,11 +43,12 @@ export default function MembersScreen({ isAdmin = false }) {
     }
     setSaveBusy(true);
     try {
-      await updateCustomer(id, cusEditData);
+      const { map } = await saveCustomerVerified(id, cusEditData);
+      setFsCustomers(map);
       setCusEditId(null);
       showFlash('✅ บันทึกสำเร็จแล้วครับ');
     } catch (e) {
-      showFlash('❌ บันทึกไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+      showFlash('❌ ' + (e?.message || 'บันทึกไม่สำเร็จ'));
     } finally {
       setSaveBusy(false);
     }
@@ -78,12 +79,13 @@ export default function MembersScreen({ isAdmin = false }) {
     }
     setSaveBusy(true);
     try {
-      await createCustomer(newCus);
+      const { map } = await createCustomerVerified(newCus);
+      setFsCustomers(map);
       setNewCus({ name: '', zone: '', phone: '', lineUserId: '' });
       setShowAdd(false);
       showFlash('✅ เพิ่มลูกค้าสำเร็จแล้วครับ');
     } catch (e) {
-      showFlash('❌ เพิ่มไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+      showFlash('❌ ' + (e?.message || 'เพิ่มไม่สำเร็จ'));
     } finally {
       setSaveBusy(false);
     }
@@ -98,11 +100,12 @@ export default function MembersScreen({ isAdmin = false }) {
     if (!window.confirm(`ลบลูกค้า "${c.name}" ออกจากระบบ?\n(ลบถาวร กู้คืนไม่ได้)`)) return;
     setSaveBusy(true);
     try {
-      await deleteCustomer(c.id);
+      const map = await deleteCustomerVerified(c.id);
+      setFsCustomers(map);
       if (cusEditId === c.id) setCusEditId(null);
       showFlash('✅ ลบลูกค้าแล้ว');
     } catch (e) {
-      showFlash('❌ ลบไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+      showFlash('❌ ' + (e?.message || 'ลบไม่สำเร็จ'));
     } finally {
       setSaveBusy(false);
     }
@@ -113,11 +116,12 @@ export default function MembersScreen({ isAdmin = false }) {
     if (!window.confirm(`ซ่อน "${c.name}" ออกจากรายชื่อ?\n(ยังเลือกตอนขายได้ถ้ารู้รหัสเดิม)`)) return;
     setSaveBusy(true);
     try {
-      await hideCustomerFromList(c.id);
+      const map = await hideCustomerFromList(c.id);
+      setFsCustomers(map);
       if (cusEditId === c.id) setCusEditId(null);
       showFlash('✅ ซ่อนรายการแล้ว');
     } catch (e) {
-      showFlash('❌ ซ่อนไม่สำเร็จ: ' + (e?.message || ''));
+      showFlash('❌ ' + (e?.message || 'ซ่อนไม่สำเร็จ'));
     } finally {
       setSaveBusy(false);
     }
@@ -368,10 +372,11 @@ export default function MembersScreen({ isAdmin = false }) {
                           type="button"
                           disabled={saveBusy}
                           onClick={() => removeCustomer(c)}
-                          className="text-xs text-red-500 border border-red-200 px-2 py-1.5 rounded-lg"
-                          title="ลบถาวร (ลูกค้าที่เพิ่มเอง)"
+                          className="text-xs font-bold text-white bg-red-500 border border-red-600 px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                          title="ลบถาวร"
                         >
                           <Trash2 size={14} />
+                          ลบ
                         </button>
                       )}
                       {isBuiltinCustomer(c) && c.duplicate && (

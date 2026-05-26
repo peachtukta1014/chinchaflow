@@ -1,8 +1,8 @@
 import { collection, onSnapshot } from 'firebase/firestore';
 import { CUSTOMERS } from '../constants';
 import { db } from '../firebase';
-import { normalizeLineUserId } from '../lib/lineUserId';
-import { fsDelete, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
+import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
+import { fsDelete, fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
 import { exactCustomerNameMatch } from '../lib/customerNameMatch';
 
 function compactName(s) {
@@ -29,8 +29,21 @@ export function subscribeCustomers(onData, onError) {
       snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
       onData(map);
     },
-    () => onError?.(),
+    (err) => {
+      console.warn('subscribeCustomers', err);
+      onError?.();
+    },
   );
+}
+
+/** โหลด customers จาก REST (ใช้หลังบันทึก — ไม่รอ listener) */
+export async function fetchCustomersMap() {
+  const docs = await fsListCollection('customers', 500);
+  const map = {};
+  for (const d of docs) {
+    if (d.id) map[d.id] = d;
+  }
+  return map;
 }
 
 export function mergeCustomerLists(fsCustomers) {
@@ -72,9 +85,9 @@ export function isBuiltinCustomer(c) {
 
 function customerPayload({ name, zone, phone, lineUserId, hidden }) {
   const payload = {
-    name: name.trim(),
-    zone: (zone || '').trim(),
-    phone: (phone || '').trim(),
+    name: String(name || '').trim(),
+    zone: String(zone || '').trim(),
+    phone: String(phone || '').trim(),
   };
   const line = normalizeLineUserId(lineUserId);
   payload.lineUserId = line || '';
@@ -83,21 +96,56 @@ function customerPayload({ name, zone, phone, lineUserId, hidden }) {
   return payload;
 }
 
+function assertSaved(doc, want, id) {
+  if (!doc) {
+    throw new Error('บันทึกไม่สำเร็จ — ไม่พบข้อมูลในระบบหลังบันทึก');
+  }
+  if (want.name && doc.name !== want.name) {
+    throw new Error(`บันทึกชื่อไม่สำเร็จ (ในระบบยังเป็น "${doc.name || '—'}")`);
+  }
+  if (want.lineUserId && normalizeLineUserId(doc.lineUserId) !== want.lineUserId) {
+    throw new Error('บันทึก LINE UID ไม่สำเร็จ — ลองอีกครั้งหรือรีเฟรชแอป');
+  }
+  if (want.hidden === true && doc.hidden !== true) {
+    throw new Error('ซ่อนรายการไม่สำเร็จ');
+  }
+  return doc;
+}
+
 export async function updateCustomer(id, data) {
   if (!id) throw new Error('ไม่พบรหัสลูกค้า');
+  const want = customerPayload(data);
   await withTimeout(fsSetDoc(`customers/${id}`, {
-    ...customerPayload(data),
+    ...want,
     updatedAt: new Date().toISOString(),
   }));
+  const doc = await withTimeout(fsGetDoc(`customers/${id}`));
+  return assertSaved(doc, want, id);
+}
+
+/** บันทึก + ยืนยันจาก Firestore + คืน map ล่าสุด */
+export async function saveCustomerVerified(id, data) {
+  const doc = await updateCustomer(id, data);
+  const map = await fetchCustomersMap();
+  return { doc, map };
 }
 
 export async function createCustomer(data) {
   const id = `cx_${Date.now()}`;
+  const want = customerPayload(data);
   await withTimeout(fsSetDoc(`customers/${id}`, {
-    ...customerPayload(data),
+    ...want,
     createdAt: new Date().toISOString(),
   }));
+  const doc = await withTimeout(fsGetDoc(`customers/${id}`));
+  assertSaved(doc, want, id);
   return id;
+}
+
+export async function createCustomerVerified(data) {
+  const id = await createCustomer(data);
+  const map = await fetchCustomersMap();
+  return { id, map };
 }
 
 export async function deleteCustomer(id) {
@@ -105,19 +153,31 @@ export async function deleteCustomer(id) {
     throw new Error('ลบได้เฉพาะลูกค้าที่เพิ่มเอง');
   }
   await withTimeout(fsDelete(`customers/${id}`));
+  const still = await fsGetDoc(`customers/${id}`);
+  if (still) throw new Error('ลบไม่สำเร็จ — ข้อมูลยังอยู่ในระบบ');
 }
 
-/** ซ่อนรายการในแอป (รายชื่อเริ่มต้นในแอป — ลบไฟล์จริงไม่ได้) */
+export async function deleteCustomerVerified(id) {
+  await deleteCustomer(id);
+  return fetchCustomersMap();
+}
+
 export async function hideCustomerFromList(id) {
   const builtin = CUSTOMERS.find((b) => b.id === id);
-  await withTimeout(fsSetDoc(`customers/${id}`, {
+  const want = customerPayload({
     name: builtin?.name || id,
     zone: builtin?.zone || '',
     phone: '',
     lineUserId: '',
     hidden: true,
+  });
+  await withTimeout(fsSetDoc(`customers/${id}`, {
+    ...want,
     hiddenAt: new Date().toISOString(),
   }));
+  const doc = await fsGetDoc(`customers/${id}`);
+  assertSaved(doc, want, id);
+  return fetchCustomersMap();
 }
 
 export async function suggestLineUserIdFromOrders(customerName) {
@@ -145,3 +205,5 @@ export async function suggestLineUserIdFromOrders(customerName) {
   }
   return null;
 }
+
+export { isValidLineUserId };

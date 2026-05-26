@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link2, RefreshCw, UserPlus } from 'lucide-react';
 import {
-  createCustomer,
+  createCustomerVerified,
+  fetchCustomersMap,
   mergeCustomerLists,
+  saveCustomerVerified,
   subscribeCustomers,
-  updateCustomer,
 } from '../services/customerService';
 import {
   fetchLineOaContacts,
@@ -22,10 +23,19 @@ export default function LineOaCustomersPanel({ showFlash }) {
 
   const allCustomers = mergeCustomerLists(fsCustomers);
 
+  const refreshCustomers = useCallback(async () => {
+    const map = await fetchCustomersMap();
+    setFsCustomers(map);
+    return map;
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await fetchLineOaContacts();
+      const [rows] = await Promise.all([
+        fetchLineOaContacts(),
+        refreshCustomers(),
+      ]);
       setContacts(rows);
     } catch (e) {
       console.error(e);
@@ -33,10 +43,22 @@ export default function LineOaCustomersPanel({ showFlash }) {
     } finally {
       setLoading(false);
     }
-  }, [showFlash]);
+  }, [showFlash, refreshCustomers]);
 
   useEffect(() => subscribeCustomers(setFsCustomers, () => {}), []);
   useEffect(() => { load(); }, [load]);
+
+  const confirmLinked = (map, lineUserId, expectedName) => {
+    const list = mergeCustomerLists(map);
+    const linked = findCustomerByLineUserId(list, lineUserId);
+    if (!linked) {
+      throw new Error('ผูกไม่สำเร็จ — ลองรีเฟรชหรือบันทึกอีกครั้ง');
+    }
+    if (expectedName && linked.name !== expectedName) {
+      throw new Error(`ผูกแล้วแต่ชื่อไม่ตรง (ได้ "${linked.name}")`);
+    }
+    return linked;
+  };
 
   const saveAsNewCustomer = async (contact, nameOverride) => {
     const name = (nameOverride || contact.suggestedName || '').trim();
@@ -47,26 +69,32 @@ export default function LineOaCustomersPanel({ showFlash }) {
     setBusyUid(contact.lineUserId);
     try {
       const existing = findCustomerByExactName(allCustomers, name);
+      let map;
       if (existing) {
-        await updateCustomer(existing.id, {
+        const result = await saveCustomerVerified(existing.id, {
           name: existing.name,
           zone: existing.zone || '',
           phone: existing.phone || '',
           lineUserId: contact.lineUserId,
         });
+        map = result.map;
+        confirmLinked(map, contact.lineUserId, existing.name);
         showFlash?.(`✅ ผูก LINE กับ "${existing.name}" แล้ว`);
       } else {
-        await createCustomer({
+        const result = await createCustomerVerified({
           name,
           zone: 'LINE OA',
           phone: '',
           lineUserId: contact.lineUserId,
         });
+        map = result.map;
+        confirmLinked(map, contact.lineUserId, name);
         showFlash?.(`✅ เพิ่ม "${name}" เข้ารายชื่อหลักแล้ว`);
       }
+      setFsCustomers(map);
       await load();
     } catch (e) {
-      showFlash?.('❌ บันทึกไม่สำเร็จ: ' + (e?.message || ''));
+      showFlash?.('❌ ' + (e?.message || 'บันทึกไม่สำเร็จ'));
     } finally {
       setBusyUid(null);
       setLinkPick(null);
@@ -78,17 +106,19 @@ export default function LineOaCustomersPanel({ showFlash }) {
     if (!c) return;
     setBusyUid(contact.lineUserId);
     try {
-      await updateCustomer(c.id, {
+      const { map } = await saveCustomerVerified(c.id, {
         name: c.name,
         zone: c.zone || '',
         phone: c.phone || '',
         lineUserId: contact.lineUserId,
       });
+      confirmLinked(map, contact.lineUserId, c.name);
+      setFsCustomers(map);
       showFlash?.(`✅ ผูก LINE กับ "${c.name}" แล้ว`);
       setLinkPick(null);
       await load();
     } catch (e) {
-      showFlash?.('❌ ผูกไม่สำเร็จ');
+      showFlash?.('❌ ' + (e?.message || 'ผูกไม่สำเร็จ'));
     } finally {
       setBusyUid(null);
     }
@@ -98,8 +128,8 @@ export default function LineOaCustomersPanel({ showFlash }) {
     <div className="space-y-3">
       <div className="bg-[#06C755]/10 border border-[#06C755]/30 rounded-2xl p-3">
         <p className="text-xs text-[#047857] leading-relaxed font-medium">
-          เฉพาะลูกค้าที่ทัก LINE OA แชทตรง (ไม่รวมคนในกลุ่ม LINE ภายใน)
-          กดบันทึกเข้ารายชื่อหลักแล้วปุ่มส่งบิลอัตโนมัติจะกลับมา
+          เฉพาะลูกค้าที่ทัก LINE OA แชทตรง (ไม่รวมกลุ่ม LINE ภายใน)
+          หลังผูกจะขึ้น「ผูกแล้ว」สีเขียว — ถ้ายังส้มให้กดรีเฟรช
         </p>
       </div>
       <div className="flex items-center justify-between">
@@ -219,6 +249,7 @@ export default function LineOaCustomersPanel({ showFlash }) {
                 {linked && (
                   <p className="text-[10px] text-green-700 mt-2 font-medium">
                     พร้อมส่งบิลอัตโนมัติเมื่อเลือก "{linked.name}" ตอนขาย
+                    {isValidLineUserId(linked.lineUserId) ? '' : ' (UID ยังไม่ถูกต้อง)'}
                   </p>
                 )}
               </div>

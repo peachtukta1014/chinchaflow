@@ -123,34 +123,42 @@ export async function fsPatch(path, data) {
   if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
 }
 
-/** สร้างหรืออัปเดตเอกสารตาม path (PATCH แล้ว POST ถ้ายังไม่มี) */
+/** สร้างหรืออัปเดตเอกสารตาม path (PATCH+updateMask หรือ POST ถ้ายังไม่มี) */
 export async function fsSetDoc(path, data) {
+  if (!FS_BASE) throw new Error('Firestore ไม่ได้ตั้งค่า');
   const fields = fsObj(data);
+  if (!Object.keys(fields).length) throw new Error('ไม่มีข้อมูลให้บันทึก');
+
   const parts = path.split('/');
   const col = parts.slice(0, -1).join('/');
   const docId = parts[parts.length - 1];
+  const headers = await fsAuthHeaders();
+  if (!headers.Authorization) {
+    throw new Error('กรุณาเข้าสู่ระบบก่อนบันทึก');
+  }
 
-  let r = await fetch(`${FS_BASE}/${path}`, {
+  const qs = Object.keys(fields)
+    .map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
+    .join('&');
+
+  let r = await fetch(`${FS_BASE}/${path}?${qs}`, {
     method: 'PATCH',
-    headers: await fsAuthHeaders(),
+    headers,
     body: JSON.stringify({ fields }),
   });
-  if (r.ok) return;
 
-  const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  r = await fetch(`${FS_BASE}/${path}?${qs}`, {
-    method: 'PATCH',
-    headers: await fsAuthHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (r.ok) return;
+  if (r.status === 404) {
+    r = await fetch(`${FS_BASE}/${col}?documentId=${encodeURIComponent(docId)}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ fields }),
+    });
+  }
 
-  r = await fetch(`${FS_BASE}/${col}?documentId=${encodeURIComponent(docId)}`, {
-    method: 'POST',
-    headers: await fsAuthHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (!r.ok) throw new Error(`Firestore ${path} HTTP ${r.status}`);
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`บันทึกไม่สำเร็จ (HTTP ${r.status})${errText ? `: ${errText.slice(0, 120)}` : ''}`);
+  }
 }
 
 export async function fsDelete(path) {
