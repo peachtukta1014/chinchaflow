@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { MessageCircle, PlusCircle, Trash2, Users } from 'lucide-react';
 import {
   createCustomer,
   deleteCustomer,
@@ -10,8 +10,10 @@ import {
   updateCustomer,
 } from '../services/customerService';
 import { isValidLineUserId } from '../lib/lineUserId';
+import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
 
 export default function MembersScreen({ isAdmin = false }) {
+  const [subTab, setSubTab] = useState('list');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cusLoading, setCusLoading] = useState(true);
   const [cusEditId, setCusEditId] = useState(null);
@@ -109,8 +111,35 @@ export default function MembersScreen({ isAdmin = false }) {
         </div>
       )}
       <>
+        <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
+          <button
+            type="button"
+            onClick={() => setSubTab('list')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
+              subTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            <Users size={15} />
+            รายชื่อหลัก
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('lineOa')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
+              subTab === 'lineOa' ? 'bg-white text-[#06C755] shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            <MessageCircle size={15} />
+            ลูกค้า LINE OA
+          </button>
+        </div>
+
+        {subTab === 'lineOa' ? (
+          <LineOaCustomersPanel showFlash={showFlash} />
+        ) : (
+          <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          บันทึก LINE User ID (U...) เพื่อส่งบิลอัตโนมัติ — ดึงจากออเดอร์ได้เมื่อชื่อตรงทุกตัวอักษร
+          รายชื่อสำหรับเลือกตอนขาย — ลูกค้าที่ทัก LINE ดูแท็บ「ลูกค้า LINE OA」แล้วกดบันทึกเข้ารายชื่อ
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
@@ -303,6 +332,8 @@ export default function MembersScreen({ isAdmin = false }) {
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
       </>
     </div>
