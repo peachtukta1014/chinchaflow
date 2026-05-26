@@ -12,6 +12,7 @@ import {
   syncMainStockFromBatches,
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
+import { getAppBuildLabel } from './lib/appBuildInfo';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
 import Dashboard from './screens/Dashboard';
@@ -153,12 +154,17 @@ export default function App() {
         <div className="px-4 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
-              <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
+              <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[180px]">
                 {member.name}
                 {isAdmin && <span className="ml-1.5 text-purple-400">· แอดมิน</span>}
               </p>
+              {getAppBuildLabel() && (
+                <p className="text-[9px] text-cyan-400/90 mt-0.5 truncate max-w-[200px]" title="เวอร์ชันที่โหลดอยู่ — กดปุ่มรีเฟรชถ้าไม่ตรง">
+                  {getAppBuildLabel()}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">

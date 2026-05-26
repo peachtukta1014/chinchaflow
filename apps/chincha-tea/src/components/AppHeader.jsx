@@ -1,4 +1,5 @@
 import { hardReloadApp } from '../lib/reloadApp';
+import { getAppBuildLabel } from '../lib/appBuildInfo';
 
 export default function AppHeader({ member, lang, setLang, onLogout, t }) {
   const handleReload = () => {
@@ -12,6 +13,11 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
         <div className="min-w-0">
           <p className="font-black text-amber-300 leading-none">{t('appName')}</p>
           <p className="text-amber-700 text-[10px] truncate">{member.name}</p>
+          {getAppBuildLabel() && (
+            <p className="text-[9px] text-cyan-300/90 mt-0.5 truncate max-w-[200px]" title="เวอร์ชันที่โหลดอยู่ — กดปุ่มรีเฟรชถ้าไม่ตรง">
+              {getAppBuildLabel()}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
