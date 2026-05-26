@@ -1,7 +1,11 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
 import { fsQueryStockAdjustments } from '../lib/firestoreRest';
-import { countReceivesOnDate, formatReceiveDayLabel } from '../lib/stockBatchUtils';
+import {
+  countReceivesOnDate,
+  formatReceiveDayLabel,
+  receiveDateKeyOf,
+} from '../lib/stockBatchUtils';
 import {
   createStockBatchRecord,
   recordSpoilageLoss,
@@ -73,6 +77,21 @@ export default function InventoryScreen({
     () => countReceivesOnDate(stockBatches, todayKey),
     [stockBatches, todayKey],
   );
+
+  const todayReceives = useMemo(
+    () =>
+      stockBatches
+        .filter((b) => receiveDateKeyOf(b) === todayKey)
+        .sort(
+          (a, b) =>
+            new Date(a.purchaseDate || 0).getTime() - new Date(b.purchaseDate || 0).getTime(),
+        ),
+    [stockBatches, todayKey],
+  );
+
+  useEffect(() => {
+    onReceived?.();
+  }, []);
 
   const loadDeadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -339,6 +358,50 @@ export default function InventoryScreen({
           >
             {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
           </button>
+
+          {todayReceives.length > 0 ? (
+            <div className="border-t border-slate-200 pt-4 space-y-2">
+              <p className="text-xs font-bold text-slate-600">รายการรับเข้าวันนี้ (จากระบบ)</p>
+              {todayReceives.map((b, idx) => {
+                const live = parseFloat(b.liveKg) || 0;
+                const dead = parseFloat(b.deadKg) || 0;
+                const cost = parseFloat(b.totalCost) || 0;
+                const perKg = parseFloat(b.effectiveCostPerKg ?? b.costPerKg) || 0;
+                return (
+                  <div
+                    key={b.id || `rcv-${idx}`}
+                    className="rounded-xl bg-blue-50/80 border border-blue-100 p-3 text-xs"
+                  >
+                    <div className="flex justify-between gap-2 font-bold text-slate-800">
+                      <span>
+                        รายการที่ {idx + 1}
+                        {b.note ? ` · ${b.note}` : ''}
+                      </span>
+                      <span className="text-blue-700 shrink-0">฿{cost.toLocaleString()}</span>
+                    </div>
+                    <p className="text-slate-600 mt-1">
+                      สด {live.toFixed(2)} กก. · ตาย {dead.toFixed(2)} กก.
+                      {' · '}
+                      ฿{perKg.toFixed(2)}/กก.
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      คงเหลือในล็อต: เป็น{' '}
+                      {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(2)}
+                      {' '}
+                      · ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(2)} กก.
+                    </p>
+                  </div>
+                );
+              })}
+              <p className="text-[10px] text-slate-400">
+                ดูล็อตย้อนหลัง → แท็บ「ล็อตรับเข้า」
+              </p>
+            </div>
+          ) : todayReceiveCount === 0 && stockBatches.length === 0 ? (
+            <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl p-3 leading-relaxed">
+              ยังโหลดล็อตไม่สำเร็จ — ลองกดรีเฟรชแอป (มุมขวาบน) หรือดูแท็บ「ล็อตรับเข้า」
+            </p>
+          ) : null}
         </div>
       )}
 

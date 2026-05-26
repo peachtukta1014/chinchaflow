@@ -67,7 +67,7 @@ export default function App() {
     try {
       const [cfg, rows] = await Promise.all([
         fsGetDoc('config/stock'),
-        fsQueryStockBatches(50),
+        fsQueryStockBatches(80),
       ]);
       if (cfg) {
         setStock(normalizeStockValues(cfg.live, cfg.dead));
@@ -100,7 +100,7 @@ export default function App() {
         loadStockFromRest();
       }),
       onSnapshot(
-        query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(50)),
+        query(collection(db, 'stockBatches'), orderBy('purchaseDate', 'desc'), limit(80)),
         (snap) => setStockBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
         (err) => {
           console.warn('stockBatches snapshot', err);

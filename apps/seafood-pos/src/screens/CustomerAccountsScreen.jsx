@@ -291,6 +291,10 @@ export default function CustomerAccountsScreen({
     }, () => { loadDebtsRest(); });
   }, [loadDebtsRest, refreshKey]);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadDebtsRest(), loadOpenSalesIndex(), loadDaySales()]);
+  }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales]);
+
   useEffect(() => {
     loadOpenSalesIndex();
   }, [loadOpenSalesIndex]);
