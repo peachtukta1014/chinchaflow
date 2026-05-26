@@ -6,7 +6,6 @@ import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
-import { coalesceFirestoreRows } from '../lib/coalesceFirestoreRows';
 import { fsListCollection, fsQueryOpenSales, fsQuerySales } from '../lib/firestoreRest';
 import { billAmount } from '../lib/salesAggregate';
 import { useIntervalWhen } from '../lib/useIntervalWhen';
