@@ -12,7 +12,14 @@ import {
   fsSetConfig,
 } from '../lib/firestoreRest';
 import { validateTeaLineTargets } from '../lib/lineIds';
-import { saveProduct, saveTopping, updateProductPrice } from '../lib/productService';
+import {
+  importDefaultMenuToFirestore,
+  importDefaultToppingsToFirestore,
+  listMenuNotInFirestore,
+  saveProduct,
+  saveTopping,
+  updateProductPrice,
+} from '../lib/productService';
 
 const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
 const DEFAULT_LINE_CONFIG = {
@@ -32,6 +39,7 @@ export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
   const [products, setProducts] = useState([]);
   const [toppings, setToppings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [importBusy, setImportBusy] = useState(false);
   const [flash, setFlash] = useState('');
 
   const refresh = useCallback(async () => {
@@ -81,6 +89,25 @@ export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
     showFlash(t('priceUpdated'));
   };
 
+  const menuNotInDb = listMenuNotInFirestore(products);
+
+  const importMenuHandler = async () => {
+    if (!window.confirm(`${t('importMenuToDb')}?\n(${menuNotInDb.length} เมนู)`)) return;
+    setImportBusy(true);
+    try {
+      const addedMenu = await importDefaultMenuToFirestore(products);
+      const addedTop = await importDefaultToppingsToFirestore(toppings);
+      await refresh();
+      onCatalogChanged?.();
+      showFlash(`${t('importMenuDone')} (+${addedMenu} เมนู · +${addedTop} ท็อป)`);
+    } catch (e) {
+      console.error(e);
+      showFlash(`❌ ${e?.message || 'นำเข้าไม่สำเร็จ'}`);
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
       {flash && (
@@ -107,6 +134,9 @@ export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
         <ProductsSection
           products={products}
           toppings={toppings}
+          menuNotInDb={menuNotInDb}
+          importBusy={importBusy}
+          onImportMenu={importMenuHandler}
           t={t}
           onSaveProduct={saveProductHandler}
           onSaveTopping={saveToppingHandler}
@@ -165,7 +195,19 @@ function MembersSection({ users, t, onUpdate }) {
   );
 }
 
-function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, onQuickPrice, onDeleteProduct, onDeleteTopping }) {
+function ProductsSection({
+  products,
+  toppings,
+  menuNotInDb,
+  importBusy,
+  onImportMenu,
+  t,
+  onSaveProduct,
+  onSaveTopping,
+  onQuickPrice,
+  onDeleteProduct,
+  onDeleteTopping,
+}) {
   const [prodForm, setProdForm] = useState(null);
   const [topForm, setTopForm] = useState(null);
   const [priceEditId, setPriceEditId] = useState(null);
@@ -192,8 +234,26 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
       <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
         {t('adminProductsHint')}
       </p>
-      <div className="flex justify-between items-center">
-        <p className="font-black text-stone-700 text-sm">{t('products')}</p>
+      {menuNotInDb.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-3 space-y-2">
+          <p className="text-xs font-bold text-amber-900 leading-relaxed">{t('menuNotInDbHint')}</p>
+          <p className="text-[10px] text-amber-800">
+            ยังไม่ในระบบ {menuNotInDb.length} รายการ เช่น {menuNotInDb.slice(0, 3).map((m) => m.nameTh).join(', ')}
+            {menuNotInDb.length > 3 ? '…' : ''}
+          </p>
+          <button
+            type="button"
+            disabled={importBusy}
+            onClick={onImportMenu}
+            className="w-full py-2.5 rounded-xl text-white text-sm font-black disabled:opacity-50"
+            style={{ background: '#c87941' }}
+          >
+            {importBusy ? t('loading') : `${t('importMenuToDb')} (${menuNotInDb.length})`}
+          </button>
+        </div>
+      )}
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <p className="font-black text-stone-700 text-sm">{t('products')} ({products.length})</p>
         <button
           type="button"
           onClick={() => setProdForm({ ...emptyProduct(), _new: true })}
@@ -223,9 +283,16 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
                         {p.tag ? ` · ${p.tag}` : ''}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-1 shrink-0 justify-end">
-                      <button type="button" onClick={() => setProdForm({ ...p })} className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">{t('edit')}</button>
-                      <button type="button" onClick={() => onDeleteProduct(p.id)} className="text-xs font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded-lg">{t('delete')}</button>
+                    <div className="flex flex-wrap gap-1.5 shrink-0 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setProdForm({ ...p })}
+                        className="text-xs font-black text-white px-3 py-1.5 rounded-lg"
+                        style={{ background: '#3d1f0f' }}
+                      >
+                        {t('edit')}
+                      </button>
+                      <button type="button" onClick={() => onDeleteProduct(p.id)} className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-lg">{t('delete')}</button>
                     </div>
                   </div>
                   {priceEditId === p.id ? (
@@ -294,6 +361,7 @@ function ProductsSection({ products, toppings, t, onSaveProduct, onSaveTopping, 
       {topForm && (
         <ToppingFormModal
           form={topForm}
+          isNew={!!topForm._new}
           t={t}
           onClose={() => setTopForm(null)}
           onSave={(f) => onSaveTopping(f, topForm._new ? null : topForm.id).then(() => setTopForm(null))}
@@ -332,10 +400,10 @@ function ProductFormModal({ form, isNew, t, onClose, onSave }) {
   );
 }
 
-function ToppingFormModal({ form, t, onClose, onSave }) {
+function ToppingFormModal({ form, isNew, t, onClose, onSave }) {
   const [f, setF] = useState(form);
   return (
-    <ModalShell title={t('addTopping')} onClose={onClose}>
+    <ModalShell title={isNew ? t('addTopping') : t('editProduct')} onClose={onClose}>
       <input className="field" placeholder="ชื่อท็อปปิ้ง" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
       <input className="field" type="number" placeholder="ราคา" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
       <button type="button" onClick={() => onSave(f)} className="w-full py-3 mt-2 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
