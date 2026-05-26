@@ -1,10 +1,29 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import html2canvas from 'html2canvas';
 import BillTemplate from '../components/BillTemplate';
 import { saleToBillData } from './billDataFromSale';
 
 export { normalizeLineItem } from './billRowMap';
+
+/** โหลด html2canvas เฉพาะตอนสร้างบิล — ไม่รวมใน bundle เปิดแอป */
+async function captureBillCanvas(el) {
+  const { default: html2canvas } = await import('html2canvas');
+  const scale = getBillCanvasScale();
+  return html2canvas(el, {
+    scale,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: '#f8fafc',
+    logging: false,
+  });
+}
+
+function getBillCanvasScale() {
+  if (typeof window === 'undefined') return 2;
+  const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+  const lowMemory = typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4;
+  return coarse || lowMemory ? 1 : 2;
+}
 
 function waitForPaint() {
   return new Promise((resolve) => {
@@ -49,13 +68,7 @@ export async function generateBillImage(bill, customer = {}) {
     const el = host.querySelector('#go-uan-bill');
     if (!el) throw new Error('ไม่พบฟอร์มบิล');
 
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#f8fafc',
-      logging: false,
-    });
+    const canvas = await captureBillCanvas(el);
 
     const blob = await new Promise((resolve, reject) => {
       canvas.toBlob(

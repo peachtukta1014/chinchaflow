@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  select optgroup {
+    font-weight: 700;
+    color: #475569;
+    background: #f8fafc;
+  }
+
+  select option {
+    font-weight: 500;
+    color: #0f172a;
+  }
+}

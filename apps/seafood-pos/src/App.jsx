@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Bell, Home, LogOut, Package, RefreshCw, ShoppingCart, Users, Wallet } from 'lucide-react';
@@ -15,15 +15,24 @@ import { hardReloadApp } from './lib/reloadApp';
 import { getAppBuildLabel } from './lib/appBuildInfo';
 import NavButton from './components/NavButton';
 import LoginScreen from './screens/LoginScreen';
-import Dashboard from './screens/Dashboard';
 import POSMobile from './screens/POSMobile';
-import InventoryScreen from './screens/InventoryScreen';
-import MembersScreen from './screens/MembersScreen';
-import LineOrdersScreen from './screens/LineOrdersScreen';
-import CustomerAccountsScreen from './screens/CustomerAccountsScreen';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
-import AdminUsersScreen from './screens/AdminUsersScreen';
-import ProductSettingsScreen from './screens/ProductSettingsScreen';
+
+const Dashboard = lazy(() => import('./screens/Dashboard'));
+const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
+const MembersScreen = lazy(() => import('./screens/MembersScreen'));
+const LineOrdersScreen = lazy(() => import('./screens/LineOrdersScreen'));
+const CustomerAccountsScreen = lazy(() => import('./screens/CustomerAccountsScreen'));
+const AdminUsersScreen = lazy(() => import('./screens/AdminUsersScreen'));
+const ProductSettingsScreen = lazy(() => import('./screens/ProductSettingsScreen'));
+
+function TabLoading() {
+  return (
+    <div className="flex items-center justify-center py-16 text-slate-400 text-sm font-medium">
+      กำลังโหลด...
+    </div>
+  );
+}
 
 export default function App() {
   const [member, setMember]         = useState(undefined);
@@ -203,65 +212,85 @@ export default function App() {
       <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} />
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && (
-          <Dashboard
-            localBills={transactions}
-            refreshKey={salesRefresh}
-            active={activeTab === 'home'}
-            isAdmin={isAdmin}
-            stock={stock}
-            stockBatches={stockBatches}
-            updateMainStock={updateMainStock}
-            onSaleDeleted={() => {
-              setSalesRefresh((n) => n + 1);
-              setStockRefresh((n) => n + 1);
-              fetchPendingLineOrderCount().then(setPendingOrders);
-            }}
-          />
+        {activeTab === 'home' && (
+          <Suspense fallback={<TabLoading />}>
+            <Dashboard
+              localBills={transactions}
+              refreshKey={salesRefresh}
+              active={activeTab === 'home'}
+              isAdmin={isAdmin}
+              stock={stock}
+              stockBatches={stockBatches}
+              updateMainStock={updateMainStock}
+              onSaleDeleted={() => {
+                setSalesRefresh((n) => n + 1);
+                setStockRefresh((n) => n + 1);
+                fetchPendingLineOrderCount().then(setPendingOrders);
+              }}
+            />
+          </Suspense>
         )}
 
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && (
-          <InventoryScreen
-            stock={effectiveStock}
-            stockBatches={stockBatches}
-            updateMainStock={updateMainStock}
-            onReceived={() => setStockRefresh((n) => n + 1)}
-            onStockMoved={() => setStockRefresh((n) => n + 1)}
-          />
+          <Suspense fallback={<TabLoading />}>
+            <InventoryScreen
+              stock={effectiveStock}
+              stockBatches={stockBatches}
+              updateMainStock={updateMainStock}
+              onReceived={() => setStockRefresh((n) => n + 1)}
+              onStockMoved={() => setStockRefresh((n) => n + 1)}
+            />
+          </Suspense>
         )}
-        {activeTab === 'members'        && <MembersScreen isAdmin={isAdmin} />}
-        {activeTab === 'accounts'        && (
-          <CustomerAccountsScreen
-            refreshKey={salesRefresh}
-            isAdmin={isAdmin}
-            stock={stock}
-            stockBatches={stockBatches}
-            updateMainStock={updateMainStock}
-            onSaleDeleted={() => {
-              setSalesRefresh((n) => n + 1);
-              setStockRefresh((n) => n + 1);
-              fetchPendingLineOrderCount().then(setPendingOrders);
-            }}
-          />
+        {activeTab === 'members' && (
+          <Suspense fallback={<TabLoading />}>
+            <MembersScreen isAdmin={isAdmin} />
+          </Suspense>
         )}
-        {activeTab === 'orders'         && (
-          <LineOrdersScreen
-            user={member}
-            stock={stock}
-            stockBatches={stockBatches}
-            updateMainStock={updateMainStock}
-            onSaleRecorded={() => {
-              setSalesRefresh((n) => n + 1);
-              setStockRefresh((n) => n + 1);
-            }}
-            onOrderDone={() => {
-              fetchPendingLineOrderCount().then(setPendingOrders);
-            }}
-          />
+        {activeTab === 'accounts' && (
+          <Suspense fallback={<TabLoading />}>
+            <CustomerAccountsScreen
+              refreshKey={salesRefresh}
+              isAdmin={isAdmin}
+              stock={stock}
+              stockBatches={stockBatches}
+              updateMainStock={updateMainStock}
+              onSaleDeleted={() => {
+                setSalesRefresh((n) => n + 1);
+                setStockRefresh((n) => n + 1);
+                fetchPendingLineOrderCount().then(setPendingOrders);
+              }}
+            />
+          </Suspense>
         )}
-        {activeTab === 'admin-users'    && <AdminUsersScreen />}
-        {activeTab === 'admin-products' && <ProductSettingsScreen />}
+        {activeTab === 'orders' && (
+          <Suspense fallback={<TabLoading />}>
+            <LineOrdersScreen
+              user={member}
+              stock={stock}
+              stockBatches={stockBatches}
+              updateMainStock={updateMainStock}
+              onSaleRecorded={() => {
+                setSalesRefresh((n) => n + 1);
+                setStockRefresh((n) => n + 1);
+              }}
+              onOrderDone={() => {
+                fetchPendingLineOrderCount().then(setPendingOrders);
+              }}
+            />
+          </Suspense>
+        )}
+        {activeTab === 'admin-users' && (
+          <Suspense fallback={<TabLoading />}>
+            <AdminUsersScreen />
+          </Suspense>
+        )}
+        {activeTab === 'admin-products' && (
+          <Suspense fallback={<TabLoading />}>
+            <ProductSettingsScreen />
+          </Suspense>
+        )}
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
@@ -273,11 +302,6 @@ export default function App() {
         <NavButton icon={<Users />}        label="ลูกค้า"    isActive={activeTab === 'members'} onClick={() => setActiveTab('members')} />
         <NavButton icon={<Wallet />}       label="บัญชี"    isActive={activeTab === 'accounts'} onClick={() => setActiveTab('accounts')} />
       </div>
-
-      <style>{`
-        select optgroup { font-weight: 700; color: #475569; background: #f8fafc; }
-        select option   { font-weight: 500; color: #0f172a; }
-      `}</style>
     </div>
   );
 }
