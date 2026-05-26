@@ -24,6 +24,7 @@ export default function MembersScreen({ isAdmin = false }) {
   const [newCus, setNewCus] = useState({ name: '', zone: '', phone: '', lineUserId: '' });
   const [suggestBusy, setSuggestBusy] = useState(null);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [lineOaPending, setLineOaPending] = useState(0);
 
   useEffect(() => subscribeCustomers(
     (map) => { setFsCustomers(map); setCusLoading(false); },
@@ -154,17 +155,22 @@ export default function MembersScreen({ isAdmin = false }) {
             }`}
           >
             <MessageCircle size={15} />
-            ลูกค้า LINE OA
+            LINE รอผูก
+            {lineOaPending > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
+                {lineOaPending > 99 ? '99+' : lineOaPending}
+              </span>
+            )}
           </button>
         </div>
 
         {subTab === 'lineOa' ? (
-          <LineOaCustomersPanel showFlash={showFlash} />
+          <LineOaCustomersPanel showFlash={showFlash} onPendingCountChange={setLineOaPending} />
         ) : (
           <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          แก้ไขได้ทุกราย — ลบถาวรได้เฉพาะลูกค้าที่เพิ่มเอง (มีปุ่มถังขยะ)
-          รายชื่อในแอปใช้ปุ่ม「ซ่อน」แทน · LINE OA อยู่แท็บถัดไป
+          รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย
+          ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>

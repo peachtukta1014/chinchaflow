@@ -1,6 +1,7 @@
+import { CUSTOMERS } from '../constants';
 import { fsListCollection } from '../lib/firestoreRest';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
-import { exactCustomerNameMatch } from '../lib/customerNameMatch';
+import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
 
 function orderTime(o) {
   return String(o.createdAt || o.deliveryDate || '');
@@ -103,4 +104,45 @@ export function findCustomerByExactName(allCustomers, name) {
   const n = (name || '').trim();
   if (!n) return null;
   return allCustomers.find((c) => exactCustomerNameMatch(c.name, n)) || null;
+}
+
+/** แยกราย LINE OA ตามว่าผูกรายชื่อหลักแล้วหรือยัง */
+export function partitionLineOaContacts(contacts, allCustomers) {
+  const pending = [];
+  const linked = [];
+  for (const contact of contacts) {
+    const match = findCustomerByLineUserId(allCustomers, contact.lineUserId);
+    if (match) linked.push({ contact, customer: match });
+    else pending.push(contact);
+  }
+  return { pending, linked };
+}
+
+/** แนะนำร้านในรายชื่อหลัก (27+ทั่วไป) จากชื่อในออเดอร์ LINE */
+export function suggestMainCatalogLinks(contact, fsCustomers = {}) {
+  const catalog = CUSTOMERS.map((c) => {
+    const overlay = fsCustomers[c.id] || {};
+    if (overlay.hidden === true) return null;
+    return { ...c, ...overlay };
+  }).filter(Boolean);
+
+  const names = [...(contact.displayNames || []), contact.suggestedName].filter(Boolean);
+  const hits = new Map();
+
+  for (const orderName of names) {
+    for (const c of catalog) {
+      if (exactCustomerNameMatch(c.name, orderName)) {
+        hits.set(c.id, { customer: c, reason: 'ชื่อตรง', score: 3 });
+      } else if (compactNameMatch(c.name, orderName)) {
+        const prev = hits.get(c.id);
+        if (!prev || prev.score < 2) {
+          hits.set(c.id, { customer: c, reason: 'ชื่อใกล้เคียง', score: 2 });
+        }
+      }
+    }
+  }
+
+  return [...hits.values()]
+    .sort((a, b) => b.score - a.score)
+    .map((h) => h.customer);
 }

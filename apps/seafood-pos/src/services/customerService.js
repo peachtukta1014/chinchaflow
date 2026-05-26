@@ -46,6 +46,15 @@ export async function fetchCustomersMap() {
   return map;
 }
 
+/** รายชื่อหลักในแอป (27 ร้าน + ทั่วไป) — ใช้ตอน「ผูกลูกค้าเดิม」จาก LINE OA */
+export function getMainCatalogCustomers(fsCustomers) {
+  return CUSTOMERS.map((c) => {
+    const overlay = fsCustomers[c.id] || {};
+    if (overlay.hidden === true) return null;
+    return { ...c, ...overlay, source: 'builtin' };
+  }).filter(Boolean);
+}
+
 export function mergeCustomerLists(fsCustomers) {
   const list = [
     ...CUSTOMERS.map((c) => {
