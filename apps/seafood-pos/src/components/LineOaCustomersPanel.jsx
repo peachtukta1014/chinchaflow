@@ -98,8 +98,8 @@ export default function LineOaCustomersPanel({ showFlash }) {
     <div className="space-y-3">
       <div className="bg-[#06C755]/10 border border-[#06C755]/30 rounded-2xl p-3">
         <p className="text-xs text-[#047857] leading-relaxed font-medium">
-          รายชื่อจาก LINE OA แยกจากรายชื่อหลัก — ดึงจากออเดอร์ LINE โดยตรง
-          กดบันทึกเข้ารายชื่อหลักเมื่อต้องการใช้ตอนขาย/ส่งบิล
+          เฉพาะลูกค้าที่ทัก LINE OA แชทตรง (ไม่รวมคนในกลุ่ม LINE ภายใน)
+          กดบันทึกเข้ารายชื่อหลักแล้วปุ่มส่งบิลอัตโนมัติจะกลับมา
         </p>
       </div>
       <div className="flex items-center justify-between">

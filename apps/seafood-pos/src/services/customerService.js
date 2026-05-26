@@ -67,17 +67,25 @@ function customerPayload({ name, zone, phone, lineUserId }) {
   return payload;
 }
 
+function withTimeout(promise, ms = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('หมดเวลา — ลองใหม่')), ms)),
+  ]);
+}
+
 export async function updateCustomer(id, data) {
-  await setDoc(doc(db, 'customers', id), customerPayload(data), { merge: true });
+  if (!db) throw new Error('ยังไม่ได้เชื่อม Firebase');
+  await withTimeout(setDoc(doc(db, 'customers', id), customerPayload(data), { merge: true }));
 }
 
 export async function createCustomer(data) {
   if (!db) throw new Error('ยังไม่ได้เชื่อม Firebase');
   const id = `cx_${Date.now()}`;
-  await setDoc(doc(db, 'customers', id), {
+  await withTimeout(setDoc(doc(db, 'customers', id), {
     ...customerPayload(data),
     createdAt: serverTimestamp(),
-  });
+  }));
   return id;
 }
 
@@ -103,6 +111,7 @@ export async function suggestLineUserIdFromOrders(customerName) {
 
   for (const o of sorted) {
     if (!o.lineUserId) continue;
+    if (o.lineGroupId) continue;
     if (exactCustomerNameMatch(o.customerName, name)) {
       return normalizeLineUserId(o.lineUserId);
     }

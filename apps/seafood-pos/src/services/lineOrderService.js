@@ -53,11 +53,14 @@ export async function saveLineOrderDelivery({
     lineTotal: i.total,
   }));
 
+  const lineUid = order.lineUserId || customer.lineUserId || null;
+
   const salesId = await withTimeout(fsPost('sales', {
     billNo,
     dateKey,
     customerName: customer.name,
     customerId: customer.id,
+    customerLineUserId: lineUid,
     zone: customer.zone || 'ทั่วไป',
     items: cartItems.map((i) => ({
       productId: i.productId,
@@ -78,6 +81,7 @@ export async function saveLineOrderDelivery({
     createdAt: now,
     source: 'line-order',
     lineOrderId: order.id,
+    lineUserId: lineUid,
     lineRawText: order.rawText || '',
     fulfilledItems,
   }));

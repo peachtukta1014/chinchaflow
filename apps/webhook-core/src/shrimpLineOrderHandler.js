@@ -43,10 +43,12 @@ async function saveLineOrders(db, admin, { items, text, userId, groupId, deliver
   for (const it of items) {
     if (it.customerName) names.push(it.customerName);
   }
-  try {
-    await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
-  } catch (err) {
-    console.warn('linkLineUserToCustomers', err.message);
+  if (!groupId) {
+    try {
+      await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
+    } catch (err) {
+      console.warn('linkLineUserToCustomers', err.message);
+    }
   }
 
   return groups.size;

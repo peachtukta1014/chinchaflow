@@ -46,19 +46,20 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
     return () => { cancelled = true; };
   }, [bill, customer, staffName]);
 
+  const lookupLineUid = React.useCallback(async () => {
+    setLineUidLoading(true);
+    try {
+      const id = await resolveLineUserId(customer, bill);
+      setLineUserId(id || '');
+    } finally {
+      setLineUidLoading(false);
+    }
+  }, [customer, bill]);
+
   useEffect(() => {
     if (!bill) return undefined;
-    let cancelled = false;
-    setLineUidLoading(true);
-    resolveLineUserId(customer, bill)
-      .then((id) => {
-        if (!cancelled) setLineUserId(id || '');
-      })
-      .finally(() => {
-        if (!cancelled) setLineUidLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [bill, customer, staffName]);
+    lookupLineUid();
+  }, [bill, lookupLineUid]);
 
   useEffect(() => () => revokeBillImageUrl(previewUrl), [previewUrl]);
 
@@ -123,8 +124,8 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
                 พร้อมส่งให้ลูกค้าใน LINE (UID …{lineUserId.slice(-6)})
               </p>
             ) : (
-              <p className="text-[10px] text-amber-600 mt-0.5">
-                ยังไม่มี LINE UID — แท็บลูกค้า → ดึงจากออเดอร์ หรือแชร์เอง
+              <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">
+                ยังไม่มี LINE UID — แท็บลูกค้า →「ลูกค้า LINE OA」→ บันทึกเข้ารายชื่อ แล้วกดค้นหา UID ด้านล่าง
               </p>
             )}
           </div>
@@ -140,6 +141,15 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
           )}
         </div>
         <div className="p-4 flex flex-col gap-2 border-t border-slate-100">
+          {!canPush && !lineUidLoading && (
+            <button
+              type="button"
+              onClick={lookupLineUid}
+              className="w-full py-2.5 rounded-xl border border-[#06C755] text-[#047857] text-xs font-bold"
+            >
+              ค้นหา LINE UID อีกครั้ง
+            </button>
+          )}
           {canPush && (
             <button
               type="button"

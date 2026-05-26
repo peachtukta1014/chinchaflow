@@ -26,6 +26,12 @@ export default function LineShareButton({
     return () => { cancelled = true; };
   }, [customer, bill]);
 
+  const getLineUid = async () => {
+    const id = await resolveLineUserId(customer, bill);
+    setLineUserId(id || '');
+    return id;
+  };
+
   const canAutoPush = isValidLineUserId(lineUserId);
 
   const handleClick = async () => {
@@ -37,9 +43,10 @@ export default function LineShareButton({
     try {
       const { blob, objectUrl } = await generateBillImage(bill, customer || {});
 
-      if (canAutoPush) {
+      const uid = (await getLineUid()) || lineUserId;
+      if (isValidLineUserId(uid)) {
         await pushBillToLineCustomer({
-          lineUserId,
+          lineUserId: uid,
           blob,
           billNo: bill.billNo,
           customerName: bill.customerName || customer?.name,
