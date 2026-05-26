@@ -362,6 +362,7 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
         <BillImageSheet
           bill={billSheet.bill}
           customer={billSheet.customer}
+          staffName={billSheet.staffName}
           onClose={() => setBillSheet(null)}
         />
       )}
@@ -457,6 +458,7 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
                         phone: tx.phone,
                         lineUserId: tx.customerLineUserId || '',
                       },
+                      staffName: tx.recordedBy,
                     })}
                     className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
                   >

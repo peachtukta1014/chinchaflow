@@ -19,7 +19,13 @@ const ERROR_HINTS = {
   line_token_missing: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า LINE Bot',
 };
 
-export async function pushBillToLineCustomer({ lineUserId, blob, billNo, customerName }) {
+export async function pushBillToLineCustomer({
+  lineUserId,
+  blob,
+  billNo,
+  customerName,
+  paymentType,
+}) {
   if (!projectId) throw new Error('VITE_FIREBASE_PROJECT_ID ไม่ได้ตั้งค่า');
   const user = auth?.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบ');
@@ -33,7 +39,7 @@ export async function pushBillToLineCustomer({ lineUserId, blob, billNo, custome
       Authorization: `Bearer ${idToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ lineUserId, imageBase64, billNo, customerName }),
+    body: JSON.stringify({ lineUserId, imageBase64, billNo, customerName, paymentType }),
   });
 
   const json = await r.json().catch(() => ({}));

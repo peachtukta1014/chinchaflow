@@ -10,7 +10,7 @@ import { pushBillToLineCustomer } from '../lib/linePushBill';
 import { resolveLineUserId } from '../lib/resolveLineUserId';
 import { isValidLineUserId } from '../lib/lineUserId';
 
-export default function BillImageSheet({ bill, customer, onClose }) {
+export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [blob, setBlob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,11 @@ export default function BillImageSheet({ bill, customer, onClose }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    generateBillImage(bill, customer || {})
+    const billForImage = {
+      ...bill,
+      recordedBy: bill?.recordedBy || staffName || '',
+    };
+    generateBillImage(billForImage, customer || {})
       .then(({ blob: b, objectUrl }) => {
         if (cancelled) {
           revokeBillImageUrl(objectUrl);
@@ -40,7 +44,7 @@ export default function BillImageSheet({ bill, customer, onClose }) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [bill, customer]);
+  }, [bill, customer, staffName]);
 
   useEffect(() => {
     if (!bill) return undefined;
@@ -54,7 +58,7 @@ export default function BillImageSheet({ bill, customer, onClose }) {
         if (!cancelled) setLineUidLoading(false);
       });
     return () => { cancelled = true; };
-  }, [bill, customer]);
+  }, [bill, customer, staffName]);
 
   useEffect(() => () => revokeBillImageUrl(previewUrl), [previewUrl]);
 
@@ -73,6 +77,13 @@ export default function BillImageSheet({ bill, customer, onClose }) {
 
   const handlePushToCustomer = async () => {
     if (!blob || !isValidLineUserId(lineUserId)) return;
+    const nameOnBill = bill?.customerName || customer?.name || 'ลูกค้า';
+    const ok = window.confirm(
+      `ส่งใบส่งของชื่อ "${nameOnBill}" ไป LINE ลูกค้านี้?\n\n` +
+        `ตรวจชื่อบนบิลให้ตรงกับคนที่ทัก LINE ก่อนกด OK\n` +
+        `(UID …${lineUserId.slice(-6)})`,
+    );
+    if (!ok) return;
     setPushBusy(true);
     try {
       await pushBillToLineCustomer({
@@ -80,6 +91,7 @@ export default function BillImageSheet({ bill, customer, onClose }) {
         blob,
         billNo: bill?.billNo,
         customerName: bill?.customerName || customer?.name,
+        paymentType: bill?.paymentType,
       });
       alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');
     } catch (e) {

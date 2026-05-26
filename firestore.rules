@@ -165,10 +165,11 @@ service cloud.firestore {
       allow update, delete: if isAdminShrimp();
     }
 
-    // Customers list — staff read/create/update; admin delete
+    // Customers list — staff CRUD ลูกค้าที่เพิ่มเอง (cx_*); แอดมินลบได้ทุก doc
     match /customers/{docId} {
       allow read, create, update: if isApprovedShrimp();
-      allow delete: if isAdminShrimp();
+      allow delete: if isAdminShrimp()
+        || (isApprovedShrimp() && docId.matches('cx_.*'));
     }
 
     // Config — stock (shrimp), LINE/settings (tea)

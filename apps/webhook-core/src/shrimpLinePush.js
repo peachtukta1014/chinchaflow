@@ -4,11 +4,8 @@ function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
 }
 
-function compactNameMatch(a, b) {
-  const ca = compact(a);
-  const cb = compact(b);
-  if (!ca || !cb) return false;
-  return ca === cb || ca.includes(cb) || cb.includes(ca);
+function exactCustomerNameMatch(a, b) {
+  return compact(a) === compact(b);
 }
 
 const LINE_UID_RE = /^U[a-fA-F0-9]{32}$/;
@@ -80,7 +77,7 @@ async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames })
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     const name = data.name || '';
-    const matched = names.some((n) => compactNameMatch(name, n));
+    const matched = names.some((n) => exactCustomerNameMatch(name, n));
     if (!matched) continue;
     if (data.lineUserId === uid) continue;
     batch.set(doc.ref, { lineUserId: uid, lineUserIdLinkedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
@@ -90,7 +87,19 @@ async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames })
   if (count > 0) await batch.commit();
 }
 
-async function pushShrimpBillToCustomer(db, admin, { lineUserId, imageBase64, billNo, customerName }) {
+function lineBillPaymentNote(paymentType) {
+  if (paymentType === 'cash') return 'จ่ายแล้ว · เงินสด';
+  if (paymentType === 'transfer') return 'จ่ายแล้ว · โอน';
+  return '';
+}
+
+async function pushShrimpBillToCustomer(db, admin, {
+  lineUserId,
+  imageBase64,
+  billNo,
+  customerName,
+  paymentType,
+}) {
   const to = normalizeLineUserId(lineUserId);
   if (!LINE_UID_RE.test(to)) {
     const err = new Error('invalid_line_user_id');
@@ -114,10 +123,12 @@ async function pushShrimpBillToCustomer(db, admin, { lineUserId, imageBase64, bi
   }
 
   const { url } = await uploadBillJpeg(admin, buffer, billNo);
+  const paidNote = lineBillPaymentNote(paymentType);
   const caption = [
     '📋 ใบส่งของ — โกอ้วน คลังซีฟู้ด',
     billNo ? `เลขที่ ${billNo}` : null,
     customerName ? `ลูกค้า ${customerName}` : null,
+    paidNote ? `✅ ${paidNote}` : null,
   ]
     .filter(Boolean)
     .join('\n');

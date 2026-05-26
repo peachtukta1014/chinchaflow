@@ -43,6 +43,7 @@ export default function LineShareButton({
           blob,
           billNo: bill.billNo,
           customerName: bill.customerName || customer?.name,
+          paymentType: bill.paymentType,
         });
         URL.revokeObjectURL(objectUrl);
         alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');

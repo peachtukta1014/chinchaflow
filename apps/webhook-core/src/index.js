@@ -206,6 +206,7 @@ exports.shrimpPushBill = functions
         imageBase64: body.imageBase64,
         billNo: body.billNo,
         customerName: body.customerName,
+        paymentType: body.paymentType,
       });
       res.json(result);
     } catch (err) {

@@ -292,6 +292,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
         <BillImageSheet
           bill={billSheet.bill}
           customer={billSheet.customer}
+          staffName={user?.name}
           onClose={() => setBillSheet(null)}
         />
       )}

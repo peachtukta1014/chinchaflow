@@ -1,7 +1,6 @@
 import { normalizeLineUserId, isValidLineUserId } from './lineUserId';
-import { suggestLineUserIdFromOrders } from '../services/customerService';
 
-/** หา LINE UID จาก customer object หรือข้อมูลบิล */
+/** หา LINE UID จากโปรไฟล์ลูกค้าหรือบิลเท่านั้น (ไม่เดา UID จากชื่อคล้ายกัน) */
 export function resolveLineUserIdSync(customer, bill) {
   const fromCustomer = normalizeLineUserId(customer?.lineUserId);
   if (isValidLineUserId(fromCustomer)) return fromCustomer;
@@ -10,15 +9,6 @@ export function resolveLineUserIdSync(customer, bill) {
   return '';
 }
 
-/** ถ้ายังไม่มีในโปรไฟล์ — ลองดึงจากออเดอร์ LINE ล่าสุดที่ชื่อตรง */
 export async function resolveLineUserId(customer, bill) {
-  const direct = resolveLineUserIdSync(customer, bill);
-  if (direct) return direct;
-  const name = bill?.customerName || customer?.name;
-  if (!name) return '';
-  try {
-    return (await suggestLineUserIdFromOrders(name)) || '';
-  } catch {
-    return '';
-  }
+  return resolveLineUserIdSync(customer, bill);
 }

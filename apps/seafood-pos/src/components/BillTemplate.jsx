@@ -2,7 +2,7 @@ import React from 'react';
 import { BILL_QR_URL } from '../lib/billTemplateConfig';
 
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
-/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number }} BillData */
+/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; paymentNote?: string }} BillData */
 
 export const FIXED_TEMPLATE_ROWS = [
   { key: 'shrimp-a', defaultName: 'กุ้งแม่น้ำ A' },
@@ -28,6 +28,19 @@ function formatCellPrice(n) {
   const v = parseFloat(n);
   if (!Number.isFinite(v) || v === 0) return '';
   return String(v);
+}
+
+function FieldLine({ label, value, valueClassName = '' }) {
+  return (
+    <div className="flex items-end gap-2 min-w-0">
+      <span className="shrink-0 text-[#1e3a8a] pb-[6px] leading-none">{label}</span>
+      <p
+        className={`flex-1 min-w-0 border-b border-dotted border-gray-500 text-black font-semibold leading-tight pb-[6px] min-h-[22px] ${valueClassName}`}
+      >
+        {value || '\u00a0'}
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -119,44 +132,27 @@ export default function BillTemplate({ data }) {
         จำหน่าย : ซีฟู้ดของสดของเป็น เน้นกุ้งแม่น้ำธรรมชาติเป็นๆ พร้อมส่ง
       </p>
 
-      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-2">
+      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-1">
         ใบส่งของ
       </div>
+      {data.paymentNote ? (
+        <p className="text-center text-emerald-700 font-black text-base mb-3 tracking-wide">
+          {data.paymentNote}
+        </p>
+      ) : (
+        <div className="mb-3" />
+      )}
 
-      <div className="text-xs space-y-2 mb-4 font-medium -mt-1">
+      <div className="text-xs space-y-3 mb-4 font-medium">
         <div className="flex w-full gap-4">
           <div className="flex-grow min-w-0">
-            <div className="flex gap-1.5 items-start">
-              <span className="whitespace-nowrap pt-0.5 shrink-0">นามลูกค้า</span>
-              <div className="flex-grow min-w-0 relative pb-1">
-                <p className="text-black font-semibold truncate leading-snug mb-1 relative z-10">
-                  {data.customerName}
-                </p>
-                <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
-              </div>
-            </div>
+            <FieldLine label="นามลูกค้า" value={data.customerName} />
           </div>
-          <div className="w-40 shrink-0">
-            <div className="flex gap-1.5 items-start">
-              <span className="whitespace-nowrap pt-0.5 shrink-0">วันที่ส่ง</span>
-              <div className="flex-grow min-w-0 relative pb-1">
-                <p className="text-black font-semibold leading-snug mb-1 relative z-10 whitespace-nowrap">
-                  {data.date}
-                </p>
-                <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
-              </div>
-            </div>
+          <div className="w-[9.5rem] shrink-0">
+            <FieldLine label="วันที่ส่ง" value={data.date} valueClassName="whitespace-nowrap" />
           </div>
         </div>
-        <div className="flex w-full gap-1.5 items-start">
-          <span className="whitespace-nowrap pt-0.5 shrink-0">ที่อยู่</span>
-          <div className="flex-grow min-w-0 relative pb-1">
-            <p className="text-black leading-snug mb-1 min-h-[1rem] relative z-10">
-              {data.address || '\u00a0'}
-            </p>
-            <div className="border-b border-dotted border-gray-400 w-full" aria-hidden />
-          </div>
-        </div>
+        <FieldLine label="ที่อยู่" value={data.address} />
       </div>
 
       <table className="w-full border-collapse border-2 border-[#1e3a8a] bg-white text-xs shadow-sm">
@@ -199,16 +195,18 @@ export default function BillTemplate({ data }) {
         </tbody>
       </table>
 
-      <div className="flex justify-between items-center text-[10px] mt-8 font-medium px-2 text-[#1e3a8a]">
-        <div className="flex items-center">
-          <span>ลงชื่อ</span>
-          <span className="border-b border-dotted border-gray-400 w-36 mx-1" />
-          <span>ผู้ส่งของ</span>
+      <div className="flex justify-between items-end text-[10px] mt-8 font-medium px-2 text-[#1e3a8a] gap-6">
+        <div className="flex items-end flex-1 min-w-0 gap-1">
+          <span className="shrink-0 pb-[5px]">ลงชื่อ</span>
+          <p className="flex-1 border-b border-dotted border-gray-500 text-black font-semibold pb-[5px] min-h-[18px] truncate">
+            {data.senderName || '\u00a0'}
+          </p>
+          <span className="shrink-0 pb-[5px]">ผู้ส่งของ</span>
         </div>
-        <div className="flex items-center">
-          <span>ลงชื่อ</span>
-          <span className="border-b border-dotted border-gray-400 w-36 mx-1" />
-          <span>ผู้รับของ</span>
+        <div className="flex items-end flex-1 min-w-0 gap-1">
+          <span className="shrink-0 pb-[5px]">ลงชื่อ</span>
+          <p className="flex-1 border-b border-dotted border-gray-500 min-h-[18px] pb-[5px]" />
+          <span className="shrink-0 pb-[5px]">ผู้รับของ</span>
         </div>
       </div>
     </div>
