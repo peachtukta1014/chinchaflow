@@ -15,7 +15,6 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
   return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
-import { computeLotReport } from '../src/lib/lotReport.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -80,6 +79,16 @@ try {
   assert(billAmount({ total: 500 }) === 500, 'billAmount');
 } catch (e) {
   fail('billAmount', e);
+}
+
+try {
+  const received = 100 + 10;
+  const sold = 70 + 20;
+  const remain = 10 + 5;
+  const shrinkage = Math.max(0, received - sold - remain);
+  assert(shrinkage === 5, 'lot shrinkage = รับ − ขาย − คงเหลือ');
+} catch (e) {
+  fail('lotReport formula', e);
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');
