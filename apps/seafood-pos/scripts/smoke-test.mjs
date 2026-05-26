@@ -91,6 +91,21 @@ try {
   fail('lotReport formula', e);
 }
 
+try {
+  const totalCost = 30000;
+  const receivedKg = 100;
+  const soldDeadKg = 5;
+  const deadRevenue = 400;
+  const avgCost = totalCost / receivedKg;
+  const deadCogs = soldDeadKg * avgCost;
+  const deadGross = deadRevenue - deadCogs;
+  assert(Math.abs(avgCost - 300) < 0.01, 'avg cost per kg');
+  assert(Math.abs(deadCogs - 1500) < 0.01, 'dead COGS uses live lot cost');
+  assert(Math.abs(deadGross - (-1100)) < 0.01, 'dead gross = revenue − live-cost COGS');
+} catch (e) {
+  fail('lotReport dead COGS', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

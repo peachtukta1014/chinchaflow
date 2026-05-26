@@ -99,8 +99,14 @@ export function computeLotReport({
   const shrinkageBaht = shrinkageKg * avgCostPerKg;
   const spoilageBaht = adj.spoilageKg * avgCostPerKg;
 
-  const cogsSold = soldTotalKg * avgCostPerKg;
+  /** ต้นทุนขาย — กก.ตายใช้ต้นทุนเดียวกับกุ้งเป็น (ทุนล็อต) ไม่ใช่ราคาขายตาย */
+  const liveCogs = soldLiveKg * avgCostPerKg;
+  const deadCogs = soldDeadKg * avgCostPerKg;
+  const cogsSold = liveCogs + deadCogs;
+  const liveGrossProfit = salesAgg.liveRevenue - liveCogs;
+  const deadGrossProfit = salesAgg.deadRevenue - deadCogs;
   const grossProfit = revenue - cogsSold;
+  const pondToDeadCostBaht = adj.pondToDeadKg * avgCostPerKg;
   const totalLossBaht = shrinkageBaht + adj.stockCountBaht;
   const netLotProfit = grossProfit - totalLossBaht;
 
@@ -146,7 +152,12 @@ export function computeLotReport({
     deadRevenue: salesAgg.deadRevenue,
     revenue,
     billCount: salesAgg.billCount,
+    liveCogs,
+    deadCogs,
+    liveGrossProfit,
+    deadGrossProfit,
     pondToDeadKg: adj.pondToDeadKg,
+    pondToDeadCostBaht,
     spoilageKg: adj.spoilageKg,
     stockCountKg: adj.stockCountKg,
     stockCountBaht: adj.stockCountBaht,
