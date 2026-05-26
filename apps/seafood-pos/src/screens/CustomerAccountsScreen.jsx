@@ -8,18 +8,18 @@ import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
-import { fsListCollection, fsQuerySales } from '../lib/firestoreRest';
+import { fsListCollection, fsQueryOpenSales, fsQuerySales } from '../lib/firestoreRest';
 import { billAmount } from '../lib/salesAggregate';
 import {
   applyFifoCustomerPayment,
   clearCustomerDebtAll,
   deleteSaleBill,
+  fetchCustomerOpenSales,
   updateSalePayment,
 } from '../services/salesService';
 
 function CustomerFifoPanel({
   row,
-  allSales,
   debtByKey,
   onRefresh,
   expandedKey,
@@ -28,12 +28,30 @@ function CustomerFifoPanel({
   const [payInput, setPayInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [billBusy, setBillBusy] = useState(null);
+  const [fifoBills, setFifoBills] = useState([]);
+  const [billsLoading, setBillsLoading] = useState(false);
   const open = expandedKey === row.key;
 
-  const fifoBills = useMemo(
-    () => openSalesForCustomer(allSales, row.customerId, row.customerName),
-    [allSales, row.customerId, row.customerName],
-  );
+  useEffect(() => {
+    if (!open) {
+      setFifoBills([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setBillsLoading(true);
+    fetchCustomerOpenSales(row.customerId, row.customerName)
+      .then((bills) => {
+        if (!cancelled) setFifoBills(bills);
+      })
+      .catch((e) => {
+        console.warn('fetchCustomerOpenSales', e);
+        if (!cancelled) setFifoBills([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBillsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [open, row.customerId, row.customerName, onRefresh]);
 
   const debt = debtByKey.get(row.key);
   const totalOwed = debt?.totalDebt ?? fifoBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0);
@@ -49,7 +67,7 @@ function CustomerFifoPanel({
     }
     setBusy(true);
     try {
-      const res = await applyFifoCustomerPayment(row.customerId, row.customerName, amt, allSales);
+      const res = await applyFifoCustomerPayment(row.customerId, row.customerName, amt, fifoBills);
       await onRefresh();
       setPayInput('');
       const lines = res.allocations.map((a, i) => (
@@ -113,8 +131,7 @@ function CustomerFifoPanel({
           <p className="font-bold text-slate-800 truncate">{row.customerName}</p>
           <p className="text-xs text-slate-400">
             {row.zone}
-            {' · '}
-            {fifoBills.length} บิลค้าง (FIFO)
+            {open && !billsLoading ? ` · ${fifoBills.length} บิลค้าง (FIFO)` : ' · แตะดูบิลค้าง'}
           </p>
         </div>
         <p className="font-black text-orange-500 ml-2 shrink-0">฿{Number(totalOwed).toLocaleString()}</p>
@@ -143,7 +160,9 @@ function CustomerFifoPanel({
             </button>
           </div>
 
-          {fifoBills.length === 0 ? (
+          {billsLoading ? (
+            <p className="text-center text-slate-400 text-sm py-4">กำลังโหลดบิลค้าง...</p>
+          ) : fifoBills.length === 0 ? (
             <p className="text-center text-slate-400 text-sm py-4">ไม่มีบิลค้าง</p>
           ) : (
             fifoBills.map((tx, idx) => {
@@ -222,7 +241,7 @@ export default function CustomerAccountsScreen({
 }) {
   const [viewDate, setViewDate] = useState(() => dateKeyBangkok());
   const [customerDebts, setCustomerDebts] = useState([]);
-  const [allSales, setAllSales] = useState([]);
+  const [openSalesIndex, setOpenSalesIndex] = useState([]);
   const [daySales, setDaySales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState(null);
@@ -239,12 +258,12 @@ export default function CustomerAccountsScreen({
     }
   }, []);
 
-  const loadAllSales = useCallback(async () => {
+  const loadOpenSalesIndex = useCallback(async () => {
     try {
-      const docs = await fsListCollection('sales', 300);
-      setAllSales(docs);
+      setOpenSalesIndex(await fsQueryOpenSales(120));
     } catch (e) {
-      console.warn('fsListCollection sales', e);
+      console.warn('fsQueryOpenSales', e);
+      setOpenSalesIndex([]);
     }
   }, [refreshKey]);
 
@@ -261,8 +280,8 @@ export default function CustomerAccountsScreen({
   }, [viewDate, refreshKey]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadDebtsRest(), loadAllSales(), loadDaySales()]);
-  }, [loadDebtsRest, loadAllSales, loadDaySales]);
+    await Promise.all([loadDebtsRest(), loadOpenSalesIndex(), loadDaySales()]);
+  }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales]);
 
   useEffect(() => {
     loadDebtsRest();
@@ -369,7 +388,7 @@ export default function CustomerAccountsScreen({
         totalDebt: d.totalDebt || 0,
       });
     }
-    for (const s of allSales) {
+    for (const s of openSalesIndex) {
       if ((parseFloat(s.remainingAmount) || 0) <= 0) continue;
       const key = debtCustomerKey(s.customerId, s.customerName);
       if (!key || map.has(key)) continue;
@@ -382,7 +401,7 @@ export default function CustomerAccountsScreen({
       });
     }
     return [...map.values()].sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0));
-  }, [customerDebts, allSales]);
+  }, [customerDebts, openSalesIndex]);
 
   return (
     <div className="p-5 space-y-4 pb-8">
@@ -527,7 +546,6 @@ export default function CustomerAccountsScreen({
               <CustomerFifoPanel
                 key={row.key}
                 row={row}
-                allSales={allSales}
                 debtByKey={debtByKey}
                 onRefresh={refreshAll}
                 expandedKey={expandedKey}

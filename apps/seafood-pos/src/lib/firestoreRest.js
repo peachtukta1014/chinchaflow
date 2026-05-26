@@ -2,6 +2,7 @@
  * Firestore REST — ใช้ Bearer token จาก Firebase Auth (pattern เดียวกับ chincha-tea)
  */
 import { auth } from '../firebase';
+import { sortSalesFifoAsc } from './saleFifo.js';
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
 export const FS_BASE = projectId
@@ -287,7 +288,7 @@ function saleMatchesDateKey(doc, dateKey) {
   return created.startsWith(dateKey);
 }
 
-/** โหลดบิลขายตามวัน — REST (เดียวกับตอนบันทึก fsPost) */
+/** โหลดบิลขายตามวัน — ไม่ดึงทั้ง collection */
 export async function fsQuerySales(dateKey) {
   const docs = await fsRunQuery({
     from: [{ collectionId: 'sales' }],
@@ -301,12 +302,37 @@ export async function fsQuerySales(dateKey) {
     limit: 200,
   });
   if (docs.length > 0) return sortSalesDesc(docs);
-  const all = await fsListCollection('sales', 200);
-  return sortSalesDesc(all.filter((d) => saleMatchesDateKey(d, dateKey)));
+
+  // fallback เล็ก — กรณี index ยังไม่พร้อม (ไม่โหลดบิลทั้งหมด 300+)
+  const recent = await fsListCollection('sales', 80);
+  const matched = sortSalesDesc(recent.filter((d) => saleMatchesDateKey(d, dateKey)));
+  if (matched.length > 0) return matched;
+  return docs;
 }
 
-/** บิลขายของลูกค้า (ย้อนหลัง) — ใช้ในแท็บบัญชี */
-export async function fsQuerySalesByCustomer(customerId, limit = 120) {
+/** บิลมียอดค้าง — ใช้แท็บลูกหนี้/FIFO (มักมีไม่กี่สิบบิล ไม่ใช่ทั้งระบบ) */
+export async function fsQueryOpenSales(limit = 120) {
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'remainingAmount' },
+        op: 'GREATER_THAN',
+        value: { doubleValue: 0 },
+      },
+    },
+    limit,
+  });
+  if (docs.length > 0) return sortSalesFifoAsc(docs);
+
+  const recent = await fsListCollection('sales', 80);
+  return sortSalesFifoAsc(
+    recent.filter((d) => (parseFloat(d.remainingAmount) || 0) > 0),
+  );
+}
+
+/** บิลขายของลูกค้าคนเดียว — ใช้ตอนรับชำระผ่อน/FIFO */
+export async function fsQuerySalesByCustomer(customerId, limit = 80) {
   if (!customerId) return [];
   const docs = await fsRunQuery({
     from: [{ collectionId: 'sales' }],
@@ -320,8 +346,8 @@ export async function fsQuerySalesByCustomer(customerId, limit = 120) {
     limit,
   });
   if (docs.length > 0) return sortSalesDesc(docs);
-  const all = await fsListCollection('sales', limit);
-  return sortSalesDesc(all.filter((d) => d.customerId === customerId));
+  const open = await fsQueryOpenSales(limit);
+  return sortSalesDesc(open.filter((d) => d.customerId === customerId));
 }
 
 export async function fsIncrementDebt(customerId, meta, delta) {

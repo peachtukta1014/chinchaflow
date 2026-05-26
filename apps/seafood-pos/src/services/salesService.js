@@ -3,7 +3,14 @@ import { dateKeyBangkok } from '../lib/date';
 import { billAmount } from '../lib/salesAggregate';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, sortSalesFifoAsc } from '../lib/saleFifo';
-import { fsDelete, fsGetDoc, fsListCollection, fsPatch, fsPost } from '../lib/firestoreRest';
+import {
+  fsDelete,
+  fsGetDoc,
+  fsPatch,
+  fsPost,
+  fsQueryOpenSales,
+  fsQuerySalesByCustomer,
+} from '../lib/firestoreRest';
 import { normalizeBillItems } from '../lib/salesAggregate';
 import { incrementCustomerDebt } from './debtService';
 import { deductStockForSale, getEffectiveStock, restoreStockForSale } from './stockService';
@@ -284,12 +291,31 @@ export async function applyPaymentToSale(sale, paymentAmount) {
   return { applied: add, paymentType, paidAmount, remainingAmount: newRemain };
 }
 
+/** โหลดเฉพาะบิลค้างของลูกค้า (ไม่ดึง sales ทั้งระบบ) */
+export async function fetchCustomerOpenSales(customerId, customerName) {
+  let sales = [];
+  if (customerId) {
+    sales = await fsQuerySalesByCustomer(customerId, 80);
+  }
+  const queue = openSalesForCustomer(sales, customerId, customerName);
+  if (queue.length > 0) return queue;
+
+  const open = await fsQueryOpenSales(120);
+  return openSalesForCustomer(open, customerId, customerName);
+}
+
 /** รับชำระลูกค้าแบบ FIFO — หักบิลเก่าก่อน */
-export async function applyFifoCustomerPayment(customerId, customerName, paymentAmount, allSales = null) {
+export async function applyFifoCustomerPayment(
+  customerId,
+  customerName,
+  paymentAmount,
+  prefetchedOpenSales = null,
+) {
   const amount = parseFloat(paymentAmount) || 0;
   if (amount <= 0) throw new Error('ใส่ยอดที่รับชำระ');
 
-  const sales = allSales || await fsListCollection('sales', 300);
+  const sales = prefetchedOpenSales
+    || await fetchCustomerOpenSales(customerId, customerName);
   const queue = openSalesForCustomer(sales, customerId, customerName);
   if (queue.length === 0) throw new Error('ไม่มีบิลค้าง');
 
@@ -330,11 +356,7 @@ export async function clearCustomerDebtAll(customerId, customerName, paymentType
   const key = debtCustomerKey(customerId, customerName);
   if (!key) throw new Error('ไม่พบลูกค้า');
 
-  const sales = await fsListCollection('sales', 300);
-  const open = sortSalesFifoAsc(sales.filter((s) => {
-    if ((parseFloat(s.remainingAmount) || 0) <= 0) return false;
-    return debtCustomerKey(s.customerId, s.customerName) === key;
-  }));
+  const open = await fetchCustomerOpenSales(customerId, customerName);
 
   for (const sale of open) {
     if (!sale.id) continue;
