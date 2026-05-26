@@ -214,7 +214,7 @@ export default function App() {
             onStockMoved={() => setStockRefresh((n) => n + 1)}
           />
         )}
-        {activeTab === 'members'        && <MembersScreen />}
+        {activeTab === 'members'        && <MembersScreen isAdmin={isAdmin} />}
         {activeTab === 'accounts'        && <CustomerAccountsScreen refreshKey={salesRefresh} />}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
