@@ -119,31 +119,25 @@ export default function BillTemplate({ data }) {
         จำหน่าย : ซีฟู้ดของสดของเป็น เน้นกุ้งแม่น้ำธรรมชาติเป็นๆ พร้อมส่ง
       </p>
 
-      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-4">
+      <div className="bg-[#2563eb] text-white text-center py-1.5 font-bold tracking-widest text-lg rounded-sm shadow-sm mb-2">
         ใบส่งของ
       </div>
 
-      <div className="text-xs space-y-2 mb-4 font-medium">
-        <div className="flex w-full gap-4">
+      <div className="text-xs space-y-1.5 mb-4 font-medium -mt-0.5">
+        <div className="flex w-full gap-4 items-end">
           <div className="flex-grow flex min-w-0">
             <span className="whitespace-nowrap">นามลูกค้า</span>
-            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold truncate">
+            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold truncate leading-tight">
               {data.customerName}
             </span>
           </div>
-          <div className="w-40 flex shrink-0">
+          <div className="w-44 flex shrink-0 items-end">
             <span className="whitespace-nowrap">วันที่</span>
-            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold">
+            <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black font-semibold leading-tight">
               {data.date}
             </span>
           </div>
         </div>
-        {data.deliveryDate && (
-          <div className="flex w-full gap-4 text-[10px]">
-            <span className="whitespace-nowrap text-slate-500">ส่งวันที่</span>
-            <span className="text-black font-semibold">{data.deliveryDate}</span>
-          </div>
-        )}
         <div className="flex w-full">
           <span className="whitespace-nowrap">ที่อยู่</span>
           <span className="border-b border-dotted border-gray-400 flex-grow pl-2 text-black">

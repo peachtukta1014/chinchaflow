@@ -69,7 +69,7 @@ export function saleToBillData(bill, customer = {}) {
   const dateKey = bill.dateKey || '';
   const deliveryKey =
     bill.deliveryDateKey ||
-    (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? shiftDateKey(dateKey, 1) : '');
+    (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? shiftDateKey(dateKey, 1) : dateKey);
   const items = bill.items || [];
   const byTemplate = new Map();
   const extraLines = [];
@@ -108,8 +108,8 @@ export function saleToBillData(bill, customer = {}) {
     bookNo: bill.bookNo || '',
     billNo: bill.billNo || '',
     customerName: bill.customerName || customer.name || '',
-    date: formatDateThaiShort(dateKey),
-    deliveryDate: formatDateThaiShort(deliveryKey),
+    /** วันที่บนบิล = วันจัดส่งเท่านั้น (ไม่แสดงวันสั่งซื้อ) */
+    date: deliveryKey ? formatDateThaiShort(deliveryKey) : formatDateThaiShort(dateKey),
     address: addressParts.join(' · '),
     items: Array.from(byTemplate.values()),
     extraLines,
