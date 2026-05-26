@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { Share2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Send, Share2 } from 'lucide-react';
 import { generateBillImage } from '../lib/generateBillImage';
 import { shareToLine } from '../lib/shareLine';
 import { downloadBillImageBlob } from '../lib/generateBillImage';
+import { pushBillToLineCustomer } from '../lib/linePushBill';
+import { resolveLineUserId } from '../lib/resolveLineUserId';
+import { isValidLineUserId } from '../lib/lineUserId';
 
-/** ปุ่มแชร์ LINE จากข้อมูลบิล — ใช้ท้ายรายการหรือในรายการ */
+/** ปุ่มแชร์/ส่งบิล LINE — ส่งอัตโนมัติถ้ามี LINE UID */
 export default function LineShareButton({
   bill,
   customer,
@@ -13,6 +16,17 @@ export default function LineShareButton({
   variant = 'line',
 }) {
   const [busy, setBusy] = useState(false);
+  const [lineUserId, setLineUserId] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveLineUserId(customer, bill).then((id) => {
+      if (!cancelled) setLineUserId(id || '');
+    });
+    return () => { cancelled = true; };
+  }, [customer, bill]);
+
+  const canAutoPush = isValidLineUserId(lineUserId);
 
   const handleClick = async () => {
     if (!bill?.items?.length && !bill?.total) {
@@ -22,6 +36,19 @@ export default function LineShareButton({
     setBusy(true);
     try {
       const { blob, objectUrl } = await generateBillImage(bill, customer || {});
+
+      if (canAutoPush) {
+        await pushBillToLineCustomer({
+          lineUserId,
+          blob,
+          billNo: bill.billNo,
+          customerName: bill.customerName || customer?.name,
+        });
+        URL.revokeObjectURL(objectUrl);
+        alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');
+        return;
+      }
+
       const res = await shareToLine({
         blob,
         title: bill.billNo,
@@ -45,6 +72,12 @@ export default function LineShareButton({
       ? 'bg-[#06C755] text-white'
       : 'bg-slate-100 text-slate-700 border border-slate-200';
 
+  const displayLabel = busy
+    ? 'กำลังส่ง…'
+    : canAutoPush
+      ? 'ส่งให้ลูกค้า'
+      : label;
+
   return (
     <button
       type="button"
@@ -52,8 +85,8 @@ export default function LineShareButton({
       onClick={handleClick}
       className={`font-bold text-sm py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 ${base} ${className}`}
     >
-      <Share2 size={16} />
-      {busy ? 'กำลังสร้างภาพ…' : label}
+      {canAutoPush ? <Send size={16} /> : <Share2 size={16} />}
+      {displayLabel}
     </button>
   );
 }

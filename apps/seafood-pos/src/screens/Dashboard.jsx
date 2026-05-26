@@ -228,7 +228,15 @@ export default function Dashboard({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setBillSheet({ bill: tx, customer: { zone: tx.zone, phone: tx.phone } })}
+                    onClick={() => setBillSheet({
+                      bill: tx,
+                      customer: {
+                        name: tx.customerName,
+                        zone: tx.zone,
+                        phone: tx.phone,
+                        lineUserId: tx.customerLineUserId || '',
+                      },
+                    })}
                     className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1"
                   >
                     <FileImage size={14} />

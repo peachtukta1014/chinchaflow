@@ -8,6 +8,7 @@ const {
 } = require('./parseLineOrder');
 const { parseDeliveryDateFromText, todayBKK, formatDateThai } = require('./parseDeliveryDate');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
+const { linkLineUserToCustomers } = require('./shrimpLinePush');
 
 async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
   const groups = groupItemsByCustomer(items);
@@ -35,6 +36,19 @@ async function saveLineOrders(db, admin, { items, text, userId, groupId, deliver
     });
   }
   await batch.commit();
+
+  const names = [...groups.keys()]
+    .filter((k) => k !== '__none__')
+    .map((k) => k);
+  for (const it of items) {
+    if (it.customerName) names.push(it.customerName);
+  }
+  try {
+    await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
+  } catch (err) {
+    console.warn('linkLineUserToCustomers', err.message);
+  }
+
   return groups.size;
 }
 

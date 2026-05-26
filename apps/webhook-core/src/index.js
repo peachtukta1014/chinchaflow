@@ -26,6 +26,10 @@ const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
 } = require('./shrimpDailySummary');
+const {
+  verifyShrimpStaff,
+  pushShrimpBillToCustomer,
+} = require('./shrimpLinePush');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -170,6 +174,64 @@ exports.lineWebhookTea = functions
     } catch (err) {
       console.error('lineWebhookTea', err);
       res.status(500).json({ error: 'internal' });
+    }
+  });
+
+// ── พนักงานส่งภาพบิลให้ลูกค้าทาง LINE OA (Bearer Firebase ID token) ─────────────
+exports.shrimpPushBill = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    if (req.method === 'GET') {
+      res.status(200).json({ ok: true, hint: 'POST { lineUserId, imageBase64, billNo?, customerName? }' });
+      return;
+    }
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const authHeader = req.headers.authorization || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!idToken) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      await verifyShrimpStaff(db(), decoded.uid);
+
+      const body = req.body || {};
+      const result = await pushShrimpBillToCustomer(db(), admin, {
+        lineUserId: body.lineUserId,
+        imageBase64: body.imageBase64,
+        billNo: body.billNo,
+        customerName: body.customerName,
+      });
+      res.json(result);
+    } catch (err) {
+      const code = err.code || 'failed';
+      if (code === 'forbidden') {
+        res.status(403).json({ error: 'forbidden', hint: 'ต้องเป็นสมาชิกที่อนุมัติแล้ว' });
+        return;
+      }
+      if (code === 'invalid_line_user_id') {
+        res.status(400).json({ error: code, hint: 'LINE User ID ต้องขึ้นต้น U (33 ตัวอักษร)' });
+        return;
+      }
+      if (code === 'line_token_missing') {
+        res.status(500).json({ error: code, hint: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN' });
+        return;
+      }
+      if (code === 'line_push_failed') {
+        res.status(502).json({
+          error: code,
+          hint: 'ลูกค้าต้องเคยแอด LINE OA เป็นเพื่อนก่อนถึงส่งได้',
+          status: err.status,
+        });
+        return;
+      }
+      console.error('shrimpPushBill', err);
+      res.status(500).json({ error: err.message || 'failed' });
     }
   });
 

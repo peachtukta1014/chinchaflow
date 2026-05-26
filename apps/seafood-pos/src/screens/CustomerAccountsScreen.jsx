@@ -451,7 +451,12 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
                     type="button"
                     onClick={() => setBillSheet({
                       bill: tx,
-                      customer: { zone: tx.zone, phone: tx.phone },
+                      customer: {
+                        name: tx.customerName,
+                        zone: tx.zone,
+                        phone: tx.phone,
+                        lineUserId: tx.customerLineUserId || '',
+                      },
                     })}
                     className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
                   >

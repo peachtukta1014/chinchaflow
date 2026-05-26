@@ -23,6 +23,7 @@ export function buildPreviewBill({
     dateKey,
     customerName: customer?.name || 'ลูกค้า',
     customerId: selectedCustomer,
+    customerLineUserId: customer?.lineUserId || null,
     zone: customer?.zone || '',
     items: cartItems,
     total,

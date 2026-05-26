@@ -73,7 +73,7 @@ export default function MembersScreen() {
       )}
       <>
           <p className="text-[10px] text-slate-500 leading-relaxed">
-            บันทึก LINE User ID (ขึ้นต้น U) ไว้ส่งบิลทาง LINE โดยตรงในอนาคต — ไม่ใช่ชื่อ @ไลน์
+            บันทึก LINE User ID (ขึ้นต้น U) เพื่อกดส่งบิลให้ลูกค้าใน LINE อัตโนมัติ — หรือกดดึงจากออเดอร์ล่าสุด
           </p>
           <div className="flex items-center justify-between">
             <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>

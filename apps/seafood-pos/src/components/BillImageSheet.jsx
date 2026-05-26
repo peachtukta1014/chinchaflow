@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Share2, X } from 'lucide-react';
+import { Download, Send, Share2, X } from 'lucide-react';
 import {
   downloadBillImageBlob,
   generateBillImage,
   revokeBillImageUrl,
 } from '../lib/generateBillImage';
 import { shareToLine } from '../lib/shareLine';
+import { pushBillToLineCustomer } from '../lib/linePushBill';
+import { resolveLineUserId } from '../lib/resolveLineUserId';
+import { isValidLineUserId } from '../lib/lineUserId';
 
 export default function BillImageSheet({ bill, customer, onClose }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [blob, setBlob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lineUserId, setLineUserId] = useState('');
+  const [lineUidLoading, setLineUidLoading] = useState(true);
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     if (!bill) return undefined;
@@ -36,6 +42,20 @@ export default function BillImageSheet({ bill, customer, onClose }) {
     return () => { cancelled = true; };
   }, [bill, customer]);
 
+  useEffect(() => {
+    if (!bill) return undefined;
+    let cancelled = false;
+    setLineUidLoading(true);
+    resolveLineUserId(customer, bill)
+      .then((id) => {
+        if (!cancelled) setLineUserId(id || '');
+      })
+      .finally(() => {
+        if (!cancelled) setLineUidLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [bill, customer]);
+
   useEffect(() => () => revokeBillImageUrl(previewUrl), [previewUrl]);
 
   const handleShareLine = async () => {
@@ -51,6 +71,26 @@ export default function BillImageSheet({ bill, customer, onClose }) {
     }
   };
 
+  const handlePushToCustomer = async () => {
+    if (!blob || !isValidLineUserId(lineUserId)) return;
+    setPushBusy(true);
+    try {
+      await pushBillToLineCustomer({
+        lineUserId,
+        blob,
+        billNo: bill?.billNo,
+        customerName: bill?.customerName || customer?.name,
+      });
+      alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');
+    } catch (e) {
+      alert(e.message || 'ส่งไม่สำเร็จ');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const canPush = isValidLineUserId(lineUserId);
+
   if (!bill) return null;
 
   return (
@@ -64,6 +104,17 @@ export default function BillImageSheet({ bill, customer, onClose }) {
               {' · '}
               {(bill.items || []).length} รายการ
             </p>
+            {lineUidLoading ? (
+              <p className="text-[10px] text-slate-400 mt-0.5">กำลังตรวจ LINE UID…</p>
+            ) : canPush ? (
+              <p className="text-[10px] text-green-600 font-bold mt-0.5">
+                พร้อมส่งให้ลูกค้าใน LINE (UID …{lineUserId.slice(-6)})
+              </p>
+            ) : (
+              <p className="text-[10px] text-amber-600 mt-0.5">
+                ยังไม่มี LINE UID — แท็บลูกค้า → ดึงจากออเดอร์ หรือแชร์เอง
+              </p>
+            )}
           </div>
           <button type="button" onClick={onClose} className="p-2 rounded-xl bg-slate-100">
             <X size={20} />
@@ -76,25 +127,38 @@ export default function BillImageSheet({ bill, customer, onClose }) {
             <img src={previewUrl} alt="บิล" className="w-full rounded-xl shadow-md" />
           )}
         </div>
-        <div className="p-4 flex gap-2 border-t border-slate-100">
-          <button
-            type="button"
-            disabled={!blob || loading}
-            onClick={handleShareLine}
-            className="flex-1 py-3 rounded-2xl bg-[#06C755] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Share2 size={18} />
-            แชร์ LINE
-          </button>
-          <button
-            type="button"
-            disabled={!blob || loading}
-            onClick={() => blob && downloadBillImageBlob(blob, bill?.billNo)}
-            className="flex-1 py-3 rounded-2xl bg-slate-800 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Download size={18} />
-            บันทึกรูป
-          </button>
+        <div className="p-4 flex flex-col gap-2 border-t border-slate-100">
+          {canPush && (
+            <button
+              type="button"
+              disabled={!blob || loading || pushBusy}
+              onClick={handlePushToCustomer}
+              className="w-full py-3.5 rounded-2xl bg-[#06C755] text-white font-black flex items-center justify-center gap-2 disabled:opacity-50 shadow-md"
+            >
+              <Send size={18} />
+              {pushBusy ? 'กำลังส่งให้ลูกค้า…' : 'ส่งให้ลูกค้า (LINE อัตโนมัติ)'}
+            </button>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!blob || loading}
+              onClick={handleShareLine}
+              className="flex-1 py-3 rounded-2xl bg-slate-700 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Share2 size={18} />
+              แชร์เอง
+            </button>
+            <button
+              type="button"
+              disabled={!blob || loading}
+              onClick={() => blob && downloadBillImageBlob(blob, bill?.billNo)}
+              className="flex-1 py-3 rounded-2xl bg-slate-800 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Download size={18} />
+              บันทึกรูป
+            </button>
+          </div>
         </div>
       </div>
     </div>
