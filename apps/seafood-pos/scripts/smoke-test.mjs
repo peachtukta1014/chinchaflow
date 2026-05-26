@@ -15,6 +15,7 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
   return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
+import { computeLotReport } from '../src/lib/lotReport.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
 import fs from 'node:fs';
 import path from 'node:path';

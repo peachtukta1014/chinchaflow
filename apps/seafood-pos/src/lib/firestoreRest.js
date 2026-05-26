@@ -310,6 +310,12 @@ function saleMatchesDateKey(doc, dateKey) {
   return created.startsWith(dateKey);
 }
 
+function saleDateKeyOf(doc) {
+  if (doc.dateKey) return doc.dateKey;
+  const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
+  return created.slice(0, 10);
+}
+
 /** โหลดบิลขายตามวัน — ไม่ดึงทั้ง collection */
 export async function fsQuerySales(dateKey) {
   const docs = await fsRunQuery({
@@ -330,6 +336,24 @@ export async function fsQuerySales(dateKey) {
   const matched = sortSalesDesc(recent.filter((d) => saleMatchesDateKey(d, dateKey)));
   if (matched.length > 0) return matched;
   return docs;
+}
+
+/** บิลขายช่วงวัน (สรุปล็อต) — ดึงรายการล่าสุดแล้วกรองตาม dateKey */
+export async function fsQuerySalesBetween(startKey, endKey) {
+  if (!startKey || !endKey || startKey > endKey) return [];
+  const all = await fsListCollection('sales', 400);
+  return sortSalesDesc(
+    all.filter((d) => {
+      const dk = saleDateKeyOf(d);
+      return dk >= startKey && dk <= endKey;
+    }),
+  );
+}
+
+/** ประวัติปรับสต๊อก (ย้ายบ่อ / เสียหาย / ชั่งปิด) */
+export async function fsListStockAdjustments(limit = 200) {
+  const rows = await fsListCollection('stockAdjustments', limit);
+  return rows.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
 /** บิลมียอดค้าง — ใช้แท็บลูกหนี้/FIFO (มักมีไม่กี่สิบบิล ไม่ใช่ทั้งระบบ) */

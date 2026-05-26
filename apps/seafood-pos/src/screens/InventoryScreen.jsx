@@ -8,6 +8,7 @@ import {
   transferPondDeath,
 } from '../services/stockService';
 import DateNavBar from '../components/DateNavBar';
+import LotReportPanel from '../components/LotReportPanel';
 import StockLotTimeline from '../components/StockLotTimeline';
 
 const ADJUST_LABELS = {
@@ -31,6 +32,7 @@ export default function InventoryScreen({
   onReceived,
   onStockMoved,
   member,
+  isAdmin = false,
 }) {
   const todayKey = dateKeyBangkok();
   const [lotViewDate, setLotViewDate] = useState(todayKey);
@@ -47,6 +49,10 @@ export default function InventoryScreen({
   const [deadHistory, setDeadHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin && tab === 'lotReport') setTab('receive');
+  }, [isAdmin, tab]);
 
   const liveKg = parseFloat(rcvLive) || 0;
   const deadKg = parseFloat(rcvDead) || 0;
@@ -178,7 +184,21 @@ export default function InventoryScreen({
         >
           กุ้งตายบ่อ
         </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setTab('lotReport')}
+            className={`flex-1 py-3 font-bold text-[10px] rounded-xl ${tab === 'lotReport' ? 'bg-white text-purple-600' : 'text-slate-500'}`}
+            title="สรุปล็อต — แอดมินเท่านั้น"
+          >
+            สรุปล็อต
+          </button>
+        )}
       </div>
+
+      {tab === 'lotReport' && isAdmin && (
+        <LotReportPanel stockBatches={stockBatches} />
+      )}
 
       {tab === 'lots' && (
         <StockLotTimeline
