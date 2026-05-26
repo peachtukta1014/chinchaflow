@@ -148,7 +148,7 @@ export default function LotReportPanel({ stockBatches = [] }) {
       </div>
 
       {(report.warnings.hasOtherLotStock || report.warnings.hasNewerLot) && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl p-4 leading-relaxed">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl p-4 leading-relaxed space-y-1">
           {report.warnings.hasNewerLot && (
             <p>มีล็อตรับเข้าหลังวันนี้แล้ว — ยอดขายในช่วงนี้อาจตัดสต๊อกจากหลายล็อต (FIFO)</p>
           )}

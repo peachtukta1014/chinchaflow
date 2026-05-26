@@ -33,6 +33,20 @@ function formatCellPrice(n) {
   return String(v);
 }
 
+/** ตัวเลขในตาราง — ขยับขึ้นเล็กน้อยให้อ่านชัด (ไม่ชิดขอบล่างเซลล์) */
+function TableNum({ children, align = 'center' }) {
+  if (children === '' || children == null) return null;
+  const alignCls =
+    align === 'right' ? 'justify-end' : align === 'left' ? 'justify-start' : 'justify-center';
+  return (
+    <span
+      className={`inline-flex w-full items-center ${alignCls} leading-none -translate-y-[3px] min-h-[1.1em]`}
+    >
+      {children}
+    </span>
+  );
+}
+
 function FieldLine({ label, value, valueClassName = '' }) {
   return (
     <div className="flex items-end gap-2 min-w-0">
@@ -119,14 +133,16 @@ export default function BillTemplate({ data }) {
               {data.billNo || ' '}
             </span>
           </p>
-          <div className="inline-block border border-[#1e3a8a] p-1 bg-white rounded text-center">
+          <div
+            className="w-[76px] h-[76px] ml-auto border-2 border-[#1e3a8a] bg-white rounded-sm flex items-center justify-center overflow-hidden p-1 shadow-sm"
+            title="สแกนแอด LINE โกอ้วน"
+          >
             <img
               src={BILL_QR_URL}
-              alt="LINE QR"
-              className="w-12 h-12 object-contain"
+              alt="LINE OA QR"
+              className="w-full h-full object-contain object-center"
               crossOrigin="anonymous"
             />
-            <p className="text-[8px] font-bold mt-0.5 text-[#1e3a8a]">LINE</p>
           </div>
         </div>
       </div>
@@ -164,28 +180,28 @@ export default function BillTemplate({ data }) {
           {FIXED_TEMPLATE_ROWS.map((row) => {
             const rowValue = getRowData(data, row.defaultName, extraQueue);
             return (
-              <tr key={row.key} className="h-8 text-center">
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50">
-                  {rowValue.quantity}
+              <tr key={row.key} className="h-8 text-center align-middle">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50 align-middle py-0">
+                  <TableNum>{rowValue.quantity}</TableNum>
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-left px-3 text-sm font-medium text-gray-800">
+                <td className="border-r border-b border-[#1e3a8a] text-left px-3 text-sm font-medium text-gray-800 align-middle">
                   {rowValue.label}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50">
-                  {rowValue.pricePerUnit}
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50 align-middle py-0">
+                  <TableNum>{rowValue.pricePerUnit}</TableNum>
                 </td>
-                <td className="border-b border-[#1e3a8a] text-right px-2 text-red-600 text-base font-extrabold">
-                  {rowValue.amount}
+                <td className="border-b border-[#1e3a8a] text-red-600 text-base font-extrabold align-middle py-0 px-2">
+                  <TableNum align="right">{rowValue.amount}</TableNum>
                 </td>
               </tr>
             );
           })}
-          <tr className="h-8 font-bold bg-blue-50/30">
-            <td colSpan={3} className="border-r-2 border-[#1e3a8a] text-right pr-4 text-[#1e3a8a]">
+          <tr className="h-9 font-bold bg-blue-50/30 align-middle">
+            <td colSpan={3} className="border-r-2 border-[#1e3a8a] text-right pr-4 text-[#1e3a8a] align-middle">
               รวมเงิน
             </td>
-            <td className="text-right px-2 text-xl text-red-600 font-black bg-blue-50">
-              {formatCellMoney(data.totalAmount)}
+            <td className="text-xl text-red-600 font-black bg-blue-50 align-middle py-0 px-2">
+              <TableNum align="right">{formatCellMoney(data.totalAmount)}</TableNum>
             </td>
           </tr>
         </tbody>

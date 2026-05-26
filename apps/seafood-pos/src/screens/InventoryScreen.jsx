@@ -9,6 +9,7 @@ import {
 } from '../services/stockService';
 import DateNavBar from '../components/DateNavBar';
 import LotReportPanel from '../components/LotReportPanel';
+import StockCountPanel from '../components/StockCountPanel';
 import StockLotTimeline from '../components/StockLotTimeline';
 
 const ADJUST_LABELS = {
@@ -51,7 +52,7 @@ export default function InventoryScreen({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin && tab === 'lotReport') setTab('receive');
+    if (!isAdmin && (tab === 'lotReport' || tab === 'stockCount')) setTab('receive');
   }, [isAdmin, tab]);
 
   const liveKg = parseFloat(rcvLive) || 0;
@@ -162,7 +163,7 @@ export default function InventoryScreen({
 
   return (
     <div className="p-5 space-y-5">
-      <div className="flex bg-slate-200 p-1.5 rounded-2xl gap-1">
+      <div className="flex flex-wrap bg-slate-200 p-1.5 rounded-2xl gap-1">
         <button
           type="button"
           onClick={() => setTab('receive')}
@@ -185,19 +186,39 @@ export default function InventoryScreen({
           กุ้งตายบ่อ
         </button>
         {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setTab('lotReport')}
-            className={`flex-1 py-3 font-bold text-[10px] rounded-xl ${tab === 'lotReport' ? 'bg-white text-purple-600' : 'text-slate-500'}`}
-            title="สรุปล็อต — แอดมินเท่านั้น"
-          >
-            สรุปล็อต
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setTab('lotReport')}
+              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'lotReport' ? 'bg-white text-purple-600' : 'text-slate-500'}`}
+              title="สรุปล็อต — แอดมินเท่านั้น"
+            >
+              สรุปล็อต
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('stockCount')}
+              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'stockCount' ? 'bg-white text-purple-700' : 'text-slate-500'}`}
+              title="ชั่งปิดสต๊อก — แอดมินเท่านั้น"
+            >
+              ชั่งปิด
+            </button>
+          </>
         )}
       </div>
 
       {tab === 'lotReport' && isAdmin && (
         <LotReportPanel stockBatches={stockBatches} />
+      )}
+
+      {tab === 'stockCount' && isAdmin && (
+        <StockCountPanel
+          stock={stock}
+          stockBatches={stockBatches}
+          updateMainStock={updateMainStock}
+          member={member}
+          onDone={onStockMoved}
+        />
       )}
 
       {tab === 'lots' && (
