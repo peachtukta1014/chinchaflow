@@ -140,12 +140,70 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
   return { patches, allocations };
 }
 
+/** ต้นทุนเฉลี่ย/กก. จากล็อตคงเหลือ (ประมาณการของเสีย) */
+export function estimateAvgCostPerKg(batches = []) {
+  let totalKg = 0;
+  let totalCost = 0;
+  for (const b of batches) {
+    const live = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+    const dead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+    const kg = live + dead;
+    if (kg <= 0) continue;
+    const perKg = parseFloat(b.effectiveCostPerKg ?? b.costPerKg) || 0;
+    totalKg += kg;
+    totalCost += perKg * kg;
+  }
+  return totalKg > 0 ? totalCost / totalKg : 0;
+}
+
+/** หักเฉพาะกุ้งตายในล็อต (เสียหายไม่ขาย) */
+async function deductDeadSpoilageFromBatches(batches, lossKg) {
+  let left = lossKg;
+  const patches = [];
+  const allocations = [];
+
+  for (const b of sortBatchesFifoOrder(batches)) {
+    if (left <= 0) break;
+    const remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+    const remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+    if (remDead <= 0) continue;
+    const take = Math.min(left, remDead);
+    patches.push({
+      id: b.id,
+      remainingLiveKg: remLive,
+      remainingDeadKg: normalizeStockValues(0, remDead - take).dead,
+    });
+    allocations.push({
+      batchId: b.id,
+      receiveDateKey: receiveDateKeyOf(b),
+      batchNote: b.note || '',
+      liveTaken: 0,
+      deadTaken: take,
+      deadAdded: 0,
+    });
+    left -= take;
+  }
+
+  if (left > 0.001) {
+    throw new Error(`กุ้งตายในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
+  }
+
+  for (const p of patches) {
+    await fsPatch(`stockBatches/${p.id}`, {
+      remainingLiveKg: p.remainingLiveKg,
+      remainingDeadKg: p.remainingDeadKg,
+    });
+  }
+  return { patches, allocations };
+}
+
 async function logStockAdjustment({
   type,
-  weightKg,
+  weightKg = 0,
   note = '',
   recordedBy = '',
   allocations = [],
+  extra = {},
 }) {
   if (!isFirebaseReady) return;
   await fsPost('stockAdjustments', {
@@ -156,7 +214,90 @@ async function logStockAdjustment({
     recordedBy,
     allocations,
     createdAt: new Date().toISOString(),
+    ...extra,
   });
+}
+
+/**
+ * ชั่งปิดวัน — ปรับสต๊อกให้ตรงจริง ส่วนต่างที่หายไป (กุ้งกิน/เน่าไม่ชั่ง) = ของเสียใน P&L
+ */
+export async function reconcileStockToActual(
+  stock,
+  batches,
+  actualLive,
+  actualDead,
+  updateMainStock,
+  meta = {},
+) {
+  const system = batches.length > 0
+    ? sumStockFromBatches(batches)
+    : normalizeStockValues(stock?.live ?? 0, stock?.dead ?? 0);
+  const actual = normalizeStockValues(actualLive, actualDead);
+  const varianceLive = actual.live - system.live;
+  const varianceDead = actual.dead - system.dead;
+  const allAllocations = [];
+
+  if (varianceLive < -0.001 && batches.length > 0) {
+    const r = await deductSpoilageFromBatches(batches, Math.abs(varianceLive));
+    allAllocations.push(...r.allocations);
+  }
+  if (varianceDead < -0.001 && batches.length > 0) {
+    const r = await deductDeadSpoilageFromBatches(batches, Math.abs(varianceDead));
+    allAllocations.push(...r.allocations);
+  }
+
+  if (batches.length > 0) {
+    const refreshed = sumStockFromBatches(
+      batches.map((b) => {
+        const livePatch = allAllocations.find((a) => a.batchId === b.id);
+        if (!livePatch) return b;
+        const p = allAllocations.filter((x) => x.batchId === b.id);
+        let remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
+        let remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
+        for (const x of p) {
+          if (x.liveTaken) remLive -= x.liveTaken;
+          if (x.deadTaken) remDead -= x.deadTaken;
+          if (x.deadAdded) remDead += x.deadAdded;
+        }
+        return { ...b, remainingLiveKg: remLive, remainingDeadKg: remDead };
+      }),
+    );
+    await updateMainStock(refreshed.live, refreshed.dead);
+  } else {
+    await updateMainStock(actual.live, actual.dead);
+  }
+
+  const shrinkKg = Math.max(0, -varianceLive) + Math.max(0, -varianceDead);
+  const avgCost = estimateAvgCostPerKg(batches);
+  const estimatedLossBaht = shrinkKg * avgCost;
+
+  await logStockAdjustment({
+    type: 'stock_count',
+    weightKg: shrinkKg,
+    note: meta.note,
+    recordedBy: meta.recordedBy,
+    allocations: allAllocations,
+    extra: {
+      systemLive: system.live,
+      systemDead: system.dead,
+      actualLive: actual.live,
+      actualDead: actual.dead,
+      varianceLive,
+      varianceDead,
+      estimatedLossBaht,
+      avgCostPerKg: avgCost,
+    },
+  });
+
+  return {
+    system,
+    actual,
+    varianceLive,
+    varianceDead,
+    shrinkKg,
+    estimatedLossBaht,
+    allocations: allAllocations,
+  };
 }
 
 export async function transferPondDeath(
