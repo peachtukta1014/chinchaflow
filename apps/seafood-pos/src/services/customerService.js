@@ -1,12 +1,19 @@
-import { collection, deleteDoc, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { CUSTOMERS } from '../constants';
 import { db } from '../firebase';
 import { normalizeLineUserId } from '../lib/lineUserId';
-import { fsListCollection } from '../lib/firestoreRest';
+import { fsDelete, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
 import { exactCustomerNameMatch } from '../lib/customerNameMatch';
 
 function compactName(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function withTimeout(promise, ms = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('หมดเวลา — ลองใหม่')), ms)),
+  ]);
 }
 
 /** subscribe รายชื่อลูกค้า Firestore */
@@ -28,15 +35,19 @@ export function subscribeCustomers(onData, onError) {
 
 export function mergeCustomerLists(fsCustomers) {
   const list = [
-    ...CUSTOMERS.map((c) => ({ ...c, ...(fsCustomers[c.id] || {}), source: 'builtin' })),
+    ...CUSTOMERS.map((c) => {
+      const overlay = fsCustomers[c.id] || {};
+      if (overlay.hidden === true) return null;
+      return { ...c, ...overlay, source: 'builtin' };
+    }).filter(Boolean),
     ...Object.values(fsCustomers)
       .filter((c) => !CUSTOMERS.find((b) => b.id === c.id))
+      .filter((c) => c.hidden !== true)
       .map((c) => ({ ...c, source: 'firestore' })),
   ];
   return markDuplicateCustomers(list);
 }
 
-/** แฟลกรายการชื่อซ้ำ (compact name เดียวกัน) */
 export function markDuplicateCustomers(list) {
   const counts = new Map();
   for (const c of list) {
@@ -55,49 +66,60 @@ export function isDeletableCustomer(c) {
   return String(c.id || '').startsWith('cx_');
 }
 
-function customerPayload({ name, zone, phone, lineUserId }) {
+export function isBuiltinCustomer(c) {
+  return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
+}
+
+function customerPayload({ name, zone, phone, lineUserId, hidden }) {
   const payload = {
     name: name.trim(),
-    zone: zone.trim(),
-    phone: phone.trim(),
+    zone: (zone || '').trim(),
+    phone: (phone || '').trim(),
   };
   const line = normalizeLineUserId(lineUserId);
-  if (line) payload.lineUserId = line;
-  else payload.lineUserId = '';
+  payload.lineUserId = line || '';
+  if (hidden === true) payload.hidden = true;
+  if (hidden === false) payload.hidden = false;
   return payload;
 }
 
-function withTimeout(promise, ms = 15000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('หมดเวลา — ลองใหม่')), ms)),
-  ]);
-}
-
 export async function updateCustomer(id, data) {
-  if (!db) throw new Error('ยังไม่ได้เชื่อม Firebase');
-  await withTimeout(setDoc(doc(db, 'customers', id), customerPayload(data), { merge: true }));
+  if (!id) throw new Error('ไม่พบรหัสลูกค้า');
+  await withTimeout(fsSetDoc(`customers/${id}`, {
+    ...customerPayload(data),
+    updatedAt: new Date().toISOString(),
+  }));
 }
 
 export async function createCustomer(data) {
-  if (!db) throw new Error('ยังไม่ได้เชื่อม Firebase');
   const id = `cx_${Date.now()}`;
-  await withTimeout(setDoc(doc(db, 'customers', id), {
+  await withTimeout(fsSetDoc(`customers/${id}`, {
     ...customerPayload(data),
-    createdAt: serverTimestamp(),
+    createdAt: new Date().toISOString(),
   }));
   return id;
 }
 
 export async function deleteCustomer(id) {
-  if (!db) throw new Error('ยังไม่ได้เชื่อม Firebase');
   if (!String(id).startsWith('cx_')) {
-    throw new Error('ลบได้เฉพาะลูกค้าที่เพิ่มเอง (ไม่ใช่รายการเริ่มต้นในแอป)');
+    throw new Error('ลบได้เฉพาะลูกค้าที่เพิ่มเอง');
   }
-  await deleteDoc(doc(db, 'customers', id));
+  await withTimeout(fsDelete(`customers/${id}`));
 }
 
-/** หา LINE user id จากออเดอร์ LINE ล่าสุดที่ชื่อลูกค้าตรงกัน */
+/** ซ่อนรายการในแอป (รายชื่อเริ่มต้นในแอป — ลบไฟล์จริงไม่ได้) */
+export async function hideCustomerFromList(id) {
+  const builtin = CUSTOMERS.find((b) => b.id === id);
+  await withTimeout(fsSetDoc(`customers/${id}`, {
+    name: builtin?.name || id,
+    zone: builtin?.zone || '',
+    phone: '',
+    lineUserId: '',
+    hidden: true,
+    hiddenAt: new Date().toISOString(),
+  }));
+}
+
 export async function suggestLineUserIdFromOrders(customerName) {
   const orders = await fsListCollection('lineOrders', 200);
   const name = (customerName || '').trim();

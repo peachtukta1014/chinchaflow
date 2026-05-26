@@ -123,6 +123,45 @@ export async function fsPatch(path, data) {
   if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
 }
 
+/** สร้างหรืออัปเดตเอกสารตาม path (PATCH แล้ว POST ถ้ายังไม่มี) */
+export async function fsSetDoc(path, data) {
+  const fields = fsObj(data);
+  const parts = path.split('/');
+  const col = parts.slice(0, -1).join('/');
+  const docId = parts[parts.length - 1];
+
+  let r = await fetch(`${FS_BASE}/${path}`, {
+    method: 'PATCH',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return;
+
+  const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  r = await fetch(`${FS_BASE}/${path}?${qs}`, {
+    method: 'PATCH',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return;
+
+  r = await fetch(`${FS_BASE}/${col}?documentId=${encodeURIComponent(docId)}`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`Firestore ${path} HTTP ${r.status}`);
+}
+
+export async function fsDelete(path) {
+  const r = await fetch(`${FS_BASE}/${path}`, {
+    method: 'DELETE',
+    headers: await fsAuthHeaders(),
+  });
+  if (r.status === 404) return;
+  if (!r.ok) throw new Error(`Firestore DELETE ${path} HTTP ${r.status}`);
+}
+
 export async function fsSetStockDoc(data) {
   try {
     await fsPatch('config/stock', data);

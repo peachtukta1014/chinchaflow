@@ -3,6 +3,8 @@ import { MessageCircle, PlusCircle, Trash2, Users } from 'lucide-react';
 import {
   createCustomer,
   deleteCustomer,
+  hideCustomerFromList,
+  isBuiltinCustomer,
   isDeletableCustomer,
   mergeCustomerLists,
   suggestLineUserIdFromOrders,
@@ -34,6 +36,7 @@ export default function MembersScreen({ isAdmin = false }) {
   const showFlash = (msg) => { setSaveFlash(msg); setTimeout(() => setSaveFlash(''), 3000); };
 
   const saveCusEdit = async (id) => {
+    if (saveBusy) return;
     if (!cusEditData.name.trim()) {
       showFlash('❌ ใส่ชื่อลูกค้าก่อนครับ');
       return;
@@ -68,6 +71,7 @@ export default function MembersScreen({ isAdmin = false }) {
   };
 
   const addCustomer = async () => {
+    if (saveBusy) return;
     if (!newCus.name.trim()) {
       showFlash('❌ ใส่ชื่อลูกค้าก่อนครับ');
       return;
@@ -86,11 +90,12 @@ export default function MembersScreen({ isAdmin = false }) {
   };
 
   const removeCustomer = async (c) => {
+    if (saveBusy) return;
     if (!isDeletableCustomer(c)) {
-      showFlash('ลบได้เฉพาะลูกค้าที่เพิ่มเอง (cx_...) — รายการเริ่มต้นแก้ชื่อได้อย่างเดียว');
+      showFlash('ลบได้เฉพาะลูกค้าที่เพิ่มเอง — รายการในแอปใช้「ซ่อน」แทน');
       return;
     }
-    if (!window.confirm(`ลบลูกค้า "${c.name}" ออกจากระบบ?`)) return;
+    if (!window.confirm(`ลบลูกค้า "${c.name}" ออกจากระบบ?\n(ลบถาวร กู้คืนไม่ได้)`)) return;
     setSaveBusy(true);
     try {
       await deleteCustomer(c.id);
@@ -98,6 +103,21 @@ export default function MembersScreen({ isAdmin = false }) {
       showFlash('✅ ลบลูกค้าแล้ว');
     } catch (e) {
       showFlash('❌ ลบไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
+  const hideCustomer = async (c) => {
+    if (saveBusy) return;
+    if (!window.confirm(`ซ่อน "${c.name}" ออกจากรายชื่อ?\n(ยังเลือกตอนขายได้ถ้ารู้รหัสเดิม)`)) return;
+    setSaveBusy(true);
+    try {
+      await hideCustomerFromList(c.id);
+      if (cusEditId === c.id) setCusEditId(null);
+      showFlash('✅ ซ่อนรายการแล้ว');
+    } catch (e) {
+      showFlash('❌ ซ่อนไม่สำเร็จ: ' + (e?.message || ''));
     } finally {
       setSaveBusy(false);
     }
@@ -139,7 +159,8 @@ export default function MembersScreen({ isAdmin = false }) {
         ) : (
           <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          รายชื่อสำหรับเลือกตอนขาย — ลูกค้าที่ทัก LINE ดูแท็บ「ลูกค้า LINE OA」แล้วกดบันทึกเข้ารายชื่อ
+          แก้ไขได้ทุกราย — ลบถาวรได้เฉพาะลูกค้าที่เพิ่มเอง (มีปุ่มถังขยะ)
+          รายชื่อในแอปใช้ปุ่ม「ซ่อน」แทน · LINE OA อยู่แท็บถัดไป
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
@@ -254,22 +275,44 @@ export default function MembersScreen({ isAdmin = false }) {
                     >
                       {suggestBusy === c.id ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
                     </button>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         type="button"
                         disabled={saveBusy}
                         onClick={() => saveCusEdit(c.id)}
-                        className="flex-1 bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl active:scale-95 disabled:opacity-50"
+                        className="flex-1 min-w-[45%] bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl active:scale-95 disabled:opacity-50"
                       >
                         {saveBusy ? 'กำลังบันทึก...' : 'บันทึก'}
                       </button>
                       <button
                         type="button"
+                        disabled={saveBusy}
                         onClick={() => setCusEditId(null)}
-                        className="flex-1 border border-slate-200 text-slate-400 text-xs font-bold py-2.5 rounded-xl"
+                        className="flex-1 min-w-[45%] border border-slate-200 text-slate-400 text-xs font-bold py-2.5 rounded-xl"
                       >
                         ยกเลิก
                       </button>
+                      {isDeletableCustomer(c) && (
+                        <button
+                          type="button"
+                          disabled={saveBusy}
+                          onClick={() => removeCustomer(c)}
+                          className="w-full py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center justify-center gap-1"
+                        >
+                          <Trash2 size={14} />
+                          ลบถาวร
+                        </button>
+                      )}
+                      {isBuiltinCustomer(c) && (
+                        <button
+                          type="button"
+                          disabled={saveBusy}
+                          onClick={() => hideCustomer(c)}
+                          className="w-full py-2 rounded-xl border border-slate-300 text-slate-600 text-xs font-bold"
+                        >
+                          ซ่อนออกจากรายชื่อ
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -280,6 +323,11 @@ export default function MembersScreen({ isAdmin = false }) {
                         {c.duplicate && (
                           <span className="text-[10px] bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">
                             ชื่อซ้ำ
+                          </span>
+                        )}
+                        {isBuiltinCustomer(c) && (
+                          <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
+                            ในแอป
                           </span>
                         )}
                         {c.zone && (
@@ -321,9 +369,19 @@ export default function MembersScreen({ isAdmin = false }) {
                           disabled={saveBusy}
                           onClick={() => removeCustomer(c)}
                           className="text-xs text-red-500 border border-red-200 px-2 py-1.5 rounded-lg"
-                          title="ลบลูกค้าที่เพิ่มเอง"
+                          title="ลบถาวร (ลูกค้าที่เพิ่มเอง)"
                         >
                           <Trash2 size={14} />
+                        </button>
+                      )}
+                      {isBuiltinCustomer(c) && c.duplicate && (
+                        <button
+                          type="button"
+                          disabled={saveBusy}
+                          onClick={() => hideCustomer(c)}
+                          className="text-[10px] text-slate-500 border border-slate-200 px-2 py-1 rounded-lg"
+                        >
+                          ซ่อน
                         </button>
                       )}
                     </div>
