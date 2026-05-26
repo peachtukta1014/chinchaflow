@@ -93,12 +93,23 @@ function lineBillPaymentNote(paymentType) {
   return '';
 }
 
+function lineBillUnpaidHint(paymentType, remainingAmount, total) {
+  const remain = parseFloat(remainingAmount);
+  const unpaid = Number.isFinite(remain) && remain > 0
+    ? remain
+    : (paymentType === 'credit' ? parseFloat(total) || 0 : 0);
+  if (unpaid <= 0) return '';
+  return `ค้างชำระ ฿${unpaid.toLocaleString('th-TH')} — ดูเลขบัญชีในภาพบิล`;
+}
+
 async function pushShrimpBillToCustomer(db, admin, {
   lineUserId,
   imageBase64,
   billNo,
   customerName,
   paymentType,
+  remainingAmount,
+  total,
 }) {
   const to = normalizeLineUserId(lineUserId);
   if (!LINE_UID_RE.test(to)) {
@@ -124,11 +135,13 @@ async function pushShrimpBillToCustomer(db, admin, {
 
   const { url } = await uploadBillJpeg(admin, buffer, billNo);
   const paidNote = lineBillPaymentNote(paymentType);
+  const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total);
   const caption = [
     '📋 ใบส่งของ — โกอ้วน คลังซีฟู้ด',
     billNo ? `เลขที่ ${billNo}` : null,
     customerName ? `ลูกค้า ${customerName}` : null,
     paidNote ? `✅ ${paidNote}` : null,
+    creditHint || null,
   ]
     .filter(Boolean)
     .join('\n');

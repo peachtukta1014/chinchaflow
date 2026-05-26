@@ -207,6 +207,8 @@ exports.shrimpPushBill = functions
         billNo: body.billNo,
         customerName: body.customerName,
         paymentType: body.paymentType,
+        remainingAmount: body.remainingAmount,
+        total: body.total,
       });
       res.json(result);
     } catch (err) {

@@ -51,6 +51,8 @@ export default function LineShareButton({
           billNo: bill.billNo,
           customerName: bill.customerName || customer?.name,
           paymentType: bill.paymentType,
+          remainingAmount: bill.remainingAmount,
+          total: bill.total,
         });
         URL.revokeObjectURL(objectUrl);
         alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');

@@ -1,6 +1,6 @@
 import { dateKeyBangkok, formatDateThaiShort } from './date.js';
 import { normalizeLineItem } from './billRowMap.js';
-import { lineBillPaymentNote } from './lineBillPaymentNote.js';
+import { billCreditTransferBlock, lineBillPaymentNote } from './lineBillPaymentNote.js';
 
 export const TEMPLATE_ROW_NAMES = {
   large: 'กุ้งแม่น้ำ A',
@@ -118,6 +118,7 @@ export function saleToBillData(bill, customer = {}) {
     totalAmount: subtotal,
     senderName: bill.recordedBy || bill.senderName || customer.recordedBy || '',
     paymentNote: lineBillPaymentNote(bill.paymentType),
+    creditTransfer: billCreditTransferBlock(bill),
     paymentType: bill.paymentType || '',
   };
 }

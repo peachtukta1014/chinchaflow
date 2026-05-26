@@ -25,6 +25,8 @@ export async function pushBillToLineCustomer({
   billNo,
   customerName,
   paymentType,
+  remainingAmount,
+  total,
 }) {
   if (!projectId) throw new Error('VITE_FIREBASE_PROJECT_ID ไม่ได้ตั้งค่า');
   const user = auth?.currentUser;
@@ -39,7 +41,15 @@ export async function pushBillToLineCustomer({
       Authorization: `Bearer ${idToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ lineUserId, imageBase64, billNo, customerName, paymentType }),
+    body: JSON.stringify({
+      lineUserId,
+      imageBase64,
+      billNo,
+      customerName,
+      paymentType,
+      remainingAmount,
+      total,
+    }),
   });
 
   const json = await r.json().catch(() => ({}));

@@ -93,6 +93,8 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
         billNo: bill?.billNo,
         customerName: bill?.customerName || customer?.name,
         paymentType: bill?.paymentType,
+        remainingAmount: bill?.remainingAmount,
+        total: bill?.total,
       });
       alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');
     } catch (e) {

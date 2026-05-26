@@ -2,7 +2,8 @@ import React from 'react';
 import { BILL_QR_URL } from '../lib/billTemplateConfig';
 
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
-/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; paymentNote?: string }} BillData */
+/** @typedef {{ holder: string; bank: string; accountNo: string; unpaidAmount: number; promptPhone?: string }} CreditTransferInfo */
+/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; paymentNote?: string; creditTransfer?: CreditTransferInfo | null }} BillData */
 
 export const FIXED_TEMPLATE_ROWS = [
   { key: 'shrimp-a', defaultName: 'กุ้งแม่น้ำ A' },
@@ -136,9 +137,23 @@ export default function BillTemplate({ data }) {
         ใบส่งของ
       </div>
       {data.paymentNote ? (
-        <p className="text-center text-emerald-700 font-black text-base mb-3 tracking-wide">
+        <p className="text-center text-red-600 font-black text-2xl mb-3 tracking-wide leading-tight">
           {data.paymentNote}
         </p>
+      ) : data.creditTransfer ? (
+        <div className="mb-3 rounded-lg border-2 border-red-500 bg-red-50 px-3 py-2.5 text-center">
+          <p className="text-red-600 font-black text-xl leading-tight">
+            ค้างชำระ ฿{formatCellMoney(data.creditTransfer.unpaidAmount)}
+          </p>
+          <p className="text-red-700 font-bold text-sm mt-2">โอนชำระเข้าบัญชี</p>
+          <p className="text-red-800 font-black text-base mt-0.5">{data.creditTransfer.holder}</p>
+          <p className="text-red-700 font-bold text-sm">
+            {data.creditTransfer.bank}
+            {data.creditTransfer.accountNo
+              ? ` · ${data.creditTransfer.accountNo}`
+              : ` · สอบถามเลขบัญชี ${data.creditTransfer.promptPhone || 'ร้าน'}`}
+          </p>
+        </div>
       ) : (
         <div className="mb-3" />
       )}
@@ -155,7 +170,7 @@ export default function BillTemplate({ data }) {
         <FieldLine label="ที่อยู่" value={data.address} />
       </div>
 
-      <table className="w-full border-collapse border-2 border-[#1e3a8a] bg-white text-xs shadow-sm">
+      <table className="w-full border-collapse border-2 border-[#1e3a8a] bg-white text-sm shadow-sm">
         <thead>
           <tr className="bg-[#1e3a8a] text-white text-center font-bold">
             <th className="border border-[#1e3a8a] py-2 w-[15%]">จำนวน</th>
@@ -168,17 +183,17 @@ export default function BillTemplate({ data }) {
           {FIXED_TEMPLATE_ROWS.map((row) => {
             const rowValue = getRowData(data, row.defaultName, extraQueue);
             return (
-              <tr key={row.key} className="h-7 text-center">
-                <td className="border-r border-b border-[#1e3a8a] text-red-700 font-bold bg-slate-50/50">
+              <tr key={row.key} className="h-8 text-center">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50">
                   {rowValue.quantity}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-left px-3 font-medium text-gray-800">
+                <td className="border-r border-b border-[#1e3a8a] text-left px-3 text-sm font-medium text-gray-800">
                   {rowValue.label}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-red-700 font-bold bg-slate-50/50">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50">
                   {rowValue.pricePerUnit}
                 </td>
-                <td className="border-b border-[#1e3a8a] text-right px-2 text-red-800 font-bold">
+                <td className="border-b border-[#1e3a8a] text-right px-2 text-red-600 text-base font-extrabold">
                   {rowValue.amount}
                 </td>
               </tr>
@@ -188,7 +203,7 @@ export default function BillTemplate({ data }) {
             <td colSpan={3} className="border-r-2 border-[#1e3a8a] text-right pr-4 text-[#1e3a8a]">
               รวมเงิน
             </td>
-            <td className="text-right px-2 text-lg text-blue-900 font-extrabold bg-blue-50">
+            <td className="text-right px-2 text-xl text-red-600 font-black bg-blue-50">
               {formatCellMoney(data.totalAmount)}
             </td>
           </tr>
