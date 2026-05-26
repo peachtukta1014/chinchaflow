@@ -218,7 +218,11 @@ export default function Dashboard({
         <h3 className="font-bold text-slate-800 mb-1">บิลทั้งหมด — {formatViewDateLabel(viewDate)}</h3>
         <p className="text-[10px] text-slate-400 mb-3">สด · โอน · ค้าง · ผ่อน · แตะดูภาพบิล / แชร์ LINE</p>
         {sortedSales.length === 0 ? (
-          <p className="text-center text-slate-400 py-6">ไม่มีบิลวันนี้</p>
+          <p className="text-center text-slate-400 py-6">
+            ไม่มีบิล
+            {' '}
+            {formatViewDateLabel(viewDate)}
+          </p>
         ) : (
           <div className="space-y-3">
             {sortedSales.map((tx, i) => {

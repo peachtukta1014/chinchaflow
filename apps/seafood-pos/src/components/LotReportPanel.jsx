@@ -71,6 +71,11 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   }, [lotDateKey, endDateKey]);
 
   useEffect(() => {
+    if (endDateKey >= lotDateKey) return;
+    setEndDateKey(lotDateKey);
+  }, [lotDateKey, endDateKey]);
+
+  useEffect(() => {
     if (!active) return;
     loadReportData();
   }, [loadReportData, active]);
@@ -135,7 +140,8 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         <DateNavBar
           dateKey={endDateKey}
           onDateChange={setEndDateKey}
-          subtitle={`สรุปถึง ${formatViewDateLabel(endDateKey)}`}
+          minDateKey={lotDateKey}
+          subtitle={`สรุปถึง ${formatViewDateLabel(endDateKey)} (จากวันรับล็อต)`}
         />
 
         <button

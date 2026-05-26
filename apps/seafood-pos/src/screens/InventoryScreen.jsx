@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { dateKeyBangkok } from '../lib/date';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQueryStockAdjustments } from '../lib/firestoreRest';
 import {
   countReceivesOnDate,
@@ -49,6 +49,7 @@ export default function InventoryScreen({
   const todayKey = dateKeyBangkok();
   const [lotViewDate, setLotViewDate] = useState(todayKey);
   const [deadViewDate, setDeadViewDate] = useState(todayKey);
+  const [receiveViewDate, setReceiveViewDate] = useState(todayKey);
   const [tab, setTab] = useState('receive');
   const [rcvLive, setRcvLive] = useState('');
   const [rcvDead, setRcvDead] = useState('');
@@ -78,20 +79,66 @@ export default function InventoryScreen({
     [stockBatches, todayKey],
   );
 
-  const todayReceives = useMemo(
+  const receivesForDate = useMemo(
     () =>
       stockBatches
-        .filter((b) => receiveDateKeyOf(b) === todayKey)
+        .filter((b) => receiveDateKeyOf(b) === receiveViewDate)
         .sort(
           (a, b) =>
             new Date(a.purchaseDate || 0).getTime() - new Date(b.purchaseDate || 0).getTime(),
         ),
-    [stockBatches, todayKey],
+    [stockBatches, receiveViewDate],
+  );
+
+  const receiveCountForDate = useMemo(
+    () => countReceivesOnDate(stockBatches, receiveViewDate),
+    [stockBatches, receiveViewDate],
   );
 
   useEffect(() => {
     onReceived?.();
   }, []);
+
+  const receiveDateBootstrapped = useRef(false);
+  const lotDateBootstrapped = useRef(false);
+
+  const pickLatestReceiveDateKey = useCallback(() => {
+    const latest = [...stockBatches].sort(
+      (a, b) => new Date(b.purchaseDate || 0).getTime() - new Date(a.purchaseDate || 0).getTime(),
+    )[0];
+    return latest ? receiveDateKeyOf(latest) : todayKey;
+  }, [stockBatches, todayKey]);
+
+  const handleReceiveViewDateChange = (dk) => {
+    setReceiveViewDate(dk);
+    setLotViewDate(dk);
+  };
+
+  const handleLotViewDateChange = (dk) => {
+    setLotViewDate(dk);
+    setReceiveViewDate(dk);
+  };
+
+  /** ครั้งแรกที่โหลดล็อต: ถ้าวันนี้ว่าง ให้ไปวันรับเข้าล่าสุด (เช่น 24–25/5) */
+  useEffect(() => {
+    if (tab !== 'receive' || stockBatches.length === 0 || receiveDateBootstrapped.current) return;
+    receiveDateBootstrapped.current = true;
+    if (countReceivesOnDate(stockBatches, todayKey) > 0) {
+      setReceiveViewDate(todayKey);
+      setLotViewDate(todayKey);
+      return;
+    }
+    const dk = pickLatestReceiveDateKey();
+    setReceiveViewDate(dk);
+    setLotViewDate(dk);
+  }, [tab, stockBatches, todayKey, pickLatestReceiveDateKey]);
+
+  useEffect(() => {
+    if (tab !== 'lots' || stockBatches.length === 0 || lotDateBootstrapped.current) return;
+    lotDateBootstrapped.current = true;
+    if (countReceivesOnDate(stockBatches, lotViewDate) > 0) return;
+    setLotViewDate(pickLatestReceiveDateKey());
+  }, [tab, stockBatches, lotViewDate, pickLatestReceiveDateKey]);
 
   const loadDeadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -106,8 +153,9 @@ export default function InventoryScreen({
   }, [deadViewDate]);
 
   useEffect(() => {
-    if (tab === 'dead') loadDeadHistory();
-  }, [tab, loadDeadHistory]);
+    if (tab !== 'dead') return;
+    loadDeadHistory();
+  }, [tab, deadViewDate, loadDeadHistory]);
 
   const handleReceive = async () => {
     if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
@@ -255,18 +303,104 @@ export default function InventoryScreen({
         <StockLotTimeline
           stockBatches={stockBatches}
           viewDate={lotViewDate}
-          onViewDateChange={setLotViewDate}
+          onViewDateChange={handleLotViewDateChange}
         />
       )}
 
       {tab === 'receive' && (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า (วันนี้)</h2>
+          <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            แต่ละครั้งที่กดบันทึก = 1 รายการ (ราคา/รถต่างกัน) รวมอยู่ล็อตวันที่เดียวกัน
+            ล็อต = 1 วันรับรถ · เลื่อนวันดูย้อนหลัง (เช่น 24–25/5/69)
+          </p>
+
+          <DateNavBar
+            dateKey={receiveViewDate}
+            onDateChange={handleReceiveViewDateChange}
+            subtitle={
+              receiveCountForDate > 0
+                ? `${receiveCountForDate} รายการ · ${formatViewDateLabel(receiveViewDate)}`
+                : 'ไม่มีรับเข้าวันนี้'
+            }
+          />
+
+          {receivesForDate.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-600">
+                รายการรับเข้า
+                {' '}
+                {formatViewDateLabel(receiveViewDate)}
+                {' '}
+                (
+                {receiveViewDate}
+                )
+              </p>
+              {receivesForDate.map((b, idx) => {
+                const live = parseFloat(b.liveKg) || 0;
+                const dead = parseFloat(b.deadKg) || 0;
+                const cost = parseFloat(b.totalCost) || 0;
+                const perKg = parseFloat(b.effectiveCostPerKg ?? b.costPerKg) || 0;
+                return (
+                  <div
+                    key={b.id || `rcv-${idx}`}
+                    className="rounded-xl bg-blue-50/80 border border-blue-100 p-3 text-xs"
+                  >
+                    <div className="flex justify-between gap-2 font-bold text-slate-800">
+                      <span>
+                        รายการที่ {idx + 1}
+                        {b.note ? ` · ${b.note}` : ''}
+                      </span>
+                      <span className="text-blue-700 shrink-0">฿{cost.toLocaleString()}</span>
+                    </div>
+                    <p className="text-slate-600 mt-1">
+                      สด {live.toFixed(2)} กก. · ตาย {dead.toFixed(2)} กก.
+                      {' · '}
+                      ฿{perKg.toFixed(2)}/กก.
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      คงเหลือในล็อต: เป็น{' '}
+                      {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(2)}
+                      {' '}
+                      · ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(2)} กก.
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : stockBatches.length === 0 ? (
+            <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl p-3 leading-relaxed">
+              ยังโหลดล็อตไม่สำเร็จ — กดรีเฟรชแอป (มุมขวาบน)
+            </p>
+          ) : (
+            <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl p-3 text-center">
+              ไม่มีรายการรับเข้าวัน
+              {' '}
+              {formatViewDateLabel(receiveViewDate)}
+              {' '}
+              — เลื่อนวันก่อนหน้า หรือดูแท็บ「ล็อตรับเข้า」
+            </p>
+          )}
+
+          {receiveViewDate !== todayKey && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+              กำลังดูย้อนหลัง — บันทึกรับเข้าใหม่จะลง
+              <strong> วันนี้</strong>
+              {' '}
+              (
+              {formatViewDateLabel(todayKey)}
+              )
+              เท่านั้น
+            </p>
+          )}
+
+          {receiveViewDate === todayKey && (
+            <>
+          <p className="text-xs font-bold text-slate-600 border-t border-slate-100 pt-4">
+            บันทึกรับเข้าใหม่ (วันนี้)
             {todayReceiveCount > 0 && (
-              <span className="block mt-1 font-bold text-blue-600">
-                วันนี้บันทึกแล้ว {todayReceiveCount} รายการ
+              <span className="font-normal text-blue-600">
+                {' '}
+                · มีแล้ว {todayReceiveCount} รายการ
               </span>
             )}
           </p>
@@ -358,50 +492,8 @@ export default function InventoryScreen({
           >
             {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
           </button>
-
-          {todayReceives.length > 0 ? (
-            <div className="border-t border-slate-200 pt-4 space-y-2">
-              <p className="text-xs font-bold text-slate-600">รายการรับเข้าวันนี้ (จากระบบ)</p>
-              {todayReceives.map((b, idx) => {
-                const live = parseFloat(b.liveKg) || 0;
-                const dead = parseFloat(b.deadKg) || 0;
-                const cost = parseFloat(b.totalCost) || 0;
-                const perKg = parseFloat(b.effectiveCostPerKg ?? b.costPerKg) || 0;
-                return (
-                  <div
-                    key={b.id || `rcv-${idx}`}
-                    className="rounded-xl bg-blue-50/80 border border-blue-100 p-3 text-xs"
-                  >
-                    <div className="flex justify-between gap-2 font-bold text-slate-800">
-                      <span>
-                        รายการที่ {idx + 1}
-                        {b.note ? ` · ${b.note}` : ''}
-                      </span>
-                      <span className="text-blue-700 shrink-0">฿{cost.toLocaleString()}</span>
-                    </div>
-                    <p className="text-slate-600 mt-1">
-                      สด {live.toFixed(2)} กก. · ตาย {dead.toFixed(2)} กก.
-                      {' · '}
-                      ฿{perKg.toFixed(2)}/กก.
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      คงเหลือในล็อต: เป็น{' '}
-                      {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(2)}
-                      {' '}
-                      · ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(2)} กก.
-                    </p>
-                  </div>
-                );
-              })}
-              <p className="text-[10px] text-slate-400">
-                ดูล็อตย้อนหลัง → แท็บ「ล็อตรับเข้า」
-              </p>
-            </div>
-          ) : todayReceiveCount === 0 && stockBatches.length === 0 ? (
-            <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl p-3 leading-relaxed">
-              ยังโหลดล็อตไม่สำเร็จ — ลองกดรีเฟรชแอป (มุมขวาบน) หรือดูแท็บ「ล็อตรับเข้า」
-            </p>
-          ) : null}
+            </>
+          )}
         </div>
       )}
 
@@ -484,7 +576,11 @@ export default function InventoryScreen({
             {historyLoading ? (
               <p className="text-center text-slate-400 py-6 text-sm">กำลังโหลด...</p>
             ) : deadHistory.length === 0 ? (
-              <p className="text-center text-slate-400 py-6 text-sm">ไม่มีรายการวันนี้</p>
+              <p className="text-center text-slate-400 py-6 text-sm">
+                ไม่มีรายการ
+                {' '}
+                {formatViewDateLabel(deadViewDate)}
+              </p>
             ) : (
               <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
                 {deadHistory.map((row) => {

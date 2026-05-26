@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { dateKeyBangkok } from '../lib/date';
+import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
 import DateNavBar from './DateNavBar';
 
@@ -40,8 +40,12 @@ export default function StockLotTimeline({ stockBatches = [], viewDate, onViewDa
       </p>
       {!day || day.items.length === 0 ? (
         <div className="bg-white p-8 rounded-[2rem] shadow-sm text-center text-slate-400">
-          <p className="font-bold">ไม่มีรายการรับเข้าวันนี้</p>
-          <p className="text-xs mt-1">เลื่อนวันหรือแตะปฏิทินเพื่อดูประวัติ</p>
+          <p className="font-bold">
+            ไม่มีรายการรับเข้า
+            {' '}
+            {formatViewDateLabel(viewDate)}
+          </p>
+          <p className="text-xs mt-1">เลื่อนวันก่อนหน้า หรือแตะปฏิทิน (เช่น 24–25/5)</p>
         </div>
       ) : (
         <div

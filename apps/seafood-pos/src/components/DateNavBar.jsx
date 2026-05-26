@@ -10,17 +10,20 @@ export default function DateNavBar({
   dateKey,
   onDateChange,
   maxDateKey = dateKeyBangkok(),
+  minDateKey = null,
   subtitle = '',
 }) {
   const [showCalendar, setShowCalendar] = useState(false);
+  const canGoPrev = !minDateKey || dateKey > minDateKey;
 
   return (
     <>
       <div className="bg-white rounded-2xl p-3 flex items-center justify-between shadow-sm">
         <button
           type="button"
-          onClick={() => onDateChange(shiftDateKey(dateKey, -1))}
-          className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95"
+          onClick={() => canGoPrev && onDateChange(shiftDateKey(dateKey, -1))}
+          disabled={!canGoPrev}
+          className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 disabled:opacity-30"
           aria-label="วันก่อนหน้า"
         >
           <ChevronLeft size={20} />
@@ -49,8 +52,10 @@ export default function DateNavBar({
       </div>
       {showCalendar && (
         <CalendarPickerModal
+          key={dateKey}
           dateKey={dateKey}
           maxDateKey={maxDateKey}
+          minDateKey={minDateKey}
           onSelect={onDateChange}
           onClose={() => setShowCalendar(false)}
         />

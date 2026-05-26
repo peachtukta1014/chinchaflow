@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { dateKeyBangkok } from '../lib/date';
 
-export default function CalendarPickerModal({ dateKey, maxDateKey, onSelect, onClose }) {
+export default function CalendarPickerModal({
+  dateKey,
+  maxDateKey,
+  minDateKey = null,
+  onSelect,
+  onClose,
+}) {
   const max = maxDateKey || dateKeyBangkok();
+  const min = minDateKey || undefined;
   const [picked, setPicked] = useState(dateKey);
 
   return (
@@ -18,15 +25,20 @@ export default function CalendarPickerModal({ dateKey, maxDateKey, onSelect, onC
         <input
           type="date"
           value={picked}
+          min={min}
           max={max}
           onChange={(e) => setPicked(e.target.value)}
           className="w-full p-4 border border-slate-200 rounded-2xl text-lg font-bold text-slate-800"
         />
-        <p className="text-[10px] text-slate-400 mt-2">เลือกวันย้อนหลังเพื่อดูยอดขาย / บิล / รับเข้า</p>
+        <p className="text-[10px] text-slate-400 mt-2">
+          เลือกวันย้อนหลังเพื่อดูยอดขาย / บิล / รับเข้า / ประวัติบ่อ
+        </p>
         <button
           type="button"
           onClick={() => {
-            if (picked && picked <= max) onSelect(picked);
+            if (!picked || picked > max) return;
+            if (min && picked < min) return;
+            onSelect(picked);
             onClose();
           }}
           className="w-full mt-4 py-3 rounded-2xl bg-blue-600 text-white font-bold"

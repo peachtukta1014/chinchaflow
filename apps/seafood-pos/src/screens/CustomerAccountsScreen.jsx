@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { PAY } from '../constants';
-import { dateKeyBangkok, formatDateThaiShort } from '../lib/date';
+import { dateKeyBangkok, formatDateThaiShort, formatViewDateLabel } from '../lib/date';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
@@ -453,7 +453,11 @@ export default function CustomerAccountsScreen({
         {loading ? (
           <p className="text-center text-slate-400 py-8 text-sm">กำลังโหลด...</p>
         ) : sortedDaySales.length === 0 ? (
-          <p className="text-center text-slate-400 py-8 text-sm">ไม่มีบิลวันนี้</p>
+          <p className="text-center text-slate-400 py-8 text-sm">
+            ไม่มีบิล
+            {' '}
+            {formatViewDateLabel(viewDate)}
+          </p>
         ) : (
           <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
             {sortedDaySales.map((tx, i) => {
