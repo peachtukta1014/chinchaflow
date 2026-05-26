@@ -182,8 +182,8 @@ export default function LotExpensesPanel({
         note={pondNote}
         onAmount={setPondAmt}
         onNote={setPondNote}
-        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าน้ำมัน · ลูก · อื่นๆ ****"
-        notePlaceholder="เช่น จ้าง 600 น้ำมัน 400 ลูก 2 ก้อน"
+        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าน้ำมัน · ค่าลูกน้ำ · อื่นๆ ****"
+        notePlaceholder="เช่น จ้าง 600 น้ำมัน 400 ลูกน้ำ 2 ก้อน"
         accent="border-blue-200 bg-blue-50/80"
       />
 
@@ -194,8 +194,8 @@ export default function LotExpensesPanel({
         note={marketNote}
         onAmount={setMarketAmt}
         onNote={setMarketNote}
-        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ลูก · อื่นๆ ****"
-        notePlaceholder="เช่น จ้างแผง 500 ลูก 3 ก้อน"
+        noteHint="**** กรุณาระบุให้ชัดเจน จ่ายค่าจ้าง · ค่าลูกน้ำ · อื่นๆ ****"
+        notePlaceholder="เช่น จ้างแผง 500 ลูกน้ำ 3 ก้อน"
         accent="border-orange-200 bg-orange-50/80"
       />
 
