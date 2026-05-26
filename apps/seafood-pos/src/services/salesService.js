@@ -3,9 +3,10 @@ import { dateKeyBangkok } from '../lib/date';
 import { billAmount } from '../lib/salesAggregate';
 import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, sortSalesFifoAsc } from '../lib/saleFifo';
-import { fsGetDoc, fsListCollection, fsPatch, fsPost } from '../lib/firestoreRest';
+import { fsDelete, fsGetDoc, fsListCollection, fsPatch, fsPost } from '../lib/firestoreRest';
+import { normalizeBillItems } from '../lib/salesAggregate';
 import { incrementCustomerDebt } from './debtService';
-import { deductStockForSale, getEffectiveStock } from './stockService';
+import { deductStockForSale, getEffectiveStock, restoreStockForSale } from './stockService';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -171,6 +172,54 @@ export async function persistSaleBill({
       lastUpdated: now,
     }, remain));
   }
+}
+
+export function saleStockKg(sale) {
+  let liveKg = 0;
+  let deadKg = 0;
+  for (const item of normalizeBillItems(sale)) {
+    if (item.type === 'dead') deadKg += item.weightKg;
+    else liveKg += item.weightKg;
+  }
+  return { liveKg, deadKg };
+}
+
+/**
+ * ลบบิล (แอดมิน) — คืนหนี้ค้าง + คืนสต๊อก + เปิดออเดอร์ LINE กลับเป็นรอส่ง (ถ้ามี)
+ */
+export async function deleteSaleBill(sale, { stock, stockBatches = [], updateMainStock } = {}) {
+  if (!sale?.id) throw new Error('ไม่พบบิล');
+  if (!isFirebaseReady) throw new Error('Firebase ไม่พร้อม — ลบบิลไม่ได้');
+
+  const remain = parseFloat(sale.remainingAmount) || 0;
+  if (remain > 0) {
+    await incrementCustomerDebt(sale.customerId, {
+      customerId: sale.customerId,
+      customerName: sale.customerName || '',
+      zone: sale.zone || 'ทั่วไป',
+      lastBillNo: sale.billNo || sale.id,
+      lastUpdated: new Date().toISOString(),
+    }, -remain);
+  }
+
+  const { liveKg, deadKg } = saleStockKg(sale);
+  if ((liveKg > 0 || deadKg > 0) && typeof updateMainStock === 'function' && stock) {
+    await restoreStockForSale(stock, liveKg, deadKg, updateMainStock, stockBatches);
+  }
+
+  if (sale.lineOrderId) {
+    await fsPatch(`lineOrders/${sale.lineOrderId}`, {
+      status: 'pending',
+      salesId: '',
+      billNo: '',
+      completedAt: '',
+    });
+  }
+
+  await withTimeout(fsDelete(`sales/${sale.id}`));
+  const still = await fsGetDoc(`sales/${sale.id}`);
+  if (still) throw new Error('ลบบิลไม่สำเร็จ — ลองอีกครั้ง');
+  return { billNo: sale.billNo, liveKg, deadKg, debtReversed: remain };
 }
 
 /** แก้สถานะชำระบิลในภาพรวม — ปรับลูกหนี้ตามผลต่างค้างจ่าย */

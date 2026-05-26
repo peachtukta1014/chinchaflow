@@ -132,6 +132,38 @@ export async function deductStockForSale(stock, liveKg, deadKg, updateMainStock,
   );
 }
 
+/** คืนสต๊อกเมื่อลบบิล — คืนเข้าล็อตล่าสุดก่อน แล้วซิงก์ยอดรวม */
+export async function restoreStockForSale(stock, liveKg, deadKg, updateMainStock, batches = []) {
+  const cfg = normalizeStockValues(stock?.live ?? 0, stock?.dead ?? 0);
+  let nextLive = cfg.live + (parseFloat(liveKg) || 0);
+  let nextDead = cfg.dead + (parseFloat(deadKg) || 0);
+
+  if (batches.length > 0 && (liveKg > 0 || deadKg > 0)) {
+    const newest = [...sortBatchesFifoOrder(batches)].reverse()[0];
+    if (newest?.id) {
+      const remLive = parseFloat(newest.remainingLiveKg ?? newest.liveKg) || 0;
+      const remDead = parseFloat(newest.remainingDeadKg ?? newest.deadKg) || 0;
+      const patched = normalizeStockValues(remLive + liveKg, remDead + deadKg);
+      await fsPatch(`stockBatches/${newest.id}`, {
+        remainingLiveKg: patched.live,
+        remainingDeadKg: patched.dead,
+      });
+      const summed = sumStockFromBatches(
+        batches.map((b) => (b.id === newest.id
+          ? { ...b, remainingLiveKg: patched.live, remainingDeadKg: patched.dead }
+          : b)),
+      );
+      nextLive = Math.max(nextLive, summed.live);
+      nextDead = Math.max(nextDead, summed.dead);
+    }
+  }
+
+  return updateMainStock(
+    normalizeStockValues(nextLive, nextDead).live,
+    normalizeStockValues(nextLive, nextDead).dead,
+  );
+}
+
 export function normalizeStockValues(live, dead) {
   return {
     live: Math.max(0, parseFloat(Number(live).toFixed(3))),

@@ -203,7 +203,23 @@ export default function App() {
       <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} />
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
-        {activeTab === 'home'           && <Dashboard localBills={transactions} refreshKey={salesRefresh} active={activeTab === 'home'} />}
+        {activeTab === 'home'           && (
+          <Dashboard
+            localBills={transactions}
+            refreshKey={salesRefresh}
+            active={activeTab === 'home'}
+            isAdmin={isAdmin}
+            stock={stock}
+            stockBatches={stockBatches}
+            updateMainStock={updateMainStock}
+            onSaleDeleted={() => {
+              setSalesRefresh((n) => n + 1);
+              setStockRefresh((n) => n + 1);
+              fetchPendingLineOrderCount().then(setPendingOrders);
+            }}
+          />
+        )}
+
         {activeTab === 'pos'            && <POSMobile user={member} stock={stock} stockBatches={stockBatches} updateMainStock={updateMainStock} onSaveBill={b => { setTransactions(prev => [b, ...prev]); setSalesRefresh(n => n + 1); }} />}
         {activeTab === 'stock'          && (
           <InventoryScreen
@@ -215,7 +231,20 @@ export default function App() {
           />
         )}
         {activeTab === 'members'        && <MembersScreen isAdmin={isAdmin} />}
-        {activeTab === 'accounts'        && <CustomerAccountsScreen refreshKey={salesRefresh} />}
+        {activeTab === 'accounts'        && (
+          <CustomerAccountsScreen
+            refreshKey={salesRefresh}
+            isAdmin={isAdmin}
+            stock={stock}
+            stockBatches={stockBatches}
+            updateMainStock={updateMainStock}
+            onSaleDeleted={() => {
+              setSalesRefresh((n) => n + 1);
+              setStockRefresh((n) => n + 1);
+              fetchPendingLineOrderCount().then(setPendingOrders);
+            }}
+          />
+        )}
         {activeTab === 'orders'         && (
           <LineOrdersScreen
             user={member}

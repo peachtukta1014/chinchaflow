@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { FileImage } from 'lucide-react';
+import { FileImage, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQuerySales } from '../lib/firestoreRest';
@@ -11,7 +11,7 @@ import {
   mergeSalesDocs,
 } from '../lib/salesAggregate';
 import { PAY } from '../constants';
-import { updateSalePayment } from '../services/salesService';
+import { deleteSaleBill, updateSalePayment } from '../services/salesService';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
 
@@ -19,6 +19,11 @@ export default function Dashboard({
   localBills = [],
   refreshKey = 0,
   active = true,
+  isAdmin = false,
+  stock = null,
+  stockBatches = [],
+  updateMainStock,
+  onSaleDeleted,
 }) {
   const [viewDate, setViewDate] = useState(() => dateKeyBangkok());
   const [firestoreSales, setFirestoreSales] = useState([]);
@@ -26,6 +31,7 @@ export default function Dashboard({
   const [salesLoadError, setSalesLoadError] = useState(false);
   const [salesRetry, setSalesRetry] = useState(0);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
 
   const loadSalesRest = useCallback(async () => {
@@ -101,6 +107,27 @@ export default function Dashboard({
       setSalesRetry((c) => c + 1);
     } finally {
       setPayUpdatingId(null);
+    }
+  };
+
+  const handleDeleteSale = async (tx) => {
+    if (!isAdmin || !tx.id || deleteBusyId) return;
+    const label = `${tx.billNo || tx.id} · ${tx.customerName} · ฿${billAmount(tx).toLocaleString()}`;
+    if (!window.confirm(
+      `ลบบิลนี้ออกจากระบบ?\n\n${label}\n\n` +
+        '· คืนยอดค้าง (ถ้ามี)\n· คืนสต๊อกกุ้ง\n· ออเดอร์ LINE กลับเป็นรอส่ง (ถ้ามี)\n\nกู้คืนไม่ได้',
+    )) return;
+    setDeleteBusyId(tx.id);
+    try {
+      await deleteSaleBill(tx, { stock, stockBatches, updateMainStock });
+      setFirestoreSales((prev) => prev.filter((b) => b.id !== tx.id));
+      onSaleDeleted?.();
+      alert('✅ ลบบิลแล้ว — บันทึกใหม่ได้ที่ออเดอร์ LINE หรือขายของ');
+    } catch (e) {
+      alert(e?.message || 'ลบบิลไม่สำเร็จ');
+      setSalesRetry((c) => c + 1);
+    } finally {
+      setDeleteBusyId(null);
     }
   };
 
@@ -194,6 +221,7 @@ export default function Dashboard({
           <div className="space-y-3">
             {sortedSales.map((tx, i) => {
               const busy = payUpdatingId === tx.id;
+              const deleting = deleteBusyId === tx.id;
               const pt = PAY.find((p) => p.id === tx.paymentType);
               return (
                 <div key={tx.id || i} className="border border-slate-100 rounded-xl p-3">
@@ -227,23 +255,37 @@ export default function Dashboard({
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setBillSheet({
-                      bill: tx,
-                      customer: {
-                        name: tx.customerName,
-                        zone: tx.zone,
-                        phone: tx.phone,
-                        lineUserId: tx.customerLineUserId || '',
-                      },
-                      staffName: tx.recordedBy,
-                    })}
-                    className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1"
-                  >
-                    <FileImage size={14} />
-                    ดูภาพบิล / แชร์ LINE
-                  </button>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBillSheet({
+                        bill: tx,
+                        customer: {
+                          name: tx.customerName,
+                          zone: tx.zone,
+                          phone: tx.phone,
+                          lineUserId: tx.customerLineUserId || tx.lineUserId || '',
+                        },
+                        staffName: tx.recordedBy,
+                      })}
+                      className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1"
+                    >
+                      <FileImage size={14} />
+                      ดูภาพบิล / แชร์ LINE
+                    </button>
+                    {isAdmin && tx.id && (
+                      <button
+                        type="button"
+                        disabled={deleting || busy}
+                        onClick={() => handleDeleteSale(tx)}
+                        className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+                        title="ลบบิล (แอดมิน)"
+                      >
+                        <Trash2 size={14} />
+                        {deleting ? '…' : 'ลบ'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

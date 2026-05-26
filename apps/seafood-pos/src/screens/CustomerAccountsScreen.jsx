@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { PAY } from '../constants';
@@ -12,6 +13,7 @@ import { billAmount } from '../lib/salesAggregate';
 import {
   applyFifoCustomerPayment,
   clearCustomerDebtAll,
+  deleteSaleBill,
   updateSalePayment,
 } from '../services/salesService';
 
@@ -210,7 +212,14 @@ function CustomerFifoPanel({
   );
 }
 
-export default function CustomerAccountsScreen({ refreshKey = 0 }) {
+export default function CustomerAccountsScreen({
+  refreshKey = 0,
+  isAdmin = false,
+  stock = null,
+  stockBatches = [],
+  updateMainStock,
+  onSaleDeleted,
+}) {
   const [viewDate, setViewDate] = useState(() => dateKeyBangkok());
   const [customerDebts, setCustomerDebts] = useState([]);
   const [allSales, setAllSales] = useState([]);
@@ -218,6 +227,7 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState(null);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
 
   const loadDebtsRest = useCallback(async () => {
@@ -324,6 +334,26 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
     }
   };
 
+  const handleDeleteSale = async (tx) => {
+    if (!isAdmin || !tx.id || deleteBusyId) return;
+    const label = `${tx.billNo || tx.id} · ${tx.customerName} · ฿${billAmount(tx).toLocaleString()}`;
+    if (!window.confirm(
+      `ลบบิลนี้ออกจากระบบ?\n\n${label}\n\n` +
+        '· คืนยอดค้าง (ถ้ามี)\n· คืนสต๊อกกุ้ง\n· ออเดอร์ LINE กลับเป็นรอส่ง (ถ้ามี)\n\nกู้คืนไม่ได้',
+    )) return;
+    setDeleteBusyId(tx.id);
+    try {
+      await deleteSaleBill(tx, { stock, stockBatches, updateMainStock });
+      await refreshAll();
+      onSaleDeleted?.();
+      alert('✅ ลบบิลแล้ว — บันทึกใหม่ได้ที่ออเดอร์ LINE หรือขายของ');
+    } catch (e) {
+      alert(e?.message || 'ลบบิลไม่สำเร็จ');
+    } finally {
+      setDeleteBusyId(null);
+    }
+  };
+
   const debtByKey = useMemo(() => {
     const m = new Map();
     customerDebts.forEach((d) => m.set(d.id, d));
@@ -407,6 +437,7 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
           <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
             {sortedDaySales.map((tx, i) => {
               const busy = payUpdatingId === tx.id;
+              const deleting = deleteBusyId === tx.id;
               const pt = PAY.find((p) => p.id === tx.paymentType);
               const itemCount = tx.items?.length ?? 0;
               return (
@@ -448,22 +479,36 @@ export default function CustomerAccountsScreen({ refreshKey = 0 }) {
                       </button>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setBillSheet({
-                      bill: tx,
-                      customer: {
-                        name: tx.customerName,
-                        zone: tx.zone,
-                        phone: tx.phone,
-                        lineUserId: tx.customerLineUserId || '',
-                      },
-                      staffName: tx.recordedBy,
-                    })}
-                    className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
-                  >
-                    ดูภาพบิล / แชร์ LINE
-                  </button>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBillSheet({
+                        bill: tx,
+                        customer: {
+                          name: tx.customerName,
+                          zone: tx.zone,
+                          phone: tx.phone,
+                          lineUserId: tx.customerLineUserId || tx.lineUserId || '',
+                        },
+                        staffName: tx.recordedBy,
+                      })}
+                      className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
+                    >
+                      ดูภาพบิล / แชร์ LINE
+                    </button>
+                    {isAdmin && tx.id && (
+                      <button
+                        type="button"
+                        disabled={deleting || busy}
+                        onClick={() => handleDeleteSale(tx)}
+                        className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+                        title="ลบบิล (แอดมิน)"
+                      >
+                        <Trash2 size={14} />
+                        {deleting ? '…' : 'ลบ'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
