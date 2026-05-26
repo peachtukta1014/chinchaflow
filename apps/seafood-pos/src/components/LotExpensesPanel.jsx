@@ -12,15 +12,12 @@ function fmtBaht(n) {
   return `฿${Math.round(parseFloat(n) || 0).toLocaleString()}`;
 }
 
-function ExpenseBlock({ title, hint, amount, note, onAmount, onNote, accent }) {
+function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, noteHint, notePlaceholder, accent }) {
   return (
     <div className={`rounded-2xl border p-4 space-y-3 ${accent}`}>
+      {title && <p className="text-xs font-bold text-slate-800">{title}</p>}
       <div>
-        <p className="text-xs font-bold text-slate-800">{title}</p>
-        <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{hint}</p>
-      </div>
-      <div>
-        <label className="text-[10px] font-bold text-slate-500 mb-1 block">ยอด (฿)</label>
+        <label className="text-xs font-bold text-slate-700 mb-1 block">{amountLabel}</label>
         <input
           type="number"
           min="0"
@@ -32,12 +29,15 @@ function ExpenseBlock({ title, hint, amount, note, onAmount, onNote, accent }) {
         />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-500 mb-1 block">หมายเหตุ</label>
+        <label className="text-xs font-bold text-slate-700 mb-1 block">หมายเหตุ</label>
+        {noteHint && (
+          <p className="text-[10px] text-slate-500 mb-1.5 leading-relaxed">{noteHint}</p>
+        )}
         <input
           type="text"
           value={note}
           onChange={(e) => onNote(e.target.value)}
-          placeholder="เช่น ลูกแผง 3 ก้อน · น้ำมันรถส่งกุ้งเป็น"
+          placeholder={notePlaceholder}
           className="w-full p-3 bg-white rounded-xl text-sm text-slate-800 outline-none border border-slate-100"
         />
       </div>
@@ -174,23 +174,27 @@ export default function LotExpensesPanel({
       </div>
 
       <ExpenseBlock
-        title="แผงตลาด — ฝั่งน้อง (ขายกุ้งตาย)"
-        hint="ลูกน้ำแข็งแผง ค่าแรงน้อง จ่ายที่ตลาด ฯลฯ · ใส่หมายเหตุให้แม่ดูบัญชีรู้"
-        amount={marketAmt}
-        note={marketNote}
-        onAmount={setMarketAmt}
-        onNote={setMarketNote}
-        accent="border-orange-200 bg-orange-50/80"
-      />
-
-      <ExpenseBlock
         title="บ่อ / ส่งของเป็น"
-        hint="น้ำมันรถส่งกุ้งเป็น ลูกส่งของเป็น จ้างลูกฝั่งบ่อ ฯลฯ · แยกจากแผงตลาด"
+        amountLabel="จ่ายรายวันกุ้งเป็น (฿)"
         amount={pondAmt}
         note={pondNote}
         onAmount={setPondAmt}
         onNote={setPondNote}
+        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวัน · ค่าน้ำมันรถ · ลูกส่งของเป็น"
+        notePlaceholder="เช่น น้ำมันรถ 400 · จ้างส่งของ 600 · ลูก 2 ก้อน"
         accent="border-blue-200 bg-blue-50/80"
+      />
+
+      <ExpenseBlock
+        title="ตลาดนัด — ฝั่งน้องขายกุ้งตาย"
+        amountLabel="จ่ายรายวันกุ้งตาย (ตลาดนัด) (฿)"
+        amount={marketAmt}
+        note={marketNote}
+        onAmount={setMarketAmt}
+        onNote={setMarketNote}
+        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวันน้องแผง · ลูกน้ำแข็งแผง"
+        notePlaceholder="เช่น จ้างน้องแผง 500 · ลูก 3 ก้อน"
+        accent="border-orange-200 bg-orange-50/80"
       />
 
       <div className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center">
