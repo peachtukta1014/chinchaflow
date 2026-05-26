@@ -7,6 +7,10 @@ export function lineBillPaymentNote(paymentType) {
   return '';
 }
 
+/** ประโยคขอบคุณบนบิลที่ชำระครบแล้ว */
+export const BILL_PAID_THANK_YOU_MESSAGE =
+  'ขอบคุณที่ไว้วางใจและอุดหนุน โกอ้วน คลังซีฟู้ด — ยินดีให้บริการท่านเสมอ';
+
 /** ยอดค้างที่ต้องแสดงบนบิล */
 export function billUnpaidAmount(bill) {
   const total = parseFloat(bill?.total) || 0;
