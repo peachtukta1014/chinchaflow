@@ -1,3 +1,5 @@
+import { saleDateKeyFromBill } from './date.js';
+
 /** แปลงยอดเงินให้เป็นตัวเลขเสมอ (กัน NaN บน Dashboard) */
 export function billAmount(bill) {
   return parseFloat(bill?.total) || 0;
@@ -59,7 +61,5 @@ export function mergeSalesDocs(cloud = [], local = []) {
 }
 
 export function billMatchesDateKey(bill, dateKey) {
-  if (bill.dateKey === dateKey) return true;
-  const created = typeof bill.createdAt === 'string' ? bill.createdAt : '';
-  return created.startsWith(dateKey);
+  return saleDateKeyFromBill(bill) === dateKey;
 }

@@ -2,6 +2,7 @@
  * Firestore REST — ใช้ Bearer token จาก Firebase Auth (pattern เดียวกับ chincha-tea)
  */
 import { auth } from '../firebase';
+import { dateKeysBetween, saleDateKeyFromBill } from './date.js';
 import { sortSalesFifoAsc } from './saleFifo.js';
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
@@ -305,20 +306,24 @@ function sortSalesDesc(docs) {
 }
 
 function saleMatchesDateKey(doc, dateKey) {
-  if (doc.dateKey === dateKey) return true;
-  const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
-  return created.startsWith(dateKey);
+  return saleDateKeyFromBill(doc) === dateKey;
 }
 
-function saleDateKeyOf(doc) {
-  if (doc.dateKey) return doc.dateKey;
-  const created = typeof doc.createdAt === 'string' ? doc.createdAt : '';
-  return created.slice(0, 10);
+function mergeUniqueSales(docs) {
+  const seen = new Set();
+  const out = [];
+  for (const d of docs) {
+    const id = d.id || d.billNo;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(d);
+  }
+  return out;
 }
 
 /** โหลดบิลขายตามวัน — ไม่ดึงทั้ง collection */
 export async function fsQuerySales(dateKey) {
-  const docs = await fsRunQuery({
+  const queried = await fsRunQuery({
     from: [{ collectionId: 'sales' }],
     where: {
       fieldFilter: {
@@ -329,32 +334,31 @@ export async function fsQuerySales(dateKey) {
     },
     limit: 200,
   });
-  if (docs.length > 0) return sortSalesDesc(docs);
 
-  // fallback เล็ก — กรณี index ยังไม่พร้อม (ไม่โหลดบิลทั้งหมด 300+)
-  const recent = await fsListCollection('sales', 80);
-  const matched = sortSalesDesc(recent.filter((d) => saleMatchesDateKey(d, dateKey)));
-  if (matched.length > 0) return matched;
-  return docs;
+  const recent = await fsListCollection('sales', 400);
+  const matched = recent.filter((d) => saleMatchesDateKey(d, dateKey));
+  return sortSalesDesc(mergeUniqueSales([...queried, ...matched]));
 }
 
-/** บิลขายช่วงวัน (สรุปล็อต) — query รายวัน ไม่ดึง sales ทั้งก้อน */
+/** บิลขายช่วงวัน (สรุปล็อต) — query รายวัน + fallback รวมบิลจาก list */
 export async function fsQuerySalesBetween(startKey, endKey) {
   if (!startKey || !endKey || startKey > endKey) return [];
-  const keys = dateKeysBetween(startKey, endKey, 60);
-  if (keys.length === 0) return [];
-  const chunks = await Promise.all(keys.map((dk) => fsQuerySales(dk)));
-  const seen = new Set();
-  const merged = [];
-  for (const docs of chunks) {
-    for (const d of docs) {
-      const id = d.id || d.billNo;
-      if (id && seen.has(id)) continue;
-      if (id) seen.add(id);
-      merged.push(d);
-    }
+
+  const keys = dateKeysBetween(startKey, endKey, 120);
+  let merged = [];
+  for (const dk of keys) {
+    const docs = await fsQuerySales(dk);
+    merged = mergeUniqueSales([...merged, ...docs]);
   }
-  return sortSalesDesc(merged);
+  if (merged.length > 0) return sortSalesDesc(merged);
+
+  const all = await fsListCollection('sales', 500);
+  return sortSalesDesc(
+    all.filter((d) => {
+      const dk = saleDateKeyFromBill(d);
+      return dk && dk >= startKey && dk <= endKey;
+    }),
+  );
 }
 
 /** ประวัติปรับสต๊อก (ย้ายบ่อ / เสียหาย / ชั่งปิด) */

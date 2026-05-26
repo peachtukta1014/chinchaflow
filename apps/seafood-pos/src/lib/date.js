@@ -16,6 +16,17 @@ export function shiftDateKey(dateKey, deltaDays) {
   return dateKeyBangkok(d);
 }
 
+/** วันที่บิล/เอกสาร — ใช้ dateKey ก่อน แล้วค่อยแปลง createdAt เป็นเวลาไทย */
+export function saleDateKeyFromBill(bill) {
+  const dk = bill?.dateKey;
+  if (dk && /^\d{4}-\d{2}-\d{2}$/.test(String(dk))) return dk;
+  const raw = bill?.createdAt || bill?.timestamp || '';
+  if (!raw) return '';
+  const d = raw instanceof Date ? raw : new Date(raw);
+  if (Number.isNaN(d.getTime())) return '';
+  return dateKeyBangkok(d);
+}
+
 export function formatDateThaiShort(dateKey) {
   const [y, mo, d] = dateKey.split('-').map((x) => parseInt(x, 10));
   if (!y || !mo || !d) return dateKey;

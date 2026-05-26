@@ -1,3 +1,4 @@
+import { saleDateKeyFromBill } from './date.js';
 import { receiveDateKeyOf, groupBatchesByReceiveDay } from './stockBatchUtils';
 import { aggregateDailySales } from './salesAggregate';
 
@@ -79,8 +80,8 @@ export function computeLotReport({
   const avgCostPerKg = receivedTotalKg > 0 ? totalCost / receivedTotalKg : 0;
 
   const periodSales = sales.filter((s) => {
-    const dk = s.dateKey || String(s.createdAt || '').slice(0, 10);
-    return dk >= lotDateKey && dk <= endDateKey;
+    const dk = saleDateKeyFromBill(s);
+    return dk && dk >= lotDateKey && dk <= endDateKey;
   });
   const salesAgg = aggregateDailySales(periodSales);
   const soldLiveKg = salesAgg.liveKg;

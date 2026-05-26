@@ -40,6 +40,7 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   const [loading, setLoading] = useState(false);
   const [countedLive, setCountedLive] = useState('');
   const [countedDead, setCountedDead] = useState('');
+  const [salesLoadNote, setSalesLoadNote] = useState('');
 
   useEffect(() => {
     if (lotDays.some((d) => d.dateKey === lotDateKey)) return;
@@ -55,6 +56,11 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         fsListStockAdjustments(200),
       ]);
       setSales(saleRows);
+      setSalesLoadNote(
+        saleRows.length > 0
+          ? ''
+          : 'ไม่พบบิลในช่วงนี้ — ลองกด「สรุปถึงวันนี้」หรือดูแท็บภาพรวม/บัญชีว่ามียอดวันไหน',
+      );
       setAdjustments(
         adjRows.filter((a) => {
           const dk = a.dateKey || String(a.createdAt || '').slice(0, 10);
@@ -64,6 +70,7 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     } catch (e) {
       console.warn('LotReportPanel load', e);
       setSales([]);
+      setSalesLoadNote('โหลดบิลไม่สำเร็จ — ลองกดรีเฟรชสรุปล็อต');
       setAdjustments([]);
     } finally {
       setLoading(false);
@@ -116,7 +123,11 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           <label className="text-xs font-bold text-slate-500 mb-1 block">ล็อต (วันรับกุ้งเข้า)</label>
           <select
             value={lotDateKey}
-            onChange={(e) => setLotDateKey(e.target.value)}
+            onChange={(e) => {
+              const dk = e.target.value;
+              setLotDateKey(dk);
+              if (endDateKey < dk) setEndDateKey(todayKey);
+            }}
             className="w-full p-3 bg-slate-50 rounded-2xl font-bold text-slate-800 outline-none"
           >
             {lotDays.length === 0 ? (
@@ -143,6 +154,18 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           minDateKey={lotDateKey}
           subtitle={`สรุปถึง ${formatViewDateLabel(endDateKey)} (จากวันรับล็อต)`}
         />
+
+        {endDateKey < todayKey && (
+          <button
+            type="button"
+            onClick={() => setEndDateKey(todayKey)}
+            className="w-full py-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200"
+          >
+            รวมยอดขายถึงวันนี้ (
+            {formatViewDateLabel(todayKey)}
+            )
+          </button>
+        )}
 
         <button
           type="button"
@@ -206,6 +229,11 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           sub={fmtKg(report.soldDeadKg)}
         />
         <MetricRow label="น้ำหนักขายรวม" value={fmtKg(report.soldTotalKg)} />
+        {report.billCount === 0 && salesLoadNote && (
+          <p className="text-[11px] text-amber-800 bg-amber-50 rounded-xl p-3 mt-2 leading-relaxed">
+            {salesLoadNote}
+          </p>
+        )}
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
