@@ -2,7 +2,8 @@ import React from 'react';
 import { BILL_QR_URL } from '../lib/billTemplateConfig';
 
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
-/** @typedef {{ holder: string; bank: string; accountNo: string; unpaidAmount: number; promptPhone?: string }} CreditTransferInfo */
+/** @typedef {{ label?: string; holder: string; bank: string; accountNo: string }} TransferAccount */
+/** @typedef {{ unpaidAmount: number; accounts: TransferAccount[] }} CreditTransferInfo */
 /** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; paymentNote?: string; creditTransfer?: CreditTransferInfo | null }} BillData */
 
 export const FIXED_TEMPLATE_ROWS = [
@@ -145,14 +146,27 @@ export default function BillTemplate({ data }) {
           <p className="text-red-600 font-black text-xl leading-tight">
             ค้างชำระ ฿{formatCellMoney(data.creditTransfer.unpaidAmount)}
           </p>
-          <p className="text-red-700 font-bold text-sm mt-2">โอนชำระเข้าบัญชี</p>
-          <p className="text-red-800 font-black text-base mt-0.5">{data.creditTransfer.holder}</p>
-          <p className="text-red-700 font-bold text-sm">
-            {data.creditTransfer.bank}
-            {data.creditTransfer.accountNo
-              ? ` · ${data.creditTransfer.accountNo}`
-              : ` · สอบถามเลขบัญชี ${data.creditTransfer.promptPhone || 'ร้าน'}`}
-          </p>
+          <p className="text-red-700 font-bold text-sm mt-2">โอนชำระเข้าบัญชี (เลือกบัญชีใดบัญชีหนึ่ง)</p>
+          <div className="mt-2 space-y-2 text-left">
+            {(data.creditTransfer.accounts || []).map((acc) => (
+              <div
+                key={`${acc.label}-${acc.accountNo}`}
+                className="bg-white/80 rounded-md px-2.5 py-1.5 border border-red-200"
+              >
+                {acc.label && (
+                  <p className="text-red-800 font-black text-sm">{acc.label}</p>
+                )}
+                <p className="text-red-700 font-bold text-xs">
+                  {acc.holder}
+                  {' · '}
+                  {acc.bank}
+                </p>
+                <p className="text-red-600 font-black text-base tracking-wide mt-0.5">
+                  {acc.accountNo}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="mb-3" />

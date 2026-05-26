@@ -1,4 +1,4 @@
-import { BILL_TRANSFER_INFO } from './billTemplateConfig.js';
+import { BILL_TRANSFER_ACCOUNTS } from './billTemplateConfig.js';
 
 /** ข้อความบนบิลเมื่อชำระแล้ว (สด/โอน) */
 export function lineBillPaymentNote(paymentType) {
@@ -20,12 +20,8 @@ export function billUnpaidAmount(bill) {
 export function billCreditTransferBlock(bill) {
   const unpaid = billUnpaidAmount(bill);
   if (unpaid <= 0) return null;
-  const { holder, bank, accountNo, promptPhone } = BILL_TRANSFER_INFO;
   return {
     unpaidAmount: unpaid,
-    holder,
-    bank,
-    accountNo: String(accountNo || '').trim(),
-    promptPhone,
+    accounts: BILL_TRANSFER_ACCOUNTS,
   };
 }
