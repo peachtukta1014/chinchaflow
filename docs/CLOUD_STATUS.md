@@ -4,7 +4,7 @@
 | แอพ | URL |
 |-----|-----|
 | ชินชา | https://chincha-tea.web.app |
-| กุ้ง | https://chincha-shrimp.web.app |
+| กุ้ง | https://ko-seafood.top |
 
 ## Cloud Functions — ต้องเขียวใน Console
 Console → Build → Functions → ควรเห็น:

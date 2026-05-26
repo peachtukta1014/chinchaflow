@@ -9,7 +9,7 @@
 ```mermaid
 flowchart TB
   subgraph clients["แอปฝั่งลูกค้า (React + Vite PWA)"]
-    Shrimp["seafood-pos\nchincha-shrimp.web.app"]
+    Shrimp["seafood-pos\nko-seafood.top"]
     Tea["chincha-tea\nchincha-tea.web.app"]
   end
 
@@ -170,7 +170,7 @@ flowchart TB
 URL ที่ใช้งาน (จาก `docs/CLOUD_STATUS.md`):
 
 - ชา: https://chincha-tea.web.app
-- กุ้ง: https://chincha-shrimp.web.app
+- กุ้ง: https://ko-seafood.top
 
 ---
 

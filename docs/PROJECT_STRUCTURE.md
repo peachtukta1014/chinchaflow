@@ -4,7 +4,7 @@ Monorepo **chincha-business-os** — Firebase project `chincha-eeed6`
 
 | แอป | URL Hosting | ผู้ใช้หลัก |
 |-----|-------------|-----------|
-| กุ้ง `seafood-pos` | https://chincha-shrimp.web.app | พนักงานร้านกุ้ง |
+| กุ้ง `seafood-pos` | https://ko-seafood.top | พนักงานร้านกุ้ง |
 | ชา `chincha-tea` | https://chincha-tea.web.app | พนักงานร้านชา + แอดมิน |
 | LINE `webhook-core` | Cloud Functions | บอท LINE กุ้ง/ชา |
 
