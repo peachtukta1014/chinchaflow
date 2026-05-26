@@ -46,7 +46,7 @@ function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, note
 }
 
 /**
- * รายจ่ายล็อต — แยกแผงตลาด (น้อง) กับบ่อ/ส่งของเป็น · ค่ารถอยู่ตอนรับเข้า
+ * รายจ่ายล็อต — แยกแผงตลาดกับบ่อ/ส่งของเป็น · ค่ารถอยู่ตอนรับเข้า
  */
 export default function LotExpensesPanel({
   stockBatches = [],
@@ -137,7 +137,7 @@ export default function LotExpensesPanel({
         <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
           <h2 className="font-black text-slate-800 text-lg">รายจ่ายล็อต</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            แยกฝั่งแผงตลาด (น้องขายตาย) กับฝั่งบ่อ/ส่งของเป็น · ค่ารถใส่ตอนรับเข้า
+            แยกฝั่งแผงตลาด (ขายกุ้งตาย) กับฝั่งบ่อ/ส่งของเป็น · ค่ารถใส่ตอนรับเข้า
             แอปไม่เดาให้ — ใส่ยอดและหมายเหตุเอง
           </p>
           <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับเข้า)</label>
@@ -186,14 +186,14 @@ export default function LotExpensesPanel({
       />
 
       <ExpenseBlock
-        title="ตลาดนัด — ฝั่งน้องขายกุ้งตาย"
+        title="ตลาดนัด — ขายกุ้งตาย"
         amountLabel="จ่ายรายวันกุ้งตาย (ตลาดนัด) (฿)"
         amount={marketAmt}
         note={marketNote}
         onAmount={setMarketAmt}
         onNote={setMarketNote}
-        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวันน้องแผง · ลูกน้ำแข็งแผง"
-        notePlaceholder="เช่น จ้างน้องแผง 500 · ลูก 3 ก้อน"
+        noteHint="ระบุรายละเอียด เช่น ค่าจ้างรายวันแผง · ลูกน้ำแข็งแผง"
+        notePlaceholder="เช่น จ้างพนักงานแผง 500 · ลูก 3 ก้อน"
         accent="border-orange-200 bg-orange-50/80"
       />
 
