@@ -18,6 +18,40 @@ function tomorrowBKK() {
   return dateKeyBangkok(d);
 }
 
+/** 18:00 เมื่อวาน → 14:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
+const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 14 };
+
+/**
+ * วันส่งเริ่มต้นเมื่อลูกค้าไม่พิมพ์ วันนี้/พรุ่งนี้/วันที่
+ * ช่วง 18:00 เมื่อวาน – 14:00 วันนี้ → วันนี้ · หลัง 14:00 → พรุ่งนี้
+ */
+function tomorrowFromDate(date = new Date()) {
+  const d = new Date(`${dateKeyBangkok(date)}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return dateKeyBangkok(d);
+}
+
+function defaultDeliveryDateKeyBangkok(now = new Date()) {
+  const todayKey = dateKeyBangkok(now);
+  const yesterdayKey = shiftDateKeyByDays(todayKey, -1);
+
+  const startMs = new Date(
+    `${yesterdayKey}T${pad2(DEFAULT_TODAY_WINDOW.startHour)}:00:00+07:00`,
+  ).getTime();
+  const endMs = new Date(
+    `${todayKey}T${pad2(DEFAULT_TODAY_WINDOW.endHour)}:00:00+07:00`,
+  ).getTime();
+
+  if (now.getTime() >= startMs && now.getTime() < endMs) return todayKey;
+  return tomorrowFromDate(now);
+}
+
+function shiftDateKeyByDays(dateKey, delta) {
+  const d = new Date(`${dateKey}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return dateKeyBangkok(d);
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -123,6 +157,8 @@ function formatDateThai(dateKey) {
 module.exports = {
   todayBKK,
   tomorrowBKK,
+  defaultDeliveryDateKeyBangkok,
+  DEFAULT_TODAY_WINDOW,
   parseDeliveryDateFromText,
   formatDateThai,
   dateKeyFromParts,

@@ -6,7 +6,11 @@ const {
   simpleToOrderItem,
   pendingToItems,
 } = require('./parseLineOrder');
-const { parseDeliveryDateFromText, todayBKK, formatDateThai } = require('./parseDeliveryDate');
+const {
+  parseDeliveryDateFromText,
+  defaultDeliveryDateKeyBangkok,
+  formatDateThai,
+} = require('./parseDeliveryDate');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
 const { linkLineUserToCustomers } = require('./shrimpLinePush');
 
@@ -72,7 +76,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const { dateKey: parsedDate, textWithoutDate } = parseDeliveryDateFromText(text);
   const body = (textWithoutDate || text).trim();
 
-  let deliveryDate = parsedDate || session.deliveryDate || todayBKK();
+  let deliveryDate = parsedDate || session.deliveryDate || defaultDeliveryDateKeyBangkok();
 
   if (parsedDate) {
     await setLineOrderSession(db, session.id, { deliveryDate: parsedDate }, ts);

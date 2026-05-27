@@ -92,14 +92,30 @@ try {
 }
 
 try {
-  const { inferDeliveryDateKey } = await import('../src/lib/lineOrderDate.js');
+  const { orderDeliveryDateKey, defaultDeliveryDateKeyBangkok } = await import('../src/lib/lineOrderDate.js');
   const { dateKeyBangkok, tomorrowDateKeyBangkok } = await import('../src/lib/date.js');
   const t = dateKeyBangkok();
   const tm = tomorrowDateKeyBangkok();
   assert(
-    inferDeliveryDateKey({ rawText: 'พรุ่งนี้ ร้านเฟิร์ส กุ้งกลาง 2 โล', deliveryDate: t })
-      === tm,
-    'LINE order พรุ่งนี้ → วันพรุ่งนี้ (แม้ deliveryDate เก่าผิด)',
+    orderDeliveryDateKey({ rawText: 'พรุ่งนี้ ร้านเฟิร์ส กุ้งกลาง 2 โล', deliveryDate: t })
+      === t,
+    'ใช้ deliveryDate ใน Firestore เป็นหลัก (ไม่แปลงพรุ่งนี้ซ้ำ)',
+  );
+  assert(
+    orderDeliveryDateKey({ rawText: 'พรุ่งนี้ ร้านเฟิร์ส กุ้งกลาง 2 โล' }) === tm,
+    'ไม่มี deliveryDate → อ่านจากข้อความ',
+  );
+  assert(
+    defaultDeliveryDateKeyBangkok(new Date('2026-03-24T10:00:00+07:00')) === '2026-03-24',
+    '10:00 ไม่ระบุวัน = ส่งวันนี้',
+  );
+  assert(
+    defaultDeliveryDateKeyBangkok(new Date('2026-03-24T15:00:00+07:00')) === '2026-03-25',
+    '15:00 ไม่ระบุวัน = ส่งพรุ่งนี้',
+  );
+  assert(
+    defaultDeliveryDateKeyBangkok(new Date('2026-03-23T19:00:00+07:00')) === '2026-03-24',
+    '19:00 เมื่อวาน ไม่ระบุวัน = ส่งวันนี้ (รอบเช้า)',
   );
 } catch (e) {
   fail('lineOrderDate infer', e);

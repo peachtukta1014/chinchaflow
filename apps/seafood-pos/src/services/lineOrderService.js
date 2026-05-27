@@ -1,6 +1,6 @@
 import { DEFAULT_PAYMENT_TYPE } from '../constants/payments';
-import { dateKeyBangkok } from '../lib/date';
-import { fsPatch, fsPost, fsQueryLineOrders } from '../lib/firestoreRest';
+import { dateKeyBangkok, shiftDateKey } from '../lib/date';
+import { fsListCollection, fsPatch, fsPost, fsQueryLineOrders } from '../lib/firestoreRest';
 import { actualQtyOf } from '../lib/lineOrderToSale';
 import { incrementCustomerDebt } from './debtService';
 
@@ -11,15 +11,58 @@ function withTimeout(promise, ms = 12000) {
   ]);
 }
 
-export async function fetchLineOrdersFromToday() {
+/**
+ * โหลดออเดอร์รอส่งบนบอร์ด — รวมค้างส่ง (วันส่งผ่านมา) และวันนี้/ข้างหน้า
+ * กันออเดอร์เมื่อคืนที่ deliveryDate คลาดไม่หายจากรายการ
+ */
+export async function fetchLineOrdersForBoard() {
   const today = dateKeyBangkok();
-  return fsQueryLineOrders({ minDeliveryDate: today });
+  const minDate = shiftDateKey(today, -7);
+  const maxDate = shiftDateKey(today, 14);
+
+  let rows = [];
+  try {
+    rows = await fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: minDate });
+  } catch (e) {
+    console.warn('fsQueryLineOrders', e);
+  }
+
+  if (rows.length === 0) {
+    try {
+      rows = await fsListCollection('lineOrders', 200);
+    } catch (e) {
+      console.warn('fsListCollection lineOrders', e);
+      return [];
+    }
+  }
+
+  return rows
+    .filter((o) => {
+      if (o.status === 'cancelled' || o.status === 'done') return false;
+      if (o.status !== 'pending') return false;
+      const dk = String(o.deliveryDate || '');
+      if (!dk || !/^\d{4}-\d{2}-\d{2}$/.test(dk)) return true;
+      return dk >= minDate && dk <= maxDate;
+    })
+    .sort((a, b) => {
+      const da = a.deliveryDate || '';
+      const db = b.deliveryDate || '';
+      if (da !== db) return da.localeCompare(db);
+      const ta = a.createdAt || '';
+      const tb = b.createdAt || '';
+      return String(tb).localeCompare(String(ta));
+    });
+}
+
+/** @deprecated */
+export async function fetchLineOrdersFromToday() {
+  return fetchLineOrdersForBoard();
 }
 
 export async function fetchPendingLineOrderCount() {
   const today = dateKeyBangkok();
-  const rows = await fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: today });
-  return rows.length;
+  const rows = await fetchLineOrdersForBoard();
+  return rows.filter((o) => (o.deliveryDate || '') <= today).length;
 }
 
 export async function cancelLineOrder(orderId, cancelledBy) {
@@ -42,7 +85,9 @@ export async function saveLineOrderDelivery({
   recordedBy,
 }) {
   const billNo = `LINE-${Date.now().toString().slice(-8)}`;
-  const dateKey = dateKeyBangkok();
+  const dateKey = order.deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(order.deliveryDate)
+    ? order.deliveryDate
+    : dateKeyBangkok();
   const now = new Date().toISOString();
   const fulfilledItems = cartItems.map((i) => ({
     productId: i.productId,

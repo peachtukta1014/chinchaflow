@@ -2,14 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { dateKeyBangkok } from '../lib/date';
 import { formatDateThaiShort } from '../lib/date';
-import { deliveryDateLabel, inferDeliveryDateKey } from '../lib/lineOrderDate';
+import { deliveryDateLabel, orderDeliveryDateKey } from '../lib/lineOrderDate';
 import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
 import { mergeCustomerLists, subscribeCustomers } from '../services/customerService';
 import {
   cancelLineOrder as cancelLineOrderService,
-  fetchLineOrdersFromToday,
+  fetchLineOrdersForBoard,
   markLineOrderDoneOnly,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
@@ -52,7 +52,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
   }, []);
 
   const loadOrders = useCallback(async () => {
-    const rows = await fetchLineOrdersFromToday();
+    const rows = await fetchLineOrdersForBoard();
     setOrders(rows);
     setLoading(false);
   }, []);
@@ -143,30 +143,118 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
   const ordersWithDate = useMemo(
     () => orders.map((o) => ({
       ...o,
-      effectiveDeliveryDate: inferDeliveryDateKey(o),
+      effectiveDeliveryDate: orderDeliveryDateKey(o),
     })),
     [orders],
   );
 
-  const upcoming = ordersWithDate.filter(
-    (o) => o.effectiveDeliveryDate >= today && o.status !== 'cancelled',
-  );
   const isPending = (o) => o.status === 'pending';
-  const grouped = upcoming.reduce((acc, o) => {
+  const overdue = ordersWithDate.filter((o) => o.effectiveDeliveryDate < today);
+  const dueToday = ordersWithDate.filter((o) => o.effectiveDeliveryDate === today);
+  const upcoming = ordersWithDate.filter((o) => o.effectiveDeliveryDate > today);
+  const groupedFuture = upcoming.reduce((acc, o) => {
     const k = o.effectiveDeliveryDate || 'ไม่ระบุ';
     (acc[k] = acc[k] || []).push(o);
     return acc;
   }, {});
 
+  const renderOrderCard = (o) => (
+    <div
+      key={o.id}
+      className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex-1 min-w-0 mr-2">
+          {o.customerName && (
+            <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
+          )}
+          <p className="text-[10px] font-bold text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-lg mt-0.5">
+            ส่ง
+            {' '}
+            {deliveryDateLabel(o.effectiveDeliveryDate)}
+            {' '}
+            (
+            {formatDateThaiShort(o.effectiveDeliveryDate)}
+            )
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
+          <p className="text-xs text-slate-500 mt-0.5 truncate italic">&quot;{o.rawText}&quot;</p>
+        </div>
+        {o.status === 'done' ? (
+          <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
+            ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
+          </span>
+        ) : isPending(o) ? (
+          <div className="flex flex-col gap-1 shrink-0">
+            <button
+              type="button"
+              disabled={savingId === o.id}
+              onClick={() => openDeliverySheet(o)}
+              className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 disabled:opacity-50"
+            >
+              {savingId === o.id ? 'กำลังบันทึก...' : 'ส่งเรียบร้อย'}
+            </button>
+            <button
+              type="button"
+              disabled={savingId === o.id}
+              onClick={() => cancelLineOrder(o)}
+              className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-lg active:scale-95 disabled:opacity-50"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div className="space-y-1">
+        {(o.items || []).map((item, i) => (
+          <div key={i} className="flex items-center gap-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+            {item.customerName && item.customerName !== o.customerName && (
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{item.customerName}</span>
+            )}
+            <p className="text-sm font-bold text-slate-700">{item.product}</p>
+            <p className="text-sm text-slate-500 ml-auto">{item.qty} {item.unit}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderSection = (title, items, accent = '') => {
+    if (items.length === 0) return null;
+    const pendingCount = items.filter(isPending).length;
+    return (
+      <div key={title}>
+        <p className={`text-xs font-bold mb-2 uppercase tracking-wide ${accent || 'text-slate-500'}`}>
+          {title}
+          {' '}
+          ·
+          {' '}
+          {items.length}
+          {' '}
+          ออเดอร์
+          {pendingCount > 0 && (
+            <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              {pendingCount}
+              {' '}
+              รอ
+            </span>
+          )}
+        </p>
+        <div className="space-y-2">{items.map(renderOrderCard)}</div>
+      </div>
+    );
+  };
+
   if (loading) return <div className="flex items-center justify-center h-40 text-slate-400 text-sm">กำลังโหลด...</div>;
 
-  if (upcoming.length === 0) return (
+  if (ordersWithDate.length === 0) return (
     <div className="flex flex-col items-center justify-center h-60 text-slate-300">
       <Bell size={48} strokeWidth={1} className="mb-3" />
       <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
       <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
       <p className="text-[10px] mt-2 text-slate-400 text-center px-6 leading-relaxed">
-        ตัวอย่าง LINE: &quot;25/5/69&quot; แล้ว &quot;ปุ้ย 2&quot; + &quot;กลาง&quot; · หรือ &quot;กุ้งใหญ่ 2 กก&quot;
+        ไม่ระบุวันส่ง: 18:00 เมื่อวาน–14:00 วันนี้ = ส่งวันนี้ · หลัง 14:00 = พรุ่งนี้
       </p>
     </div>
   );
@@ -188,89 +276,13 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
         />
       )}
     <div className="px-4 pt-4 pb-6 space-y-5">
-      {Object.entries(grouped).sort().map(([date, items]) => (
-        <div key={date}>
-          <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-            📅 ส่ง
-            {deliveryDateLabel(date)}
-            {' '}
-            (
-            {formatDateThaiShort(date)}
-            )
-            {' '}
-            ·
-            {' '}
-            {items.length}
-            {' '}
-            ออเดอร์
-            {items.filter(isPending).length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                {items.filter(isPending).length} รอ
-              </span>
-            )}
-          </p>
-          <div className="space-y-2">
-            {items.map(o => (
-              <div key={o.id}
-                className={`bg-white rounded-2xl p-4 shadow-sm border transition-all ${o.status === 'done' ? 'border-green-200 opacity-50' : 'border-slate-200'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1 min-w-0 mr-2">
-                    {o.customerName && (
-                      <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
-                    )}
-                    <p className="text-[10px] font-bold text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-lg mt-0.5">
-                      ส่ง
-                      {' '}
-                      {deliveryDateLabel(o.effectiveDeliveryDate)}
-                      {' '}
-                      (
-                      {formatDateThaiShort(o.effectiveDeliveryDate)}
-                      )
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
-                  </div>
-                  {o.status === 'done' ? (
-                    <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-1 rounded-xl shrink-0">
-                      ✓ ส่งแล้ว{o.billNo ? ` · ${o.billNo}` : ''}
-                    </span>
-                  ) : isPending(o) ? (
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <button
-                        type="button"
-                        disabled={savingId === o.id}
-                        onClick={() => openDeliverySheet(o)}
-                        className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 disabled:opacity-50"
-                      >
-                        {savingId === o.id ? 'กำลังบันทึก...' : 'ส่งเรียบร้อย'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={savingId === o.id}
-                        onClick={() => cancelLineOrder(o)}
-                        className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-lg active:scale-95 disabled:opacity-50"
-                      >
-                        ยกเลิก
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="space-y-1">
-                  {(o.items || []).map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 flex-wrap">
-                      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                      {item.customerName && item.customerName !== o.customerName && (
-                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{item.customerName}</span>
-                      )}
-                      <p className="text-sm font-bold text-slate-700">{item.product}</p>
-                      <p className="text-sm text-slate-500 ml-auto">{item.qty} {item.unit}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {renderSection('⚠️ ค้างส่ง (เลยวันแล้ว)', overdue, 'text-red-600')}
+      {renderSection(`🚚 ส่งวันนี้ · ${deliveryDateLabel(today)}`, dueToday, 'text-emerald-700')}
+      {Object.entries(groupedFuture).sort().map(([date, items]) => (
+        renderSection(
+          `📅 ส่ง ${deliveryDateLabel(date)} (${formatDateThaiShort(date)})`,
+          items,
+        )
       ))}
     </div>
     </>
