@@ -132,6 +132,29 @@ try {
 }
 
 try {
+  const {
+    formStateToLines,
+    normalizeExpenseLinesFromDoc,
+    sumExpenseLines,
+  } = await import('../src/lib/lotExpenseLines.js');
+  const rows = formStateToLines([
+    { label: 'ค่าน้ำมันมาสด้า', amount: '1000' },
+    { label: 'พีช กินข้าว', amount: '200' },
+  ]);
+  assert(rows.length === 2 && sumExpenseLines(rows) === 1200, 'รายจ่ายย่อยรวมยอด');
+  const legacy = normalizeExpenseLinesFromDoc(null, 1200, 'ค่าน้ำมัน 1,000 · ข้าว 200');
+  assert(legacy.length === 1 && legacy[0].amount === 1200, 'ข้อมูลเก่ายอดเดียว → 1 แถว');
+  const fromLines = normalizeExpenseLinesFromDoc(
+    [{ label: 'น้ำมัน', amount: 1000 }, { label: 'ข้าว', amount: 200 }],
+    999,
+    '',
+  );
+  assert(fromLines.length === 2 && sumExpenseLines(fromLines) === 1200, 'pondLines รวมจากแถว');
+} catch (e) {
+  fail('lotExpenseLines', e);
+}
+
+try {
   const totalCost = 30000;
   const receivedKg = 100;
   const soldDeadKg = 5;

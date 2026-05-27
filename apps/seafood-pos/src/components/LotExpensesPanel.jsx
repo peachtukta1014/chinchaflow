@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { dateKeyBangkok } from '../lib/date';
+import {
+  emptyExpenseLineForm,
+  formStateToLines,
+  linesToFormState,
+  sumExpenseLines,
+} from '../lib/lotExpenseLines';
 import { formatReceiveDayLabel, groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
 import {
   fetchLotExpenses,
@@ -12,46 +18,97 @@ function fmtBaht(n) {
   return `฿${Math.round(parseFloat(n) || 0).toLocaleString()}`;
 }
 
-function ExpenseBlock({ title, amountLabel, amount, note, onAmount, onNote, noteItems, notePlaceholder, accent }) {
+function ExpenseLineBlock({
+  title,
+  accent,
+  hintItems,
+  formLines,
+  onChangeLines,
+}) {
+  const subtotal = useMemo(
+    () => sumExpenseLines(formStateToLines(formLines)),
+    [formLines],
+  );
+
+  const updateRow = (index, field, value) => {
+    onChangeLines(
+      formLines.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const addRow = () => {
+    onChangeLines([...formLines, emptyExpenseLineForm()]);
+  };
+
+  const removeRow = (index) => {
+    if (formLines.length <= 1) {
+      onChangeLines([emptyExpenseLineForm()]);
+      return;
+    }
+    onChangeLines(formLines.filter((_, i) => i !== index));
+  };
+
   return (
     <div className={`rounded-2xl border p-4 space-y-3 ${accent}`}>
       {title && <p className="text-xs font-bold text-slate-800">{title}</p>}
-      <div>
-        <label className="text-xs font-bold text-slate-700 mb-1 block">{amountLabel}</label>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          value={amount}
-          onChange={(e) => onAmount(e.target.value)}
-          placeholder="0"
-          className="w-full p-3 bg-white rounded-xl font-bold text-slate-800 outline-none border border-slate-100"
-        />
+      <div className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 space-y-1">
+        <p>เพิ่มทีละรายการ — ระบบรวมยอดให้ (คล้ายบิล)</p>
+        <ul className="list-disc list-inside font-semibold text-amber-800 space-y-0.5">
+          {hintItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </div>
-      <div>
-        <label className="text-xs font-bold text-slate-700 mb-1 block">หมายเหตุ</label>
-        <div className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-2 space-y-1.5">
-          <p>กรุณาระบุในช่องหมายเหตุให้ชัด เช่น</p>
-          <ul className="list-disc list-inside font-semibold text-amber-800 space-y-0.5">
-            {noteItems.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => onNote(e.target.value)}
-          placeholder={notePlaceholder}
-          className="w-full p-3 bg-white rounded-xl text-sm text-slate-800 outline-none border border-slate-100 placeholder:text-slate-400"
-        />
+
+      <div className="space-y-2">
+        {formLines.map((row, index) => (
+          <div key={`line-${index}`} className="flex gap-2 items-start">
+            <input
+              type="text"
+              value={row.label}
+              onChange={(e) => updateRow(index, 'label', e.target.value)}
+              placeholder="รายการ เช่น ค่าน้ำมัน"
+              className="flex-1 min-w-0 p-3 bg-white rounded-xl text-sm text-slate-800 outline-none border border-slate-100 placeholder:text-slate-400"
+            />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={row.amount}
+              onChange={(e) => updateRow(index, 'amount', e.target.value)}
+              placeholder="฿"
+              className="w-24 shrink-0 p-3 bg-white rounded-xl font-bold text-slate-800 outline-none border border-slate-100 text-right"
+            />
+            <button
+              type="button"
+              onClick={() => removeRow(index)}
+              className="shrink-0 w-10 h-12 rounded-xl text-red-500 font-bold text-lg bg-white border border-slate-100"
+              aria-label="ลบรายการ"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={addRow}
+        className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-600 text-xs font-bold"
+      >
+        + เพิ่มรายการ
+      </button>
+
+      <div className="flex justify-between items-center pt-1 border-t border-slate-200/80">
+        <span className="text-xs font-bold text-slate-600">รวมสายนี้</span>
+        <span className="text-lg font-black text-slate-800">{fmtBaht(subtotal)}</span>
       </div>
     </div>
   );
 }
 
 /**
- * รายจ่ายล็อต — แยกแผงตลาดกับบ่อ/ส่งของเป็น · ค่ารถอยู่ตอนรับเข้า
+ * รายจ่ายล็อต — แยกแผงตลาดกับบ่อ/ส่งของเป็น · รายการย่อยรวมยอด
  */
 export default function LotExpensesPanel({
   stockBatches = [],
@@ -68,10 +125,8 @@ export default function LotExpensesPanel({
   const lotDateKey = controlledLotKey ?? internalLotKey;
   const setLotDateKey = onLotDateKeyChange ?? setInternalLotKey;
 
-  const [marketAmt, setMarketAmt] = useState('');
-  const [marketNote, setMarketNote] = useState('');
-  const [pondAmt, setPondAmt] = useState('');
-  const [pondNote, setPondNote] = useState('');
+  const [marketForm, setMarketForm] = useState([emptyExpenseLineForm()]);
+  const [pondForm, setPondForm] = useState([emptyExpenseLineForm()]);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -80,22 +135,37 @@ export default function LotExpensesPanel({
     if (defaultLotKey) setLotDateKey(defaultLotKey);
   }, [lotDays, lotDateKey, defaultLotKey, setLotDateKey]);
 
+  const expensesFromForm = useMemo(() => {
+    const marketLines = formStateToLines(marketForm);
+    const pondLines = formStateToLines(pondForm);
+    const marketExpenses = sumExpenseLines(marketLines);
+    const pondExpenses = sumExpenseLines(pondLines);
+    return {
+      marketExpenses,
+      marketLines,
+      marketNote: marketLines.map((l) => `${l.label} ${l.amount}`).join(' \u00b7 '),
+      pondExpenses,
+      pondLines,
+      pondNote: pondLines.map((l) => `${l.label} ${l.amount}`).join(' \u00b7 '),
+    };
+  }, [marketForm, pondForm]);
+
   const load = useCallback(async () => {
     if (!lotDateKey) return;
     setLoaded(false);
     try {
       const exp = await fetchLotExpenses(lotDateKey);
-      setMarketAmt(exp.marketExpenses > 0 ? String(exp.marketExpenses) : '');
-      setMarketNote(exp.marketNote);
-      setPondAmt(exp.pondExpenses > 0 ? String(exp.pondExpenses) : '');
-      setPondNote(exp.pondNote);
+      setMarketForm(linesToFormState(exp.marketLines));
+      setPondForm(linesToFormState(exp.pondLines));
       onExpensesChange?.(exp);
     } catch (e) {
       console.warn('fetchLotExpenses', e);
       onExpensesChange?.({
         marketExpenses: 0,
+        marketLines: [],
         marketNote: '',
         pondExpenses: 0,
+        pondLines: [],
         pondNote: '',
       });
     } finally {
@@ -107,27 +177,25 @@ export default function LotExpensesPanel({
     load();
   }, [load]);
 
-  const expenses = useMemo(() => ({
-    marketExpenses: parseFloat(marketAmt) || 0,
-    marketNote: marketNote.trim(),
-    pondExpenses: parseFloat(pondAmt) || 0,
-    pondNote: pondNote.trim(),
-  }), [marketAmt, marketNote, pondAmt, pondNote]);
-
   useEffect(() => {
     if (!loaded) return;
-    onExpensesChange?.(expenses);
-  }, [expenses, loaded, onExpensesChange]);
+    onExpensesChange?.(expensesFromForm);
+  }, [expensesFromForm, loaded, onExpensesChange]);
 
   const transportTotal = sumLotTransport(stockBatches, lotDateKey);
-  const miscTotal = totalMiscExpenses(expenses);
+  const miscTotal = totalMiscExpenses(expensesFromForm);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveLotExpenses(lotDateKey, expenses);
+      const saved = await saveLotExpenses(lotDateKey, {
+        marketLines: formStateToLines(marketForm),
+        pondLines: formStateToLines(pondForm),
+      });
       alert('✅ บันทึกรายจ่ายล็อตแล้ว');
-      await load();
+      setMarketForm(linesToFormState(saved.marketLines));
+      setPondForm(linesToFormState(saved.pondLines));
+      onExpensesChange?.(saved);
     } catch (e) {
       console.error(e);
       alert(e?.message || 'บันทึกไม่สำเร็จ');
@@ -142,8 +210,7 @@ export default function LotExpensesPanel({
         <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
           <h2 className="font-black text-slate-800 text-lg">รายจ่ายล็อต</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            แยกฝั่งแผงตลาด (ขายกุ้งตาย) กับฝั่งบ่อ/ส่งของเป็น · ค่ารถใส่ตอนรับเข้า
-            แอปไม่เดาให้ — ใส่ยอดและหมายเหตุเอง
+            แยกฝั่งแผงตลาด (ขายกุ้งตาย) กับฝั่งบ่อ/ส่งของเป็น · กรอกทีละรายการแล้วรวมยอด · ค่ารถใส่ตอนรับเข้า
           </p>
           <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับเข้า)</label>
           <select
@@ -178,27 +245,19 @@ export default function LotExpensesPanel({
         </p>
       </div>
 
-      <ExpenseBlock
+      <ExpenseLineBlock
         title="บ่อ / ส่งของเป็น"
-        amountLabel="จ่ายรายวันกุ้งเป็น (฿)"
-        amount={pondAmt}
-        note={pondNote}
-        onAmount={setPondAmt}
-        onNote={setPondNote}
-        noteItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
-        notePlaceholder="เช่น จ้าง 600 · น้ำมัน 400 · น้ำแข็ง 2 ก้อน 80"
+        hintItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+        formLines={pondForm}
+        onChangeLines={setPondForm}
         accent="border-blue-200 bg-blue-50/80"
       />
 
-      <ExpenseBlock
+      <ExpenseLineBlock
         title="ตลาดนัด — ขายกุ้งตาย"
-        amountLabel="จ่ายรายวันกุ้งตาย (ตลาดนัด) (฿)"
-        amount={marketAmt}
-        note={marketNote}
-        onAmount={setMarketAmt}
-        onNote={setMarketNote}
-        noteItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
-        notePlaceholder="เช่น จ้างแผง 500 · น้ำแข็ง 3 ก้อน 120"
+        hintItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+        formLines={marketForm}
+        onChangeLines={setMarketForm}
         accent="border-orange-200 bg-orange-50/80"
       />
 

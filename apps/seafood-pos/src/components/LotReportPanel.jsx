@@ -37,6 +37,7 @@ function LineSummaryCard({
   headerCls,
   report,
   line,
+  expenseLineItems,
 }) {
   const isLive = line === 'live';
   const receivedKg = isLive ? report.receivedLive : report.receivedDead;
@@ -49,6 +50,7 @@ function LineSummaryCard({
   const soldKg = isLive ? report.soldLiveKg : report.soldDeadKg;
   const cogs = isLive ? report.liveCogs : report.deadCogs;
   const expenses = isLive ? report.pondExpensesBaht : report.marketExpensesBaht;
+  const expenseLines = isLive ? expenseLineItems?.pondLines : expenseLineItems?.marketLines;
   const expenseLabel = isLive ? 'รายจ่ายบ่อ / ส่งเป็น' : 'รายจ่ายแผงตลาด';
   const lineNet = isLive ? report.liveLineNetBaht : report.deadLineNetBaht;
   const gross = isLive ? report.liveGrossProfit : report.deadGrossProfit;
@@ -100,7 +102,19 @@ function LineSummaryCard({
         accent={gross >= 0 ? 'text-emerald-700' : 'text-red-600'}
       />
       {expenses > 0 && (
-        <StepRow label={expenseLabel} value={fmtBaht(expenses)} sign="minus" />
+        <>
+          <StepRow label={expenseLabel} value={fmtBaht(expenses)} sign="minus" />
+          {expenseLines?.length > 0 && (
+            <ul className="text-[10px] text-slate-500 pl-1 mb-1 space-y-0.5">
+              {expenseLines.map((row) => (
+                <li key={`${row.label}-${row.amount}`} className="flex justify-between gap-2">
+                  <span className="truncate">{row.label}</span>
+                  <span className="shrink-0 tabular-nums">{fmtBaht(row.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
       {weightLossKg > 0.01 && (
         <StepRow
@@ -136,8 +150,10 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   const [lotExpenses, setLotExpenses] = useState({
     marketExpenses: 0,
     marketNote: '',
+    marketLines: [],
     pondExpenses: 0,
     pondNote: '',
+    pondLines: [],
   });
 
   useEffect(() => {
@@ -324,6 +340,7 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         headerCls="text-blue-700"
         report={report}
         line="live"
+        expenseLineItems={lotExpenses}
       />
 
       <LineSummaryCard
@@ -333,6 +350,7 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         headerCls="text-orange-700"
         report={report}
         line="dead"
+        expenseLineItems={lotExpenses}
       />
 
       <div className="bg-red-50 border-2 border-red-100 p-5 rounded-[2rem] shadow-sm">
