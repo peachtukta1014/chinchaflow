@@ -204,6 +204,12 @@ export async function fsQueryToppings() {
   return fsListCollection('toppings');
 }
 
+/** ข้อความจาก LINE webhook ชา — ใช้ดึง Group / User ID ล่าสุด */
+export async function fsQueryLineMessages(limit = 80) {
+  const docs = await fsListCollection('line_messages', limit);
+  return sortByCreatedAtDesc(docs).slice(0, limit);
+}
+
 export async function fsGetConfig(docId = 'teaLine') {
   return fsGetDoc(`config/${docId}`);
 }
