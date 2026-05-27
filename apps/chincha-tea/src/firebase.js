@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -16,6 +16,30 @@ export const firebaseConfig = {
 const required = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'];
 export const fbReady = required.every((k) => Boolean(firebaseConfig[k]));
 
-export const fbApp = fbReady ? initializeApp(firebaseConfig, 'chincha-tea') : null;
+/** ใช้ default app — กัน getIdToken() หา [DEFAULT] ไม่เจอ (เคยตั้งชื่อ chincha-tea) */
+function initFirebaseApp() {
+  if (!fbReady) return null;
+  const apps = getApps();
+  if (apps.length > 0) return apps[0];
+  return initializeApp(firebaseConfig);
+}
+
+export const fbApp = initFirebaseApp();
 export const auth = fbApp ? getAuth(fbApp) : null;
 export const storage = fbApp ? getStorage(fbApp) : null;
+
+/** ID token สำหรับเรียก Cloud Functions (ส่งสรุป LINE) */
+export async function getFirebaseIdToken(forceRefresh = false) {
+  if (!auth?.currentUser) {
+    throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  }
+  try {
+    return await auth.currentUser.getIdToken(forceRefresh);
+  } catch (e) {
+    const msg = e?.message || '';
+    if (msg.includes('default Firebase app')) {
+      throw new Error('เซสชันหมดอายุ — ออกจากระบบแล้วเข้าใหม่');
+    }
+    throw e;
+  }
+}
