@@ -12,10 +12,12 @@ const crypto = require('crypto');
 const {
   todayBKK,
   buildSummaryForDate,
+  buildRestockPurchaseForDate,
   dispatchTeaSummary,
   lineReply,
   HELP_TEXT,
   SUMMARY_CMD,
+  RESTOCK_PURCHASE_CMD,
   HELP_CMD,
   getTeaLineConfig,
 } = require('./teaDailySummary');
@@ -168,6 +170,19 @@ exports.lineWebhookTea = functions
           } catch (err) {
             console.error('tea summary reply', err);
             await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (RESTOCK_PURCHASE_CMD.test(text)) {
+          const dateKey = todayBKK();
+          try {
+            const msg = await buildRestockPurchaseForDate(db(), dateKey);
+            await lineReply(replyToken, msg, token);
+          } catch (err) {
+            console.error('tea restock reply', err);
+            await lineReply(replyToken, '⚠️ ดึงรายการซื้อเข้าร้านไม่สำเร็จ ลองใหม่ครับ', token);
           }
           await completeLineEvent(db(), event);
           continue;

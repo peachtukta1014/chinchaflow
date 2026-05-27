@@ -662,7 +662,7 @@ function LineSettingsSection({ t }) {
           onChange={(e) => setForm({ ...form, autoSummaryHour: parseInt(e.target.value, 10) || 22 })}
         />
         <p className="text-[10px] text-stone-400">เวลาไทย (Bangkok)</p>
-        <p className="text-[10px] text-stone-400">{t('lineCommands')}: สรุป · สรุปวันนี้ · ปิดวัน · help</p>
+        <p className="text-[10px] text-stone-400">{t('lineCommands')}: {t('lineCommandsHint')}</p>
       </div>
       <button type="button" disabled={saving} onClick={save} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>
         {saving ? '⏳' : t('save')}

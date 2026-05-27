@@ -52,15 +52,16 @@ function aggregateDay({ orders, expenses, restocks }) {
   const restockPurchasedLines = [];
   for (const req of restocks) {
     const bought = req.purchaseStatus === 'purchased' && Number(req.purchaseTotal) > 0;
+    const by = req.purchasedBy || req.createdBy || '';
     if (bought) {
       totalRestockPurchased += Math.round(Number(req.purchaseTotal));
       const names = (req.items || []).map((it) => it.name).filter(Boolean).join(', ') || 'รายการ';
-      restockPurchasedLines.push(`• ${names} ${formatMoney(req.purchaseTotal)}`);
+      restockPurchasedLines.push(`• ${names} ${formatMoney(req.purchaseTotal)}${by ? ` — ${by}` : ''}`);
     }
     for (const it of req.items || []) {
       const st = STATUS_LABEL[it.status] || it.status || '';
-      const price = bought ? '' : '';
-      restockLines.push(`• ${it.name} ×${it.qty || 1}${st ? ` (${st})` : ''}${price}`);
+      const boughtTag = bought ? ' (ซื้อแล้ว)' : '';
+      restockLines.push(`• ${it.name} ×${it.qty || 1}${st ? ` (${st})` : ''}${boughtTag}`);
     }
   }
   const net = totalSales - totalExpenses - totalRestockPurchased;
@@ -133,6 +134,47 @@ async function buildSummaryForDate(db, dateKey) {
   return formatSummaryMessage(dateKey, agg);
 }
 
+/** ข้อความเฉพาะรายการสั่งของ / ซื้อเข้าร้าน (คำสั่ง LINE แยกจากสรุปปิดวัน) */
+function formatRestockPurchaseMessage(dateKey, agg) {
+  const lines = [
+    '📦 ซื้อเข้าร้าน — ชินชา',
+    `📅 ${dateKey}`,
+    '',
+    `💰 ยอดซื้อแล้วรวม: ${formatMoney(agg.totalRestockPurchased)}`,
+  ];
+
+  if (agg.restockPurchasedLines.length) {
+    lines.push('', '🛒 บันทึกว่าซื้อแล้ว:');
+    lines.push(...agg.restockPurchasedLines.slice(0, 15));
+    if (agg.restockPurchasedLines.length > 15) {
+      lines.push(`   … และอีก ${agg.restockPurchasedLines.length - 15} ใบ`);
+    }
+  } else {
+    lines.push('', '🛒 (ยังไม่มีใบที่กด「ซื้อแล้ว」ในแอป)');
+  }
+
+  lines.push('');
+  lines.push('📋 รายการสั่งของวันนี้:');
+  if (agg.restockLines.length) {
+    lines.push(...agg.restockLines.slice(0, 25));
+    if (agg.restockLines.length > 25) lines.push(`   … และอีก ${agg.restockLines.length - 25} รายการ`);
+  } else {
+    lines.push('   (ยังไม่มีรายการสั่งของวันนี้)');
+  }
+
+  lines.push('');
+  lines.push('— บันทึกจากแอปชินชา (แท็บสั่งของ) —');
+
+  const text = lines.join('\n');
+  return text.length > 4800 ? `${text.slice(0, 4790)}…` : text;
+}
+
+async function buildRestockPurchaseForDate(db, dateKey) {
+  const data = await fetchDayData(db, dateKey);
+  const agg = aggregateDay(data);
+  return formatRestockPurchaseMessage(dateKey, agg);
+}
+
 async function linePush(to, text, token) {
   if (!token || !to) return false;
   try {
@@ -200,22 +242,27 @@ const HELP_TEXT = [
   'คำสั่ง:',
   '• สรุป / สรุปวันนี้ / ปิดวัน',
   '   → สรุปยอดขาย สด/โอน แก้ว ค่าใช้จ่าย สั่งของ',
+  '• ซื้อเข้าร้าน / ซื้อของ',
+  '   → รายการสั่งของวันนี้ + ยอดที่ซื้อแล้ว',
   '• help / ช่วยเหลือ',
   '',
   'สรุปอัตโนมัติตามเวลาที่แอดมินตั้งในแอป',
 ].join('\n');
 
 const SUMMARY_CMD = /^(สรุป|สรุปวันนี้|ปิดวัน|summary|daily|รายงาน)/i;
+const RESTOCK_PURCHASE_CMD = /^(ซื้อเข้าร้าน|ซื้อของเข้าร้าน|ซื้อของ|restock|buy[\s-]?in)/i;
 const HELP_CMD = /^(help|ช่วยเหลือ|คำสั่ง|menu)/i;
 
 module.exports = {
   todayBKK,
   getTeaLineConfig,
   buildSummaryForDate,
+  buildRestockPurchaseForDate,
   dispatchTeaSummary,
   lineReply,
   linePush,
   HELP_TEXT,
   SUMMARY_CMD,
+  RESTOCK_PURCHASE_CMD,
   HELP_CMD,
 };
