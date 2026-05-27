@@ -1,3 +1,5 @@
+import { cartItemDisplayName } from '../lib/displayNames';
+
 export default function CartSheet({
   open,
   onClose,
@@ -9,6 +11,8 @@ export default function CartSheet({
   saving,
   onSave,
   t,
+  lang = 'th',
+  menuItems = [],
 }) {
   if (!open) return null;
 
@@ -21,15 +25,20 @@ export default function CartSheet({
       >
         <p className="font-black mb-3">{t('items')}</p>
         <div className="space-y-2 max-h-56 overflow-y-auto mb-4">
-          {cart.map((item) => (
-            <div key={item.cartId} className="flex justify-between text-sm">
-              <span>{item.emoji} {item.nameSnapshot} ×{item.qty}</span>
-              <div className="flex gap-2 items-center">
+          {cart.map((item) => {
+            const { primary, sub } = cartItemDisplayName(item, lang, t, menuItems);
+            return (
+            <div key={item.cartId} className="flex justify-between text-sm gap-2">
+              <span className="min-w-0">
+                {item.emoji} {primary} ×{item.qty}
+                {sub ? <span className="block text-[10px] text-stone-400">{sub}</span> : null}
+              </span>
+              <div className="flex gap-2 items-center shrink-0">
                 <span className="font-black">฿{item.price * item.qty}</span>
                 <button type="button" onClick={() => removeCart(item.cartId)} className="text-red-400 font-black">×</button>
               </div>
             </div>
-          ))}
+          );})}
         </div>
         <div className="flex gap-2 mb-3">
           {[['cash', `💵 ${t('cash')}`], ['transfer', `📱 ${t('transfer')}`]].map(([v, label]) => (
