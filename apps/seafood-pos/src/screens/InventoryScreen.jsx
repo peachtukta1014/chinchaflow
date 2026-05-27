@@ -14,11 +14,9 @@ import {
 import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
 
-const LotReportPanel = lazy(() => import('../components/LotReportPanel'));
 const LotExpensesPanel = lazy(() => import('../components/LotExpensesPanel'));
-const StockCountPanel = lazy(() => import('../components/StockCountPanel'));
 
-function AdminPanelLoading() {
+function PanelLoading() {
   return (
     <div className="py-10 text-center text-slate-400 text-sm font-medium">กำลังโหลด...</div>
   );
@@ -45,12 +43,10 @@ export default function InventoryScreen({
   onReceived,
   onStockMoved,
   member,
-  isAdmin = false,
 }) {
   const todayKey = dateKeyBangkok();
   const [lotViewDate, setLotViewDate] = useState(todayKey);
   const [deadViewDate, setDeadViewDate] = useState(todayKey);
-  const [receiveViewDate, setReceiveViewDate] = useState(todayKey);
   const [tab, setTab] = useState('receive');
   const [rcvLive, setRcvLive] = useState('');
   const [rcvDead, setRcvDead] = useState('');
@@ -64,12 +60,6 @@ export default function InventoryScreen({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!isAdmin && (tab === 'lotReport' || tab === 'stockCount' || tab === 'expenses')) {
-      setTab('receive');
-    }
-  }, [isAdmin, tab]);
-
   const liveKg = parseFloat(rcvLive) || 0;
   const deadKg = parseFloat(rcvDead) || 0;
   const costPerKg = parseFloat(rcvCost) || 0;
@@ -82,27 +72,10 @@ export default function InventoryScreen({
     [stockBatches, todayKey],
   );
 
-  const receivesForDate = useMemo(
-    () =>
-      stockBatches
-        .filter((b) => receiveDateKeyOf(b) === receiveViewDate)
-        .sort(
-          (a, b) =>
-            new Date(a.purchaseDate || 0).getTime() - new Date(b.purchaseDate || 0).getTime(),
-        ),
-    [stockBatches, receiveViewDate],
-  );
-
-  const receiveCountForDate = useMemo(
-    () => countReceivesOnDate(stockBatches, receiveViewDate),
-    [stockBatches, receiveViewDate],
-  );
-
   useEffect(() => {
     onReceived?.();
   }, []);
 
-  const receiveDateBootstrapped = useRef(false);
   const lotDateBootstrapped = useRef(false);
 
   const pickLatestReceiveDateKey = useCallback(() => {
@@ -111,30 +84,6 @@ export default function InventoryScreen({
     )[0];
     return latest ? receiveDateKeyOf(latest) : todayKey;
   }, [stockBatches, todayKey]);
-
-  const handleReceiveViewDateChange = (dk) => {
-    setReceiveViewDate(dk);
-    setLotViewDate(dk);
-  };
-
-  const handleLotViewDateChange = (dk) => {
-    setLotViewDate(dk);
-    setReceiveViewDate(dk);
-  };
-
-  /** ครั้งแรกที่โหลดล็อต: ถ้าวันนี้ว่าง ให้ไปวันรับเข้าล่าสุด (เช่น 24–25/5) */
-  useEffect(() => {
-    if (tab !== 'receive' || stockBatches.length === 0 || receiveDateBootstrapped.current) return;
-    receiveDateBootstrapped.current = true;
-    if (countReceivesOnDate(stockBatches, todayKey) > 0) {
-      setReceiveViewDate(todayKey);
-      setLotViewDate(todayKey);
-      return;
-    }
-    const dk = pickLatestReceiveDateKey();
-    setReceiveViewDate(dk);
-    setLotViewDate(dk);
-  }, [tab, stockBatches, todayKey, pickLatestReceiveDateKey]);
 
   useEffect(() => {
     if (tab !== 'lots' || stockBatches.length === 0 || lotDateBootstrapped.current) return;
@@ -244,75 +193,36 @@ export default function InventoryScreen({
         <button
           type="button"
           onClick={() => setTab('receive')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}
+          className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'receive' ? 'bg-white text-blue-600' : 'text-slate-500'}`}
         >
           รับกุ้งเข้า
         </button>
         <button
           type="button"
-          onClick={() => setTab('lots')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}
+          onClick={() => setTab('dead')}
+          className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}
         >
-          ล็อตรับเข้า
+          กุ้งตายในบ่อ
         </button>
         <button
           type="button"
-          onClick={() => setTab('dead')}
-          className={`flex-1 py-3 font-bold text-xs rounded-xl ${tab === 'dead' ? 'bg-white text-red-600' : 'text-slate-500'}`}
+          onClick={() => setTab('expenses')}
+          className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'expenses' ? 'bg-white text-violet-600' : 'text-slate-500'}`}
         >
-          กุ้งตายบ่อ
+          รายจ่าย
         </button>
-        {isAdmin && (
-          <>
-            <button
-              type="button"
-              onClick={() => setTab('expenses')}
-              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'expenses' ? 'bg-white text-violet-600' : 'text-slate-500'}`}
-              title="รายจ่ายล็อต — แอดมิน"
-            >
-              รายจ่าย
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('lotReport')}
-              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'lotReport' ? 'bg-white text-purple-600' : 'text-slate-500'}`}
-              title="สรุปล็อต — แอดมินเท่านั้น"
-            >
-              สรุปล็อต
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('stockCount')}
-              className={`flex-1 min-w-[4.5rem] py-3 font-bold text-[10px] rounded-xl ${tab === 'stockCount' ? 'bg-white text-purple-700' : 'text-slate-500'}`}
-              title="ชั่งปิดสต๊อก — แอดมินเท่านั้น"
-            >
-              ชั่งปิด
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={() => setTab('lots')}
+          className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}
+        >
+          ล็อตกุ้ง
+        </button>
       </div>
 
-      {tab === 'expenses' && isAdmin && (
-        <Suspense fallback={<AdminPanelLoading />}>
+      {tab === 'expenses' && (
+        <Suspense fallback={<PanelLoading />}>
           <LotExpensesPanel stockBatches={stockBatches} standalone />
-        </Suspense>
-      )}
-
-      {tab === 'lotReport' && isAdmin && (
-        <Suspense fallback={<AdminPanelLoading />}>
-          <LotReportPanel stockBatches={stockBatches} active />
-        </Suspense>
-      )}
-
-      {tab === 'stockCount' && isAdmin && (
-        <Suspense fallback={<AdminPanelLoading />}>
-          <StockCountPanel
-            stock={stock}
-            stockBatches={stockBatches}
-            updateMainStock={updateMainStock}
-            member={member}
-            onDone={onStockMoved}
-          />
         </Suspense>
       )}
 
@@ -320,7 +230,7 @@ export default function InventoryScreen({
         <StockLotTimeline
           stockBatches={stockBatches}
           viewDate={lotViewDate}
-          onViewDateChange={handleLotViewDateChange}
+          onViewDateChange={setLotViewDate}
         />
       )}
 
@@ -328,99 +238,24 @@ export default function InventoryScreen({
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
           <h2 className="font-black text-slate-800 text-xl">บันทึกรายการรับเข้า</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            ล็อต = 1 วันรับรถ · เลื่อนวันดูย้อนหลัง (เช่น 24–25/5/69)
+            บันทึกลง
+            <strong> วันนี้</strong>
+            {' '}
+            (
+            {formatViewDateLabel(todayKey)}
+            )
+            {' '}
+            · ดูย้อนหลังที่แท็บ「ล็อตกุ้ง」
           </p>
-
-          <DateNavBar
-            dateKey={receiveViewDate}
-            onDateChange={handleReceiveViewDateChange}
-            subtitle={
-              receiveCountForDate > 0
-                ? `${receiveCountForDate} รายการ · ${formatViewDateLabel(receiveViewDate)}`
-                : 'ไม่มีรับเข้าวันนี้'
-            }
-          />
-
-          {receivesForDate.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-600">
-                รายการรับเข้า
-                {' '}
-                {formatViewDateLabel(receiveViewDate)}
-                {' '}
-                (
-                {receiveViewDate}
-                )
-              </p>
-              {receivesForDate.map((b, idx) => {
-                const live = parseFloat(b.liveKg) || 0;
-                const dead = parseFloat(b.deadKg) || 0;
-                const cost = parseFloat(b.totalCost) || 0;
-                const perKg = parseFloat(b.effectiveCostPerKg ?? b.costPerKg) || 0;
-                return (
-                  <div
-                    key={b.id || `rcv-${idx}`}
-                    className="rounded-xl bg-blue-50/80 border border-blue-100 p-3 text-xs"
-                  >
-                    <div className="flex justify-between gap-2 font-bold text-slate-800">
-                      <span>
-                        รายการที่ {idx + 1}
-                        {b.note ? ` · ${b.note}` : ''}
-                      </span>
-                      <span className="text-blue-700 shrink-0">฿{cost.toLocaleString()}</span>
-                    </div>
-                    <p className="text-slate-600 mt-1">
-                      สด {live.toFixed(2)} กก. · ตาย {dead.toFixed(2)} กก.
-                      {' · '}
-                      ฿{perKg.toFixed(2)}/กก.
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      คงเหลือในล็อต: เป็น{' '}
-                      {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(2)}
-                      {' '}
-                      · ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(2)} กก.
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : stockBatches.length === 0 ? (
-            <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl p-3 leading-relaxed">
-              ยังโหลดล็อตไม่สำเร็จ — กดรีเฟรชแอป (มุมขวาบน)
-            </p>
-          ) : (
-            <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl p-3 text-center">
-              ไม่มีรายการรับเข้าวัน
+          {todayReceiveCount > 0 && (
+            <p className="text-[11px] text-blue-700 bg-blue-50 rounded-xl px-3 py-2">
+              วันนี้มีรับเข้าแล้ว
               {' '}
-              {formatViewDateLabel(receiveViewDate)}
+              {todayReceiveCount}
               {' '}
-              — เลื่อนวันก่อนหน้า หรือดูแท็บ「ล็อตรับเข้า」
+              รายการ
             </p>
           )}
-
-          {receiveViewDate !== todayKey && (
-            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
-              กำลังดูย้อนหลัง — บันทึกรับเข้าใหม่จะลง
-              <strong> วันนี้</strong>
-              {' '}
-              (
-              {formatViewDateLabel(todayKey)}
-              )
-              เท่านั้น
-            </p>
-          )}
-
-          {receiveViewDate === todayKey && (
-            <>
-          <p className="text-xs font-bold text-slate-600 border-t border-slate-100 pt-4">
-            บันทึกรับเข้าใหม่ (วันนี้)
-            {todayReceiveCount > 0 && (
-              <span className="font-normal text-blue-600">
-                {' '}
-                · มีแล้ว {todayReceiveCount} รายการ
-              </span>
-            )}
-          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งสด (กก.)</label>
@@ -509,8 +344,6 @@ export default function InventoryScreen({
           >
             {saving ? 'กำลังบันทึก...' : 'บันทึกรายการรับเข้า'}
           </button>
-            </>
-          )}
         </div>
       )}
 

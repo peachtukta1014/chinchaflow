@@ -122,7 +122,7 @@ export default function StockCountPanel({
         </button>
       </div>
       <p className="text-[10px] text-slate-400 px-2 leading-relaxed">
-        ปิดรอบล็อตเฉพาะรถ → ใช้แท็บ「สรุปล็อต」 · ชั่งทั้งบ่อรวมทุกล็อต → ใช้หน้านี้
+        ปิดรอบล็อตเฉพาะรถ → แท็บบน「สรุป/ชั่งปิด」· ชั่งทั้งบ่อรวมทุกล็อต → ใช้หน้านี้
       </p>
     </div>
   );

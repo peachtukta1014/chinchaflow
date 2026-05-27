@@ -25,6 +25,7 @@ const LineOrdersScreen = lazy(() => import('./screens/LineOrdersScreen'));
 const CustomerAccountsScreen = lazy(() => import('./screens/CustomerAccountsScreen'));
 const AdminUsersScreen = lazy(() => import('./screens/AdminUsersScreen'));
 const ProductSettingsScreen = lazy(() => import('./screens/ProductSettingsScreen'));
+const LotCloseScreen = lazy(() => import('./screens/LotCloseScreen'));
 
 function TabLoading() {
   return (
@@ -198,8 +199,12 @@ export default function App() {
         </div>
         {/* Admin tabs row */}
         {isAdmin && (
-          <div className="px-4 pb-3 flex gap-2">
-            {[['admin-users','👥 สมาชิก'],['admin-products','⚙️ ตั้งค่าสินค้า']].map(([t,label]) => (
+          <div className="px-4 pb-3 flex flex-wrap gap-2">
+            {[
+              ['admin-users', '👥 สมาชิก'],
+              ['admin-products', '⚙️ ตั้งค่า'],
+              ['lot-close', '📊 สรุป/ชั่งปิด'],
+            ].map(([t, label]) => (
               <button key={t} onClick={() => setActiveTab(t)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab===t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
                 {label}
@@ -251,7 +256,6 @@ export default function App() {
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
               member={member}
-              isAdmin={isAdmin}
               onReceived={() => setStockRefresh((n) => n + 1)}
               onStockMoved={() => setStockRefresh((n) => n + 1)}
             />
@@ -303,6 +307,17 @@ export default function App() {
         {activeTab === 'admin-products' && (
           <Suspense fallback={<TabLoading />}>
             <ProductSettingsScreen />
+          </Suspense>
+        )}
+        {activeTab === 'lot-close' && isAdmin && (
+          <Suspense fallback={<TabLoading />}>
+            <LotCloseScreen
+              stock={effectiveStock}
+              stockBatches={stockBatches}
+              updateMainStock={updateMainStock}
+              member={member}
+              onStockMoved={() => setStockRefresh((n) => n + 1)}
+            />
           </Suspense>
         )}
       </div>
