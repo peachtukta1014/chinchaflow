@@ -112,6 +112,15 @@ service cloud.firestore {
         || (isApproved() && resource.data.uid == request.auth.uid);
     }
 
+    // รายการสั่งของประจำร้าน — พนักงานเพิ่ม/อัปเดตได้ · แอดมินลบได้
+    match /restockCatalog/{docId} {
+      allow read: if isApproved();
+      allow create, update: if isApproved()
+        && request.resource.data.name is string
+        && request.resource.data.nameKey is string;
+      allow delete: if isAdmin();
+    }
+
     match /orderSlips/{docId} {
       allow read, create: if isApproved();
       allow update, delete: if isAdmin();
