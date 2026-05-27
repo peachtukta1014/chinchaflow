@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { compressImageFile } from '../lib/compressImage';
 import {
-  Camera, CheckCircle, ChevronRight, Delete, Edit3, MapPin, Mic, MicOff, PlusCircle, X,
+  CheckCircle, ChevronRight, Delete, Edit3, MapPin, Mic, MicOff, PlusCircle, X,
 } from 'lucide-react';
-import { storage } from '../firebase';
 import {
   hasVoiceCommitCommand,
   isVoiceOrderComplete,
@@ -32,11 +29,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
   const [saving, setSaving]         = useState(false);
   const [paymentType, setPaymentType] = useState(DEFAULT_PAYMENT_TYPE);
   const [paidAmount, setPaidAmount] = useState('');
-  const [photoUrl, setPhotoUrl]     = useState(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
   const [billSheet, setBillSheet] = useState(null);
-  const photoGalleryRef = useRef(null);
-  const photoCameraRef = useRef(null);
   const billNoRef     = useRef(`INV-${Date.now().toString().slice(-8)}`);
 
   const allCustomers = useMemo(() => mergeCustomerLists(fsCustomers), [fsCustomers]);
@@ -55,32 +48,6 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
 
   const [voiceResult, setVoiceResult] = useState('');
   const voiceTimerRef = useRef(null);
-
-  const uploadBillPhoto = async (file) => {
-    if (!file) return;
-    if (!storage) {
-      alert('⚠️ Firebase Storage ยังไม่พร้อม — ตรวจสอบการตั้งค่าแอป');
-      return;
-    }
-    setPhotoUploading(true);
-    try {
-      const compressed = await compressImageFile(file);
-      const r = stRef(storage, `billPhotos/${billNoRef.current}.jpg`);
-      await uploadBytes(r, compressed, { contentType: 'image/jpeg' });
-      setPhotoUrl(await getDownloadURL(r));
-    } catch (err) {
-      console.error('uploadBillPhoto', err);
-      alert('⚠️ อัปโหลดรูปไม่สำเร็จ\nลองถ่ายใหม่หรือเลือกรูปจากคลังอีกครั้ง');
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
-    uploadBillPhoto(file);
-    e.target.value = '';
-  };
 
   useEffect(() => subscribeCustomers(setFsCustomers, () => {}), []);
 
@@ -149,7 +116,7 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
         paidAmount,
         billNo: billNoRef.current,
         recordedBy: user.name,
-        photoUrl,
+        photoUrl: null,
         updateMainStock,
       });
       if (!result.ok) {
@@ -163,7 +130,6 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
       setBillSheet({ bill: billData, customer });
       setCart([]); setSelectedCustomer('general');
       setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
-      setPhotoUrl(null);
       billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
     } catch (err) {
       console.error(err);
@@ -370,39 +336,28 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
           </div>
         )}
 
-        {/* Total + camera + save */}
-        <div className="flex justify-between items-end border-t border-slate-100 pt-3">
-          <div>
+        {/* Total + save */}
+        <div className="flex justify-between items-end border-t border-slate-100 pt-3 gap-3">
+          <div className="min-w-0">
             <p className="text-slate-400 text-[11px] font-bold tracking-wide">ยอดรวมบิล ({cart.length} รายการ)</p>
             <h2 className="text-4xl font-black text-emerald-500 leading-none mt-1">฿{cartTotal.toLocaleString()}</h2>
+            {cart.length > 0 && (
+              <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                บิลดิจิทัล — กด「ดูภาพบิล」หรือส่ง LINE หลังจบบิล
+              </p>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => photoCameraRef.current?.click()}
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 transition-all ${
-                photoUrl ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'
-              }`} title="ถ่ายรูปบิล">
-              {photoUploading
-                ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                : photoUrl
-                  ? <img src={photoUrl} className="w-full h-full object-cover rounded-xl" alt="bill" />
-                  : <Camera size={20} className="text-slate-400" />}
-            </button>
-            <button type="button" onClick={() => photoGalleryRef.current?.click()}
-              className="text-[10px] font-bold text-slate-500 px-2 py-2 rounded-xl border border-slate-200 bg-white active:scale-95"
-              title="เลือกรูปจากคลัง">
-              คลัง
+          {cart.length > 0 && (
+            <button
+              type="button"
+              onClick={handleSaveBill}
+              disabled={saving}
+              className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-60 shrink-0"
+            >
+              <CheckCircle size={20} />
+              {saving ? 'กำลังบันทึก...' : 'จบบิล'}
             </button>
-            <input ref={photoCameraRef} type="file" accept="image/*" capture="environment"
-              onChange={handlePhotoChange} className="hidden" />
-            <input ref={photoGalleryRef} type="file" accept="image/*,.heic,.heif,image/heic,image/heif"
-              onChange={handlePhotoChange} className="hidden" />
-            {cart.length > 0 && (
-              <button onClick={handleSaveBill} disabled={saving}
-                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg active:scale-95 disabled:opacity-60">
-                <CheckCircle size={20} /> {saving ? 'กำลังบันทึก...' : 'จบบิล'}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
