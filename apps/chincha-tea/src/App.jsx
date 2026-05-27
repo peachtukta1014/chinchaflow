@@ -162,6 +162,8 @@ export default function App() {
             setViewDateKey={setViewDateKey}
             todayKey={todayKey}
             t={t}
+            lang={lang}
+            menuItems={menuItems}
           />
         )}
         {tab === 'summary' && (
@@ -175,7 +177,7 @@ export default function App() {
             isAdmin={isAdmin}
           />
         )}
-        {tab === 'restock' && <RestockTab member={member} t={t} />}
+        {tab === 'restock' && <RestockTab member={member} t={t} lang={lang} />}
         {tab === 'admin' && isAdmin && (
           <AdminPanel t={t} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
         )}
@@ -204,6 +206,8 @@ export default function App() {
         setPayType={setPayType}
         removeCart={removeCart}
         saving={saving}
+        lang={lang}
+        menuItems={menuItems}
         onSave={async () => {
           const ok = await saveOrder();
           if (ok) setShowCart(false);

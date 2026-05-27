@@ -32,3 +32,16 @@ export function toppingDisplaySub(tp, lang) {
   if (lang === 'my') return tp.label;
   return '';
 }
+
+/** ชื่อรายการในตะกร้า/ประวัติ — แปลตามภาษาปัจจุบัน ไม่ติด nameSnapshot */
+export function cartItemDisplayName(item, lang, t, menuItems) {
+  const menuItem = (menuItems || []).find((m) => m.key === item.key || m.id === item.key);
+  if (menuItem) {
+    return {
+      primary: menuDisplayName(menuItem, lang, t),
+      sub: menuDisplaySub(menuItem, lang),
+    };
+  }
+  const fallback = item.nameSnapshot || item.nameEn || item.name || '';
+  return { primary: fallback, sub: '' };
+}

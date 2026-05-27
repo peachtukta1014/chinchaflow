@@ -13,8 +13,19 @@ import {
   removeRestockLine,
   restockPurchaseTotal,
 } from '../lib/restockService';
+import { restockDisplayName } from '../lib/restockDisplay';
 
-export function RestockTab({ member, t }) {
+function RestockItemName({ name, lang }) {
+  const { primary, sub } = restockDisplayName(name, lang);
+  return (
+    <span>
+      {primary}
+      {sub ? <span className="block text-[10px] font-normal text-stone-400 leading-tight mt-0.5">{sub}</span> : null}
+    </span>
+  );
+}
+
+export function RestockTab({ member, t, lang = 'th' }) {
   const [items, setItems] = useState([]);
   const [recentRequests, setRecentRequests] = useState([]);
   const [input, setInput] = useState('');
@@ -73,7 +84,7 @@ export function RestockTab({ member, t }) {
         createdAt: new Date().toISOString(),
       });
       setItems([]);
-      setFlash('✅ ส่งรายการแล้ว!');
+      setFlash(t('restockSent'));
       await refreshRecent();
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
@@ -177,7 +188,7 @@ export function RestockTab({ member, t }) {
           {items.map((item) => (
             <div key={item.cid} className="p-4">
               <div className="flex items-center gap-2 mb-3">
-                <p className="flex-1 font-bold text-sm">{item.name}</p>
+                <p className="flex-1 font-bold text-sm"><RestockItemName name={item.name} lang={lang} /></p>
                 <button type="button" onClick={() => setItems((prev) => prev.map((i) => (i.cid === item.cid ? { ...i, qty: Math.max(1, i.qty - 1) } : i)))} className="w-7 h-7 rounded-full bg-stone-100 font-bold">−</button>
                 <span className="font-black w-5 text-center">{item.qty}</span>
                 <button type="button" onClick={() => setItems((prev) => prev.map((i) => (i.cid === item.cid ? { ...i, qty: i.qty + 1 } : i)))} className="w-7 h-7 rounded-full text-white font-bold" style={{ background: '#6b3a2a' }}>+</button>
@@ -224,7 +235,7 @@ export function RestockTab({ member, t }) {
               <div key={req.id} className={`bg-white rounded-2xl p-3 border ${purchased ? 'border-emerald-200' : 'border-stone-200'} ${busy ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between gap-2 mb-1 flex-wrap">
                   <div className="min-w-0">
-                    <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} รายการ</p>
+                    <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} {t('items')}</p>
                     {purchased ? (
                       <p className="text-[10px] font-bold text-emerald-600">
                         ✓ {t('restockPurchased')} · ฿{restockPurchaseTotal(req).toLocaleString()}
@@ -288,7 +299,7 @@ export function RestockTab({ member, t }) {
                 {(req.items || []).map((it, i) => (
                   <div key={i} className="flex items-center gap-1 text-xs text-stone-600">
                     <p className="flex-1 min-w-0">
-                      {it.name} ×{it.qty}
+                      <RestockItemName name={it.name} lang={lang} /> ×{it.qty}
                       <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
                       </span>
