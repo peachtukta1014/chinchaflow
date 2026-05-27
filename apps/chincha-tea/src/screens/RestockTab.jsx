@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
 import { uploadOrderSlip } from '../lib/orderSlipService';
@@ -13,6 +11,14 @@ import {
   removeRestockLine,
   restockPurchaseTotal,
 } from '../lib/restockService';
+import {
+  bootstrapCatalogFromRestocks,
+  deleteRestockCatalogItem,
+  fsQueryRestockCatalog,
+  groupCatalogByCategory,
+  restockNameKey,
+  upsertRestockCatalogItems,
+} from '../lib/restockCatalogService';
 import { restockDisplayName } from '../lib/restockDisplay';
 
 function RestockItemName({ name, lang }) {
@@ -27,6 +33,8 @@ function RestockItemName({ name, lang }) {
 
 export function RestockTab({ member, t, lang = 'th' }) {
   const [items, setItems] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [recentRequests, setRecentRequests] = useState([]);
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -37,12 +45,40 @@ export function RestockTab({ member, t, lang = 'th' }) {
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
+  const isAdmin = member?.role === 'admin';
+
+  const selectedKeys = useMemo(
+    () => new Set(items.map((i) => restockNameKey(i.name))),
+    [items],
+  );
+
+  const catalogGroups = useMemo(
+    () => groupCatalogByCategory(catalog, t, lang),
+    [catalog, t, lang],
+  );
 
   const refreshRecent = () => fsQueryRestocks(20).then(setRecentRequests).catch(() => {});
 
+  const refreshCatalog = useCallback(async (recent) => {
+    setCatalogLoading(true);
+    try {
+      let list = await fsQueryRestockCatalog();
+      const history = recent ?? await fsQueryRestocks(20);
+      if (list.length === 0 && history.length > 0) {
+        await bootstrapCatalogFromRestocks(history, member);
+        list = await fsQueryRestockCatalog();
+      }
+      setCatalog(list);
+    } catch (e) {
+      console.error(e);
+    }
+    setCatalogLoading(false);
+  }, [member]);
+
   useEffect(() => {
     refreshRecent();
-  }, []);
+    refreshCatalog();
+  }, [refreshCatalog]);
 
   const STATUS_CFG = [
     { key: 'normal', label: t('statusNormal'), active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
@@ -53,8 +89,35 @@ export function RestockTab({ member, t, lang = 'th' }) {
   const addItem = () => {
     const name = input.trim();
     if (!name) return;
+    const key = restockNameKey(name);
+    if (items.some((i) => restockNameKey(i.name) === key)) {
+      setInput('');
+      return;
+    }
     setItems((prev) => [...prev, { cid: Date.now(), name, qty: 1, status: 'out' }]);
     setInput('');
+  };
+
+  const toggleCatalogItem = (catItem) => {
+    const key = restockNameKey(catItem.name);
+    if (selectedKeys.has(key)) {
+      setItems((prev) => prev.filter((i) => restockNameKey(i.name) !== key));
+    } else {
+      setItems((prev) => [...prev, { cid: Date.now(), name: catItem.name, qty: 1, status: 'out' }]);
+    }
+  };
+
+  const handleRemoveCatalog = async (catItem) => {
+    if (!isAdmin) return;
+    if (!window.confirm(t('confirmRemoveCatalog'))) return;
+    try {
+      await deleteRestockCatalogItem(catItem.id);
+      setCatalog((prev) => prev.filter((c) => c.id !== catItem.id));
+      setItems((prev) => prev.filter((i) => restockNameKey(i.name) !== restockNameKey(catItem.name)));
+    } catch (e) {
+      console.error(e);
+      alert(t('saveFailed'));
+    }
   };
 
   const uploadOrderPhoto = async (file) => {
@@ -75,6 +138,7 @@ export function RestockTab({ member, t, lang = 'th' }) {
     if (!items.length) return;
     setSaving(true);
     try {
+      const names = items.map((i) => i.name);
       await fsPost('restocks', {
         dateKey,
         uid: member?.uid || 'unknown',
@@ -83,9 +147,10 @@ export function RestockTab({ member, t, lang = 'th' }) {
         purchaseStatus: 'pending',
         createdAt: new Date().toISOString(),
       });
+      await upsertRestockCatalogItems(names, member);
       setItems([]);
       setFlash(t('restockSent'));
-      await refreshRecent();
+      await Promise.all([refreshRecent(), refreshCatalog()]);
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
@@ -159,6 +224,59 @@ export function RestockTab({ member, t, lang = 'th' }) {
       {flash && (
         <div className="py-3 rounded-2xl text-center font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 text-sm">{flash}</div>
       )}
+
+      {/* รายการประจำร้าน — ติ๊กเลือกตามหมวด */}
+      <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-stone-100" style={{ background: '#faf5f0' }}>
+          <p className="font-black text-sm text-stone-800">📋 {t('restockSavedList')}</p>
+          <p className="text-[10px] text-stone-500 mt-0.5">{t('restockSavedHint')}</p>
+        </div>
+        {catalogLoading ? (
+          <p className="text-center text-stone-400 text-sm py-6">{t('loading')}</p>
+        ) : catalogGroups.length === 0 ? (
+          <p className="text-center text-stone-400 text-xs py-6 px-4">{t('restockCatalogEmpty')}</p>
+        ) : (
+          <div className="divide-y divide-stone-100">
+            {catalogGroups.map((group) => (
+              <div key={group.id}>
+                <p className="px-4 py-2 text-[10px] font-black uppercase tracking-wide text-amber-900 bg-amber-50/80 border-b border-amber-100">
+                  {group.label}
+                  <span className="ml-1.5 font-bold text-stone-400">({group.items.length})</span>
+                </p>
+                {group.items.map((catItem) => {
+                  const checked = selectedKeys.has(restockNameKey(catItem.name));
+                  return (
+                    <label
+                      key={catItem.id}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer active:bg-stone-50 ${checked ? 'bg-amber-50/40' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCatalogItem(catItem)}
+                        className="mt-1 w-5 h-5 rounded border-2 border-stone-300 accent-amber-700 shrink-0"
+                      />
+                      <span className="flex-1 min-w-0 text-sm font-bold text-stone-700">
+                        <RestockItemName name={catItem.name} lang={lang} />
+                      </span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleRemoveCatalog(catItem); }}
+                          className="text-red-300 hover:text-red-500 font-black text-xs px-1 shrink-0"
+                          aria-label={t('restockRemoveFromList')}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadOrderPhoto(f); e.target.value = ''; }} />
       <button
