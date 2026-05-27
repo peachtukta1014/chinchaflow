@@ -5,13 +5,18 @@ import {
   fsGetConfig,
   fsPatch,
   fsPost,
+  fsQueryLineMessages,
   fsQueryOrders,
   fsQueryProducts,
   fsQueryToppings,
   fsQueryUsers,
   fsSetConfig,
 } from '../lib/firestoreRest';
-import { validateTeaLineTargets } from '../lib/lineIds';
+import {
+  mergeNotifyUserIds,
+  pickLatestLineIds,
+  validateTeaLineTargets,
+} from '../lib/lineIds';
 import {
   importDefaultMenuToFirestore,
   importDefaultToppingsToFirestore,
@@ -512,6 +517,7 @@ function LineSettingsSection({ t }) {
   const [form, setForm] = useState({ ...DEFAULT_LINE_CONFIG });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fetchBusy, setFetchBusy] = useState(null);
   const [flash, setFlash] = useState('');
 
   useEffect(() => {
@@ -547,6 +553,35 @@ function LineSettingsSection({ t }) {
     setSaving(false);
   };
 
+  const fetchLineIds = async (kind) => {
+    setFetchBusy(kind);
+    try {
+      const messages = await fsQueryLineMessages(80);
+      const { groupId, userId } = pickLatestLineIds(messages);
+      if (kind === 'group') {
+        if (!groupId) {
+          setFlash(`⚠️ ${t('lineFetchNoGroupId')}`);
+          return;
+        }
+        setForm((p) => ({ ...p, notifyGroupId: groupId }));
+        setFlash(t('lineFetchGroupIdOk'));
+      } else {
+        if (!userId) {
+          setFlash(`⚠️ ${t('lineFetchNoUserId')}`);
+          return;
+        }
+        setForm((p) => ({ ...p, notifyUserIds: mergeNotifyUserIds(p.notifyUserIds, userId) }));
+        setFlash(t('lineFetchUserIdOk'));
+      }
+      setTimeout(() => setFlash(''), 2500);
+    } catch (e) {
+      console.error(e);
+      setFlash(`⚠️ ${t('lineFetchFailed')}`);
+    } finally {
+      setFetchBusy(null);
+    }
+  };
+
   if (loading) return <p className="text-center text-stone-400 py-8">{t('loading')}</p>;
 
   return (
@@ -576,6 +611,14 @@ function LineSettingsSection({ t }) {
           value={form.notifyGroupId || ''}
           onChange={(e) => setForm({ ...form, notifyGroupId: e.target.value.trim() })}
         />
+        <button
+          type="button"
+          disabled={!!fetchBusy || saving}
+          onClick={() => fetchLineIds('group')}
+          className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
+        >
+          {fetchBusy === 'group' ? '⏳' : `📥 ${t('lineFetchGroupId')}`}
+        </button>
         <label className="text-[10px] font-bold text-stone-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
         <input
           className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
@@ -583,6 +626,14 @@ function LineSettingsSection({ t }) {
           value={form.notifyUserIds || ''}
           onChange={(e) => setForm({ ...form, notifyUserIds: e.target.value })}
         />
+        <button
+          type="button"
+          disabled={!!fetchBusy || saving}
+          onClick={() => fetchLineIds('user')}
+          className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
+        >
+          {fetchBusy === 'user' ? '⏳' : `📥 ${t('lineFetchUserId')}`}
+        </button>
         <p className="text-[10px] text-stone-400">{t('lineGroupIdHint')}</p>
       </div>
       <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-2">
