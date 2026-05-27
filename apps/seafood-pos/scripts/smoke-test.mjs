@@ -92,6 +92,20 @@ try {
 }
 
 try {
+  const { inferDeliveryDateKey } = await import('../src/lib/lineOrderDate.js');
+  const { dateKeyBangkok, tomorrowDateKeyBangkok } = await import('../src/lib/date.js');
+  const t = dateKeyBangkok();
+  const tm = tomorrowDateKeyBangkok();
+  assert(
+    inferDeliveryDateKey({ rawText: 'พรุ่งนี้ ร้านเฟิร์ส กุ้งกลาง 2 โล', deliveryDate: t })
+      === tm,
+    'LINE order พรุ่งนี้ → วันพรุ่งนี้ (แม้ deliveryDate เก่าผิด)',
+  );
+} catch (e) {
+  fail('lineOrderDate infer', e);
+}
+
+try {
   const liveGross = 10000 - 7000;
   const deadGross = 4000 - 1500;
   const liveNet = liveGross - 500 - 0;

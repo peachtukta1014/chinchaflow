@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { dateKeyBangkok, tomorrowDateKeyBangkok } from '../lib/date';
+import { dateKeyBangkok } from '../lib/date';
+import { formatDateThaiShort } from '../lib/date';
+import { deliveryDateLabel, inferDeliveryDateKey } from '../lib/lineOrderDate';
 import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
@@ -136,15 +138,22 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     }
   };
 
-  const today    = todayBKK();
-  const tomorrow = tomorrowDateKeyBangkok();
-  const dateLabel = (k) => k === today ? 'วันนี้' : k === tomorrow ? 'พรุ่งนี้' : k;
+  const today = todayBKK();
 
-  // Group by deliveryDate — ซ่อนออเดอร์ที่ยกเลิกแล้ว
-  const upcoming = orders.filter((o) => (o.deliveryDate || '') >= today && o.status !== 'cancelled');
+  const ordersWithDate = useMemo(
+    () => orders.map((o) => ({
+      ...o,
+      effectiveDeliveryDate: inferDeliveryDateKey(o),
+    })),
+    [orders],
+  );
+
+  const upcoming = ordersWithDate.filter(
+    (o) => o.effectiveDeliveryDate >= today && o.status !== 'cancelled',
+  );
   const isPending = (o) => o.status === 'pending';
-  const grouped  = upcoming.reduce((acc, o) => {
-    const k = o.deliveryDate || 'ไม่ระบุ';
+  const grouped = upcoming.reduce((acc, o) => {
+    const k = o.effectiveDeliveryDate || 'ไม่ระบุ';
     (acc[k] = acc[k] || []).push(o);
     return acc;
   }, {});
@@ -182,7 +191,18 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       {Object.entries(grouped).sort().map(([date, items]) => (
         <div key={date}>
           <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-            📅 ส่ง{dateLabel(date)} · {items.length} ออเดอร์
+            📅 ส่ง
+            {deliveryDateLabel(date)}
+            {' '}
+            (
+            {formatDateThaiShort(date)}
+            )
+            {' '}
+            ·
+            {' '}
+            {items.length}
+            {' '}
+            ออเดอร์
             {items.filter(isPending).length > 0 && (
               <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                 {items.filter(isPending).length} รอ
@@ -198,7 +218,16 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
                     {o.customerName && (
                       <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
                     )}
-                    <p className="text-[11px] text-slate-400">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
+                    <p className="text-[10px] font-bold text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-lg mt-0.5">
+                      ส่ง
+                      {' '}
+                      {deliveryDateLabel(o.effectiveDeliveryDate)}
+                      {' '}
+                      (
+                      {formatDateThaiShort(o.effectiveDeliveryDate)}
+                      )
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">LINE · {o.lineUserId?.slice(-6) || '—'}</p>
                     <p className="text-xs text-slate-500 mt-0.5 truncate italic">"{o.rawText}"</p>
                   </div>
                   {o.status === 'done' ? (

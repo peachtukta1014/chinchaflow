@@ -3,14 +3,19 @@
  * รองรับ 25/5/69, 25-5-2569, ออเดอร์?25/5/69, วันนี้, พรุ่งนี้ (ทุกตำแหน่งในข้อความ)
  */
 
+/** วันที่ตาม Asia/Bangkok (ไม่ใช้ UTC+7 แบบ hack — กันคลาดวัน) */
+function dateKeyBangkok(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(date);
+}
+
 function todayBKK() {
-  return new Date(Date.now() + 7 * 3600000).toISOString().split('T')[0];
+  return dateKeyBangkok();
 }
 
 function tomorrowBKK() {
-  const bkk = new Date(Date.now() + 7 * 3600000);
-  bkk.setUTCDate(bkk.getUTCDate() + 1);
-  return bkk.toISOString().split('T')[0];
+  const d = new Date(`${todayBKK()}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return dateKeyBangkok(d);
 }
 
 function pad2(n) {
