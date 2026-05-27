@@ -17,6 +17,7 @@ import {
   pickLatestLineIds,
   validateTeaLineTargets,
 } from '../lib/lineIds';
+import { cartItemDisplayName } from '../lib/displayNames';
 import {
   importDefaultMenuToFirestore,
   importDefaultToppingsToFirestore,
@@ -38,7 +39,7 @@ const DEFAULT_LINE_CONFIG = {
   autoSummaryHour: 22,
 };
 
-export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
+export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged }) {
   const [section, setSection] = useState('products');
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -150,7 +151,7 @@ export function AdminPanel({ t, onOrdersChanged, onCatalogChanged }) {
           onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(() => { refresh(); onCatalogChanged?.(); })}
         />
       ) : section === 'orders' ? (
-        <OrdersSection t={t} onChanged={onOrdersChanged} />
+        <OrdersSection t={t} lang={lang} menuItems={menuItems} onChanged={onOrdersChanged} />
       ) : (
         <LineSettingsSection t={t} />
       )}
@@ -416,7 +417,7 @@ function ToppingFormModal({ form, isNew, t, onClose, onSave }) {
   );
 }
 
-function OrdersSection({ t, onChanged }) {
+function OrdersSection({ t, lang = 'th', menuItems = [], onChanged }) {
   const todayKey = dateKeyBangkok();
   const [viewDateKey, setViewDateKey] = useState(todayKey);
   const [orders, setOrders] = useState([]);
@@ -468,13 +469,18 @@ function OrdersSection({ t, onChanged }) {
           <div key={o.id} className="bg-white rounded-2xl p-4 border border-stone-200">
             <div className="flex justify-between mb-2">
               <p className="text-xs text-stone-400">
-                {o.createdBy || '—'} · {o.payType === 'transfer' ? 'โอน' : 'สด'}
+                {o.createdBy || '—'} · {o.payType === 'transfer' ? t('transfer') : t('cash')}
               </p>
               <p className="font-black" style={{ color: '#3d1f0f' }}>฿{(o.total || 0).toLocaleString()}</p>
             </div>
-            {(o.items || []).slice(0, 3).map((it, j) => (
-              <p key={j} className="text-xs text-stone-500 truncate">{it.qty}× {it.nameSnapshot || it.nameEn}</p>
-            ))}
+            {(o.items || []).map((it, j) => {
+              const { primary, sub } = cartItemDisplayName(it, lang, t, menuItems);
+              return (
+              <p key={j} className="text-xs text-stone-600">
+                {it.qty}× {primary}
+                {sub ? <span className="block text-[10px] text-sky-700/90 font-semibold">{sub}</span> : null}
+              </p>
+            );})}
             <div className="flex gap-2 mt-3">
               <button type="button" onClick={() => setEditOrder(o)} className="flex-1 py-2 rounded-xl border-2 border-amber-200 text-xs font-bold text-amber-800">{t('edit')}</button>
               <button type="button" onClick={() => deleteOrder(o.id)} className="flex-1 py-2 rounded-xl border-2 border-red-200 text-xs font-bold text-red-600">{t('delete')}</button>
@@ -504,7 +510,7 @@ function OrderEditModal({ order, t, onClose, onSave }) {
       <input className="field" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
       <label className="text-xs font-bold text-stone-500 mt-2 block">การชำระ</label>
       <div className="flex gap-2 mb-3">
-        {[['cash', 'สด'], ['transfer', 'โอน']].map(([v, label]) => (
+        {[['cash', t('cash')], ['transfer', t('transfer')]].map(([v, label]) => (
           <button key={v} type="button" onClick={() => setPayType(v)} className={`flex-1 py-2 rounded-xl font-bold text-sm border-2 ${payType === v ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}>{label}</button>
         ))}
       </div>

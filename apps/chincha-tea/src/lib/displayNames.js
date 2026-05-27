@@ -7,9 +7,10 @@ export function menuDisplayName(item, lang, t) {
   return item.nameTh || t?.(item.key) || item.nameEn;
 }
 
-/** บรรทัดรอง — พนักงานพม่าเห็นชื่อไทยช่วยจำ */
+/** บรรทัดรอง — พนักงานพม่าเห็นชื่ออังกฤษ (ไม่เน้นไทย) */
 export function menuDisplaySub(item, lang) {
-  if (lang === 'my') return item.nameTh || item.nameEn || '';
+  if (lang === 'my') return item.nameEn || '';
+  if (lang === 'en') return item.nameMy || item.nameTh || '';
   return item.nameEn || '';
 }
 
