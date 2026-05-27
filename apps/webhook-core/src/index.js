@@ -26,6 +26,7 @@ const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
 } = require('./shrimpDailySummary');
+const { buildShrimpTodayOrdersSummary } = require('./shrimpTodayOrdersSummary');
 const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
@@ -91,6 +92,19 @@ exports.lineWebhook = functions
           } catch (err) {
             console.error('shrimp summary', err);
             await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'today_orders') {
+          try {
+            const dateKey = todayBKK();
+            const summary = await buildShrimpTodayOrdersSummary(db(), dateKey);
+            await lineReply(replyToken, summary, token);
+          } catch (err) {
+            console.error('shrimp today orders', err);
+            await lineReply(replyToken, '⚠️ ดึงรายการออเดอร์ไม่สำเร็จ ลองใหม่ครับ', token);
           }
           await completeLineEvent(db(), event);
           continue;

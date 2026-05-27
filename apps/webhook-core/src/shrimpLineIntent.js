@@ -4,6 +4,7 @@
 const { parseOrderItems, normalizeOrderText, parseSimpleOrderLine } = require('./parseLineOrder');
 const { parseDeliveryDateFromText } = require('./parseDeliveryDate');
 const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummary');
+const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
 
 const UNIT_RE = /(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)/i;
 const ORDER_VERB_RE = /^(สั่ง|จอง|ใส่|บันทึก|ออเดอร์|order)\b/i;
@@ -24,7 +25,9 @@ function isShrimpOrderCommand(text) {
   const raw = String(text || '').trim();
   if (!raw) return false;
 
-  if (isShrimpSummaryCommand(raw) || SHRIMP_HELP_CMD.test(raw)) return false;
+  if (isShrimpSummaryCommand(raw) || isShrimpTodayOrdersCommand(raw) || SHRIMP_HELP_CMD.test(raw)) {
+    return false;
+  }
 
   const { dateKey, textWithoutDate } = parseDeliveryDateFromText(raw);
   if (dateKey && !hasOrderBody(raw)) return true;
@@ -48,6 +51,7 @@ function classifyShrimpLineMessage(text) {
   if (!raw) return 'ignore';
 
   if (SHRIMP_HELP_CMD.test(raw)) return 'help';
+  if (isShrimpTodayOrdersCommand(raw)) return 'today_orders';
   if (isShrimpSummaryCommand(raw)) return 'summary';
   if (isShrimpOrderCommand(raw)) return 'order';
 
