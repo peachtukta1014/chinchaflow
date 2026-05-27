@@ -22,11 +22,19 @@ import {
 import { restockDisplayName } from '../lib/restockDisplay';
 
 function RestockItemName({ name, lang }) {
-  const { primary, sub } = restockDisplayName(name, lang);
+  const { primary, sub, en } = restockDisplayName(name, lang);
+  const englishLine = lang === 'my' ? (en || sub) : en;
+  const showEnglish = englishLine && englishLine !== primary;
+  const showSub = sub && sub !== primary && sub !== englishLine;
   return (
     <span>
       {primary}
-      {sub ? <span className="block text-[10px] font-normal text-stone-400 leading-tight mt-0.5">{sub}</span> : null}
+      {showEnglish ? (
+        <span className="block text-[10px] font-semibold text-sky-700/90 leading-tight mt-0.5">{englishLine}</span>
+      ) : null}
+      {showSub ? (
+        <span className="block text-[10px] font-normal text-stone-400 leading-tight mt-0.5">{sub}</span>
+      ) : null}
     </span>
   );
 }

@@ -179,7 +179,7 @@ export default function App() {
         )}
         {tab === 'restock' && <RestockTab member={member} t={t} lang={lang} />}
         {tab === 'admin' && isAdmin && (
-          <AdminPanel t={t} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
+          <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
         )}
       </main>
 
