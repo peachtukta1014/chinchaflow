@@ -1,45 +1,93 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-/** Speech-to-text ภาษาไทย (Chrome) */
+/** Speech-to-text ภาษาไทย (Chrome / Edge) */
 export function useVoice(onText) {
   const [listening, setListening] = useState(false);
   const [liveText, setLiveText] = useState('');
   const recRef = useRef(null);
   const onTextRef = useRef(onText);
+  const committedRef = useRef('');
+  const displayRef = useRef('');
+  const wantListenRef = useRef(false);
   onTextRef.current = onText;
 
-  const toggle = () => {
+  const flushTranscript = useCallback(() => {
+    const text = displayRef.current.trim();
+    committedRef.current = '';
+    displayRef.current = '';
+    setLiveText('');
+    if (text) onTextRef.current(text);
+  }, []);
+
+  const stop = useCallback(() => {
+    wantListenRef.current = false;
+    recRef.current?.stop();
+    setListening(false);
+    flushTranscript();
+  }, [flushTranscript]);
+
+  const start = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      alert('ใช้ Chrome เพื่อเปิด Voice ครับ');
+      alert('ใช้ Chrome หรือ Edge เพื่อสั่งงานด้วยเสียงครับ');
       return;
     }
-    if (listening) {
-      recRef.current?.stop();
-      return;
-    }
+    wantListenRef.current = true;
+    committedRef.current = '';
+    displayRef.current = '';
     const rec = new SR();
     rec.lang = 'th-TH';
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = true;
     recRef.current = rec;
+
     rec.onresult = (e) => {
-      const interim = Array.from(e.results).map((r) => r[0].transcript).join('');
-      setLiveText(interim);
-      const last = e.results[e.results.length - 1];
-      if (last.isFinal) onTextRef.current(last[0].transcript.trim());
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          committedRef.current += e.results[i][0].transcript;
+        }
+      }
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      const display = (committedRef.current + interim).trim();
+      displayRef.current = display;
+      setLiveText(display);
     };
+
     rec.onerror = () => {
-      setListening(false);
-      setLiveText('');
+      if (!wantListenRef.current) {
+        setListening(false);
+        setLiveText('');
+      }
     };
+
     rec.onend = () => {
-      setListening(false);
-      setLiveText('');
+      if (wantListenRef.current) {
+        try {
+          rec.start();
+        } catch {
+          wantListenRef.current = false;
+          setListening(false);
+          flushTranscript();
+        }
+      } else {
+        setListening(false);
+        flushTranscript();
+      }
     };
+
     rec.start();
     setListening(true);
-  };
+  }, [flushTranscript]);
 
-  return { listening, toggle, liveText };
+  const toggle = useCallback(() => {
+    if (listening) stop();
+    else start();
+  }, [listening, start, stop]);
+
+  return { listening, toggle, stop, liveText };
 }
