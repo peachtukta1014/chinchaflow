@@ -92,11 +92,12 @@ export function isBuiltinCustomer(c) {
   return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
 }
 
-function customerPayload({ name, zone, phone, lineUserId, hidden }) {
+function customerPayload({ name, zone, phone, notes, lineUserId, hidden }) {
   const payload = {
     name: String(name || '').trim(),
     zone: String(zone || '').trim(),
     phone: String(phone || '').trim(),
+    notes: String(notes || '').trim(),
   };
   const line = normalizeLineUserId(lineUserId);
   payload.lineUserId = line || '';

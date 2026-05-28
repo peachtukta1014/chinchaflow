@@ -24,6 +24,7 @@ const {
 const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
+const { getLineOrderSession } = require('./lineOrderSession');
 const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
@@ -73,7 +74,8 @@ exports.lineWebhook = functions
         const userId     = event.source.userId;
         const groupId    = event.source.groupId || event.source.roomId || null;
         const replyToken = event.replyToken;
-        const intent     = classifyShrimpLineMessage(text);
+        const session = await getLineOrderSession(db(), groupId, userId);
+        const intent = classifyShrimpLineMessage(text, session);
 
         if (intent === 'ignore') {
           await completeLineEvent(db(), event);

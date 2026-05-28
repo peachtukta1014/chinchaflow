@@ -3,8 +3,10 @@ const {
   groupItemsByCustomer,
   ORDER_FORMAT_HELP,
   parseSimpleOrderLine,
+  parseRiverPrawnPendingLine,
   simpleToOrderItem,
   pendingToItems,
+  formatRiverSizePrompt,
 } = require('./parseLineOrder');
 const {
   parseDeliveryDateFromText,
@@ -13,6 +15,13 @@ const {
 } = require('./parseDeliveryDate');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
 const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
+const {
+  assessLineCustomerProfile,
+  parseProfileFields,
+  formatMissingProfilePrompt,
+  upsertCustomerProfile,
+  isProfileComplete,
+} = require('./shrimpLineCustomerProfile');
 
 async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
   const groups = groupItemsByCustomer(items);
@@ -73,6 +82,160 @@ function formatItemsSummary(items) {
     .join('\n');
 }
 
+function primaryCustomerNameFromItems(items) {
+  for (const it of items) {
+    if (it.customerName) return it.customerName;
+  }
+  return null;
+}
+
+function shouldVerifyCustomerProfile(groupId) {
+  return !groupId;
+}
+
+async function tryCompleteOrder(db, admin, session, ts, ctx) {
+  const { items, text, userId, groupId, deliveryDate } = ctx;
+  const deliveryLabel = `${formatDateThai(deliveryDate)} (${deliveryDate})`;
+  const summary = formatItemsSummary(items);
+
+  if (shouldVerifyCustomerProfile(groupId)) {
+    const customerName = primaryCustomerNameFromItems(items)
+      || (await findCustomerNameByLineUserId(db, userId));
+    const { customer, missing } = await assessLineCustomerProfile(db, {
+      lineUserId: userId,
+      customerName,
+      groupId,
+    });
+
+    if (missing.length > 0) {
+      await setLineOrderSession(
+        db,
+        session.id,
+        {
+          deliveryDate,
+          pending: null,
+          orderDraft: { items, text, userId, groupId, deliveryDate },
+          profileCollect: {
+            missing,
+            customerId: customer?.id || null,
+            customerName: customer?.name || customerName || null,
+          },
+        },
+        ts,
+      );
+      return {
+        ok: true,
+        reply: formatMissingProfilePrompt(missing, {
+          itemsSummary: summary,
+          deliveryDateLabel: deliveryLabel,
+        }),
+      };
+    }
+  }
+
+  const orderCount = await saveLineOrders(db, admin, {
+    items,
+    text,
+    userId,
+    groupId,
+    deliveryDate,
+  });
+
+  await setLineOrderSession(
+    db,
+    session.id,
+    { deliveryDate, pending: null, orderDraft: null, profileCollect: null },
+    ts,
+  );
+
+  return {
+    ok: true,
+    reply: `✅ รับออเดอร์แล้วครับ (${orderCount} ราย)\n📅 ส่ง ${deliveryLabel}\n\n${summary}`,
+  };
+}
+
+async function handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body }) {
+  const draft = session.orderDraft;
+  const collect = session.profileCollect;
+  if (!draft?.items?.length || !collect?.missing?.length) {
+    await setLineOrderSession(db, session.id, { orderDraft: null, profileCollect: null }, ts);
+    return { ok: false, reply: `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}` };
+  }
+
+  const parsed = parseProfileFields(body || text);
+  const merged = {
+    name: parsed.name || collect.customerName || '',
+    phone: parsed.phone || '',
+    notes: parsed.notes || '',
+  };
+
+  let customer = null;
+  if (collect.customerId) {
+    const snap = await db.collection('customers').doc(collect.customerId).get();
+    if (snap.exists) customer = { id: snap.id, ...snap.data() };
+  }
+
+  const saved = await upsertCustomerProfile(db, admin, {
+    customer,
+    lineUserId: userId,
+    customerName: merged.name || collect.customerName,
+    fields: {
+      name: merged.name || customer?.name,
+      phone: merged.phone || customer?.phone,
+      notes: merged.notes || customer?.notes,
+    },
+  });
+
+  const stillMissing = collect.missing.filter((key) => {
+    if (key === 'name') return !String(saved.name || '').trim();
+    if (key === 'phone') return !String(saved.phone || '').trim();
+    if (key === 'notes') return !String(saved.notes || '').trim();
+    return true;
+  });
+
+  if (stillMissing.length > 0) {
+    await setLineOrderSession(
+      db,
+      session.id,
+      {
+        profileCollect: {
+          ...collect,
+          customerId: saved.id,
+          customerName: saved.name,
+          missing: stillMissing,
+        },
+      },
+      ts,
+    );
+    return {
+      ok: true,
+      reply: formatMissingProfilePrompt(stillMissing, {
+        itemsSummary: formatItemsSummary(draft.items),
+        deliveryDateLabel: `${formatDateThai(draft.deliveryDate)} (${draft.deliveryDate})`,
+      }),
+    };
+  }
+
+  if (!isProfileComplete(saved)) {
+    return {
+      ok: true,
+      reply: formatMissingProfilePrompt(['name', 'phone', 'notes'], {
+        itemsSummary: formatItemsSummary(draft.items),
+        deliveryDateLabel: `${formatDateThai(draft.deliveryDate)} (${draft.deliveryDate})`,
+      }),
+    };
+  }
+
+  await setLineOrderSession(db, session.id, { profileCollect: null, orderDraft: null }, ts);
+  return tryCompleteOrder(db, admin, session, ts, {
+    items: draft.items,
+    text: draft.text || text,
+    userId: draft.userId || userId,
+    groupId: draft.groupId || groupId,
+    deliveryDate: draft.deliveryDate,
+  });
+}
+
 /**
  * @returns {Promise<{ ok: boolean, reply: string }>}
  */
@@ -81,6 +244,10 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const session = await getLineOrderSession(db, groupId, userId);
   const { dateKey: parsedDate, textWithoutDate } = parseDeliveryDateFromText(text);
   const body = (textWithoutDate || text).trim();
+
+  if (session.profileCollect && session.orderDraft) {
+    return handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body });
+  }
 
   let deliveryDate = resolveLineOrderDeliveryDate({
     parsedDate,
@@ -99,6 +266,8 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     };
   }
 
+  const deliveryLabel = `${formatDateThai(deliveryDate)} (${deliveryDate})`;
+  const riverPending = parseRiverPrawnPendingLine(body || text);
   let items = parseOrderItems(body || text);
   const simple = parseSimpleOrderLine(body);
 
@@ -108,6 +277,25 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   } else if (simple?.kind === 'item') {
     const it = simpleToOrderItem(simple);
     if (it) items = [it];
+  } else if (riverPending?.kind === 'pending_river') {
+    await setLineOrderSession(
+      db,
+      session.id,
+      {
+        deliveryDate,
+        pending: {
+          variant: 'river_prawn',
+          customerName: riverPending.customerName,
+          qty: riverPending.qty,
+          unit: riverPending.unit,
+        },
+      },
+      ts,
+    );
+    return {
+      ok: true,
+      reply: formatRiverSizePrompt(riverPending, deliveryLabel),
+    };
   } else if (simple?.kind === 'pending') {
     await setLineOrderSession(
       db,
@@ -135,24 +323,22 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
         reply: 'พิมพ์ชื่อลูกค้าและน้ำหนักก่อน แล้วค่อยส่ง กลาง/ใหญ่/เล็ก ครับ',
       };
     }
+    if (riverPending) {
+      return {
+        ok: true,
+        reply: formatRiverSizePrompt(riverPending, deliveryLabel),
+      };
+    }
     return { ok: false, reply: `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}` };
   }
 
-  const orderCount = await saveLineOrders(db, admin, {
+  return tryCompleteOrder(db, admin, session, ts, {
     items,
     text,
     userId,
     groupId,
     deliveryDate,
   });
-
-  await setLineOrderSession(db, session.id, { deliveryDate, pending: null }, ts);
-
-  const summary = formatItemsSummary(items);
-  return {
-    ok: true,
-    reply: `✅ รับออเดอร์แล้วครับ (${orderCount} ราย)\n📅 ส่ง ${formatDateThai(deliveryDate)} (${deliveryDate})\n\n${summary}`,
-  };
 }
 
 module.exports = { processShrimpLineOrder };

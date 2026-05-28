@@ -1,7 +1,12 @@
 /**
  * จำแนกข้อความ LINE กุ้ง — ตอบเฉพาะคำสั่ง ไม่รบกวนแชททั่วไปในกลุ่ม
  */
-const { parseOrderItems, normalizeOrderText, parseSimpleOrderLine } = require('./parseLineOrder');
+const {
+  parseOrderItems,
+  normalizeOrderText,
+  parseSimpleOrderLine,
+  parseRiverPrawnPendingLine,
+} = require('./parseLineOrder');
 const { parseDeliveryDateFromText } = require('./parseDeliveryDate');
 const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummary');
 const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
@@ -13,10 +18,18 @@ function hasOrderBody(text) {
   const { textWithoutDate } = parseDeliveryDateFromText(text);
   const body = (textWithoutDate || text || '').trim();
   if (!body) return false;
+  if (parseRiverPrawnPendingLine(body)) return true;
   if (parseOrderItems(body).length > 0) return true;
   const simple = parseSimpleOrderLine(body);
   if (simple?.kind === 'item' || simple?.kind === 'pending') return true;
   if (simple?.kind === 'size_only') return true;
+  return false;
+}
+
+function isShrimpSessionContinuation(session) {
+  if (!session) return false;
+  if (session.pending) return true;
+  if (session.profileCollect && session.orderDraft) return true;
   return false;
 }
 
@@ -36,6 +49,7 @@ function isShrimpOrderCommand(text) {
   const t = normalizeOrderText(body);
 
   if (parseSimpleOrderLine(body)) return true;
+  if (parseRiverPrawnPendingLine(body)) return true;
 
   if (!/กุ้ง/.test(t)) return false;
   if (!UNIT_RE.test(t)) return false;
@@ -46,9 +60,11 @@ function isShrimpOrderCommand(text) {
   return items.length > 0;
 }
 
-function classifyShrimpLineMessage(text) {
+function classifyShrimpLineMessage(text, session) {
   const raw = String(text || '').trim();
   if (!raw) return 'ignore';
+
+  if (isShrimpSessionContinuation(session)) return 'order';
 
   if (SHRIMP_HELP_CMD.test(raw)) return 'help';
   if (isShrimpTodayOrdersCommand(raw)) return 'today_orders';
@@ -62,4 +78,5 @@ module.exports = {
   classifyShrimpLineMessage,
   isShrimpOrderCommand,
   hasOrderBody,
+  isShrimpSessionContinuation,
 };

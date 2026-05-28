@@ -14,16 +14,27 @@ function sessionDocId(groupId, userId) {
 async function getLineOrderSession(db, groupId, userId) {
   const id = sessionDocId(groupId, userId);
   const snap = await db.collection('lineOrderSessions').doc(id).get();
-  if (!snap.exists) return { id, deliveryDate: null, pending: null };
+  if (!snap.exists) {
+    return { id, deliveryDate: null, pending: null, orderDraft: null, profileCollect: null };
+  }
   const data = snap.data() || {};
   const updatedAt = data.updatedAt?.toDate?.() || (data.updatedAt ? new Date(data.updatedAt) : null);
   if (updatedAt && Date.now() - updatedAt.getTime() > SESSION_TTL_MS) {
-    return { id, deliveryDate: null, pending: null, stale: true };
+    return {
+      id,
+      deliveryDate: null,
+      pending: null,
+      orderDraft: null,
+      profileCollect: null,
+      stale: true,
+    };
   }
   return {
     id,
     deliveryDate: data.deliveryDate || null,
     pending: data.pending || null,
+    orderDraft: data.orderDraft || null,
+    profileCollect: data.profileCollect || null,
   };
 }
 
