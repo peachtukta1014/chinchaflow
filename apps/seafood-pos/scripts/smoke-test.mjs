@@ -53,6 +53,21 @@ try {
 }
 
 try {
+  const { countPendingLineOrdersForBadge } = await import('../src/lib/lineOrderBadge.js');
+  const tomorrow = shiftDateKey(dateKeyBangkok(), 1);
+  const rows = [
+    { status: 'pending', deliveryDate: tomorrow },
+    { status: 'done', deliveryDate: tomorrow },
+  ];
+  assert(
+    countPendingLineOrdersForBadge(rows) === 1,
+    'badge นับออเดอร์ส่งพรุ่งนี้ (ไม่กรองแค่วันนี้)',
+  );
+} catch (e) {
+  fail('countPendingLineOrdersForBadge', e);
+}
+
+try {
   const cash = computePaymentAmounts(1000, 'cash');
   assert(cash.remainingAmount === 0 && cash.paidAmount === 1000, 'computePaymentAmounts cash');
   const credit = computePaymentAmounts(1000, 'credit');
