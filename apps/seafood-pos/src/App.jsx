@@ -18,6 +18,7 @@ import AppHeaderMenu from './components/AppHeaderMenu';
 import HeaderQuickLinks from './components/HeaderQuickLinks';
 import LineTabIcon from './components/LineTabIcon';
 import { setAppIconBadge } from './lib/appBadge';
+import { registerBadgeServiceWorker } from './lib/registerBadgeWorker';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
@@ -141,26 +142,38 @@ export default function App() {
     [stock, stockBatches],
   );
 
-  const pollOrderBadge = Boolean(
-    member && import.meta.env.VITE_FIREBASE_PROJECT_ID && activeTab !== 'orders',
-  );
+  const canPollOrders = Boolean(member && import.meta.env.VITE_FIREBASE_PROJECT_ID);
 
-  useEffect(() => {
-    if (!member || !import.meta.env.VITE_FIREBASE_PROJECT_ID) return;
+  const refreshPendingOrderBadge = useCallback(() => {
+    if (!canPollOrders) return;
     fetchPendingLineOrderCount().then(setPendingOrders);
-  }, [member, activeTab]);
-
-  useIntervalWhen(
-    pollOrderBadge,
-    () => {
-      fetchPendingLineOrderCount().then(setPendingOrders);
-    },
-    45000,
-  );
+  }, [canPollOrders]);
 
   useEffect(() => {
+    if (!canPollOrders) return undefined;
+    registerBadgeServiceWorker();
+    refreshPendingOrderBadge();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshPendingOrderBadge();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refreshPendingOrderBadge);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refreshPendingOrderBadge);
+    };
+  }, [canPollOrders, refreshPendingOrderBadge]);
+
+  useIntervalWhen(canPollOrders, refreshPendingOrderBadge, 30000);
+
+  useEffect(() => {
+    if (!member) {
+      setPendingOrders(0);
+      setAppIconBadge(0);
+      return;
+    }
     setAppIconBadge(pendingOrders);
-  }, [pendingOrders]);
+  }, [member, pendingOrders]);
 
   const handleLogin = (m) => setMember(m);
   const handleLogout = async () => {
