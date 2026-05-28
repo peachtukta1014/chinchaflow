@@ -52,7 +52,7 @@ export default function AppHeaderMenu({ isAdmin, activeTab, onNavigate }) {
 
       {open && (
         <div
-          className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl py-2 z-50"
+          className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl py-2 z-[100]"
           role="menu"
         >
           <p className="px-4 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">

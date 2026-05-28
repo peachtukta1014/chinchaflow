@@ -202,7 +202,7 @@ export default function App() {
         <img src="/logo.jpg" alt="" className="w-72 h-72 object-contain opacity-[0.04]" />
       </div>
 
-      <div className="bg-slate-900 text-white z-10 shrink-0">
+      <div className="bg-slate-900 text-white z-30 shrink-0 overflow-visible relative">
         {isOverlayTab ? (
           <div className="px-4 pt-6 pb-3 flex items-center gap-2">
             <button
