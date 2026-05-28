@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { ArrowLeft, BarChart2, Bell, LogOut, RefreshCw, ShoppingCart, Users } from 'lucide-react';
+import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart } from 'lucide-react';
 import { auth } from './firebase';
 import { FS_BASE, fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
@@ -15,6 +15,9 @@ import { getAppBuildLabel } from './lib/appBuildInfo';
 import { useIntervalWhen } from './lib/useIntervalWhen';
 import NavButton from './components/NavButton';
 import AppHeaderMenu from './components/AppHeaderMenu';
+import HeaderQuickLinks from './components/HeaderQuickLinks';
+import LineTabIcon from './components/LineTabIcon';
+import { setAppIconBadge } from './lib/appBadge';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
@@ -27,11 +30,12 @@ const AdminUsersScreen = lazy(() => import('./screens/AdminUsersScreen'));
 const ProductSettingsScreen = lazy(() => import('./screens/ProductSettingsScreen'));
 const LotCloseScreen = lazy(() => import('./screens/LotCloseScreen'));
 
-const MAIN_TABS = new Set(['pos', 'sales', 'orders', 'members']);
+const MAIN_TABS = new Set(['pos', 'sales', 'orders']);
 
 const OVERLAY_TITLES = {
-  stock: 'รับสต๊อก / คลัง',
-  'admin-users': 'สมาชิกระบบ',
+  stock: 'รับเข้า / คลัง',
+  members: 'รายชื่อลูกค้า',
+  'admin-users': 'สมาชิกแอป',
   'admin-products': 'ตั้งค่าราคากุ้ง',
   'lot-close': 'สรุป / ชั่งปิดล็อต',
 };
@@ -154,6 +158,10 @@ export default function App() {
     45000,
   );
 
+  useEffect(() => {
+    setAppIconBadge(pendingOrders);
+  }, [pendingOrders]);
+
   const handleLogin = (m) => setMember(m);
   const handleLogout = async () => {
     if (!window.confirm('ออกจากระบบ?')) return;
@@ -266,6 +274,14 @@ export default function App() {
 
       <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} />
 
+      {isMainTab && (
+        <HeaderQuickLinks
+          isAdmin={isAdmin}
+          onOpenCustomers={() => openOverlay('members')}
+          onOpenAppMembers={() => openOverlay('admin-users')}
+        />
+      )}
+
       <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'pos' && (
           <POSMobile
@@ -273,6 +289,7 @@ export default function App() {
             stock={stock}
             stockBatches={stockBatches}
             updateMainStock={updateMainStock}
+            onOpenReceive={() => openOverlay('stock')}
             onSaveBill={(b) => {
               setTransactions((prev) => [b, ...prev]);
               bumpSalesAndStock();
@@ -360,29 +377,25 @@ export default function App() {
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
           <NavButton
-            icon={<ShoppingCart />}
-            label="ขาย"
+            icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
+            label="บันทึกการขาย"
+            compactLabel
             isActive={activeTab === 'pos'}
             onClick={() => goMainTab('pos')}
           />
           <NavButton
-            icon={<BarChart2 />}
-            label="ยอด"
+            icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
+            label="ยอดขาย/ยอดค้าง"
+            compactLabel
             isActive={activeTab === 'sales'}
             onClick={() => goMainTab('sales')}
           />
           <NavButton
-            icon={<Bell />}
-            label="ออเดอร์"
+            icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
+            label="LINE"
             isActive={activeTab === 'orders'}
             onClick={() => goMainTab('orders')}
             badge={pendingOrders}
-          />
-          <NavButton
-            icon={<Users />}
-            label="ลูกค้า"
-            isActive={activeTab === 'members'}
-            onClick={() => goMainTab('members')}
           />
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CheckCircle, ChevronRight, Delete, Edit3, MapPin, Mic, MicOff, PlusCircle, X,
+  CheckCircle, ChevronDown, Delete, Edit3, MapPin, Mic, MicOff, Package, PlusCircle, X,
 } from 'lucide-react';
 import {
   hasVoiceCommitCommand,
@@ -16,7 +16,9 @@ import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
 
-export default function POSMobile({ user, stock, stockBatches = [], updateMainStock, onSaveBill }) {
+export default function POSMobile({
+  user, stock, stockBatches = [], updateMainStock, onSaveBill, onOpenReceive,
+}) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cart, setCart]             = useState([]);
@@ -263,21 +265,18 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
         />
       )}
       <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
-        {/* Customer selector */}
-        <div className="flex items-center bg-slate-50 rounded-2xl p-2 border border-slate-200 mb-3">
-          <MapPin className="text-blue-500 ml-2 shrink-0" size={20} />
-          <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)}
-            className="bg-transparent text-slate-800 w-full outline-none p-2 font-bold text-base">
-            {Object.keys(groupedCustomers).map(zone => (
-              <optgroup key={zone} label={`── ${zone} ──`}>
-                {groupedCustomers[zone].map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </optgroup>
-            ))}
-          </select>
-          <ChevronRight className="text-slate-400 mr-2 shrink-0" size={20} />
-        </div>
+        {onOpenReceive && (
+          <button
+            type="button"
+            onClick={onOpenReceive}
+            className="w-full flex items-center justify-center gap-2 mb-3 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm shadow-md active:scale-[0.98]"
+          >
+            <Package size={20} />
+            รับเข้า / รับสต๊อก
+          </button>
+        )}
 
-        {/* Cart items */}
+        {/* Cart items */}
         {cart.length > 0 && (
           <div className="max-h-40 overflow-y-auto mb-3 space-y-2 border-t border-slate-100 pt-3">
             {cart.map((item, idx) => (
@@ -361,17 +360,43 @@ export default function POSMobile({ user, stock, stockBatches = [], updateMainSt
         </div>
       </div>
 
-      {/* Product chips */}
-      <div className="px-4 py-3 overflow-x-auto whitespace-nowrap flex gap-3 shrink-0">
-        {PRODUCTS.map(p => (
-          <button key={p.id} onClick={() => handleProductChange(p.id)}
-            className={`inline-block px-6 py-3 rounded-3xl font-bold text-sm transition-all ${
-              selectedProduct === p.id
-                ? (p.type === 'dead' ? 'bg-red-500 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg')
-                : 'bg-white text-slate-500 border border-slate-200'
-            }`}>{p.name}</button>
-        ))}
-      </div>
+      {/* ลูกค้า + ขนาดกุ้ง (แถวเดียว) */}
+      <div className="px-3 py-3 flex gap-2 items-stretch shrink-0 min-h-[52px]">
+        <div className="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm shrink-0 w-[38%] max-w-[9.5rem] min-w-[7.5rem]">
+          <MapPin className="text-blue-500 ml-2 shrink-0" size={16} />
+          <select
+            value={selectedCustomer}
+            onChange={(e) => setSelectedCustomer(e.target.value)}
+            className="bg-transparent text-slate-800 w-full outline-none py-2.5 pr-1 pl-1 font-bold text-xs truncate"
+            aria-label="เลือกลูกค้า"
+          >
+            {Object.keys(groupedCustomers).map((zone) => (
+              <optgroup key={zone} label={`── ${zone} ──`}>
+                {groupedCustomers[zone].map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <ChevronDown className="text-slate-400 mr-1.5 shrink-0" size={16} />
+        </div>
+        <div className="flex-1 overflow-x-auto whitespace-nowrap flex gap-2 items-center">
+          {PRODUCTS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleProductChange(p.id)}
+              className={`inline-block px-4 py-2.5 rounded-2xl font-bold text-xs transition-all shrink-0 ${
+                selectedProduct === p.id
+                  ? (p.type === 'dead' ? 'bg-red-500 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg')
+                  : 'bg-white text-slate-500 border border-slate-200'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Numpad */}
       <div className="flex-1 bg-white p-5 flex flex-col rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.04)]"
