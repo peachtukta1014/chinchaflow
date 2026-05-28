@@ -47,12 +47,18 @@ function TableNum({ children, align = 'center' }) {
   );
 }
 
-function FieldLine({ label, value, valueClassName = '' }) {
+/** @param {'default' | 'customer'} variant */
+function FieldLine({ label, value, valueClassName = '', variant = 'default' }) {
+  const valueCls =
+    variant === 'customer'
+      ? 'text-[#2563eb] font-extrabold text-[22px] leading-snug tracking-tight'
+      : 'text-black font-semibold text-sm leading-tight';
+
   return (
     <div className="flex items-end gap-2 min-w-0">
-      <span className="shrink-0 text-[#1e3a8a] pb-[6px] leading-none">{label}</span>
+      <span className="shrink-0 text-[#1e3a8a] text-sm font-bold pb-[8px] leading-none">{label}</span>
       <p
-        className={`flex-1 min-w-0 border-b border-dotted border-gray-500 text-black font-semibold leading-tight pb-[6px] min-h-[22px] ${valueClassName}`}
+        className={`flex-1 min-w-0 border-b border-dotted border-gray-500 pb-[8px] min-h-[30px] ${valueCls} ${valueClassName}`}
       >
         {value || '\u00a0'}
       </p>
@@ -155,10 +161,10 @@ export default function BillTemplate({ data }) {
         ใบส่งของ
       </div>
 
-      <div className="text-xs space-y-3 mb-4 font-medium">
+      <div className="text-sm space-y-3 mb-4 font-medium">
         <div className="flex w-full gap-4">
           <div className="flex-grow min-w-0">
-            <FieldLine label="นามลูกค้า" value={data.customerName} />
+            <FieldLine label="นามลูกค้า" value={data.customerName} variant="customer" />
           </div>
           <div className="w-[9.5rem] shrink-0">
             <FieldLine label="วันที่ส่ง" value={data.date} valueClassName="whitespace-nowrap" />
@@ -179,18 +185,25 @@ export default function BillTemplate({ data }) {
         <tbody>
           {FIXED_TEMPLATE_ROWS.map((row) => {
             const rowValue = getRowData(data, row.defaultName, extraQueue);
+            const isExtraLine = !row.defaultName && rowValue.label;
             return (
-              <tr key={row.key} className="h-8 text-center align-middle">
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50 align-middle py-0">
+              <tr key={row.key} className="h-9 text-center align-middle">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-xl font-black bg-slate-50/50 align-middle py-0.5">
                   <TableNum>{rowValue.quantity}</TableNum>
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-left px-3 text-sm font-medium text-gray-800 align-middle">
+                <td
+                  className={`border-r border-b border-[#1e3a8a] text-left px-3 align-middle ${
+                    isExtraLine
+                      ? 'text-[#2563eb] text-base font-bold'
+                      : 'text-sm font-semibold text-gray-800'
+                  }`}
+                >
                   {rowValue.label}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-base font-extrabold bg-slate-50/50 align-middle py-0">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-xl font-black bg-slate-50/50 align-middle py-0.5">
                   <TableNum>{rowValue.pricePerUnit}</TableNum>
                 </td>
-                <td className="border-b border-[#1e3a8a] text-red-600 text-base font-extrabold align-middle py-0 px-2">
+                <td className="border-b border-[#1e3a8a] text-red-600 text-xl font-black align-middle py-0.5 px-2">
                   <TableNum align="right">{rowValue.amount}</TableNum>
                 </td>
               </tr>
@@ -247,18 +260,18 @@ export default function BillTemplate({ data }) {
         </div>
       ) : null}
 
-      <div className="flex justify-between items-end text-[10px] mt-8 font-medium px-2 text-[#1e3a8a] gap-6">
-        <div className="flex items-end flex-1 min-w-0 gap-1">
-          <span className="shrink-0 pb-[5px]">ลงชื่อ</span>
-          <p className="flex-1 border-b border-dotted border-gray-500 text-black font-semibold pb-[5px] min-h-[18px] truncate">
+      <div className="flex justify-between items-end text-sm mt-8 font-medium px-2 text-[#1e3a8a] gap-6">
+        <div className="flex items-end flex-1 min-w-0 gap-1.5">
+          <span className="shrink-0 pb-[7px] text-xs font-bold">ลงชื่อ</span>
+          <p className="flex-1 border-b-2 border-dotted border-[#1e3a8a]/50 text-[#1e3a8a] font-extrabold text-lg leading-tight pb-[7px] min-h-[26px] truncate">
             {data.senderName || '\u00a0'}
           </p>
-          <span className="shrink-0 pb-[5px]">ผู้ส่งของ</span>
+          <span className="shrink-0 pb-[7px] text-xs font-bold">ผู้บันทึก/ส่งของ</span>
         </div>
-        <div className="flex items-end flex-1 min-w-0 gap-1">
-          <span className="shrink-0 pb-[5px]">ลงชื่อ</span>
-          <p className="flex-1 border-b border-dotted border-gray-500 min-h-[18px] pb-[5px]" />
-          <span className="shrink-0 pb-[5px]">ผู้รับของ</span>
+        <div className="flex items-end flex-1 min-w-0 gap-1.5">
+          <span className="shrink-0 pb-[7px] text-xs font-bold">ลงชื่อ</span>
+          <p className="flex-1 border-b border-dotted border-gray-500 min-h-[26px] pb-[7px]" />
+          <span className="shrink-0 pb-[7px] text-xs font-bold">ผู้รับของ</span>
         </div>
       </div>
     </div>

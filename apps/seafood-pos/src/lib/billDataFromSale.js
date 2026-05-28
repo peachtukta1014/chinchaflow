@@ -91,8 +91,14 @@ export function saleToBillData(bill, customer = {}) {
         byTemplate.set(line.templateName, entry);
       }
     } else if (line.amount > 0 || line.quantity) {
+      const perLineCustomer = (raw.customerName || '').trim();
+      const billCustomer = (bill.customerName || customer.name || '').trim();
+      const label =
+        perLineCustomer && perLineCustomer !== billCustomer
+          ? perLineCustomer
+          : (line.lineLabel || 'อื่นๆ');
       extraLines.push({
-        name: line.lineLabel || 'อื่นๆ',
+        name: label,
         quantity: line.quantity,
         pricePerUnit: line.pricePerUnit,
         amount: line.amount,
