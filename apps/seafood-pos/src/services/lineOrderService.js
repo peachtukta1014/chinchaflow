@@ -1,5 +1,6 @@
 import { DEFAULT_PAYMENT_TYPE } from '../constants/payments';
 import { dateKeyBangkok, shiftDateKey } from '../lib/date';
+import { countPendingLineOrdersForBadge } from '../lib/lineOrderBadge';
 import { fsListCollection, fsPatch, fsPost, fsQueryLineOrders } from '../lib/firestoreRest';
 import { actualQtyOf } from '../lib/lineOrderToSale';
 import { incrementCustomerDebt } from './debtService';
@@ -60,9 +61,8 @@ export async function fetchLineOrdersFromToday() {
 }
 
 export async function fetchPendingLineOrderCount() {
-  const today = dateKeyBangkok();
   const rows = await fetchLineOrdersForBoard();
-  return rows.filter((o) => (o.deliveryDate || '') <= today).length;
+  return countPendingLineOrdersForBadge(rows);
 }
 
 export async function cancelLineOrder(orderId, cancelledBy) {
