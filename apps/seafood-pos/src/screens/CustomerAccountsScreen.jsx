@@ -232,6 +232,8 @@ function CustomerFifoPanel({
 
 export default function CustomerAccountsScreen({
   refreshKey = 0,
+  active = true,
+  debtsOnly = false,
   isAdmin = false,
   stock = null,
   stockBatches = [],
@@ -283,21 +285,27 @@ export default function CustomerAccountsScreen({
   }, [loadDebtsRest, refreshKey]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadDebtsRest(), loadOpenSalesIndex(), loadDaySales()]);
-  }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales]);
+    const tasks = [loadDebtsRest(), loadOpenSalesIndex()];
+    if (!debtsOnly) tasks.push(loadDaySales());
+    await Promise.all(tasks);
+  }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales, debtsOnly]);
 
   useEffect(() => {
+    if (!active) return undefined;
     loadOpenSalesIndex();
-  }, [loadOpenSalesIndex]);
+    return undefined;
+  }, [loadOpenSalesIndex, active]);
 
   useEffect(() => {
+    if (!active || debtsOnly) return undefined;
     loadDaySales();
-  }, [loadDaySales]);
+    return undefined;
+  }, [loadDaySales, active, debtsOnly]);
 
-  useIntervalWhen(true, () => {
+  useIntervalWhen(active, () => {
     loadDebtsRest();
     loadOpenSalesIndex();
-    loadDaySales({ background: true });
+    if (!debtsOnly) loadDaySales({ background: true });
   }, 45000);
 
   const totalDebt = customerDebts.reduce((s, c) => s + (parseFloat(c.totalDebt) || 0), 0);
@@ -409,121 +417,125 @@ export default function CustomerAccountsScreen({
         </p>
       </div>
 
-      <DateNavBar
-        dateKey={viewDate}
-        onDateChange={setViewDate}
-        subtitle={
-          loading
-            ? 'โหลด...'
-            : `${sortedDaySales.length} บิล · ฿${dayTotal.toLocaleString()}`
-        }
-      />
+      {!debtsOnly && (
+        <>
+          <DateNavBar
+            dateKey={viewDate}
+            onDateChange={setViewDate}
+            subtitle={
+              loading
+                ? 'โหลด...'
+                : `${sortedDaySales.length} บิล · ฿${dayTotal.toLocaleString()}`
+            }
+          />
 
-      <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-1">บิลทั้งหมด</h3>
-        <p className="text-[10px] text-slate-400 mb-3">
-          สด · โอน · ค้าง · ผ่อน — เลื่อนวันดูประวัติย้อนหลัง
-        </p>
-        {sortedDaySales.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mb-4 text-[10px]">
-            {dayPayBreakdown.filter((p) => p.count > 0).map((p) => (
-              <div key={p.id} className="bg-slate-50 rounded-xl px-2 py-1.5 flex justify-between gap-1">
-                <span className="font-bold text-slate-700">{p.label}</span>
-                <span className="text-slate-600 shrink-0">{p.count} · ฿{p.amount.toLocaleString()}</span>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-1">บิลทั้งหมด</h3>
+            <p className="text-[10px] text-slate-400 mb-3">
+              สด · โอน · ค้าง · ผ่อน — เลื่อนวันดูประวัติย้อนหลัง
+            </p>
+            {sortedDaySales.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-4 text-[10px]">
+                {dayPayBreakdown.filter((p) => p.count > 0).map((p) => (
+                  <div key={p.id} className="bg-slate-50 rounded-xl px-2 py-1.5 flex justify-between gap-1">
+                    <span className="font-bold text-slate-700">{p.label}</span>
+                    <span className="text-slate-600 shrink-0">{p.count} · ฿{p.amount.toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-        {loading ? (
-          <p className="text-center text-slate-400 py-8 text-sm">กำลังโหลด...</p>
-        ) : sortedDaySales.length === 0 ? (
-          <p className="text-center text-slate-400 py-8 text-sm">
-            ไม่มีบิล
-            {' '}
-            {formatViewDateLabel(viewDate)}
-          </p>
-        ) : (
-          <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
-            {sortedDaySales.map((tx, i) => {
-              const busy = payUpdatingId === tx.id;
-              const deleting = deleteBusyId === tx.id;
-              const pt = PAY.find((p) => p.id === tx.paymentType);
-              const itemCount = tx.items?.length ?? 0;
-              return (
-                <div key={tx.id || i} className="border border-slate-100 rounded-xl p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-slate-800 truncate">{tx.customerName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {tx.billNo || '—'}
-                        {tx.timestamp ? ` · ${tx.timestamp}` : ''}
-                        {tx.zone ? ` · ${tx.zone}` : ''}
-                        {itemCount ? ` · ${itemCount} รายการ` : ''}
-                      </p>
+            )}
+            {loading ? (
+              <p className="text-center text-slate-400 py-8 text-sm">กำลังโหลด...</p>
+            ) : sortedDaySales.length === 0 ? (
+              <p className="text-center text-slate-400 py-8 text-sm">
+                ไม่มีบิล
+                {' '}
+                {formatViewDateLabel(viewDate)}
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
+                {sortedDaySales.map((tx, i) => {
+                  const busy = payUpdatingId === tx.id;
+                  const deleting = deleteBusyId === tx.id;
+                  const pt = PAY.find((p) => p.id === tx.paymentType);
+                  const itemCount = tx.items?.length ?? 0;
+                  return (
+                    <div key={tx.id || i} className="border border-slate-100 rounded-xl p-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-slate-800 truncate">{tx.customerName}</p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {tx.billNo || '—'}
+                            {tx.timestamp ? ` · ${tx.timestamp}` : ''}
+                            {tx.zone ? ` · ${tx.zone}` : ''}
+                            {itemCount ? ` · ${itemCount} รายการ` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-black text-emerald-600">฿{billAmount(tx).toLocaleString()}</p>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pt?.cls || 'bg-slate-200'} text-white`}>
+                            {paymentTypeLabel(tx)}
+                          </span>
+                        </div>
+                      </div>
+                      {(tx.remainingAmount || 0) > 0 && (
+                        <p className="text-[10px] text-orange-500 font-bold mt-1">
+                          ค้างจ่าย ฿{Number(tx.remainingAmount).toLocaleString()}
+                        </p>
+                      )}
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {PAY.filter((p) => p.id !== 'installment').map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            disabled={busy || !tx.id}
+                            onClick={() => handleDayBillPayment(tx, p.id)}
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-all ${
+                              tx.paymentType === p.id ? `${p.cls} text-white` : 'bg-slate-100 text-slate-500'
+                            } ${busy ? 'opacity-50' : 'active:scale-95'}`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setBillSheet({
+                            bill: tx,
+                            customer: {
+                              name: tx.customerName,
+                              zone: tx.zone,
+                              phone: tx.phone,
+                              lineUserId: tx.customerLineUserId || tx.lineUserId || '',
+                            },
+                            staffName: tx.recordedBy,
+                          })}
+                          className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
+                        >
+                          ดูภาพบิล / แชร์ LINE
+                        </button>
+                        {isAdmin && tx.id && (
+                          <button
+                            type="button"
+                            disabled={deleting || busy}
+                            onClick={() => handleDeleteSale(tx)}
+                            className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+                            title="ลบบิล (แอดมิน)"
+                          >
+                            <Trash2 size={14} />
+                            {deleting ? '…' : 'ลบ'}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-black text-emerald-600">฿{billAmount(tx).toLocaleString()}</p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pt?.cls || 'bg-slate-200'} text-white`}>
-                        {paymentTypeLabel(tx)}
-                      </span>
-                    </div>
-                  </div>
-                  {(tx.remainingAmount || 0) > 0 && (
-                    <p className="text-[10px] text-orange-500 font-bold mt-1">
-                      ค้างจ่าย ฿{Number(tx.remainingAmount).toLocaleString()}
-                    </p>
-                  )}
-                  <div className="flex gap-1 mt-2 flex-wrap">
-                    {PAY.filter((p) => p.id !== 'installment').map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        disabled={busy || !tx.id}
-                        onClick={() => handleDayBillPayment(tx, p.id)}
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-all ${
-                          tx.paymentType === p.id ? `${p.cls} text-white` : 'bg-slate-100 text-slate-500'
-                        } ${busy ? 'opacity-50' : 'active:scale-95'}`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setBillSheet({
-                        bill: tx,
-                        customer: {
-                          name: tx.customerName,
-                          zone: tx.zone,
-                          phone: tx.phone,
-                          lineUserId: tx.customerLineUserId || tx.lineUserId || '',
-                        },
-                        staffName: tx.recordedBy,
-                      })}
-                      className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
-                    >
-                      ดูภาพบิล / แชร์ LINE
-                    </button>
-                    {isAdmin && tx.id && (
-                      <button
-                        type="button"
-                        disabled={deleting || busy}
-                        onClick={() => handleDeleteSale(tx)}
-                        className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
-                        title="ลบบิล (แอดมิน)"
-                      >
-                        <Trash2 size={14} />
-                        {deleting ? '…' : 'ลบ'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
         <h3 className="font-bold text-slate-800 mb-1">ลูกหนี้ — รับชำระผ่อน (FIFO)</h3>
