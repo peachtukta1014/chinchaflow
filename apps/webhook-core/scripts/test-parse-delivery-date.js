@@ -28,7 +28,7 @@ assert(
     sessionDate: '2026-05-28',
     now: afterCutoff,
   }) === defaultDeliveryDateKeyBangkok(afterCutoff),
-  'session วันนี้เช้าไม่บังคับส่งวันนี้หลังเลย 14:00',
+  'session วันนี้เช้าไม่บังคับส่งวันนี้หลังเลย 15:00',
 );
 assert(
   resolveLineOrderDeliveryDate({

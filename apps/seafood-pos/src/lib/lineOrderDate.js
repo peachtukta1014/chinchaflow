@@ -6,12 +6,12 @@ import {
   tomorrowDateKeyBangkok,
 } from './date.js';
 
-/** 18:00 เมื่อวาน → 14:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
-export const LINE_DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 14 };
+/** 18:00 เมื่อวาน → 15:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
+export const LINE_DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 15 };
 
 /**
  * วันส่งเริ่มต้นเมื่อไม่พิมพ์วันที่ — ตรงกับบอท LINE
- * ช่วง 18:00 เมื่อวาน – 14:00 วันนี้ → วันนี้ · หลัง 14:00 → พรุ่งนี้
+ * ช่วง 18:00 เมื่อวาน – 15:00 วันนี้ → วันนี้ · หลัง 15:00 → พรุ่งนี้
  */
 export function defaultDeliveryDateKeyBangkok(now = new Date()) {
   const todayKey = dateKeyBangkok(now);

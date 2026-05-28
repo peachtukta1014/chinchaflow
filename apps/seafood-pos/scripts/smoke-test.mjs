@@ -113,6 +113,10 @@ try {
     '10:00 ไม่ระบุวัน = ส่งวันนี้',
   );
   assert(
+    defaultDeliveryDateKeyBangkok(new Date('2026-03-24T14:30:00+07:00')) === '2026-03-24',
+    '14:30 ไม่ระบุวัน = ส่งวันนี้ (ก่อน cutoff 15:00)',
+  );
+  assert(
     defaultDeliveryDateKeyBangkok(new Date('2026-03-24T15:00:00+07:00')) === '2026-03-25',
     '15:00 ไม่ระบุวัน = ส่งพรุ่งนี้',
   );
@@ -160,7 +164,7 @@ try {
       sessionDate: '2026-05-28',
       now: late,
     }) === defaultDeliveryDateKeyBangkok(late),
-    'หลัง 14:00 session วันนี้ไม่ดึงออเดอร์ใหม่กลับเป็นส่งวันนี้',
+    'หลัง 15:00 session วันนี้ไม่ดึงออเดอร์ใหม่กลับเป็นส่งวันนี้',
   );
 } catch (e) {
   fail('webhook resolveLineOrderDeliveryDate', e);

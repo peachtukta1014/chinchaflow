@@ -18,12 +18,12 @@ function tomorrowBKK() {
   return dateKeyBangkok(d);
 }
 
-/** 18:00 เมื่อวาน → 14:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
-const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 14 };
+/** 18:00 เมื่อวาน → 15:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
+const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 15 };
 
 /**
  * วันส่งเริ่มต้นเมื่อลูกค้าไม่พิมพ์ วันนี้/พรุ่งนี้/วันที่
- * ช่วง 18:00 เมื่อวาน – 14:00 วันนี้ → วันนี้ · หลัง 14:00 → พรุ่งนี้
+ * ช่วง 18:00 เมื่อวาน – 15:00 วันนี้ → วันนี้ · หลัง 15:00 → พรุ่งนี้
  */
 function tomorrowFromDate(date = new Date()) {
   const d = new Date(`${dateKeyBangkok(date)}T12:00:00+07:00`);

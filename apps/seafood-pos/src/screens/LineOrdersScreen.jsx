@@ -260,7 +260,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       <p className="font-bold text-sm">ยังไม่มีออเดอร์</p>
       <p className="text-xs mt-1 text-center px-4">ออเดอร์จาก LINE จะขึ้นที่นี่</p>
       <p className="text-[10px] mt-2 text-slate-400 text-center px-6 leading-relaxed">
-        ไม่ระบุวันส่ง: 18:00 เมื่อวาน–14:00 วันนี้ = ส่งวันนี้ · หลัง 14:00 = พรุ่งนี้
+        ไม่ระบุวันส่ง: 18:00 เมื่อวาน–15:00 วันนี้ = ส่งวันนี้ · หลัง 15:00 = พรุ่งนี้
       </p>
     </div>
   );
