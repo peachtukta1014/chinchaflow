@@ -22,6 +22,16 @@ const THAI_NUM = {
 };
 
 const SHRIMP_PRODUCT_RE = /กุ้ง\s*(ใหญ่|กลาง|เล็ก|ตาย)|กุ้ง(ใหญ่|กลาง|เล็ก|ตาย)/i;
+const RIVER_PRAWN_RE = /กุ้ง\s*แม่น้ำ|กุ้งแม่น้ำ/i;
+const RIVER_PRAWN_SIZED_RE =
+  /กุ้ง\s*แม่น้ำ\s*(ใหญ่|กลาง|เล็ก|ตาย)|กุ้งแม่น้ำ\s*(ใหญ่|กลาง|เล็ก|ตาย)/i;
+
+const RIVER_SIZE_PROMPT =
+  '🦐 กุ้งแม่น้ำ — กรุณาเลือกขนาดก่อนยืนยันออเดอร์ครับ\n' +
+  '• เล็ก 850 บาท/กก\n' +
+  '• กลาง 1,100 บาท/กก\n' +
+  '• ใหญ่ 1,450 บาท/กก\n\n' +
+  'พิมพ์ เล็ก / กลาง / ใหญ่ ต่อได้ครับ';
 
 const UNIT_PATTERN = Object.keys(UNIT_ALIASES)
   .sort((a, b) => b.length - a.length)
@@ -64,6 +74,63 @@ function pushItem(items, product, qty, unit, customerName) {
     unit: normalizeUnit(unit),
     customerName: customerName || null,
   });
+}
+
+/** กุ้งแม่น้ำ + ขนาด + น้ำหนัก → กุ้งใหญ่/กลาง/เล็ก */
+function parseRiverPrawnWithSize(line) {
+  const normalized = normalizeOrderText(line);
+  if (!RIVER_PRAWN_RE.test(normalized)) return [];
+
+  const sized = normalized.match(RIVER_PRAWN_SIZED_RE);
+  if (!sized) return [];
+
+  const sizeWord = (sized[0].match(/(ใหญ่|กลาง|เล็ก|ตาย)/i) || [])[0];
+  const product = /ตาย/.test(sizeWord || '') ? 'กุ้งตาย' : `กุ้ง${sizeWord || 'เล็ก'}`;
+
+  const before = normalized.slice(0, sized.index).trim();
+  let customerName = null;
+  if (before && !/กุ้ง/.test(before)) {
+    customerName = before.replace(/^(ถึง|สำหรับ|ลูกค้า)\s*/i, '').trim() || null;
+  }
+
+  const unitMatch = normalized.match(new RegExp(`([\\d.]+)\\s*(${UNIT_PATTERN})`, 'i'));
+  if (!unitMatch) return [];
+
+  const items = [];
+  pushItem(items, product, parseFloat(unitMatch[1]), unitMatch[2], customerName);
+  return items;
+}
+
+/** กุ้งแม่น้ำโดยไม่ระบุขนาด — รอลูกค้าเลือก เล็ก/กลาง/ใหญ่ */
+function parseRiverPrawnPendingLine(line) {
+  const normalized = normalizeOrderText(line);
+  if (!RIVER_PRAWN_RE.test(normalized)) return null;
+  if (RIVER_PRAWN_SIZED_RE.test(normalized)) return null;
+
+  const unitMatch = normalized.match(new RegExp(`([\\d.]+)\\s*(${UNIT_PATTERN})`, 'i'));
+  if (!unitMatch) return null;
+
+  const qty = parseFloat(unitMatch[1]);
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+
+  const riverIdx = normalized.search(RIVER_PRAWN_RE);
+  const before = normalized.slice(0, riverIdx).trim();
+  let customerName = null;
+  if (before && !/กุ้ง/.test(before) && before.length >= 2) {
+    customerName = before.replace(/^(ถึง|สำหรับ|ลูกค้า)\s*/i, '').trim() || null;
+  }
+
+  return {
+    kind: 'pending_river',
+    customerName,
+    qty,
+    unit: normalizeUnit(unitMatch[2]),
+  };
+}
+
+function isBareRiverPrawnProduct(product) {
+  const p = String(product || '').replace(/\s+/g, '');
+  return /กุ้งแม่น้ำ/i.test(p) && !/(ใหญ่|กลาง|เล็ก|ตาย)/i.test(p);
 }
 
 function parseShrimpNatural(line) {
@@ -112,6 +179,9 @@ function parseGluedOrderLine(line) {
 }
 
 function parseLine(line) {
+  const riverSized = parseRiverPrawnWithSize(line);
+  if (riverSized.length > 0) return riverSized;
+
   const glued = parseGluedOrderLine(line);
   if (glued.length > 0) return glued;
 
@@ -123,14 +193,14 @@ function parseLine(line) {
   LINE_RE.lastIndex = 0;
   while ((m = LINE_RE.exec(line)) !== null) {
     const product = (m[1] || '').trim();
-    if (/กุ้ง/.test(product)) {
+    if (/กุ้ง/.test(product) && !isBareRiverPrawnProduct(product)) {
       pushItem(items, product, parseFloat(m[2]), m[3]);
     }
   }
   LINE_RE_REV.lastIndex = 0;
   while ((m = LINE_RE_REV.exec(line)) !== null) {
     const product = (m[3] || '').trim();
-    if (/กุ้ง/.test(product)) {
+    if (/กุ้ง/.test(product) && !isBareRiverPrawnProduct(product)) {
       pushItem(items, product, parseFloat(m[1]), m[2]);
     }
   }
@@ -241,10 +311,18 @@ function simpleToOrderItem(simple) {
 }
 
 function pendingToItems(pending, productName) {
-  if (!pending?.customerName || !pending.qty) return [];
+  if (!pending?.qty) return [];
   const items = [];
-  pushItem(items, productName, pending.qty, pending.unit || 'กก', pending.customerName);
+  pushItem(items, productName, pending.qty, pending.unit || 'กก', pending.customerName || null);
   return items;
+}
+
+function formatRiverSizePrompt(pending, deliveryDateLabel) {
+  const who = pending?.customerName ? `${pending.customerName} · ` : '';
+  const qty = pending?.qty;
+  const unit = pending?.unit || 'กก';
+  const dateLine = deliveryDateLabel ? `\n📅 ส่ง ${deliveryDateLabel}` : '';
+  return `📝 ${who}กุ้งแม่น้ำ ${qty} ${unit}${dateLine}\n\n${RIVER_SIZE_PROMPT}`;
 }
 
 const ORDER_FORMAT_HELP =
@@ -252,17 +330,22 @@ const ORDER_FORMAT_HELP =
   '• ออเดอร์ 25/5/69 หรือ 25/5/69 → ตั้งวันส่งก่อน\n' +
   '• ปุ้ย 2 หรือ จะเขียด กลาง 6\n' +
   '• กุ้งใหญ่ 2 กก · ตาจุ้ย กุ้งเล็ก 1 โล\n' +
+  '• กุ้งแม่น้ำ 4 โล (ระบบจะถามขนาด เล็ก/กลาง/ใหญ่)\n' +
   '• 2 กก กุ้งกลาง\n\n' +
   'หลายลูกค้าในข้อความเดียว → แยกเป็นหลายออเดอร์ในแอป';
 
 module.exports = {
   parseOrderItems,
   parseSimpleOrderLine,
+  parseRiverPrawnPendingLine,
+  parseRiverPrawnWithSize,
   simpleToOrderItem,
   pendingToItems,
+  formatRiverSizePrompt,
   sizeWordToProduct,
   groupItemsByCustomer,
   ORDER_FORMAT_HELP,
+  RIVER_SIZE_PROMPT,
   normalizeOrderText,
   DEFAULT_SIMPLE_PRODUCT,
 };
