@@ -18,12 +18,12 @@ function tomorrowBKK() {
   return dateKeyBangkok(d);
 }
 
-/** 18:00 เมื่อวาน → 14:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
-const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 14 };
+/** 18:00 เมื่อวาน → 15:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
+const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 15 };
 
 /**
  * วันส่งเริ่มต้นเมื่อลูกค้าไม่พิมพ์ วันนี้/พรุ่งนี้/วันที่
- * ช่วง 18:00 เมื่อวาน – 14:00 วันนี้ → วันนี้ · หลัง 14:00 → พรุ่งนี้
+ * ช่วง 18:00 เมื่อวาน – 15:00 วันนี้ → วันนี้ · หลัง 15:00 → พรุ่งนี้
  */
 function tomorrowFromDate(date = new Date()) {
   const d = new Date(`${dateKeyBangkok(date)}T12:00:00+07:00`);
@@ -163,13 +163,24 @@ function coalesceSessionDeliveryDate(sessionDateKey, today = todayBKK()) {
 }
 
 /**
- * วันส่งสำหรับออเดอร์ LINE: วันที่ในข้อความ > session (ถ้ายังไม่เลยวัน) > ค่าเริ่มต้นตามเวลา
+ * วันส่งสำหรับออเดอร์ LINE: วันที่ในข้อความ > session (ถ้าไม่เก่ากว่าค่าเริ่มต้นตามเวลา) > ค่าเริ่มต้น
+ * @param {{ lockSessionDate?: boolean }} — true เมื่อกำลังต่อข้อความ pending (ไม่เปลี่ยนวันส่งกลางคัน)
  */
-function resolveLineOrderDeliveryDate({ parsedDate, sessionDate, now = new Date() }) {
+function resolveLineOrderDeliveryDate({
+  parsedDate,
+  sessionDate,
+  now = new Date(),
+  lockSessionDate = false,
+}) {
   if (parsedDate) return parsedDate;
+  const defaultDate = defaultDeliveryDateKeyBangkok(now);
   const fromSession = coalesceSessionDeliveryDate(sessionDate);
-  if (fromSession) return fromSession;
-  return defaultDeliveryDateKeyBangkok(now);
+  if (fromSession) {
+    if (lockSessionDate) return fromSession;
+    // ออเดอร์ใหม่หลังเลย cutoff: session วันนี้จากเช้าไม่ดึงกลับมาเป็น「ส่งวันนี้」
+    if (fromSession >= defaultDate) return fromSession;
+  }
+  return defaultDate;
 }
 
 module.exports = {
