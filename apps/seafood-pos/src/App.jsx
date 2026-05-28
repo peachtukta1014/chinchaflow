@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart } from 'lucide-react';
 import { auth } from './firebase';
@@ -19,6 +19,7 @@ import HeaderQuickLinks from './components/HeaderQuickLinks';
 import LineTabIcon from './components/LineTabIcon';
 import { setAppIconBadge } from './lib/appBadge';
 import { registerBadgeServiceWorker } from './lib/registerBadgeWorker';
+import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
@@ -59,6 +60,7 @@ export default function App() {
   const [salesRefresh, setSalesRefresh] = useState(0);
   const [stockRefresh, setStockRefresh] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
+  const prevPendingOrdersRef = useRef(null);
 
   const isMainTab = MAIN_TABS.has(activeTab);
   const isOverlayTab = !isMainTab;
@@ -150,6 +152,11 @@ export default function App() {
   }, [canPollOrders]);
 
   useEffect(() => {
+    if (!member) return;
+    ensureNotifyPermission();
+  }, [member]);
+
+  useEffect(() => {
     if (!canPollOrders) return undefined;
     registerBadgeServiceWorker();
     refreshPendingOrderBadge();
@@ -170,10 +177,21 @@ export default function App() {
     if (!member) {
       setPendingOrders(0);
       setAppIconBadge(0);
+      prevPendingOrdersRef.current = null;
       return;
     }
     setAppIconBadge(pendingOrders);
-  }, [member, pendingOrders]);
+    const prev = prevPendingOrdersRef.current;
+    if (prev !== null && pendingOrders > prev) {
+      const added = pendingOrders - prev;
+      showWebNotify(
+        'ออเดอร์ LINE ใหม่',
+        added === 1 ? 'มีออเดอร์รอจัดส่ง 1 รายการ' : `มีออเดอร์รอจัดส่ง ${pendingOrders} รายการ`,
+        { tag: 'line-orders', onClick: () => goMainTab('orders') },
+      );
+    }
+    prevPendingOrdersRef.current = pendingOrders;
+  }, [member, pendingOrders, goMainTab]);
 
   const handleLogin = (m) => setMember(m);
   const handleLogout = async () => {

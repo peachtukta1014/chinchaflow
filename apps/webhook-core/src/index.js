@@ -34,6 +34,7 @@ const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
 } = require('./shrimpLinePush');
+const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -308,6 +309,35 @@ exports.teaPushSummary = functions
     } catch (err) {
       console.error('teaPushSummary', err);
       res.status(500).json({ error: err.message || 'failed' });
+    }
+  });
+
+// ── แจ้งเตือนทันที → กลุ่ม LINE ที่ตั้งในแอป (ออเดอร์กุ้ง / สั่งของชา) ─────────────
+exports.onShrimpLineOrderCreated = functions
+  .region('asia-southeast1')
+  .firestore.document('lineOrders/{orderId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = snap.data();
+      const result = await notifyShrimpLineOrder(db(), data);
+      if (result.skipped) console.log('onShrimpLineOrderCreated', result.skipped);
+      else console.log('onShrimpLineOrderCreated sent', result.sent);
+    } catch (err) {
+      console.error('onShrimpLineOrderCreated', err);
+    }
+  });
+
+exports.onTeaRestockCreated = functions
+  .region('asia-southeast1')
+  .firestore.document('restocks/{restockId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = { id: snap.id, ...snap.data() };
+      const result = await notifyTeaRestock(db(), data);
+      if (result.skipped) console.log('onTeaRestockCreated', result.skipped);
+      else console.log('onTeaRestockCreated sent', result.sent);
+    } catch (err) {
+      console.error('onTeaRestockCreated', err);
     }
   });
 

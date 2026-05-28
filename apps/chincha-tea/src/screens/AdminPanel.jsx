@@ -38,6 +38,7 @@ const DEFAULT_LINE_CONFIG = {
   notifyUserIds: '',
   autoSummaryEnabled: false,
   autoSummaryHour: 22,
+  instantRestockNotify: true,
 };
 
 export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged }) {
@@ -591,6 +592,7 @@ function LineSettingsSection({ t }) {
       await fsSetConfig('teaLine', {
         ...form,
         notifyGroupId: (form.notifyGroupId || '').trim(),
+        instantRestockNotify: form.instantRestockNotify !== false,
         updatedAt: new Date().toISOString(),
       });
       setFlash('✅ บันทึกการตั้งค่าแล้ว');
@@ -684,6 +686,18 @@ function LineSettingsSection({ t }) {
           {fetchBusy === 'user' ? '⏳' : `📥 ${t('lineFetchUserId')}`}
         </button>
         <p className="text-[10px] text-stone-400">{t('lineGroupIdHint')}</p>
+      </div>
+      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-2">
+        <p className="font-bold text-xs text-emerald-900">{t('lineInstantRestockNotify')}</p>
+        <p className="text-[10px] text-emerald-800 leading-relaxed">{t('lineInstantRestockNotifyDesc')}</p>
+        <label className="flex items-center gap-2 text-sm font-bold text-emerald-900">
+          <input
+            type="checkbox"
+            checked={form.instantRestockNotify !== false}
+            onChange={(e) => setForm({ ...form, instantRestockNotify: e.target.checked })}
+          />
+          {t('lineInstantRestockNotifyOn')}
+        </label>
       </div>
       <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-2">
         <p className="font-bold text-xs text-stone-700">{t('lineAutoSummary')}</p>
