@@ -153,6 +153,15 @@ try {
     }) === '2026-05-30',
     'วันที่ในข้อความชนะ session',
   );
+  const late = new Date('2026-05-28T16:00:00+07:00');
+  assert(
+    resolveLineOrderDeliveryDate({
+      parsedDate: null,
+      sessionDate: '2026-05-28',
+      now: late,
+    }) === defaultDeliveryDateKeyBangkok(late),
+    'หลัง 14:00 session วันนี้ไม่ดึงออเดอร์ใหม่กลับเป็นส่งวันนี้',
+  );
 } catch (e) {
   fail('webhook resolveLineOrderDeliveryDate', e);
 }

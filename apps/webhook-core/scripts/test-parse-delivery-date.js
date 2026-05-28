@@ -21,4 +21,22 @@ assert(
     === defaultDeliveryDateKeyBangkok(now),
   'ignore old session',
 );
+const afterCutoff = new Date('2026-05-28T16:00:00+07:00');
+assert(
+  resolveLineOrderDeliveryDate({
+    parsedDate: null,
+    sessionDate: '2026-05-28',
+    now: afterCutoff,
+  }) === defaultDeliveryDateKeyBangkok(afterCutoff),
+  'session วันนี้เช้าไม่บังคับส่งวันนี้หลังเลย 14:00',
+);
+assert(
+  resolveLineOrderDeliveryDate({
+    parsedDate: null,
+    sessionDate: '2026-05-28',
+    now: afterCutoff,
+    lockSessionDate: true,
+  }) === '2026-05-28',
+  'pending ค้างข้าม cutoff ยังใช้วันส่งเดิม',
+);
 console.log('all parseDeliveryDate tests passed');

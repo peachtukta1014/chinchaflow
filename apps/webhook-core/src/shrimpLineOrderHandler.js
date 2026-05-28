@@ -249,9 +249,11 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     return handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body });
   }
 
+  const lockSessionDate = Boolean(session.pending);
   let deliveryDate = resolveLineOrderDeliveryDate({
     parsedDate,
     sessionDate: session.deliveryDate,
+    lockSessionDate,
   });
 
   if (parsedDate) {

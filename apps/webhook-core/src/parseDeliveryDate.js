@@ -163,13 +163,24 @@ function coalesceSessionDeliveryDate(sessionDateKey, today = todayBKK()) {
 }
 
 /**
- * วันส่งสำหรับออเดอร์ LINE: วันที่ในข้อความ > session (ถ้ายังไม่เลยวัน) > ค่าเริ่มต้นตามเวลา
+ * วันส่งสำหรับออเดอร์ LINE: วันที่ในข้อความ > session (ถ้าไม่เก่ากว่าค่าเริ่มต้นตามเวลา) > ค่าเริ่มต้น
+ * @param {{ lockSessionDate?: boolean }} — true เมื่อกำลังต่อข้อความ pending (ไม่เปลี่ยนวันส่งกลางคัน)
  */
-function resolveLineOrderDeliveryDate({ parsedDate, sessionDate, now = new Date() }) {
+function resolveLineOrderDeliveryDate({
+  parsedDate,
+  sessionDate,
+  now = new Date(),
+  lockSessionDate = false,
+}) {
   if (parsedDate) return parsedDate;
+  const defaultDate = defaultDeliveryDateKeyBangkok(now);
   const fromSession = coalesceSessionDeliveryDate(sessionDate);
-  if (fromSession) return fromSession;
-  return defaultDeliveryDateKeyBangkok(now);
+  if (fromSession) {
+    if (lockSessionDate) return fromSession;
+    // ออเดอร์ใหม่หลังเลย cutoff: session วันนี้จากเช้าไม่ดึงกลับมาเป็น「ส่งวันนี้」
+    if (fromSession >= defaultDate) return fromSession;
+  }
+  return defaultDate;
 }
 
 module.exports = {
