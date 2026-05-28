@@ -321,7 +321,10 @@ function mergeUniqueSales(docs) {
   return out;
 }
 
-/** โหลดบิลขายตามวัน — ไม่ดึงทั้ง collection */
+/** บิลเก่าที่ยังไม่มีฟิลด์ dateKey — ดึงจาก list เล็กเท่านั้น */
+const SALES_LEGACY_FALLBACK_SIZE = 80;
+
+/** โหลดบิลขายตามวัน — query ตาม dateKey ก่อน; list ทั้ง collection เฉพาะ fallback เล็ก */
 export async function fsQuerySales(dateKey) {
   const queried = await fsRunQuery({
     from: [{ collectionId: 'sales' }],
@@ -335,7 +338,15 @@ export async function fsQuerySales(dateKey) {
     limit: 200,
   });
 
-  const recent = await fsListCollection('sales', 400);
+  if (queried.length > 0) {
+    const recent = await fsListCollection('sales', SALES_LEGACY_FALLBACK_SIZE);
+    const legacy = recent.filter(
+      (d) => !d.dateKey && saleMatchesDateKey(d, dateKey),
+    );
+    return sortSalesDesc(mergeUniqueSales([...queried, ...legacy]));
+  }
+
+  const recent = await fsListCollection('sales', SALES_LEGACY_FALLBACK_SIZE);
   const matched = recent.filter((d) => saleMatchesDateKey(d, dateKey));
   return sortSalesDesc(mergeUniqueSales([...queried, ...matched]));
 }
