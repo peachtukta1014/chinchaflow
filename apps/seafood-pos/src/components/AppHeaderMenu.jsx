@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Menu, Package, Settings, Users, BarChart3, X } from 'lucide-react';
+import { Menu, Settings, BarChart3, X } from 'lucide-react';
 
 /**
- * เมนูรองใน header — รับสต๊อก (ทุกคน) + แอดมิน
+ * เมนูรองใน header — แอดมิน (รับเข้าอยู่หน้าขาย · ลูกค้า/สมาชิกอยู่แถบด้านบน)
  */
 export default function AppHeaderMenu({ isAdmin, activeTab, onNavigate }) {
   const [open, setOpen] = useState(false);
@@ -18,12 +18,10 @@ export default function AppHeaderMenu({ isAdmin, activeTab, onNavigate }) {
   }, [open]);
 
   const items = [
-    { id: 'stock', label: 'รับสต๊อก / คลัง', icon: Package, adminOnly: false },
     ...(isAdmin
       ? [
           { id: 'lot-close', label: 'สรุป / ชั่งปิดล็อต', icon: BarChart3, adminOnly: true },
           { id: 'admin-products', label: 'ตั้งค่าราคากุ้ง', icon: Settings, adminOnly: true },
-          { id: 'admin-users', label: 'สมาชิกระบบ', icon: Users, adminOnly: true },
         ]
       : []),
   ];
@@ -32,6 +30,8 @@ export default function AppHeaderMenu({ isAdmin, activeTab, onNavigate }) {
     onNavigate(id);
     setOpen(false);
   };
+
+  if (items.length === 0) return null;
 
   return (
     <div className="relative" ref={panelRef}>
