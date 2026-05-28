@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { DRINK_CATEGORIES, menuItemToCard } from '../lib/constants';
 import { burmeseToThai } from '../lib/burmeseToThai';
 import { categoryDisplayLabel, categoryDisplaySub } from '../lib/displayNames';
+import { canUseVoiceOrder } from '../lib/speechSupport';
 import { parseTeaVoice, useVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
 import { MenuCard } from '../components/MenuCard';
 import { CustomizeModal } from '../components/CustomizeModal';
@@ -34,7 +35,8 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
     }
   }, [menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit]);
 
-  const { listening, toggle, liveText } = useVoice(onVoiceFinal, lang);
+  const voiceAvailable = canUseVoiceOrder();
+  const { listening, toggle, liveText } = useVoice(onVoiceFinal, lang, { enabled: voiceAvailable });
 
   const grouped = useMemo(() => {
     const kw = burmeseToThai(search.trim()).toLowerCase();
@@ -64,6 +66,12 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
             className="w-full pl-4 pr-4 py-2.5 rounded-2xl bg-stone-100 text-sm outline-none focus:border-amber-300 border-2 border-transparent"
           />
         </div>
+        {!voiceAvailable && (
+          <p className="text-xs px-3 py-2.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 leading-relaxed">
+            {t('voiceIosHint')}
+          </p>
+        )}
+        {voiceAvailable && (
         <button
           type="button"
           onClick={toggle}
@@ -74,6 +82,7 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
           <span>{listening ? '🎙️' : '🎤'}</span>
           {listening ? t('voiceStop') : t('voiceListen')}
         </button>
+        )}
         {(listening || liveText || voiceLog) && (
           <p className={`text-xs px-2 py-2 rounded-xl ${listening ? 'bg-red-50 text-red-600' : 'bg-stone-100 text-stone-500'}`}>
             {liveText || voiceLog || t('voiceHint')}
