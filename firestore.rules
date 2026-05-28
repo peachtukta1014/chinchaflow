@@ -75,7 +75,7 @@ service cloud.firestore {
         || (isOwner(uid) && isTeaBootstrapAdmin()
           && request.resource.data.role == 'admin'
           && request.resource.data.approved == true);
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /teaOrders/{docId} {

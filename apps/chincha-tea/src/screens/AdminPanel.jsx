@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { auth } from '../firebase';
 import { DRINK_CATEGORIES, dateKeyBangkok, shiftDateKey } from '../lib/constants';
 import {
   fsDelete,
@@ -74,6 +75,32 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
     showFlash('✅ อัปเดตสมาชิกแล้ว');
   };
 
+  const deleteUser = async (u) => {
+    const selfId = auth?.currentUser?.uid;
+    if (!u?.id) return;
+    if (u.id === selfId) {
+      alert(t('cannotDeleteSelf'));
+      return;
+    }
+    const activeAdmins = users.filter((x) => x.role === 'admin' && x.approved);
+    if (u.role === 'admin' && u.approved && activeAdmins.length <= 1) {
+      alert(t('cannotDeleteLastAdmin'));
+      return;
+    }
+    const msg = t('confirmDeleteMember')
+      .replace('{name}', u.name || '—')
+      .replace('{email}', u.email || '—');
+    if (!window.confirm(msg)) return;
+    try {
+      await fsDelete(`users/${u.id}`);
+      await refresh();
+      showFlash(t('memberDeleted'));
+    } catch (e) {
+      console.error(e);
+      alert(t('memberDeleteFailed'));
+    }
+  };
+
   const saveProductHandler = async (form, id) => {
     await saveProduct(form, id);
     await refresh();
@@ -135,7 +162,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
       {loading && (section === 'members' || section === 'products') ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
       ) : section === 'members' ? (
-        <MembersSection users={users} t={t} onUpdate={updateUser} />
+        <MembersSection users={users} t={t} onUpdate={updateUser} onDelete={deleteUser} />
       ) : section === 'products' ? (
         <ProductsSection
           products={products}
@@ -159,44 +186,60 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   );
 }
 
-function MembersSection({ users, t, onUpdate }) {
+function MembersSection({ users, t, onUpdate, onDelete }) {
+  const selfId = auth?.currentUser?.uid;
+
   return (
     <div className="space-y-2">
       {users.length === 0 && <p className="text-stone-400 text-sm text-center py-6">ยังไม่มีผู้ใช้</p>}
-      {users.map((u) => (
-        <div key={u.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm">
-          <div className="flex justify-between items-start gap-2">
-            <div>
-              <p className="font-black text-stone-800">{u.name || '—'}</p>
-              <p className="text-xs text-stone-400 truncate">{u.email}</p>
-              <p className="text-[10px] mt-1">
-                <span className={`px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {u.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
-                </span>
-                <span className="ml-2 text-stone-500">{u.role === 'admin' ? t('roleAdmin') : t('roleStaff')}</span>
-              </p>
+      {users.map((u) => {
+        const isSelf = u.id === selfId;
+        return (
+          <div key={u.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm">
+            <div className="flex justify-between items-start gap-2">
+              <div className="min-w-0">
+                <p className="font-black text-stone-800">{u.name || '—'}</p>
+                <p className="text-xs text-stone-400 truncate">{u.email}</p>
+                {isSelf && (
+                  <p className="text-[10px] text-amber-700 font-bold mt-0.5">{t('currentAccount')}</p>
+                )}
+                <p className="text-[10px] mt-1">
+                  <span className={`px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {u.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                  </span>
+                  <span className="ml-2 text-stone-500">{u.role === 'admin' ? t('roleAdmin') : t('roleStaff')}</span>
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {!u.approved && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {!u.approved && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate(u.id, { approved: true })}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-bold"
+                >
+                  {t('approve')}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onUpdate(u.id, { approved: true })}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-bold"
+                onClick={() => onUpdate(u.id, { role: u.role === 'admin' ? 'staff' : 'admin' })}
+                className="px-3 py-1.5 rounded-xl border-2 border-stone-200 text-xs font-bold text-stone-600"
               >
-                {t('approve')}
+                → {u.role === 'admin' ? t('roleStaff') : t('roleAdmin')}
               </button>
-            )}
+            </div>
             <button
               type="button"
-              onClick={() => onUpdate(u.id, { role: u.role === 'admin' ? 'staff' : 'admin' })}
-              className="px-3 py-1.5 rounded-xl border-2 border-stone-200 text-xs font-bold text-stone-600"
+              disabled={isSelf}
+              onClick={() => onDelete(u)}
+              className="w-full mt-2 py-2 rounded-xl border-2 border-red-200 text-red-600 text-xs font-bold disabled:opacity-40 disabled:border-stone-200 disabled:text-stone-400"
             >
-              → {u.role === 'admin' ? t('roleStaff') : t('roleAdmin')}
+              🗑 {t('deleteMember')}
             </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
