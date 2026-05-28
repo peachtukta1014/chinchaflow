@@ -218,22 +218,33 @@ export function voiceLinesToCart(lines, t) {
   }));
 }
 
-export function useVoice(onFinalText, appLang = 'th') {
+export function useVoice(onFinalText, appLang = 'th', { enabled = true } = {}) {
   const [listening, setListening] = useState(false);
   const [liveText, setLiveText] = useState('');
   const recRef = useRef(null);
   const wantListenRef = useRef(false);
+  const committedRef = useRef('');
+  const displayRef = useRef('');
   const onFinalTextRef = useRef(onFinalText);
   onFinalTextRef.current = onFinalText;
+
+  const flushTranscript = useCallback(() => {
+    const text = displayRef.current.trim();
+    committedRef.current = '';
+    displayRef.current = '';
+    setLiveText('');
+    if (text) onFinalTextRef.current(text);
+  }, []);
 
   const stop = useCallback(() => {
     wantListenRef.current = false;
     recRef.current?.stop();
     setListening(false);
-    setLiveText('');
-  }, []);
+    flushTranscript();
+  }, [flushTranscript]);
 
   const start = useCallback(() => {
+    if (!enabled) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       alert(appLang === 'my'
@@ -242,6 +253,8 @@ export function useVoice(onFinalText, appLang = 'th') {
       return;
     }
     wantListenRef.current = true;
+    committedRef.current = '';
+    displayRef.current = '';
     const rec = new SR();
     rec.lang = speechRecognitionLang(appLang);
     rec.continuous = true;
@@ -249,38 +262,45 @@ export function useVoice(onFinalText, appLang = 'th') {
     recRef.current = rec;
 
     rec.onresult = (e) => {
-      let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const transcript = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
-          const text = transcript.trim();
-          setLiveText(text);
-          if (text) onFinalTextRef.current(text);
-        } else {
-          interim += transcript;
+          committedRef.current += e.results[i][0].transcript;
         }
       }
-      if (interim) setLiveText(interim);
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      const display = (committedRef.current + interim).trim();
+      displayRef.current = display;
+      setLiveText(display);
     };
     rec.onerror = () => {
       if (!wantListenRef.current) setListening(false);
     };
     rec.onend = () => {
       if (wantListenRef.current) {
-        try { rec.start(); } catch { setListening(false); }
+        try { rec.start(); } catch {
+          wantListenRef.current = false;
+          setListening(false);
+          flushTranscript();
+        }
       } else {
         setListening(false);
-        setLiveText('');
+        flushTranscript();
       }
     };
     rec.start();
     setListening(true);
-  }, [appLang]);
+  }, [appLang, enabled, flushTranscript]);
 
   const toggle = useCallback(() => {
+    if (!enabled) return;
     if (listening) stop();
     else start();
-  }, [listening, start, stop]);
+  }, [enabled, listening, start, stop]);
 
-  return { listening, toggle, stop, liveText };
+  return { listening, toggle, stop, liveText, voiceAvailable: enabled };
 }
