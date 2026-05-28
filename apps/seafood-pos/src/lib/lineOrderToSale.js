@@ -1,4 +1,5 @@
 import { PRODUCTS } from '../constants';
+import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
 import { findCustomersInText } from './voiceParse';
 
 /** แมปชื่อสินค้าจาก LINE → id ใน POS */
@@ -16,13 +17,17 @@ function compactName(s) {
 }
 
 /** จับคู่ชื่อลูกค้าจาก LINE กับรายชื่อในแอป */
-export function resolveLineCustomer(customerName, allCustomers) {
+export function resolveLineCustomer(customerName, allCustomers, lineUserId) {
   const list = allCustomers || [];
   const general = list.find((c) => c.id === 'general') || {
     id: 'general',
     name: 'ลูกค้าทั่วไปและตลาดนัด',
     zone: 'ทั่วไป',
   };
+
+  const byUid = findCustomerByLineUserId(list, lineUserId);
+  if (byUid) return byUid;
+
   if (!customerName?.trim()) return general;
 
   const found = findCustomersInText(customerName, list);

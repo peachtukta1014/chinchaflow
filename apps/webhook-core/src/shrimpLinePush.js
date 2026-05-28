@@ -63,6 +63,42 @@ async function linePushImage(to, imageUrl, token, caption) {
   return { ok: r.ok, status: r.status };
 }
 
+/** ชื่อลูกค้าจากรายชื่อที่ผูก lineUserId แล้ว */
+async function findCustomerNameByLineUserId(db, lineUserId) {
+  const uid = normalizeLineUserId(lineUserId);
+  if (!uid) return null;
+  try {
+    const snap = await db.collection('customers').where('lineUserId', '==', uid).limit(1).get();
+    if (!snap.empty) {
+      const name = snap.docs[0].data()?.name;
+      return name ? String(name).trim() : null;
+    }
+  } catch (err) {
+    console.warn('findCustomerNameByLineUserId', err.message);
+  }
+  return null;
+}
+
+/** map LINE UID → ชื่อลูกค้า (สำหรับสรุปออเดอร์หลายรายการ) */
+async function buildCustomerNameByLineUidMap(db) {
+  const map = new Map();
+  const snap = await db.collection('customers').get();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    const uid = normalizeLineUserId(data.lineUserId);
+    const name = String(data.name || '').trim();
+    if (uid && name) map.set(uid, name);
+  }
+  return map;
+}
+
+function linkedCustomerNameForOrder(order, uidMap) {
+  if (order?.customerName) return order.customerName;
+  const uid = normalizeLineUserId(order?.lineUserId);
+  if (!uid || !uidMap) return null;
+  return uidMap.get(uid) || null;
+}
+
 /** ผูก LINE UID กับลูกค้าใน Firestore เมื่อชื่อตรงจากออเดอร์ LINE */
 async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames }) {
   const uid = normalizeLineUserId(lineUserId);
@@ -168,6 +204,9 @@ async function pushShrimpBillToCustomer(db, admin, {
 module.exports = {
   normalizeLineUserId,
   verifyShrimpStaff,
+  findCustomerNameByLineUserId,
+  buildCustomerNameByLineUidMap,
+  linkedCustomerNameForOrder,
   linkLineUserToCustomers,
   pushShrimpBillToCustomer,
 };

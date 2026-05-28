@@ -154,6 +154,24 @@ function formatDateThai(dateKey) {
   return `${d}/${mo}/${(y + 543) % 100}`;
 }
 
+/** วันจาก session ที่เลยวันนี้แล้วไม่ใช้ซ้ำ (กันออเดอร์ใหม่ติดวันส่งเก่า) */
+function coalesceSessionDeliveryDate(sessionDateKey, today = todayBKK()) {
+  const s = String(sessionDateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (s < today) return null;
+  return s;
+}
+
+/**
+ * วันส่งสำหรับออเดอร์ LINE: วันที่ในข้อความ > session (ถ้ายังไม่เลยวัน) > ค่าเริ่มต้นตามเวลา
+ */
+function resolveLineOrderDeliveryDate({ parsedDate, sessionDate, now = new Date() }) {
+  if (parsedDate) return parsedDate;
+  const fromSession = coalesceSessionDeliveryDate(sessionDate);
+  if (fromSession) return fromSession;
+  return defaultDeliveryDateKeyBangkok(now);
+}
+
 module.exports = {
   todayBKK,
   tomorrowBKK,
@@ -162,4 +180,6 @@ module.exports = {
   parseDeliveryDateFromText,
   formatDateThai,
   dateKeyFromParts,
+  coalesceSessionDeliveryDate,
+  resolveLineOrderDeliveryDate,
 };

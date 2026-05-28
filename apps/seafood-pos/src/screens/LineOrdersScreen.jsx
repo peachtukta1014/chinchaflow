@@ -7,6 +7,7 @@ import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
 import { mergeCustomerLists, subscribeCustomers } from '../services/customerService';
+import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
 import {
   cancelLineOrder as cancelLineOrderService,
   fetchLineOrdersForBoard,
@@ -61,7 +62,8 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
 
   const cancelLineOrder = async (order) => {
     if (!order || order.status !== 'pending' || savingId) return;
-    const label = order.customerName || (order.rawText ? `"${order.rawText.slice(0, 50)}"` : 'ออเดอร์นี้');
+    const label = order.displayCustomerName || order.customerName
+      || (order.rawText ? `"${order.rawText.slice(0, 50)}"` : 'ออเดอร์นี้');
     if (!window.confirm(`ยกเลิกออเดอร์ LINE?\n\n${label}\n\nยังไม่ตัดสต๊อกและยังไม่บันทึกยอดขาย`)) return;
 
     setSavingId(order.id);
@@ -141,11 +143,15 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
   const today = todayBKK();
 
   const ordersWithDate = useMemo(
-    () => orders.map((o) => ({
-      ...o,
-      effectiveDeliveryDate: orderDeliveryDateKey(o),
-    })),
-    [orders],
+    () => orders.map((o) => {
+      const linked = findCustomerByLineUserId(allCustomers, o.lineUserId);
+      return {
+        ...o,
+        effectiveDeliveryDate: orderDeliveryDateKey(o),
+        displayCustomerName: o.customerName || linked?.name || null,
+      };
+    }),
+    [orders, allCustomers],
   );
 
   const isPending = (o) => o.status === 'pending';
@@ -165,8 +171,8 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 min-w-0 mr-2">
-          {o.customerName && (
-            <p className="text-xs font-bold text-slate-700">{o.customerName}</p>
+          {o.displayCustomerName && (
+            <p className="text-xs font-bold text-slate-700">{o.displayCustomerName}</p>
           )}
           <p className="text-[10px] font-bold text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded-lg mt-0.5">
             ส่ง
@@ -209,7 +215,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
         {(o.items || []).map((item, i) => (
           <div key={i} className="flex items-center gap-2 flex-wrap">
             <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-            {item.customerName && item.customerName !== o.customerName && (
+            {item.customerName && item.customerName !== o.displayCustomerName && item.customerName !== o.customerName && (
               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{item.customerName}</span>
             )}
             <p className="text-sm font-bold text-slate-700">{item.product}</p>

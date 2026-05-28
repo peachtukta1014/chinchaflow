@@ -8,19 +8,25 @@ const {
 } = require('./parseLineOrder');
 const {
   parseDeliveryDateFromText,
-  defaultDeliveryDateKeyBangkok,
   formatDateThai,
+  resolveLineOrderDeliveryDate,
 } = require('./parseDeliveryDate');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
-const { linkLineUserToCustomers } = require('./shrimpLinePush');
+const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
 
 async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
   const groups = groupItemsByCustomer(items);
   const batch = db.batch();
   const ts = admin.firestore.FieldValue.serverTimestamp();
 
+  let linkedCustomerName = null;
+  if (userId && !groupId) {
+    linkedCustomerName = await findCustomerNameByLineUserId(db, userId);
+  }
+
   for (const [key, groupItems] of groups) {
-    const customerName = key === '__none__' ? null : key;
+    let customerName = key === '__none__' ? null : key;
+    if (!customerName && linkedCustomerName) customerName = linkedCustomerName;
     const ref = db.collection('lineOrders').doc();
     batch.set(ref, {
       source: 'line',
@@ -76,7 +82,10 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const { dateKey: parsedDate, textWithoutDate } = parseDeliveryDateFromText(text);
   const body = (textWithoutDate || text).trim();
 
-  let deliveryDate = parsedDate || session.deliveryDate || defaultDeliveryDateKeyBangkok();
+  let deliveryDate = resolveLineOrderDeliveryDate({
+    parsedDate,
+    sessionDate: session.deliveryDate,
+  });
 
   if (parsedDate) {
     await setLineOrderSession(db, session.id, { deliveryDate: parsedDate }, ts);

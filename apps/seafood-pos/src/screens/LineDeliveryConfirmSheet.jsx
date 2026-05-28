@@ -32,7 +32,7 @@ export function LineDeliveryConfirmSheet({
     setAckMismatch(false);
   }, [initialCart, order?.id]);
 
-  const customer = resolveLineCustomer(order.customerName, allCustomers);
+  const customer = resolveLineCustomer(order.customerName, allCustomers, order.lineUserId);
   const avail = getEffectiveStock(stock, stockBatches);
   const { liveKg, deadKg, total } = cartStockKg(lines);
   const mismatch = hasAnyQtyMismatch(lines);

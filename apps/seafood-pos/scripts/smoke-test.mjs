@@ -18,7 +18,10 @@ import { billAmount } from '../src/lib/salesAggregate.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+
+const requireWebhook = createRequire(import.meta.url);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -119,6 +122,39 @@ try {
   );
 } catch (e) {
   fail('lineOrderDate infer', e);
+}
+
+try {
+  const {
+    resolveLineOrderDeliveryDate,
+    coalesceSessionDeliveryDate,
+    defaultDeliveryDateKeyBangkok,
+  } = requireWebhook('../../webhook-core/src/parseDeliveryDate.js');
+  assert(
+    coalesceSessionDeliveryDate('2026-05-26', '2026-05-28') === null,
+    'session วันส่งเลยวันนี้แล้ว → ไม่ใช้ซ้ำ',
+  );
+  assert(
+    coalesceSessionDeliveryDate('2026-05-28', '2026-05-28') === '2026-05-28',
+    'session วันนี้ยังใช้ได้',
+  );
+  assert(
+    resolveLineOrderDeliveryDate({
+      parsedDate: null,
+      sessionDate: '2026-05-26',
+      now: new Date('2026-05-28T10:00:00+07:00'),
+    }) === defaultDeliveryDateKeyBangkok(new Date('2026-05-28T10:00:00+07:00')),
+    'ออเดอร์ใหม่ไม่สืบทอดวันส่ง session เก่า',
+  );
+  assert(
+    resolveLineOrderDeliveryDate({
+      parsedDate: '2026-05-30',
+      sessionDate: '2026-05-26',
+    }) === '2026-05-30',
+    'วันที่ในข้อความชนะ session',
+  );
+} catch (e) {
+  fail('webhook resolveLineOrderDeliveryDate', e);
 }
 
 try {

@@ -3,6 +3,10 @@
  */
 
 const { todayBKK, formatDateThai } = require('./parseDeliveryDate');
+const {
+  buildCustomerNameByLineUidMap,
+  linkedCustomerNameForOrder,
+} = require('./shrimpLinePush');
 
 const ORDER_WORD_RE = /(?:ออ[ร์]*เดอร?์?|ออเดอร์|order)/i;
 
@@ -45,7 +49,16 @@ function aggregateByProduct(orders) {
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {string} [dateKey] — วันส่งที่ถือเป็น "วันนี้" (default Bangkok today)
  */
+function enrichOrdersWithLinkedCustomers(orders, uidMap) {
+  return orders.map((o) => {
+    const linked = linkedCustomerNameForOrder(o, uidMap);
+    if (linked && !o.customerName) return { ...o, customerName: linked };
+    return o;
+  });
+}
+
 async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK()) {
+  const uidMap = await buildCustomerNameByLineUidMap(db);
   let snap;
   try {
     snap = await db
@@ -57,14 +70,20 @@ async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK()) {
   } catch (err) {
     console.warn('today orders query', err.message);
     const all = await db.collection('lineOrders').where('status', '==', 'pending').limit(200).get();
-    const docs = all.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((o) => (o.deliveryDate || '') <= dateKey)
-      .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate)));
+    const docs = enrichOrdersWithLinkedCustomers(
+      all.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((o) => (o.deliveryDate || '') <= dateKey)
+        .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate))),
+      uidMap,
+    );
     return formatTodayOrdersReply(docs, dateKey);
   }
 
-  const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const orders = enrichOrdersWithLinkedCustomers(
+    snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    uidMap,
+  );
   return formatTodayOrdersReply(orders, dateKey);
 }
 
