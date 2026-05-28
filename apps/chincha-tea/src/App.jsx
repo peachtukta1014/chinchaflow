@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from './firebase';
 import { fsQueryOrders } from './lib/firestoreRest';
@@ -16,6 +16,9 @@ import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
+import { fetchPendingRestockCount } from './lib/restockNotifyService';
+import { setAppIconBadge } from './lib/appBadge';
+import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 
 export default function App() {
   const { lang, setLang, t, isMy } = useLang();
@@ -28,6 +31,8 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [payType, setPayType] = useState('cash');
+  const [pendingRestocks, setPendingRestocks] = useState(0);
+  const prevPendingRestocksRef = useRef(null);
 
   const isAuthed = member && member.approved === true;
   const { menuItems, toppingsList, refreshCatalog } = useCatalog(!!isAuthed);
@@ -51,6 +56,50 @@ export default function App() {
     if (!isAuthed) return;
     refreshOrders();
   }, [isAuthed, refreshOrders]);
+
+  const refreshPendingRestocks = useCallback(async () => {
+    if (!isAuthed || member?.role !== 'admin') return;
+    try {
+      const n = await fetchPendingRestockCount(todayKey);
+      setPendingRestocks(n);
+    } catch {
+      /* ignore */
+    }
+  }, [isAuthed, member?.role, todayKey]);
+
+  useEffect(() => {
+    if (!isAuthed || member.role !== 'admin') return undefined;
+    ensureNotifyPermission();
+    refreshPendingRestocks();
+    const id = setInterval(refreshPendingRestocks, 30000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshPendingRestocks();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isAuthed, member?.role, refreshPendingRestocks]);
+
+  useEffect(() => {
+    if (!isAuthed || member.role !== 'admin') {
+      setPendingRestocks(0);
+      setAppIconBadge(0);
+      prevPendingRestocksRef.current = null;
+      return;
+    }
+    setAppIconBadge(pendingRestocks);
+    const prev = prevPendingRestocksRef.current;
+    if (prev !== null && pendingRestocks > prev) {
+      showWebNotify(
+        'มีรายการสั่งของใหม่',
+        `${pendingRestocks} ใบรอซื้อวันนี้`,
+        { tag: 'restock', onClick: () => setTab('restock') },
+      );
+    }
+    prevPendingRestocksRef.current = pendingRestocks;
+  }, [isAuthed, member?.role, pendingRestocks]);
 
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
@@ -132,6 +181,7 @@ export default function App() {
       <TabNav
         tabs={tabs}
         activeTab={tab}
+        badges={isAdmin && tab !== 'restock' ? { restock: pendingRestocks } : {}}
         onSelect={(id) => {
           setTab(id);
           if (id === 'admin' || id === 'order') refreshCatalog();

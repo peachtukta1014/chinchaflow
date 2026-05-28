@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
+import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
 
 function memberDeleteConfirmMessage(u) {
   const name = u.name || '—';
@@ -76,7 +77,8 @@ export default function AdminUsersScreen() {
 
   return (
     <div className="px-4 pt-4 pb-8 space-y-3">
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+      <ShrimpLineNotifySettings />
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-2">
         จัดการสมาชิก ({users.length} คน)
       </p>
       {users.length === 0 && <p className="text-slate-300 text-center py-12">ยังไม่มีสมาชิก</p>}
