@@ -118,7 +118,7 @@ function LineSummaryCard({
       )}
       {weightLossKg > 0.01 && (
         <StepRow
-          label={`กุ้งหาย (ส่วนสายนี้ ${weightLossKg.toFixed(2)} กก.)`}
+          label={`กุ้งหายปริศนา สายนี้ ${weightLossKg.toFixed(2)} กก.`}
           value={fmtBaht(weightLossBaht)}
           sign="minus"
           accent="text-red-600"
@@ -300,18 +300,25 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
       )}
 
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl text-[11px] leading-relaxed space-y-2">
-        <p className="font-bold text-cyan-300 text-xs">อ่านง่ายๆ — ล็อต {lotLabel}</p>
+        <p className="font-bold text-cyan-300 text-xs">วิธีคิด — ล็อต {lotLabel}</p>
         <p>
-          <strong className="text-white">เงิน:</strong>
+          <strong className="text-white">กำไร/ขาดทุน:</strong>
           {' '}
-          ขายได้ − ต้นทุนขาย − รายจ่ายสาย = สุทธิแต่ละสาย → รวมสองสาย
+          ขายได้ − ต้นทุนขาย (COGS) − รายจ่ายสาย − กุ้งหายปริศนา = สุทธิสาย
+        </p>
+        <p>
+          <strong className="text-white">สุทธิสุดท้าย</strong>
+          {' '}
+          = รวมสองสาย − เสียหาย(จด) − ชั่งปิด(จด)
         </p>
         <p>
           <strong className="text-white">น้ำหนัก:</strong>
           {' '}
-          รับรวม (เป็น+ตาย) − ขาย − คงเหลือ = กุ้งหาย
+          รับ − ขาย − คงเหลือ = สูญเสียรวม
           {' '}
-          · ย้ายบ่อ→ตายไม่นับเป็นหาย
+          (แยก: ปริศนา / เสียหาย / ชั่งปิด)
+          {' '}
+          · ย้ายบ่อ→ตาย ≠ สูญหาย
         </p>
         <p className="text-slate-400">
           {periodLabel}
@@ -354,40 +361,72 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
       />
 
       <div className="bg-red-50 border-2 border-red-100 p-5 rounded-[2rem] shadow-sm">
-        <p className="text-sm font-black text-red-800 mb-2">น้ำหนัก — กุ้งหายจากล็อต</p>
+        <p className="text-sm font-black text-red-800 mb-2">น้ำหนัก — สมดุลมวลล็อต</p>
         <div className="bg-white/80 rounded-xl p-3 space-y-2 text-xs text-slate-700">
           <div className="flex justify-between gap-2">
             <span>รับเข้ารวม (เป็น + ตาย)</span>
             <span className="font-bold">{fmtKg(report.receivedTotalKg)}</span>
           </div>
-          <div className="flex justify-between gap-2 text-red-700">
+          <div className="flex justify-between gap-2 text-blue-700">
             <span>− ขายรวม (บิลเป็น + บิลตาย)</span>
             <span className="font-bold">{fmtKg(report.soldTotalKg)}</span>
           </div>
-          <div className="flex justify-between gap-2 text-red-700">
+          <div className="flex justify-between gap-2 text-blue-700">
             <span>− คงเหลือในระบบ</span>
             <span className="font-bold">{fmtKg(report.remainingTotalKg)}</span>
           </div>
+          {report.pondToDeadKg > 0.01 && (
+            <div className="flex justify-between gap-2 text-slate-500 text-[10px] italic">
+              <span>ย้ายบ่อ→ตาย (เปลี่ยนประเภท ไม่ใช่สูญหาย)</span>
+              <span>{fmtKg(report.pondToDeadKg)}</span>
+            </div>
+          )}
           <div className="flex justify-between gap-2 pt-2 border-t border-red-200 font-black text-red-800">
-            <span>= กุ้งหาย</span>
+            <span>= น้ำหนักสูญเสียรวม</span>
             <span>{fmtKg(report.shrinkageKg)}</span>
           </div>
         </div>
-        <p className="text-[10px] text-red-600/90 mt-3 leading-relaxed">
-          มูลค่าขาดทุนโดยประมาณ
-          {' '}
-          <strong>{fmtBaht(report.shrinkageBaht)}</strong>
-          {report.pondToDeadKg > 0.01 && (
-            <>
-              {' '}
-              · ย้ายบ่อ→ตาย
-              {' '}
-              {fmtKg(report.pondToDeadKg)}
-              {' '}
-              (ไม่นับเป็นหาย)
-            </>
-          )}
-        </p>
+
+        {report.shrinkageKg > 0.01 && (
+          <div className="mt-3 bg-white/60 rounded-xl p-3 space-y-1.5 text-[11px]">
+            <p className="font-bold text-slate-600 mb-1">แยกประเภทการสูญเสีย</p>
+            {report.unaccountedShrinkageKg > 0.01 && (
+              <div className="flex justify-between gap-2 text-red-700 font-bold">
+                <span>❓ หายปริศนา (ไม่ได้จด)</span>
+                <span>{fmtKg(report.unaccountedShrinkageKg)}</span>
+              </div>
+            )}
+            {report.spoilageKg > 0.01 && (
+              <div className="flex justify-between gap-2 text-amber-700">
+                <span>📋 เสียหาย/ตัดทิ้ง (จดแล้ว)</span>
+                <span className="font-bold">{fmtKg(report.spoilageKg)}</span>
+              </div>
+            )}
+            {report.stockCountKg > 0.01 && (
+              <div className="flex justify-between gap-2 text-amber-700">
+                <span>📋 ชั่งปิดสต๊อก (จดแล้ว)</span>
+                <span className="font-bold">{fmtKg(report.stockCountKg)}</span>
+              </div>
+            )}
+            {report.unaccountedShrinkageKg <= 0.01 && (
+              <p className="text-emerald-700 font-bold text-[10px]">
+                ✅ กุ้งหายทั้งหมดมีที่มาอธิบายได้ (ไม่มีปริศนา)
+              </p>
+            )}
+          </div>
+        )}
+
+        {report.shrinkageBaht > 0.01 && (
+          <p className="text-[10px] text-red-600/90 mt-2 leading-relaxed">
+            มูลค่าสูญเสียรวมโดยประมาณ
+            {' '}
+            <strong>{fmtBaht(report.shrinkageBaht)}</strong>
+            {' '}
+            (ปริศนา {fmtBaht(report.liveWeightLossBaht + report.deadWeightLossBaht)}
+            {report.spoilageTotalBaht > 0 ? ` · เสียหาย ${fmtBaht(report.spoilageTotalBaht)}` : ''}
+            {report.stockCountBaht > 0 ? ` · ชั่งปิด ${fmtBaht(report.stockCountBaht)}` : ''})
+          </p>
+        )}
       </div>
 
       <LotExpensesPanel
@@ -399,6 +438,7 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
 
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-3">
         <p className="text-xs font-bold text-cyan-300">สุทธิรวมล็อต</p>
+
         <div className="flex justify-between items-center text-sm">
           <span className="text-slate-400">สุทธิสายเป็น</span>
           <span className={`font-bold ${report.liveLineNetBaht >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -411,20 +451,35 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
             {fmtBaht(report.deadLineNetBaht)}
           </span>
         </div>
+
         <div className="flex justify-between items-center text-sm border-t border-slate-700 pt-2">
           <span className="text-slate-300 font-bold">รวมสองสาย</span>
           <span className={`font-black ${report.combinedLineNetBaht >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtBaht(report.combinedLineNetBaht)}
           </span>
         </div>
-        {report.stockCountBaht > 0 && (
-          <div className="flex justify-between items-center text-sm text-red-300">
-            <span>หักชั่งปิดสต๊อก (บันทึกแล้ว)</span>
-            <span>−{fmtBaht(report.stockCountBaht)}</span>
+
+        {/* รายการหักเพิ่มเติม (ที่จดแล้ว — ไม่รวมอยู่ใน per-line แล้ว) */}
+        {report.spoilageTotalBaht > 0 && (
+          <div className="flex justify-between items-center text-sm text-amber-300">
+            <span>− เสียหาย/ตัดทิ้ง {fmtKg(report.spoilageKg)} (จดแล้ว)</span>
+            <span>{fmtBaht(report.spoilageTotalBaht)}</span>
           </div>
         )}
+        {report.stockCountBaht > 0 && (
+          <div className="flex justify-between items-center text-sm text-amber-300">
+            <span>− ชั่งปิดสต๊อก {fmtKg(report.stockCountKg)} (จดแล้ว)</span>
+            <span>{fmtBaht(report.stockCountBaht)}</span>
+          </div>
+        )}
+
         <div className="pt-3 border-t border-slate-600 flex justify-between items-center">
-          <p className="font-bold">สุทธิสุดท้าย</p>
+          <div>
+            <p className="font-bold">สุทธิสุดท้าย</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              กำไร/(ขาดทุน) หลังหักต้นทุนทั้งหมด
+            </p>
+          </div>
           <p className={`text-2xl font-black ${report.netAfterMisc >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtBaht(report.netAfterMisc)}
           </p>
@@ -439,12 +494,24 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           <div className="pt-3 space-y-2 text-xs">
             <p className="font-bold text-slate-600">การเคลื่อนไหวที่บันทึกแล้ว</p>
             <p className="flex justify-between">
-              <span className="text-slate-500">ย้ายบ่อ → ตาย</span>
+              <span className="text-slate-500">ย้ายบ่อ → ตาย (เปลี่ยนประเภท)</span>
               <span className="font-bold">{fmtKg(report.pondToDeadKg)}</span>
             </p>
             <p className="flex justify-between">
               <span className="text-slate-500">เสียหาย / ตัดทิ้ง (จดแล้ว)</span>
               <span className="font-bold">{fmtKg(report.spoilageKg)}</span>
+            </p>
+            {report.stockCountKg > 0 && (
+              <p className="flex justify-between">
+                <span className="text-slate-500">ชั่งปิดสต๊อก (จดแล้ว)</span>
+                <span className="font-bold">{fmtKg(report.stockCountKg)}</span>
+              </p>
+            )}
+            <p className="flex justify-between">
+              <span className="text-slate-500">กุ้งหายปริศนา (ไม่ได้จดไว้)</span>
+              <span className={`font-bold ${report.unaccountedShrinkageKg > 0.01 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {fmtKg(report.unaccountedShrinkageKg)}
+              </span>
             </p>
             <p className="flex justify-between">
               <span className="text-slate-500">คงเหลือในล็อต</span>

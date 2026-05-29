@@ -20,10 +20,19 @@ export function listLotDateKeys(batches = []) {
   return groupBatchesByReceiveDay(batches).map((d) => d.dateKey);
 }
 
+/**
+ * รวมความเคลื่อนไหวสต๊อก (stockAdjustments) ที่อยู่ในล็อตนี้
+ *
+ * pond_to_dead   — ย้ายกุ้งเป็น → ตาย (ไม่ใช่ "หาย" — แค่เปลี่ยนประเภท)
+ * spoilage_loss  — ตัดทิ้ง/เน่า (live เท่านั้น ในระบบปัจจุบัน)
+ * stock_count    — ชั่งปิด: หักทั้ง live+dead ตามส่วนต่าง
+ */
 function sumAdjustmentsForLot(adjustments = [], batchIds) {
   let pondToDeadKg = 0;
   let spoilageLiveKg = 0;
   let spoilageDeadKg = 0;
+  let stockCountLiveKg = 0;
+  let stockCountDeadKg = 0;
   let stockCountKg = 0;
   let stockCountBaht = 0;
 
@@ -37,8 +46,8 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
       for (const a of allocs) spoilageLiveKg += kg(a.liveTaken);
     } else if (adj.type === 'stock_count') {
       for (const a of allocs) {
-        spoilageLiveKg += kg(a.liveTaken);
-        spoilageDeadKg += kg(a.deadTaken);
+        stockCountLiveKg += kg(a.liveTaken);
+        stockCountDeadKg += kg(a.deadTaken);
       }
       stockCountKg += kg(adj.weightKg);
       stockCountBaht += baht(adj.estimatedLossBaht);
@@ -52,6 +61,8 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
     spoilageKg,
     spoilageLiveKg,
     spoilageDeadKg,
+    stockCountLiveKg,
+    stockCountDeadKg,
     stockCountKg,
     stockCountBaht,
   };
@@ -59,7 +70,19 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
 
 /**
  * สรุปผลล็อต (รถรับเข้า 1 วัน) ในช่วงวันรับถึงวันปิด
- * ของเสีย = น้ำหนักที่หายจากล็อตโดยไม่นับเป็นยอดขาย (ปูกิน / เน่าไม่จด ฯลฯ)
+ *
+ * สมดุลมวล (น้ำหนัก):
+ *   รับเข้า = ขาย + คงเหลือ + เสียหาย(จด) + ชั่งปิด(จด) + หายปริศนา
+ *
+ * กำไร/ขาดทุน:
+ *   สุทธิสุดท้าย = (ขายได้ − ต้นทุนขาย)
+ *                − ค่าใช้จ่ายดำเนิน (บ่อ+แผง)
+ *                − ต้นทุนหายปริศนา
+ *                − ต้นทุนเสียหาย(จด)
+ *                − ต้นทุนชั่งปิด(จด)
+ *
+ * ⚠️  pond_to_dead ไม่ใช่ "สูญเสีย" — เป็นการแปลงประเภท live→dead
+ *     จึงไม่นับรวมในการคำนวณกุ้งหาย
  */
 export function computeLotReport({
   lotDateKey,
@@ -114,50 +137,75 @@ export function computeLotReport({
 
   const adj = sumAdjustmentsForLot(adjustments, batchIds);
 
-  /** สมดุลมวล: รับ − ขาย − คงเหลือ = ของหายจากล็อต */
-  const shrinkageKg = Math.max(
-    0,
-    receivedTotalKg - soldTotalKg - remainingTotalKg,
-  );
-  const shrinkageLiveKg = Math.max(0, receivedLive - soldLiveKg - remainingLive);
-  const shrinkageDeadKg = Math.max(0, receivedDead - soldDeadKg - remainingDead);
-  const shrinkageBaht = shrinkageLiveKg * liveCostPerKg + shrinkageDeadKg * deadCostPerKgForCogs;
-  const spoilageBaht = adj.spoilageKg * liveCostPerKg;
+  // ── สมดุลมวลรวม (ตัวเลขถูกต้องเสมอ ใช้ใน weight section) ──────────────────
+  // กุ้งหายรวม = รับ − ขาย − คงเหลือ (รวมที่จดไว้และปริศนา)
+  const shrinkageKg = Math.max(0, receivedTotalKg - soldTotalKg - remainingTotalKg);
 
+  // ── กุ้งหาย "ปริศนา" ต่อสาย (ไม่รวม pond_to_dead / spoilage / stock_count) ──
+  //
+  // สาย LIVE:  รับเป็น − ขายเป็น − คงเป็น − (ย้ายไปตาย) − (ตัดทิ้ง) − (ชั่งปิด live)
+  // สาย DEAD:  (รับตาย + ย้ายจากบ่อ) − ขายตาย − คงตาย − (ตัดทิ้งตาย) − (ชั่งปิด dead)
+  const unaccountedLiveKg = Math.max(
+    0,
+    receivedLive - soldLiveKg - remainingLive
+      - adj.pondToDeadKg - adj.spoilageLiveKg - adj.stockCountLiveKg,
+  );
+  const unaccountedDeadKg = Math.max(
+    0,
+    (receivedDead + adj.pondToDeadKg) - soldDeadKg - remainingDead
+      - adj.spoilageDeadKg - adj.stockCountDeadKg,
+  );
+  const unaccountedShrinkageKg = unaccountedLiveKg + unaccountedDeadKg;
+
+  // ── ต้นทุนสูญเสีย (ไม่นับซ้ำ) ───────────────────────────────────────────────
+  const unaccountedLiveBaht = unaccountedLiveKg * liveCostPerKg;
+  const unaccountedDeadBaht = unaccountedDeadKg * deadCostPerKgForCogs;
+
+  // ต้นทุนเสียหาย/ตัดทิ้ง (จดแล้ว)
+  const spoilageLiveBaht = adj.spoilageLiveKg * liveCostPerKg;
+  const spoilageDeadBaht = adj.spoilageDeadKg * deadCostPerKgForCogs;
+  const spoilageTotalBaht = spoilageLiveBaht + spoilageDeadBaht;
+
+  // รวมต้นทุนสูญเสียทั้งหมด (ไม่นับซ้ำ):
+  //   ปริศนา + เสียหาย(จด) + ชั่งปิด(จด)
+  const shrinkageBaht = unaccountedLiveBaht + unaccountedDeadBaht + spoilageTotalBaht + adj.stockCountBaht;
+
+  // ── COGS / กำไรขั้นต้น ──────────────────────────────────────────────────────
   const liveCogs = soldLiveKg * liveCostPerKg;
   const deadCogs = soldDeadKg * deadCostPerKgForCogs;
   const cogsSold = liveCogs + deadCogs;
   const liveGrossProfit = salesAgg.liveRevenue - liveCogs;
   const deadGrossProfit = salesAgg.deadRevenue - deadCogs;
   const grossProfit = revenue - cogsSold;
-  const pondToDeadCostBaht = adj.pondToDeadKg * liveCostPerKg;
-  const totalLossBaht = shrinkageBaht + adj.stockCountBaht;
-  const netLotProfit = grossProfit - totalLossBaht;
+
+  // ── รายจ่ายดำเนิน ───────────────────────────────────────────────────────────
   const marketExpensesBaht = baht(marketExpenses);
   const pondExpensesBaht = baht(pondExpenses);
   const miscFromSplit = marketExpensesBaht + pondExpensesBaht;
   const miscExpensesBaht = miscFromSplit > 0 ? miscFromSplit : baht(miscExpenses);
 
-  /** สายกุ้งเป็น / ตาย — ทุนรับเข้า − รายจ่ายสาย (มุมทุน) */
-  const liveCapitalAfterExpenses = liveCostBaht - pondExpensesBaht;
-  const deadCapitalAfterExpenses = deadCostBaht - marketExpensesBaht;
+  // ── สุทธิแต่ละสาย ────────────────────────────────────────────────────────────
+  // per-line ใช้เฉพาะกุ้งหายปริศนา (unaccounted); spoilage+stock_count อยู่ใน summary
+  const liveWeightLossKg = unaccountedLiveKg;
+  const deadWeightLossKg = unaccountedDeadKg;
+  const liveWeightLossBaht = unaccountedLiveBaht;
+  const deadWeightLossBaht = unaccountedDeadBaht;
 
-  /** ขาดทุนน้ำหนักแยกสาย (รับ − ขาย − คงเหลือ) */
-  const liveWeightLossKg = shrinkageLiveKg;
-  const deadWeightLossKg = shrinkageDeadKg;
-  const liveWeightLossBaht = liveWeightLossKg * liveCostPerKg;
-  const deadWeightLossBaht = deadWeightLossKg * deadCostPerKgForCogs;
-  const totalWeightLossKg = liveWeightLossKg + deadWeightLossKg;
-
-  /**
-   * สุทธิสาย (มุมกำไร): รายได้ขาย − ต้นทุนขาย − รายจ่ายสาย − มูลค่ากุ้งหาย (กก.)
-   */
   const liveLineNetBaht = liveGrossProfit - pondExpensesBaht - liveWeightLossBaht;
   const deadLineNetBaht = deadGrossProfit - marketExpensesBaht - deadWeightLossBaht;
   const combinedLineNetBaht = liveLineNetBaht + deadLineNetBaht;
 
-  const netAfterMisc = netLotProfit - miscExpensesBaht;
+  // ── สุทธิสุดท้าย (ไม่นับซ้ำ) ────────────────────────────────────────────────
+  // รวมสองสาย − เสียหาย(จด) − ชั่งปิด(จด)
+  const netAfterMisc = combinedLineNetBaht - spoilageTotalBaht - adj.stockCountBaht;
 
+  // legacy alias
+  const totalLossBaht = shrinkageBaht;
+  const netLotProfit = netAfterMisc;
+  const pondToDeadCostBaht = adj.pondToDeadKg * liveCostPerKg;
+  const spoilageBaht = spoilageTotalBaht;
+
+  // ── ส่วนต่างชั่งจริง ─────────────────────────────────────────────────────────
   let countVarianceKg = null;
   let countVarianceBaht = null;
   let countVarianceLiveKg = null;
@@ -200,8 +248,11 @@ export function computeLotReport({
     deadCostPerKg,
     deadCostPerKgForCogs,
     avgCostPerKg,
-    shrinkageLiveKg,
-    shrinkageDeadKg,
+    // น้ำหนัก
+    shrinkageKg,               // กุ้งหายรวม (รวมที่จดและปริศนา) — ใช้ใน weight section
+    unaccountedShrinkageKg,    // กุ้งหายปริศนา (ไม่ได้จดไว้เลย)
+    shrinkageLiveKg: unaccountedLiveKg,   // legacy name = unaccounted live เท่านั้น
+    shrinkageDeadKg: unaccountedDeadKg,   // legacy name = unaccounted dead เท่านั้น
     remainingLive,
     remainingDead,
     remainingTotalKg,
@@ -216,32 +267,35 @@ export function computeLotReport({
     deadCogs,
     liveGrossProfit,
     deadGrossProfit,
+    // การเคลื่อนไหวที่บันทึกแล้ว
     pondToDeadKg: adj.pondToDeadKg,
     pondToDeadCostBaht,
     spoilageKg: adj.spoilageKg,
+    spoilageLiveKg: adj.spoilageLiveKg,
+    spoilageDeadKg: adj.spoilageDeadKg,
+    spoilageBaht,       // alias ของ spoilageTotalBaht
+    spoilageTotalBaht,  // ต้นทุนเสียหาย/ตัดทิ้ง (จดแล้ว)
     stockCountKg: adj.stockCountKg,
     stockCountBaht: adj.stockCountBaht,
-    shrinkageKg,
-    shrinkageBaht,
-    spoilageBaht,
+    // ต้นทุนสูญเสีย (ไม่นับซ้ำ)
+    shrinkageBaht,    // = unaccounted + spoilage + stockCount
+    totalLossBaht,    // alias
+    // กำไร/ขาดทุน
     cogsSold,
     grossProfit,
-    totalLossBaht,
-    netLotProfit,
     marketExpensesBaht,
     pondExpensesBaht,
     miscExpensesBaht,
-    netAfterMisc,
-    liveCapitalAfterExpenses,
-    deadCapitalAfterExpenses,
-    liveLineNetBaht,
-    deadLineNetBaht,
-    combinedLineNetBaht,
     liveWeightLossKg,
     deadWeightLossKg,
     liveWeightLossBaht,
     deadWeightLossBaht,
-    totalWeightLossKg,
+    liveLineNetBaht,
+    deadLineNetBaht,
+    combinedLineNetBaht,
+    netAfterMisc,     // สุทธิสุดท้าย (ถูกต้อง ไม่นับซ้ำ)
+    netLotProfit,     // alias
+    // ชั่งปิดจริง
     countVarianceKg,
     countVarianceBaht,
     countVarianceLiveKg,
