@@ -65,14 +65,19 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
 
   const handleShareLine = async () => {
     if (!blob) return;
-    const res = await shareToLine({
-      blob,
-      title: `บิล ${bill?.billNo || ''}`,
-      text: `บิล ${bill?.billNo || ''} · ${bill?.customerName || ''} · ฿${(bill?.total || 0).toLocaleString()}`,
-    });
-    if (!res.ok) {
+    try {
+      const res = await shareToLine({
+        blob,
+        title: `บิล ${bill?.billNo || ''}`,
+        text: `บิล ${bill?.billNo || ''} · ${bill?.customerName || ''} · ฿${(bill?.total || 0).toLocaleString()}`,
+      });
+      if (!res.ok) {
+        downloadBillImageBlob(blob, bill?.billNo);
+        alert(res.message || 'บันทึกรูปแล้วเปิด LINE แนบรูปส่งเองนะครับ');
+      }
+    } catch {
       downloadBillImageBlob(blob, bill?.billNo);
-      alert(res.message || 'บันทึกรูปแล้วส่งใน LINE เองนะครับ');
+      alert('บันทึกรูปลงเครื่องแล้ว — เปิดแชท LINE ลูกค้าแล้วแนบรูปส่งเองครับ');
     }
   };
 

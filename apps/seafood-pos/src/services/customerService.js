@@ -19,13 +19,26 @@ export async function refreshCustomersMap() {
   return fetchCustomersMap();
 }
 
+const customerListeners = new Set();
+
+/** แจ้งทุกหน้าจอให้โหลด customers ใหม่ (หลังผูก LINE OA ฯลฯ) */
+export function notifyCustomersChanged() {
+  customerListeners.forEach((fn) => {
+    try { fn(); } catch (e) { console.warn('notifyCustomersChanged', e); }
+  });
+}
+
+export function onCustomersChanged(listener) {
+  customerListeners.add(listener);
+  return () => customerListeners.delete(listener);
+}
+
 /**
- * @deprecated ใช้ refreshCustomersMap — คงชื่อเดิมให้หน้าจอเก่าเรียกได้
- * คืน unsubscribe เปล่า (โหลดครั้งเดียวตอน mount)
+ * โหลด customers ตอน mount + ทุก ~30 วินาที + หลังบันทึก/ผูก LINE
  */
 export function subscribeCustomers(onData, onError) {
   let cancelled = false;
-  refreshCustomersMap()
+  const pull = () => refreshCustomersMap()
     .then((map) => {
       if (!cancelled) onData(map);
     })
@@ -33,7 +46,16 @@ export function subscribeCustomers(onData, onError) {
       console.warn('subscribeCustomers', err);
       if (!cancelled) onError?.(err);
     });
-  return () => { cancelled = true; };
+
+  pull();
+  const interval = setInterval(pull, 30000);
+  const offBus = onCustomersChanged(pull);
+
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+    offBus();
+  };
 }
 
 /** โหลด customers จาก REST (ใช้หลังบันทึก — ไม่รอ listener) */
@@ -122,9 +144,33 @@ function assertSaved(doc, want, id) {
   return doc;
 }
 
-export async function updateCustomer(id, data) {
+async function loadCustomerBase(id) {
+  const builtin = CUSTOMERS.find((b) => b.id === id);
+  let existing = {};
+  try {
+    existing = (await fsGetDoc(`customers/${id}`)) || {};
+  } catch {
+    existing = {};
+  }
+  return { ...builtin, ...existing };
+}
+
+function mergeCustomerFields(base, data) {
+  const pick = (key) => (key in data ? data[key] : base[key]);
+  return {
+    name: pick('name'),
+    zone: pick('zone'),
+    phone: pick('phone'),
+    notes: pick('notes'),
+    lineUserId: pick('lineUserId'),
+    hidden: 'hidden' in data ? data.hidden : base.hidden,
+  };
+}
+
+export async function updateCustomer(id, data, { merge = false } = {}) {
   if (!id) throw new Error('ไม่พบรหัสลูกค้า');
-  const want = customerPayload(data);
+  const merged = merge ? mergeCustomerFields(await loadCustomerBase(id), data) : data;
+  const want = customerPayload(merged);
   await withTimeout(fsSetDoc(`customers/${id}`, {
     ...want,
     updatedAt: new Date().toISOString(),
@@ -134,9 +180,10 @@ export async function updateCustomer(id, data) {
 }
 
 /** บันทึก + ยืนยันจาก Firestore + คืน map ล่าสุด */
-export async function saveCustomerVerified(id, data) {
-  const doc = await updateCustomer(id, data);
+export async function saveCustomerVerified(id, data, { merge = false } = {}) {
+  const doc = await updateCustomer(id, data, { merge });
   const map = await fetchCustomersMap();
+  notifyCustomersChanged();
   return { doc, map };
 }
 
@@ -155,6 +202,7 @@ export async function createCustomer(data) {
 export async function createCustomerVerified(data) {
   const id = await createCustomer(data);
   const map = await fetchCustomersMap();
+  notifyCustomersChanged();
   return { id, map };
 }
 
@@ -169,7 +217,9 @@ export async function deleteCustomer(id) {
 
 export async function deleteCustomerVerified(id) {
   await deleteCustomer(id);
-  return fetchCustomersMap();
+  const map = await fetchCustomersMap();
+  notifyCustomersChanged();
+  return map;
 }
 
 export async function hideCustomerFromList(id) {
@@ -187,7 +237,9 @@ export async function hideCustomerFromList(id) {
   }));
   const doc = await fsGetDoc(`customers/${id}`);
   assertSaved(doc, want, id);
-  return fetchCustomersMap();
+  const map = await fetchCustomersMap();
+  notifyCustomersChanged();
+  return map;
 }
 
 export async function suggestLineUserIdFromOrders(customerName) {
