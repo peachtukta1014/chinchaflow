@@ -499,13 +499,21 @@ export async function persistStock(val) {
   throw lastErr || new Error('บันทึกสต๊อกไม่สำเร็จ');
 }
 
-/** รับกุ้งเข้า — บันทึกล็อต FIFO (เรียกหลังอัปเดตสต๊อกแล้ว) */
+/**
+ * รับกุ้งเข้า — บันทึกล็อต FIFO (เรียกหลังอัปเดตสต๊อกแล้ว)
+ *
+ * sizeBreakdown ตัวเลือก (ข้อมูลอ้างอิง ไม่กระทบ FIFO):
+ *   { mode: 'mixed'|'by_size', A: kg, B: kg, C: kg }
+ *   - mode='mixed'  → รวมไซต์ (ไม่ระบุขนาดย่อย)
+ *   - mode='by_size' → แยก A/B/C โดยรวม A+B+C ต้องเท่ากับ liveKg
+ */
 export async function createStockBatchRecord({
   liveKg,
   deadKg,
   costPerKg,
   transport,
   note,
+  sizeBreakdown = null,
 }) {
   const shrimpCost = (liveKg + deadKg) * costPerKg;
   const grandTotal = shrimpCost + transport;
@@ -526,6 +534,7 @@ export async function createStockBatchRecord({
     remainingLiveKg: liveKg,
     remainingDeadKg: deadKg,
     note,
+    ...(sizeBreakdown ? { sizeBreakdown } : {}),
   }));
   return { grandTotal, effectiveCost };
 }

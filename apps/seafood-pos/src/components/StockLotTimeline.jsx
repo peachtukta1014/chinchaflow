@@ -86,6 +86,16 @@ export default function StockLotTimeline({ stockBatches = [], viewDate, onViewDa
                   <span>ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(1)} กก.</span>
                   <span className="text-slate-400">รับ {formatBatchPurchaseDate(b.purchaseDate)}</span>
                 </div>
+                {b.sizeBreakdown && b.sizeBreakdown.mode === 'by_size' && (
+                  <p className="text-[10px] text-indigo-500 mt-1">
+                    ไซต์: A {(b.sizeBreakdown.A || 0).toFixed(2)}
+                    {' · '}B {(b.sizeBreakdown.B || 0).toFixed(2)}
+                    {' · '}C {(b.sizeBreakdown.C || 0).toFixed(2)} กก.
+                  </p>
+                )}
+                {b.sizeBreakdown && b.sizeBreakdown.mode === 'mixed' && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">ไซต์: รวมไซต์</p>
+                )}
                 <p className="text-[10px] text-slate-400 mt-1">
                   ซื้อ ฿{(b.costPerKg || 0).toLocaleString()}/กก.
                   {b.transport > 0 && ` · ค่ารถ ฿${Number(b.transport).toLocaleString()}`}
