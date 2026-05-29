@@ -79,11 +79,8 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     setBusyUid(contact.lineUserId);
     try {
       const { map } = await saveCustomerVerified(c.id, {
-        name: c.name,
-        zone: c.zone || '',
-        phone: c.phone || '',
         lineUserId: contact.lineUserId,
-      });
+      }, { merge: true });
       confirmLinked(map, contact.lineUserId, c.name);
       setFsCustomers(map);
       showFlash?.(`✅ ผูก LINE กับ "${c.name}" แล้ว`);

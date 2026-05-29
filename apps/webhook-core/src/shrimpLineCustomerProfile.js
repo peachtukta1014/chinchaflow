@@ -8,12 +8,20 @@ function exactCustomerNameMatch(a, b) {
   return compact(a) === compact(b);
 }
 
+function isLinkedLineCustomer(data) {
+  return !!normalizeLineUserId(data?.lineUserId);
+}
+
 function profileMissingFields(data) {
   const missing = [];
   const name = String(data?.name || '').trim();
   const phone = String(data?.phone || '').trim();
   const notes = String(data?.notes || '').trim();
   if (!name) missing.push('name');
+  // ลูกค้าที่ผูก LINE ในแอปแล้ว — ไม่บังคับเบอร์/จุดส่งซ้ำทุกออเดอร์
+  if (isLinkedLineCustomer(data)) {
+    return missing;
+  }
   if (!phone) missing.push('phone');
   if (!notes) missing.push('notes');
   return missing;

@@ -6,7 +6,7 @@ import { deliveryDateLabel, orderDeliveryDateKey } from '../lib/lineOrderDate';
 import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
-import { mergeCustomerLists, subscribeCustomers } from '../services/customerService';
+import { mergeCustomerLists, refreshCustomersMap, subscribeCustomers } from '../services/customerService';
 import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
 import {
   cancelLineOrder as cancelLineOrderService,
@@ -79,11 +79,18 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     }
   };
 
-  const openDeliverySheet = (order) => {
+  const openDeliverySheet = async (order) => {
     if (!order || order.status !== 'pending' || savingId || deliverySheet) return;
     if (order.salesId) {
       confirmDeliveryLegacyDone(order);
       return;
+    }
+
+    try {
+      const map = await refreshCustomersMap();
+      setFsCustomers(map);
+    } catch {
+      /* ใช้ cache เดิม */
     }
 
     const { cartItems, unknownProducts } = lineItemsToCartItems(order.items, priceOf);

@@ -504,6 +504,7 @@ export default function CustomerAccountsScreen({
                           onClick={() => setBillSheet({
                             bill: tx,
                             customer: {
+                              id: tx.customerId,
                               name: tx.customerName,
                               zone: tx.zone,
                               phone: tx.phone,
