@@ -29,7 +29,10 @@ const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
 } = require('./shrimpDailySummary');
-const { buildShrimpTodayOrdersSummary } = require('./shrimpTodayOrdersSummary');
+const {
+  buildShrimpTodayOrdersSummary,
+  cancelLatestPendingOrderForUser,
+} = require('./shrimpTodayOrdersSummary');
 const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
@@ -110,6 +113,18 @@ exports.lineWebhook = functions
           } catch (err) {
             console.error('shrimp today orders', err);
             await lineReply(replyToken, '⚠️ ดึงรายการออเดอร์ไม่สำเร็จ ลองใหม่ครับ', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'cancel_order') {
+          try {
+            const { message } = await cancelLatestPendingOrderForUser(db(), userId);
+            await lineReply(replyToken, message, token);
+          } catch (err) {
+            console.error('shrimp cancel order', err);
+            await lineReply(replyToken, '⚠️ ยกเลิกออเดอร์ไม่สำเร็จ ลองใหม่หรือแจ้งพนักงานโดยตรงครับ', token);
           }
           await completeLineEvent(db(), event);
           continue;

@@ -13,11 +13,84 @@ const ORDER_WORD_RE = /(?:ออ[ร์]*เดอร?์?|ออเดอร์
 function isShrimpTodayOrdersCommand(text) {
   const raw = String(text || '').trim();
   if (!raw) return false;
+
+  // "สรุปออเดอร์" / "สรุปรายการออเดอร์" — ขึ้นต้นด้วย สรุป + มีคำว่า ออเดอร์
+  if (/^สรุป.*(ออเดอร์|order|รายการ)/i.test(raw)) return true;
+  // "สรุปรายการวันนี้"
+  if (/^สรุปรายการวันนี้/i.test(raw)) return true;
+  // "รายการวันนี้" / "รายการออเดอร์วันนี้"
+  if (/^รายการ.*(วันนี้|ออเดอร์)/i.test(raw)) return true;
+
   if (!ORDER_WORD_RE.test(raw)) return false;
   if (!/(วันนี้|today)/i.test(raw)) return false;
   if (/^(?:ออ[ร์]*เดอร?์?|ออเดอร์|order)\s*วันนี้\s*รวม?$/i.test(raw)) return true;
   if (/(รวม|สรุป|ทั้งหมด|เช็ค|ตรวจ|list)/i.test(raw)) return true;
   return false;
+}
+
+/**
+ * ยกเลิกออเดอร์ล่าสุดของ lineUserId ที่ยัง pending อยู่
+ * @returns {{ cancelled: object|null, message: string }}
+ */
+async function cancelLatestPendingOrderForUser(db, lineUserId) {
+  if (!lineUserId) return { cancelled: null, message: 'ไม่พบข้อมูลผู้ใช้ครับ' };
+
+  let snap;
+  try {
+    snap = await db
+      .collection('lineOrders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .limit(5)
+      .get();
+  } catch (err) {
+    console.warn('cancelLatestPendingOrderForUser query', err.message);
+    // fallback without orderBy (index อาจยังไม่ build)
+    const fallback = await db
+      .collection('lineOrders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'pending')
+      .limit(10)
+      .get();
+    snap = {
+      empty: fallback.empty,
+      docs: fallback.docs.sort((a, b) => {
+        const ta = a.data().createdAt;
+        const tb = b.data().createdAt;
+        if (!ta || !tb) return 0;
+        return String(tb).localeCompare(String(ta));
+      }),
+    };
+  }
+
+  if (snap.empty || snap.docs.length === 0) {
+    return { cancelled: null, message: 'ไม่พบออเดอร์รอจัดส่งของคุณในระบบครับ\nถ้าเพิ่งสั่งไปลองตรวจสอบอีกครั้ง หรือแจ้งพนักงานโดยตรงครับ' };
+  }
+
+  const target = snap.docs[0];
+  const data = target.data();
+  await target.ref.update({
+    status: 'cancelled',
+    cancelledAt: new Date().toISOString(),
+    cancelledBy: 'customer_line',
+  });
+
+  const itemLines = (data.items || [])
+    .map((it) => {
+      const who = it.customerName ? `${it.customerName} · ` : '';
+      return `• ${who}${it.product || '—'} ${it.qty ?? ''} ${it.unit || 'กก'}`.trim();
+    })
+    .join('\n');
+
+  const dateLabel = data.deliveryDate ? ` (ส่ง ${formatDateThai(data.deliveryDate)})` : '';
+  const pending = snap.docs.length - 1;
+  const moreNote = pending > 0 ? `\n\nยังมีออเดอร์รอส่ง ${pending} รายการในระบบ\nถ้าต้องการยกเลิกเพิ่มพิมพ์ "ยกเลิก" อีกครั้งครับ` : '';
+
+  return {
+    cancelled: { id: target.id, ...data },
+    message: `✅ ยกเลิกออเดอร์แล้วครับ${dateLabel}\n\n${itemLines || '(ไม่มีรายการ)'}${moreNote}`,
+  };
 }
 
 function formatItemsLines(items) {
@@ -137,4 +210,5 @@ function formatTodayOrdersReply(orders, dateKey) {
 module.exports = {
   buildShrimpTodayOrdersSummary,
   isShrimpTodayOrdersCommand,
+  cancelLatestPendingOrderForUser,
 };

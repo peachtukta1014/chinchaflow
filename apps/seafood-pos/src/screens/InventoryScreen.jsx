@@ -53,6 +53,10 @@ export default function InventoryScreen({
   const [rcvCost, setRcvCost] = useState('');
   const [rcvTransport, setRcvTransport] = useState('');
   const [rcvNote, setRcvNote] = useState('');
+  const [sizeMode, setSizeMode] = useState('mixed');
+  const [sizeA, setSizeA] = useState('');
+  const [sizeB, setSizeB] = useState('');
+  const [sizeC, setSizeC] = useState('');
   const [deadMode, setDeadMode] = useState('pond_to_dead');
   const [deadWeight, setDeadWeight] = useState('');
   const [deadNote, setDeadNote] = useState('');
@@ -67,6 +71,17 @@ export default function InventoryScreen({
   const shrimpCost = (liveKg + deadKg) * costPerKg;
   const grandTotal = shrimpCost + transport;
   const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
+
+  const sizeAKg = parseFloat(sizeA) || 0;
+  const sizeBKg = parseFloat(sizeB) || 0;
+  const sizeCKg = parseFloat(sizeC) || 0;
+  const sizeTotalKg = sizeAKg + sizeBKg + sizeCKg;
+  const sizeWarning = sizeMode === 'by_size' && liveKg > 0 && Math.abs(sizeTotalKg - liveKg) > 0.001;
+
+  function buildSizeBreakdown() {
+    if (sizeMode === 'mixed') return { mode: 'mixed' };
+    return { mode: 'by_size', A: sizeAKg, B: sizeBKg, C: sizeCKg };
+  }
   const todayReceiveCount = useMemo(
     () => countReceivesOnDate(stockBatches, todayKey),
     [stockBatches, todayKey],
@@ -112,6 +127,7 @@ export default function InventoryScreen({
   const handleReceive = async () => {
     if (!rcvLive && !rcvDead) return alert('ใส่น้ำหนักอย่างน้อย 1 ช่องครับ');
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    if (sizeWarning) return alert(`ยอดรวมไซต์ (${sizeTotalKg.toFixed(3)} กก.) ไม่ตรงกับกุ้งสด (${liveKg.toFixed(3)} กก.) ครับ`);
     setSaving(true);
     try {
       const { grandTotal: savedTotal, effectiveCost: savedCost } = await createStockBatchRecord({
@@ -120,6 +136,7 @@ export default function InventoryScreen({
         costPerKg,
         transport,
         note: rcvNote,
+        sizeBreakdown: buildSizeBreakdown(),
       });
       await updateMainStock(stock.live + liveKg, stock.dead + deadKg);
       alert(
@@ -132,6 +149,10 @@ export default function InventoryScreen({
       setRcvCost('');
       setRcvTransport('');
       setRcvNote('');
+      setSizeMode('mixed');
+      setSizeA('');
+      setSizeB('');
+      setSizeC('');
     } catch (err) {
       console.error(err);
       alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
@@ -312,6 +333,66 @@ export default function InventoryScreen({
               className="w-full p-3 bg-slate-50 rounded-2xl outline-none"
             />
           </div>
+
+          {/* ── ไซต์กุ้ง ── */}
+          <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-500">ไซต์กุ้งสด</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSizeMode('mixed')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${
+                  sizeMode === 'mixed'
+                    ? 'border-blue-400 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                รวมไซต์
+              </button>
+              <button
+                type="button"
+                onClick={() => setSizeMode('by_size')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${
+                  sizeMode === 'by_size'
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                แยก A / B / C
+              </button>
+            </div>
+            {sizeMode === 'by_size' && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'A ใหญ่ (กก.)', val: sizeA, set: setSizeA },
+                    { label: 'B กลาง (กก.)', val: sizeB, set: setSizeB },
+                    { label: 'C เล็ก (กก.)', val: sizeC, set: setSizeC },
+                  ].map(({ label, val, set }) => (
+                    <div key={label}>
+                      <label className="text-[10px] font-bold text-slate-400 mb-1 block">{label}</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={val}
+                        onChange={(e) => set(e.target.value)}
+                        placeholder="0.000"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-center"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className={`flex justify-between text-xs font-bold px-1 ${sizeWarning ? 'text-red-600' : 'text-emerald-600'}`}>
+                  <span>รวม A+B+C</span>
+                  <span>
+                    {sizeTotalKg.toFixed(3)} กก.
+                    {sizeWarning && ` ≠ ${liveKg.toFixed(3)} กก. (กุ้งสด)`}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
             <div className="flex justify-between text-sm text-slate-600">
               <span>น้ำหนักรวม</span>
