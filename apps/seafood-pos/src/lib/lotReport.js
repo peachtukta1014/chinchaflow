@@ -35,6 +35,8 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
   let stockCountDeadKg = 0;
   let stockCountKg = 0;
   let stockCountBaht = 0;
+  let carryForwardLiveKg = 0;
+  let carryForwardDeadKg = 0;
 
   for (const adj of adjustments) {
     const allocs = (adj.allocations || []).filter((a) => batchIds.has(a.batchId));
@@ -51,6 +53,11 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
       }
       stockCountKg += kg(adj.weightKg);
       stockCountBaht += baht(adj.estimatedLossBaht);
+    } else if (adj.type === 'lot_carry_forward') {
+      for (const a of allocs) {
+        carryForwardLiveKg += kg(a.liveTaken);
+        carryForwardDeadKg += kg(a.deadTaken);
+      }
     }
   }
 
@@ -65,6 +72,8 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
     stockCountDeadKg,
     stockCountKg,
     stockCountBaht,
+    carryForwardLiveKg,
+    carryForwardDeadKg,
   };
 }
 
@@ -138,22 +147,26 @@ export function computeLotReport({
   const adj = sumAdjustmentsForLot(adjustments, batchIds);
 
   // ── สมดุลมวลรวม (ตัวเลขถูกต้องเสมอ ใช้ใน weight section) ──────────────────
-  // กุ้งหายรวม = รับ − ขาย − คงเหลือ (รวมที่จดไว้และปริศนา)
-  const shrinkageKg = Math.max(0, receivedTotalKg - soldTotalKg - remainingTotalKg);
+  // กุ้งหายรวม = รับ − ขาย − คงเหลือ − ยกล็อต (รวมที่จดไว้และปริศนา)
+  const carryForwardTotalKg = adj.carryForwardLiveKg + adj.carryForwardDeadKg;
+  const shrinkageKg = Math.max(
+    0,
+    receivedTotalKg - soldTotalKg - remainingTotalKg - carryForwardTotalKg,
+  );
 
-  // ── กุ้งหาย "ปริศนา" ต่อสาย (ไม่รวม pond_to_dead / spoilage / stock_count) ──
+  // ── กุ้งหาย "ปริศนา" ต่อสาย (ไม่รวม pond_to_dead / spoilage / stock_count / carry_forward) ──
   //
-  // สาย LIVE:  รับเป็น − ขายเป็น − คงเป็น − (ย้ายไปตาย) − (ตัดทิ้ง) − (ชั่งปิด live)
-  // สาย DEAD:  (รับตาย + ย้ายจากบ่อ) − ขายตาย − คงตาย − (ตัดทิ้งตาย) − (ชั่งปิด dead)
+  // สาย LIVE:  รับเป็น − ขายเป็น − คงเป็น − (ย้ายไปตาย) − (ตัดทิ้ง) − (ชั่งปิด live) − (ยกล็อต live)
+  // สาย DEAD:  (รับตาย + ย้ายจากบ่อ) − ขายตาย − คงตาย − (ตัดทิ้งตาย) − (ชั่งปิด dead) − (ยกล็อต dead)
   const unaccountedLiveKg = Math.max(
     0,
     receivedLive - soldLiveKg - remainingLive
-      - adj.pondToDeadKg - adj.spoilageLiveKg - adj.stockCountLiveKg,
+      - adj.pondToDeadKg - adj.spoilageLiveKg - adj.stockCountLiveKg - adj.carryForwardLiveKg,
   );
   const unaccountedDeadKg = Math.max(
     0,
     (receivedDead + adj.pondToDeadKg) - soldDeadKg - remainingDead
-      - adj.spoilageDeadKg - adj.stockCountDeadKg,
+      - adj.spoilageDeadKg - adj.stockCountDeadKg - adj.carryForwardDeadKg,
   );
   const unaccountedShrinkageKg = unaccountedLiveKg + unaccountedDeadKg;
 
@@ -277,6 +290,9 @@ export function computeLotReport({
     spoilageTotalBaht,  // ต้นทุนเสียหาย/ตัดทิ้ง (จดแล้ว)
     stockCountKg: adj.stockCountKg,
     stockCountBaht: adj.stockCountBaht,
+    carryForwardLiveKg: adj.carryForwardLiveKg,
+    carryForwardDeadKg: adj.carryForwardDeadKg,
+    carryForwardTotalKg,
     // ต้นทุนสูญเสีย (ไม่นับซ้ำ)
     shrinkageBaht,    // = unaccounted + spoilage + stockCount
     totalLossBaht,    // alias

@@ -8,6 +8,7 @@ import {
 } from '../lib/firestoreRest';
 import DateNavBar from './DateNavBar';
 import LotExpensesPanel from './LotExpensesPanel';
+import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
 
 function fmtKg(n) {
   return `${(parseFloat(n) || 0).toFixed(2)} กก.`;
@@ -134,7 +135,13 @@ function LineSummaryCard({
   );
 }
 
-export default function LotReportPanel({ stockBatches = [], active = true }) {
+export default function LotReportPanel({
+  stockBatches = [],
+  active = true,
+  member = null,
+  onLotClosed = null,
+  closedLotKeys = new Set(),
+}) {
   const todayKey = dateKeyBangkok();
   const lotDays = useMemo(() => groupBatchesByReceiveDay(stockBatches), [stockBatches]);
   const defaultLotKey = lotDays.length ? lotDays[lotDays.length - 1].dateKey : todayKey;
@@ -147,6 +154,8 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
   const [countedLive, setCountedLive] = useState('');
   const [countedDead, setCountedDead] = useState('');
   const [salesLoadNote, setSalesLoadNote] = useState('');
+  const [closingLot, setClosingLot] = useState(false);
+  const [carryTargetKey, setCarryTargetKey] = useState(null);
   const [lotExpenses, setLotExpenses] = useState({
     marketExpenses: 0,
     marketNote: '',
@@ -196,6 +205,11 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     setEndDateKey(lotDateKey);
   }, [lotDateKey, endDateKey]);
 
+  // ── auto-pick carry target when lot changes ───────────────────────────────
+  useEffect(() => {
+    setCarryTargetKey(pickCarryTarget(stockBatches, lotDateKey));
+  }, [stockBatches, lotDateKey]);
+
   useEffect(() => {
     if (!active) return;
     loadReportData();
@@ -225,6 +239,36 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
     countedDead,
     lotExpenses,
   ]);
+
+  const handleCloseLot = async () => {
+    const remaining = report.remainingLive + report.remainingDead;
+    const carry = remaining > 0.001;
+    const targetLabel = carryTargetKey ? formatViewDateLabel(carryTargetKey) : '—';
+    const msg = carry
+      ? `ปิดล็อต ${formatReceiveDayLabel(lotDateKey)}?\n\nยอดคงเหลือ ${remaining.toFixed(2)} กก. จะยกไปล็อต ${targetLabel}\n\n⚠️ ไม่สามารถยกเลิกได้ หลังปิดแล้ว`
+      : `ปิดล็อต ${formatReceiveDayLabel(lotDateKey)}?\n\nไม่มีคงเหลือที่ต้องยก\n\n⚠️ ไม่สามารถยกเลิกได้ หลังปิดแล้ว`;
+    if (!window.confirm(msg)) return;
+    setClosingLot(true);
+    try {
+      await closeLotAndCarryForward({
+        lotDateKey,
+        batches: stockBatches,
+        report,
+        targetLotDateKey: carry ? carryTargetKey : null,
+        closedBy: member?.name || '',
+      });
+      alert(`✅ ปิดล็อต ${formatReceiveDayLabel(lotDateKey)} แล้ว${carry ? `\nยกยอด ${remaining.toFixed(2)} กก. → ล็อต ${targetLabel}` : ''}`);
+      onLotClosed?.(lotDateKey);
+      await loadReportData();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'ปิดล็อตไม่สำเร็จ');
+    } finally {
+      setClosingLot(false);
+    }
+  };
+
+  const isAlreadyClosed = closedLotKeys.has(lotDateKey);
 
   const lotLabel = formatReceiveDayLabel(lotDateKey);
   const periodLabel = `${formatViewDateLabel(lotDateKey)} → ${formatViewDateLabel(endDateKey)}`;
@@ -486,6 +530,15 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
         </div>
       </div>
 
+      {report.carryForwardTotalKg > 0.001 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex justify-between items-center text-xs">
+          <span className="font-bold text-blue-800">ยกยอดไปล็อตถัดไปแล้ว</span>
+          <span className="font-black text-blue-700">
+            {(report.carryForwardLiveKg + report.carryForwardDeadKg).toFixed(2)} กก.
+          </span>
+        </div>
+      )}
+
       <details className="bg-white rounded-[2rem] shadow-sm overflow-hidden">
         <summary className="p-4 text-xs font-bold text-slate-500 cursor-pointer">
           รายละเอียดเพิ่ม (ชั่งปิดจริง · ย้ายบ่อ · เสียหายจดแล้ว)
@@ -505,6 +558,12 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
               <p className="flex justify-between">
                 <span className="text-slate-500">ชั่งปิดสต๊อก (จดแล้ว)</span>
                 <span className="font-bold">{fmtKg(report.stockCountKg)}</span>
+              </p>
+            )}
+            {report.carryForwardTotalKg > 0.001 && (
+              <p className="flex justify-between">
+                <span className="text-blue-600 font-bold">ยกยอดไปล็อตถัดไป</span>
+                <span className="font-bold text-blue-600">{fmtKg(report.carryForwardTotalKg)}</span>
               </p>
             )}
             <p className="flex justify-between">
@@ -563,6 +622,62 @@ export default function LotReportPanel({ stockBatches = [], active = true }) {
           </div>
         </div>
       </details>
+
+      {/* ── ปิดล็อต ─────────────────────────────────────────────────────── */}
+      {isAlreadyClosed ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+          <p className="text-emerald-700 font-bold text-sm">✅ ล็อตนี้ปิดแล้ว</p>
+          <p className="text-emerald-600 text-xs mt-1">ดูผลสุทธิได้ที่แท็บ「ประวัติล็อต」</p>
+        </div>
+      ) : (
+        <div className="bg-white border-2 border-dashed border-slate-300 rounded-[2rem] p-5 space-y-3">
+          <div>
+            <h3 className="font-black text-slate-800">ปิดล็อตนี้</h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              บันทึก P&L สุดท้าย · ยอดคงเหลือยกไปล็อตถัดไปอัตโนมัติ
+            </p>
+          </div>
+
+          {report.remainingTotalKg > 0.001 && (
+            <div className="bg-blue-50 rounded-xl p-3 text-xs space-y-2">
+              <p className="font-bold text-blue-800">
+                คงเหลือที่จะยกไป: เป็น {report.remainingLive.toFixed(2)} + ตาย {report.remainingDead.toFixed(2)} กก.
+              </p>
+              {lotDays.filter((d) => d.dateKey !== lotDateKey).length > 0 ? (
+                <>
+                  <label className="text-slate-600 font-bold block">ยกไปล็อต</label>
+                  <select
+                    value={carryTargetKey || ''}
+                    onChange={(e) => setCarryTargetKey(e.target.value || null)}
+                    className="w-full p-2.5 bg-white rounded-xl font-bold text-slate-800 outline-none border border-slate-200"
+                  >
+                    {lotDays
+                      .filter((d) => d.dateKey !== lotDateKey)
+                      .map((d) => (
+                        <option key={d.dateKey} value={d.dateKey}>
+                          {d.label}
+                        </option>
+                      ))}
+                  </select>
+                </>
+              ) : (
+                <p className="text-amber-700">
+                  ⚠️ ไม่มีล็อตอื่นให้ยก — รับกุ้งล็อตใหม่ก่อน หรือยืนยันเพื่อตัดทิ้งยอดคงเหลือ
+                </p>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleCloseLot}
+            disabled={closingLot || (report.remainingTotalKg > 0.001 && !carryTargetKey && lotDays.filter((d) => d.dateKey !== lotDateKey).length > 0)}
+            className="w-full py-3 rounded-2xl bg-slate-900 text-white font-bold text-sm disabled:opacity-50"
+          >
+            {closingLot ? 'กำลังปิดล็อต...' : `ปิดล็อต ${lotLabel}`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

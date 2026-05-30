@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQueryStockAdjustments } from '../lib/firestoreRest';
 import {
@@ -13,14 +13,6 @@ import {
 } from '../services/stockService';
 import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
-
-const LotExpensesPanel = lazy(() => import('../components/LotExpensesPanel'));
-
-function PanelLoading() {
-  return (
-    <div className="py-10 text-center text-slate-400 text-sm font-medium">กำลังโหลด...</div>
-  );
-}
 
 const ADJUST_LABELS = {
   pond_to_dead: { title: 'ย้ายเป็นขายได้', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
@@ -227,25 +219,12 @@ export default function InventoryScreen({
         </button>
         <button
           type="button"
-          onClick={() => setTab('expenses')}
-          className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'expenses' ? 'bg-white text-violet-600' : 'text-slate-500'}`}
-        >
-          รายจ่าย
-        </button>
-        <button
-          type="button"
           onClick={() => setTab('lots')}
           className={`flex-1 min-w-[4.5rem] py-3 font-bold text-xs rounded-xl ${tab === 'lots' ? 'bg-white text-amber-600' : 'text-slate-500'}`}
         >
           ล็อตกุ้ง
         </button>
       </div>
-
-      {tab === 'expenses' && (
-        <Suspense fallback={<PanelLoading />}>
-          <LotExpensesPanel stockBatches={stockBatches} standalone />
-        </Suspense>
-      )}
 
       {tab === 'lots' && (
         <StockLotTimeline

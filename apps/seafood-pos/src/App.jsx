@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'lucide-react';
 import { auth } from './firebase';
 import { FS_BASE, fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
@@ -31,8 +31,9 @@ const LineOrdersScreen = lazy(() => import('./screens/LineOrdersScreen'));
 const AdminUsersScreen = lazy(() => import('./screens/AdminUsersScreen'));
 const ProductSettingsScreen = lazy(() => import('./screens/ProductSettingsScreen'));
 const LotCloseScreen = lazy(() => import('./screens/LotCloseScreen'));
+const ExpensesScreen = lazy(() => import('./screens/ExpensesScreen'));
 
-const MAIN_TABS = new Set(['pos', 'sales', 'orders']);
+const MAIN_TABS = new Set(['pos', 'sales', 'orders', 'expenses']);
 
 const OVERLAY_TITLES = {
   stock: 'รับเข้า / คลัง',
@@ -400,6 +401,12 @@ export default function App() {
             />
           </Suspense>
         )}
+
+        {activeTab === 'expenses' && (
+          <Suspense fallback={<TabLoading />}>
+            <ExpensesScreen stockBatches={stockBatches} />
+          </Suspense>
+        )}
       </div>
 
       {isMainTab && (
@@ -427,6 +434,13 @@ export default function App() {
             isActive={activeTab === 'orders'}
             onClick={() => goMainTab('orders')}
             badge={pendingOrders}
+          />
+          <NavButton
+            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
+            label="รายจ่าย"
+            compactLabel
+            isActive={activeTab === 'expenses'}
+            onClick={() => goMainTab('expenses')}
           />
         </div>
       )}
