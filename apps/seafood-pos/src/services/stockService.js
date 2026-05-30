@@ -50,12 +50,10 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
     );
   }
 
-  for (const p of patches) {
-    await fsPatch(`stockBatches/${p.id}`, {
-      remainingLiveKg: p.remainingLiveKg,
-      remainingDeadKg: p.remainingDeadKg,
-    });
-  }
+  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
+    remainingLiveKg: p.remainingLiveKg,
+    remainingDeadKg: p.remainingDeadKg,
+  })));
 
   return patches;
 }
@@ -91,12 +89,10 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
     throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(transferKg - left).toFixed(2)} กก. (ต้องการ ${transferKg} กก.)`);
   }
 
-  for (const p of patches) {
-    await fsPatch(`stockBatches/${p.id}`, {
-      remainingLiveKg: p.remainingLiveKg,
-      remainingDeadKg: p.remainingDeadKg,
-    });
-  }
+  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
+    remainingLiveKg: p.remainingLiveKg,
+    remainingDeadKg: p.remainingDeadKg,
+  })));
   return { patches, allocations };
 }
 
@@ -131,12 +127,10 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
     throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
-  for (const p of patches) {
-    await fsPatch(`stockBatches/${p.id}`, {
-      remainingLiveKg: p.remainingLiveKg,
-      remainingDeadKg: p.remainingDeadKg,
-    });
-  }
+  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
+    remainingLiveKg: p.remainingLiveKg,
+    remainingDeadKg: p.remainingDeadKg,
+  })));
   return { patches, allocations };
 }
 
@@ -188,12 +182,10 @@ async function deductDeadSpoilageFromBatches(batches, lossKg) {
     throw new Error(`กุ้งตายในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
-  for (const p of patches) {
-    await fsPatch(`stockBatches/${p.id}`, {
-      remainingLiveKg: p.remainingLiveKg,
-      remainingDeadKg: p.remainingDeadKg,
-    });
-  }
+  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
+    remainingLiveKg: p.remainingLiveKg,
+    remainingDeadKg: p.remainingDeadKg,
+  })));
   return { patches, allocations };
 }
 
