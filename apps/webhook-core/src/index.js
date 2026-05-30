@@ -24,7 +24,7 @@ const {
 const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
-const { getLineOrderSession } = require('./lineOrderSession');
+const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
 const {
   buildShrimpSummaryForDate,
   SHRIMP_HELP_TEXT,
@@ -121,6 +121,9 @@ exports.lineWebhook = functions
         if (intent === 'cancel_order') {
           try {
             const { message } = await cancelLatestPendingOrderForUser(db(), userId);
+            // เคลียร์ session ค้างหลังยกเลิก — fire-and-forget ไม่บล็อก reply
+            clearSessionForCancel(db(), session.id, admin.firestore.FieldValue.serverTimestamp())
+              .catch((e) => console.warn('clearSessionForCancel', e));
             await lineReply(replyToken, message, token);
           } catch (err) {
             console.error('shrimp cancel order', err);

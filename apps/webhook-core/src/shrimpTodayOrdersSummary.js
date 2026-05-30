@@ -42,7 +42,7 @@ async function cancelLatestPendingOrderForUser(db, lineUserId) {
       .where('lineUserId', '==', lineUserId)
       .where('status', '==', 'pending')
       .orderBy('createdAt', 'desc')
-      .limit(5)
+      .limit(2)
       .get();
   } catch (err) {
     console.warn('cancelLatestPendingOrderForUser query', err.message);
@@ -84,7 +84,22 @@ async function cancelLatestPendingOrderForUser(db, lineUserId) {
     .join('\n');
 
   const dateLabel = data.deliveryDate ? ` (ส่ง ${formatDateThai(data.deliveryDate)})` : '';
-  const pending = snap.docs.length - 1;
+
+  // นับออเดอร์ที่เหลือจริงด้วย count() — ถูกต้องเสมอไม่ติด limit
+  let pending = 0;
+  try {
+    const countSnap = await db
+      .collection('lineOrders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'pending')
+      .count()
+      .get();
+    pending = countSnap.data().count;
+  } catch {
+    // fallback: ประมาณจาก query เดิม (อาจต่ำกว่าจริงถ้า > limit)
+    pending = Math.max(0, snap.docs.length - 1);
+  }
+
   const moreNote = pending > 0 ? `\n\nยังมีออเดอร์รอส่ง ${pending} รายการในระบบ\nถ้าต้องการยกเลิกเพิ่มพิมพ์ "ยกเลิก" อีกครั้งครับ` : '';
 
   return {
