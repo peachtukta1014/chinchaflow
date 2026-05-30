@@ -31,6 +31,15 @@
         { "fieldPath": "status",       "order": "ASCENDING" },
         { "fieldPath": "deliveryDate", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "lineOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lineUserId", "order": "ASCENDING"  },
+        { "fieldPath": "status",     "order": "ASCENDING"  },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

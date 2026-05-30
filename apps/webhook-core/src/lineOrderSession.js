@@ -53,10 +53,25 @@ async function clearPending(db, sessionId, serverTimestamp) {
   await setLineOrderSession(db, sessionId, { pending: null }, serverTimestamp);
 }
 
+/** เคลียร์ state ออเดอร์ทั้งหมดหลังลูกค้ายกเลิก — ป้องกัน session ค้างต่อไปหลังยกเลิก */
+async function clearSessionForCancel(db, sessionId, serverTimestamp) {
+  const ref = db.collection('lineOrderSessions').doc(sessionId);
+  await ref.set(
+    {
+      pending: null,
+      orderDraft: null,
+      profileCollect: null,
+      updatedAt: serverTimestamp,
+    },
+    { merge: true },
+  );
+}
+
 module.exports = {
   sessionDocId,
   getLineOrderSession,
   setLineOrderSession,
   clearPending,
+  clearSessionForCancel,
   SESSION_TTL_MS,
 };
