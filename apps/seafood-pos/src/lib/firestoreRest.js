@@ -418,7 +418,7 @@ export async function fsQuerySalesByCustomer(customerId, limit = 80) {
   return sortSalesDesc(open.filter((d) => d.customerId === customerId));
 }
 
-export async function fsIncrementDebt(customerId, meta, delta) {
+export async function fsIncrementDebt(customerId, meta, delta, prefetched = undefined) {
   if (!FS_BASE || !customerId) return;
   const deltaN = parseFloat(delta) || 0;
   if (deltaN === 0) return;
@@ -426,13 +426,21 @@ export async function fsIncrementDebt(customerId, meta, delta) {
   const path = `customerDebts/${customerId}`;
   const headers = await fsAuthHeaders();
   let current = 0;
-  const r = await fetch(`${FS_BASE}/${path}`, { headers });
-  if (r.ok) {
-    const j = await r.json();
-    const fv = j.fields?.totalDebt;
-    current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
-  } else if (r.status !== 404) {
-    throw new Error(`GET ${path} HTTP ${r.status}`);
+  let docExists = false;
+
+  if (prefetched !== undefined) {
+    current = prefetched.current;
+    docExists = prefetched.exists;
+  } else {
+    const r = await fetch(`${FS_BASE}/${path}`, { headers });
+    if (r.ok) {
+      docExists = true;
+      const j = await r.json();
+      const fv = j.fields?.totalDebt;
+      current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
+    } else if (r.status !== 404) {
+      throw new Error(`GET ${path} HTTP ${r.status}`);
+    }
   }
 
   const totalDebt = current + deltaN;
@@ -445,7 +453,7 @@ export async function fsIncrementDebt(customerId, meta, delta) {
     totalDebt,
   });
 
-  if (r.ok) {
+  if (docExists) {
     return fsPatch(path, {
       customerName: meta.customerName,
       zone: meta.zone,
@@ -460,4 +468,23 @@ export async function fsIncrementDebt(customerId, meta, delta) {
     { method: 'POST', headers, body: JSON.stringify({ fields }) },
   );
   if (!create.ok) throw new Error(`สร้างลูกหนี้ไม่สำเร็จ HTTP ${create.status}`);
+}
+
+/** Pre-fetch ยอดหนี้ปัจจุบัน (ก่อน POST sale) เพื่อลดจำนวน serial round trip */
+export async function fsPrefetchDebt(customerId) {
+  if (!FS_BASE || !customerId) return undefined;
+  const path = `customerDebts/${customerId}`;
+  const headers = await fsAuthHeaders();
+  try {
+    const r = await fetch(`${FS_BASE}/${path}`, { headers });
+    if (r.ok) {
+      const j = await r.json();
+      const fv = j.fields?.totalDebt;
+      return { exists: true, current: parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0) };
+    }
+    if (r.status === 404) return { exists: false, current: 0 };
+  } catch {
+    /* ignore prefetch errors — fall back to normal path */
+  }
+  return undefined;
 }

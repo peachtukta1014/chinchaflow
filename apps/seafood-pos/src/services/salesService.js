@@ -7,13 +7,20 @@ import {
   fsDelete,
   fsGetDoc,
   fsPatch,
+  fsPrefetchDebt,
   fsPost,
   fsQueryOpenSales,
   fsQuerySalesByCustomer,
 } from '../lib/firestoreRest';
 import { normalizeBillItems } from '../lib/salesAggregate';
 import { incrementCustomerDebt } from './debtService';
-import { deductStockForSale, getEffectiveStock, restoreStockForSale } from './stockService';
+import {
+  deductFifoFromBatches,
+  deductStockForSale,
+  getEffectiveStock,
+  restoreStockForSale,
+  sumStockFromBatches,
+} from './stockService';
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -100,7 +107,7 @@ export function buildBillData({
 }
 
 /**
- * บันทึกบิล POS: ตรวจสต๊อก → บันทึกขาย/หนี้ → ตัดสต๊อก
+ * บันทึกบิล POS: ตรวจสต๊อก → ตัดสต๊อก FIFO → บันทึกขาย/หนี้ (parallel กับ persistStock)
  * คืน { ok: false, message } หรือ { ok: true, billData, total, remain, liveKg, deadKg }
  */
 export async function saveBillWithCart({
@@ -130,16 +137,31 @@ export async function saveBillWithCart({
     recordedBy,
     photoUrl,
   });
-  await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
-  await persistSaleBill({
-    billData,
-    cartItems,
-    remain,
-    selectedCustomer,
-    customer,
-    billNo,
-    dateKey,
-  });
+
+  // Step 1: ตัด FIFO batch (parallel patches) — ต้องเสร็จก่อนเขียนบิล
+  let newLive, newDead;
+  if (stockBatches.length > 0) {
+    const patches = await deductFifoFromBatches(stockBatches, { liveKg, deadKg });
+    const patchById = Object.fromEntries(patches.map((p) => [p.id, p]));
+    const summed = sumStockFromBatches(
+      stockBatches.map((b) => {
+        const p = patchById[b.id];
+        return p ? { ...b, remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg } : b;
+      }),
+    );
+    newLive = summed.live;
+    newDead = summed.dead;
+  } else {
+    newLive = Math.max(0, avail.live - liveKg);
+    newDead = Math.max(0, avail.dead - deadKg);
+  }
+
+  // Step 2: อัป stock summary + เขียนบิล — parallel กัน (คนละ doc, อิสระจากกัน)
+  await Promise.all([
+    updateMainStock(newLive, newDead),
+    persistSaleBill({ billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey }),
+  ]);
+
   return { ok: true, billData, total, remain, liveKg, deadKg };
 }
 
@@ -155,6 +177,11 @@ export async function persistSaleBill({
 }) {
   if (!isFirebaseReady) throw new Error('Firebase config ไม่ครบ — บันทึกบิลไม่ได้');
   const now = new Date().toISOString();
+
+  // Pre-fetch ยอดหนี้ปัจจุบันควบคู่กับ POST sale (ทั้งสอง endpoint อิสระจากกัน)
+  const debtKey = remain > 0 ? debtCustomerKey(selectedCustomer, customer.name) : null;
+  const debtPrefetchPromise = debtKey ? fsPrefetchDebt(debtKey) : Promise.resolve(undefined);
+
   await withTimeout(fsPost('sales', {
     ...billData,
     dateKey,
@@ -170,14 +197,16 @@ export async function persistSaleBill({
     createdAt: now,
     source: 'koseafood-pos',
   }));
+
   if (remain > 0) {
+    const prefetched = await debtPrefetchPromise;
     await withTimeout(incrementCustomerDebt(selectedCustomer, {
       customerId: selectedCustomer,
       customerName: customer.name,
       zone: customer.zone,
       lastBillNo: billNo,
       lastUpdated: now,
-    }, remain));
+    }, remain, prefetched));
   }
 }
 

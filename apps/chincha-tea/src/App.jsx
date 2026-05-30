@@ -124,8 +124,8 @@ export default function App() {
         member,
         lang,
       });
-      await refreshOrders();
       setCart([]);
+      refreshOrders(); // fire-and-forget — อัปเดต list หลังบันทึก ไม่บล็อก UI
       alert(t('saved'));
       return true;
     } catch (e) {
