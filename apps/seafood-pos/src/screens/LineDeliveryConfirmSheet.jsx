@@ -3,8 +3,11 @@ import { X } from 'lucide-react';
 import {
   actualQtyOf,
   applyActualToCartItem,
+  applyPriceToCartItem,
+  applySizeToCartItem,
   cartStockKg,
   hasAnyQtyMismatch,
+  LIVE_PRODUCTS,
   qtyDiffersFromOrder,
   resolveLineCustomer,
 } from '../lib/lineOrderToSale';
@@ -24,11 +27,13 @@ export function LineDeliveryConfirmSheet({
 }) {
   const [lines, setLines] = useState(initialCart);
   const [draftQty, setDraftQty] = useState({});
+  const [draftPrice, setDraftPrice] = useState({});
   const [ackMismatch, setAckMismatch] = useState(false);
 
   useEffect(() => {
     setLines(initialCart);
     setDraftQty({});
+    setDraftPrice({});
     setAckMismatch(false);
   }, [initialCart, order?.id]);
 
@@ -41,6 +46,10 @@ export function LineDeliveryConfirmSheet({
     draftQty[row.lineKey] !== undefined ? draftQty[row.lineKey] : String(actualQtyOf(row))
   );
 
+  const displayPrice = (row) => (
+    draftPrice[row.lineKey] !== undefined ? draftPrice[row.lineKey] : String(row.pricePerKg ?? '')
+  );
+
   const setActual = (lineKey, raw) => {
     setDraftQty((prev) => ({ ...prev, [lineKey]: raw }));
     const n = parseFloat(raw);
@@ -49,6 +58,24 @@ export function LineDeliveryConfirmSheet({
       row.lineKey === lineKey ? applyActualToCartItem(row, raw, priceOf) : row
     )));
     setAckMismatch(false);
+  };
+
+  const setPricePerKg = (lineKey, raw) => {
+    setDraftPrice((prev) => ({ ...prev, [lineKey]: raw }));
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n)) return;
+    setLines((prev) => prev.map((row) => (
+      row.lineKey === lineKey ? applyPriceToCartItem(row, raw) : row
+    )));
+  };
+
+  const changeSize = (lineKey, productId) => {
+    setLines((prev) => prev.map((row) => {
+      if (row.lineKey !== lineKey) return row;
+      const updated = applySizeToCartItem(row, productId, priceOf);
+      setDraftPrice((dp) => ({ ...dp, [lineKey]: String(updated.pricePerKg) }));
+      return updated;
+    }));
   };
 
   const handleConfirm = () => {
@@ -77,11 +104,11 @@ export function LineDeliveryConfirmSheet({
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/50" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-t-3xl max-h-[88vh] flex flex-col shadow-2xl">
+      <div className="bg-white rounded-t-3xl max-h-[92vh] flex flex-col shadow-2xl">
         <div className="px-4 pt-4 pb-2 border-b border-slate-100 shrink-0">
           <div className="flex justify-between items-start gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-black text-slate-800">ยืนยันน้ำหนักส่งจริง</p>
+              <p className="text-sm font-black text-slate-800">ยืนยันน้ำหนักและราคาส่งจริง</p>
               <p className="text-xs text-slate-500 mt-0.5 truncate">{customer.name}</p>
               {order.rawText && (
                 <p className="text-[10px] text-slate-400 mt-1 italic truncate">&quot;{order.rawText}&quot;</p>
@@ -100,7 +127,7 @@ export function LineDeliveryConfirmSheet({
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            ชั่ง/นับน้ำหนักจริงก่อนบันทึก — ถ้าไม่ตรงกับที่สั่งใน LINE ให้แก้ช่อง &quot;ส่งจริง&quot;
+            ชั่ง/นับน้ำหนักจริงก่อนบันทึก — แก้ไซซ์ ราคา หรือน้ำหนักได้ถ้าต่างจากที่สั่ง
           </p>
           {lines.map((row) => {
             const soldByBaht = row.type === 'dead' && row.orderedUnit === 'บาท';
@@ -113,6 +140,27 @@ export function LineDeliveryConfirmSheet({
                 className={`rounded-2xl border p-3 ${differs ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50'}`}
               >
                 <p className="text-sm font-bold text-slate-800">{row.productName}</p>
+
+                {/* ── ไซซ์กุ้ง (live เท่านั้น) ── */}
+                {row.type === 'live' && (
+                  <div className="flex gap-1.5 mt-2">
+                    {LIVE_PRODUCTS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => changeSize(row.lineKey, p.id)}
+                        className={`flex-1 py-1 rounded-xl text-xs font-bold border transition-colors ${
+                          row.productId === p.id
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-500 border-slate-200 active:bg-slate-100'
+                        }`}
+                      >
+                        {p.id === 'large' ? 'ใหญ่' : p.id === 'medium' ? 'กลาง' : 'เล็ก'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 mt-2 text-xs">
                   <span className="text-slate-500 shrink-0">สั่งมา</span>
                   <span className="font-bold text-slate-600">
@@ -124,6 +172,8 @@ export function LineDeliveryConfirmSheet({
                     </span>
                   )}
                 </div>
+
+                {/* ── น้ำหนัก/ยอดส่งจริง ── */}
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs font-bold text-green-700 shrink-0">ส่งจริง</span>
                   <input
@@ -137,9 +187,27 @@ export function LineDeliveryConfirmSheet({
                   />
                   <span className="text-xs text-slate-500 w-8 shrink-0">{unitLabel}</span>
                 </div>
-                {!soldByBaht && row.type !== 'dead' && (
-                  <p className="text-[10px] text-slate-400 mt-1 text-right">
-                    ฿{(row.total || 0).toLocaleString()} @ {row.pricePerKg}/กก.
+
+                {/* ── ราคา/กก. (live เท่านั้น) ── */}
+                {row.type === 'live' && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs font-bold text-orange-600 shrink-0">ราคา</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      step="1"
+                      min="0"
+                      value={displayPrice(row)}
+                      onChange={(e) => setPricePerKg(row.lineKey, e.target.value)}
+                      className="flex-1 bg-white border-2 border-orange-200 rounded-xl px-3 py-2 text-base font-black text-slate-800 text-center"
+                    />
+                    <span className="text-xs text-slate-500 shrink-0">฿/กก.</span>
+                  </div>
+                )}
+
+                {row.type === 'live' && (
+                  <p className="text-[10px] text-slate-400 mt-1.5 text-right font-medium">
+                    ยอด ฿{(row.total || 0).toLocaleString()}
                   </p>
                 )}
                 {soldByBaht && (

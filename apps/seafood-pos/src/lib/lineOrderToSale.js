@@ -2,6 +2,8 @@ import { PRODUCTS } from '../constants';
 import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
 import { findCustomersInText } from './voiceParse';
 
+export const LIVE_PRODUCTS = PRODUCTS.filter((p) => p.type === 'live');
+
 /** แมปชื่อสินค้าจาก LINE → id ใน POS */
 export function mapLineProductName(product) {
   const p = (product || '').replace(/\s+/g, '');
@@ -144,4 +146,27 @@ export function applyActualToCartItem(item, rawActual, priceOf) {
 
 export function hasAnyQtyMismatch(cartItems) {
   return cartItems.some((i) => qtyDiffersFromOrder(i));
+}
+
+/** เปลี่ยนราคา/กก. แล้วคำนวณยอดใหม่ (live เท่านั้น) */
+export function applyPriceToCartItem(item, rawPrice) {
+  if (item.type === 'dead') return item;
+  const ppk = parseInt(rawPrice, 10);
+  if (!Number.isFinite(ppk) || ppk < 0) return item;
+  return { ...item, pricePerKg: ppk, total: item.weight * ppk };
+}
+
+/** เปลี่ยนไซซ์กุ้ง (large/medium/small) แล้วรีเซ็ตราคาเป็น default ของไซซ์ใหม่ */
+export function applySizeToCartItem(item, productId, priceOf) {
+  if (item.type === 'dead') return item;
+  const prod = PRODUCTS.find((p) => p.id === productId);
+  if (!prod || prod.type === 'dead') return item;
+  const ppk = priceOf(productId);
+  return {
+    ...item,
+    productId,
+    productName: prod.name,
+    pricePerKg: ppk,
+    total: item.weight * ppk,
+  };
 }

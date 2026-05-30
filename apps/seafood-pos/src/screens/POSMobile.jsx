@@ -129,7 +129,6 @@ export default function POSMobile({
       onSaveBill(billData);
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
-      setBillSheet({ bill: billData, customer });
       setCart([]); setSelectedCustomer('general');
       setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
       billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
