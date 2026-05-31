@@ -7,7 +7,7 @@ import {
 } from '../lib/generateBillImage';
 import { shareToLine } from '../lib/shareLine';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
-import { resolveLineUserId } from '../lib/resolveLineUserId';
+import { resolveLineUserIdDetails } from '../lib/resolveLineUserId';
 import { isValidLineUserId } from '../lib/lineUserId';
 
 export default function BillImageSheet({ bill, customer, staffName, onClose }) {
@@ -16,6 +16,11 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lineUserId, setLineUserId] = useState('');
+  const [lineUidMeta, setLineUidMeta] = useState({
+    billUid: '',
+    profileName: '',
+    uidMismatch: false,
+  });
   const [lineUidLoading, setLineUidLoading] = useState(true);
   const [pushBusy, setPushBusy] = useState(false);
 
@@ -49,8 +54,19 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const lookupLineUid = React.useCallback(async () => {
     setLineUidLoading(true);
     try {
-      const id = await resolveLineUserId(customer, bill);
-      setLineUserId(id || '');
+      const details = await resolveLineUserIdDetails(customer, bill);
+      setLineUserId(details.uid || '');
+      const billUid = details.billUid || '';
+      const profileUid = details.profileUid || details.uid || '';
+      setLineUidMeta({
+        billUid,
+        profileName: details.profileName || '',
+        uidMismatch: Boolean(
+          isValidLineUserId(billUid)
+          && isValidLineUserId(profileUid)
+          && billUid !== profileUid,
+        ),
+      });
     } finally {
       setLineUidLoading(false);
     }
@@ -127,9 +143,21 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
             {lineUidLoading ? (
               <p className="text-[10px] text-slate-400 mt-0.5">กำลังตรวจ LINE UID…</p>
             ) : canPush ? (
-              <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                พร้อมส่งให้ลูกค้าใน LINE (UID …{lineUserId.slice(-6)})
-              </p>
+              <>
+                <p className="text-[10px] text-green-600 font-bold mt-0.5">
+                  พร้อมส่งให้ลูกค้าใน LINE (UID …{lineUserId.slice(-6)})
+                  {lineUidMeta.profileName
+                    ? ` · รายชื่อ: ${lineUidMeta.profileName}`
+                    : ''}
+                </p>
+                {lineUidMeta.uidMismatch && (
+                  <p className="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
+                    ใช้ UID จากรายชื่อลูกค้าที่บันทึกแล้ว (…{lineUserId.slice(-6)})
+                    {' '}
+                    — ไม่ใช่ UID ในบิลเก่า (…{lineUidMeta.billUid.slice(-6)})
+                  </p>
+                )}
+              </>
             ) : (
               <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">
                 ยังไม่มี LINE UID — แท็บลูกค้า →「ลูกค้า LINE OA」→ บันทึกเข้ารายชื่อ แล้วกดค้นหา UID ด้านล่าง

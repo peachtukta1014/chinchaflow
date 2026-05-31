@@ -356,7 +356,7 @@ export default function MembersScreen({ isAdmin = false }) {
                                 : 'bg-amber-100 text-amber-700'
                             }`}
                           >
-                            LINE {c.lineUserId.slice(0, 6)}…
+                            LINE …{c.lineUserId.slice(-6)}
                           </span>
                         )}
                       </div>
