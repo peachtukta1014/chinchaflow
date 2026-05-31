@@ -25,6 +25,7 @@ function hasOrderBody(text) {
   if (parseRiverPrawnPendingLine(body)) return true;
   if (parseOrderItems(body).length > 0) return true;
   const simple = parseSimpleOrderLine(body);
+  if (simple?.kind === 'invalid_weight') return true;
   if (simple?.kind === 'item' || simple?.kind === 'pending') return true;
   if (simple?.kind === 'size_only') return true;
   return false;
@@ -57,7 +58,8 @@ function isShrimpOrderCommand(text) {
     const t = normalizeOrderText(body);
 
     if (parseSimpleOrderLine(body)) return true;
-    if (parseRiverPrawnPendingLine(body)) return true;
+    const river = parseRiverPrawnPendingLine(body);
+    if (river) return true;
 
     if (hasMyanmarScript(candidate) && UNIT_RE.test(body)) return true;
 

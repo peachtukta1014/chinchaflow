@@ -29,7 +29,9 @@ const {
   replyMissingProfile,
   formatItemsSummary,
   deliveryLabelForLang,
+  replyInvalidWeight,
 } = require('./shrimpLineReply');
+const { getOrderWeightIssue } = require('./orderWeight');
 
 async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
   const groups = groupItemsByCustomer(items);
@@ -283,13 +285,36 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   let items = parseOrderItems(body);
   const simple = parseSimpleOrderLine(body);
 
+  if (simple?.kind === 'invalid_weight') {
+    return {
+      ok: false,
+      reply: replyInvalidWeight(replyLang, simple.qty, simple.unit),
+    };
+  }
+  if (riverPending?.kind === 'invalid_weight') {
+    return {
+      ok: false,
+      reply: replyInvalidWeight(replyLang, riverPending.qty, riverPending.unit),
+    };
+  }
+
   if (simple?.kind === 'size_only' && session.pending) {
+    const pendingIssue = getOrderWeightIssue(
+      session.pending.qty,
+      session.pending.unit || 'กก',
+    );
+    if (pendingIssue) {
+      return {
+        ok: false,
+        reply: replyInvalidWeight(replyLang, session.pending.qty, session.pending.unit || 'กก'),
+      };
+    }
     items = pendingToItems(session.pending, simple.product);
     await setLineOrderSession(db, session.id, { pending: null, replyLang }, ts);
   } else if (simple?.kind === 'item') {
     const it = simpleToOrderItem(simple);
     if (it) items = [it];
-  } else if (riverPending?.kind === 'pending_river') {
+  } else if (riverPending?.kind === 'pending_river' && items.length === 0) {
     await setLineOrderSession(
       db,
       session.id,
