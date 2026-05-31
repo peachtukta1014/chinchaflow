@@ -238,11 +238,14 @@ service cloud.firestore {
     match /lineOrders/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow create: if isApprovedShrimp();
-      // staff สามารถ mark done เท่านั้น — ไม่แก้วันส่ง/ราคา/ลูกค้า
+      // staff สามารถ mark done / ยกเลิก / บันทึกยอดส่งจริง — ไม่แก้วันส่ง/ราคา/ลูกค้าใน items
       allow update: if isAdmin() || isAdminShrimp()
         || (isApprovedShrimp()
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'salesId', 'billNo', 'completedAt']));
+            .hasOnly([
+              'status', 'salesId', 'billNo', 'completedAt', 'fulfilledItems',
+              'cancelledAt', 'cancelledBy',
+            ]));
       allow delete: if isAdmin() || isAdminShrimp();
     }
 

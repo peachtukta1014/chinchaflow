@@ -14,7 +14,7 @@ import {
   markLineOrderDoneOnly,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
-import { deductStockForSale, getEffectiveStock } from '../services/stockService';
+import { deductStockForSale, getEffectiveStock, restoreStockForSale } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 import { useIntervalWhen } from '../lib/useIntervalWhen';
 
@@ -120,9 +120,11 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     if (!order) return;
 
     setSavingId(order.id);
+    const avail = getEffectiveStock(stock, stockBatches);
+    let stockDeducted = false;
     try {
-      const avail = getEffectiveStock(stock, stockBatches);
       await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
+      stockDeducted = true;
 
       const { salesId, billNo } = await saveLineOrderDelivery({
         order,
@@ -141,7 +143,22 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}`);
     } catch (err) {
       console.error(err);
-      alert('บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+      if (stockDeducted) {
+        try {
+          const after = getEffectiveStock(stock, stockBatches);
+          await restoreStockForSale(after, liveKg, deadKg, updateMainStock, stockBatches);
+        } catch (restoreErr) {
+          console.error('restore stock after LINE save failed', restoreErr);
+        }
+      }
+      const msg = String(err?.message || '');
+      if (/403|PERMISSION_DENIED/i.test(msg)) {
+        alert('บันทึกไม่สำเร็จ (สิทธิ์ระบบ) — แจ้งแอดมินให้อัปเดต Firestore rules แล้วลองใหม่');
+      } else if (/timeout|Failed to fetch|NetworkError/i.test(msg)) {
+        alert('เชื่อมต่อไม่สำเร็จ — รอเน็ตกลับแล้วลองอีกครั้ง\nถ้าไม่แน่ใจว่าบันทึกแล้ว ให้เช็ครายการขายก่อนกดซ้ำ');
+      } else {
+        alert('บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+      }
     } finally {
       setSavingId(null);
     }

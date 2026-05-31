@@ -233,6 +233,17 @@ try {
   fail('lotReport dead COGS', e);
 }
 
+try {
+  const rulesPath = path.join(root, '../../firestore.rules');
+  const rules = fs.readFileSync(rulesPath, 'utf8');
+  assert(
+    rules.includes("'fulfilledItems'") && rules.includes("'cancelledAt'"),
+    'firestore.rules อนุญาต staff อัปเดต fulfilledItems / ยกเลิกออเดอร์ LINE',
+  );
+} catch (e) {
+  fail('firestore lineOrders rules', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
