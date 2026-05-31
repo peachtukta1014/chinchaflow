@@ -30,6 +30,7 @@ function CustomerFifoPanel({
   onSaleDeleted,
   deleteBusyId,
   onDeleteSale,
+  onOpenBill,
 }) {
   const [payInput, setPayInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -218,6 +219,16 @@ function CustomerFifoPanel({
                       </button>
                     ))}
                   </div>
+                  {onOpenBill && (
+                    <button
+                      type="button"
+                      disabled={billBusy === tx.id}
+                      onClick={() => onOpenBill(tx)}
+                      className="mt-2 w-full py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
+                    >
+                      ดูภาพบิล / แชร์ LINE
+                    </button>
+                  )}
                   {isAdmin && tx.id && onDeleteSale && (
                     <button
                       type="button"
@@ -270,6 +281,19 @@ export default function CustomerAccountsScreen({
   const [payUpdatingId, setPayUpdatingId] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
+
+  const openBillSheet = useCallback((tx) => {
+    setBillSheet({
+      bill: tx,
+      customer: {
+        id: tx.customerId,
+        name: tx.customerName,
+        zone: tx.zone,
+        phone: tx.phone,
+      },
+      staffName: tx.recordedBy,
+    });
+  }, []);
 
   const loadDebtsRest = useCallback(async () => {
     try {
@@ -530,16 +554,7 @@ export default function CustomerAccountsScreen({
                       <div className="mt-2 flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setBillSheet({
-                            bill: tx,
-                            customer: {
-                              id: tx.customerId,
-                              name: tx.customerName,
-                              zone: tx.zone,
-                              phone: tx.phone,
-                            },
-                            staffName: tx.recordedBy,
-                          })}
+                          onClick={() => openBillSheet(tx)}
                           className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
                         >
                           ดูภาพบิล / แชร์ LINE
@@ -594,6 +609,7 @@ export default function CustomerAccountsScreen({
                 updateMainStock={updateMainStock}
                 deleteBusyId={deleteBusyId}
                 onDeleteSale={handleDeleteSale}
+                onOpenBill={openBillSheet}
               />
             ))}
           </div>
