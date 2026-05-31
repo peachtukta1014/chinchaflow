@@ -1,4 +1,4 @@
-import { auth } from '../firebase';
+import { auth, getFirebaseIdToken } from '../firebase';
 import { FIREBASE_PROJECT_ID } from './viteEnv.js';
 
 const projectId = FIREBASE_PROJECT_ID;
@@ -8,10 +8,9 @@ export const FS_BASE = projectId
 
 async function authHeaders() {
   const base = { 'Content-Type': 'application/json' };
-  const user = auth?.currentUser;
-  if (!user) return base;
+  if (!auth?.currentUser) return base;
   try {
-    const token = await user.getIdToken();
+    const token = await getFirebaseIdToken();
     return { ...base, Authorization: `Bearer ${token}` };
   } catch {
     return base;
