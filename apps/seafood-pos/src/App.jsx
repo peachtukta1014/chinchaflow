@@ -57,6 +57,7 @@ export default function App() {
   const [lastMainTab, setLastMainTab] = useState('pos');
   const [stock, setStock] = useState({ live: 0, dead: 0 });
   const [stockBatches, setStockBatches] = useState([]);
+  const [stockLoadError, setStockLoadError] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [salesRefresh, setSalesRefresh] = useState(0);
   const [stockRefresh, setStockRefresh] = useState(0);
@@ -116,8 +117,10 @@ export default function App() {
         setStock(normalizeStockValues(cfg.live, cfg.dead));
       }
       setStockBatches(rows);
+      setStockLoadError(false);
     } catch (e) {
       console.warn('loadStockFromRest', e);
+      setStockLoadError(true);
     }
   }, [member]);
 
@@ -304,7 +307,7 @@ export default function App() {
         )}
       </div>
 
-      <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} />
+      <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} loadError={stockLoadError} />
 
       {isMainTab && (
         <HeaderQuickLinks
@@ -422,6 +425,13 @@ export default function App() {
             onClick={() => goMainTab('pos')}
           />
           <NavButton
+            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
+            label="รายจ่าย"
+            compactLabel
+            isActive={activeTab === 'expenses'}
+            onClick={() => goMainTab('expenses')}
+          />
+          <NavButton
             icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
             label="ยอดขาย/ยอดค้าง"
             compactLabel
@@ -434,13 +444,6 @@ export default function App() {
             isActive={activeTab === 'orders'}
             onClick={() => goMainTab('orders')}
             badge={pendingOrders}
-          />
-          <NavButton
-            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
-            label="รายจ่าย"
-            compactLabel
-            isActive={activeTab === 'expenses'}
-            onClick={() => goMainTab('expenses')}
           />
         </div>
       )}

@@ -106,7 +106,8 @@ export function buildBillData({
 }
 
 /**
- * บันทึกบิล POS: ตรวจสต๊อก → ตัดสต๊อก FIFO → บันทึกขาย/หนี้ (parallel กับ persistStock)
+ * บันทึกบิล POS: ตรวจสต๊อก → ตัดสต๊อก FIFO → บันทึกขาย/หนี้
+ * มี saga compensation: ถ้าเขียนบิลล้มเหลวหลังตัดสต๊อกแล้ว → คืนสต๊อกอัตโนมัติ
  * คืน { ok: false, message } หรือ { ok: true, billData, total, remain, liveKg, deadKg }
  */
 export async function saveBillWithCart({
@@ -137,7 +138,7 @@ export async function saveBillWithCart({
     photoUrl,
   });
 
-  // Step 1: ตัด FIFO batch (parallel patches) — ต้องเสร็จก่อนเขียนบิล
+  // Step 1: ตัด FIFO batch (atomic commit) — ต้องเสร็จก่อนเขียนบิล
   let newLive, newDead;
   if (stockBatches.length > 0) {
     const patches = await deductFifoFromBatches(stockBatches, { liveKg, deadKg });
@@ -155,11 +156,24 @@ export async function saveBillWithCart({
     newDead = Math.max(0, avail.dead - deadKg);
   }
 
-  // Step 2: อัป stock summary + เขียนบิล — parallel กัน (คนละ doc, อิสระจากกัน)
-  await Promise.all([
-    updateMainStock(newLive, newDead),
-    persistSaleBill({ billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey }),
-  ]);
+  // Step 2: อัป stock summary + เขียนบิล
+  // Saga compensation: ถ้า write ล้มเหลว → คืนสต๊อกที่ตัดไป ป้องกัน "สต๊อกหาย แต่ไม่มีบิล"
+  try {
+    await Promise.all([
+      updateMainStock(newLive, newDead),
+      persistSaleBill({ billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey }),
+    ]);
+  } catch (writeErr) {
+    try {
+      await restoreStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
+    } catch (restoreErr) {
+      console.error('Stock compensation failed', restoreErr);
+      throw new Error(
+        `บันทึกบิลไม่สำเร็จ — ยอดสต๊อกอาจคลาดเคลื่อน กรุณาแจ้งแอดมิน (${writeErr.message})`,
+      );
+    }
+    throw new Error(`บันทึกบิลไม่สำเร็จ — คืนสต๊อกแล้ว กรุณาลองใหม่ (${writeErr.message})`);
+  }
 
   return { ok: true, billData, total, remain, liveKg, deadKg };
 }

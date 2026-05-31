@@ -42,14 +42,17 @@ export default function LoginScreen({ onLogin }) {
         const f = (await resp.json()).fields || {};
         const role = f.role?.stringValue || 'staff';
         const approved = f.approved?.booleanValue === true;
+        // Bootstrap elevation applies only on first login (profile not yet approved).
+        // Re-elevation after admin-initiated demotion/block is intentionally disabled
+        // to prevent the hardcoded email from being a persistent privilege escalation path.
         const isBootstrap = em === ADMIN_EMAIL.toLowerCase();
-        if (isBootstrap && (role !== 'admin' || !approved)) {
+        if (isBootstrap && !approved) {
           await fsPatch(`shrimp_users/${user.uid}`, { role: 'admin', approved: true });
           onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: 'admin' });
           return;
         }
-        if (!approved) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role });
+        if (!approved) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role });
       }
     } catch (e) {
       const c = e.code || '';
