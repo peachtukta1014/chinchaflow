@@ -295,6 +295,9 @@ try {
   assert(patongSmall.length === 6, 'ป่าตอง 6 ร้านใช้กุ้งแม่น้ำเล็ก');
   assert(patongMedium.length === 4, 'ป่าตอง 4 ร้านใช้กุ้งแม่น้ำกลาง');
 
+  const kathu = CUSTOMERS.find((c) => c.id === 'c11');
+  assert(kathu?.defaultRiverSize === 'เล็ก', 'น้องเล็กสอง กะทู้ ใช้กุ้งแม่น้ำเล็ก');
+
   const { customerFieldsFromForm } = await import('../src/lib/customerAliases.js');
   const parsed = customerFieldsFromForm({
     name: 'ร้านเฟิร์ส',

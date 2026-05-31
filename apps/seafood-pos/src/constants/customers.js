@@ -23,7 +23,7 @@ export const CUSTOMERS = [
   { id: 'c8', name: 'ร้านสองพี่น้องหนึ่ง', zone: 'ป่าตอง', defaultRiverSize: 'กลาง' },
   { id: 'c9', name: 'ร้านสองพี่น้องสอง', zone: 'ป่าตอง', defaultRiverSize: 'กลาง' },
   { id: 'c10', name: 'ร้านแสนสบาย', zone: 'ป่าตอง', defaultRiverSize: 'กลาง' },
-  { id: 'c11', name: 'น้องเล็กสอง', zone: 'กะทู้' },
+  { id: 'c11', name: 'น้องเล็กสอง', zone: 'กะทู้', defaultRiverSize: 'เล็ก' },
   { id: 'c12', name: 'อีสานรสเด็ด', zone: 'กะทู้' },
   { id: 'c13', name: 'โบ๊ทซีฟู้ด', zone: 'ภูเก็ต' },
   { id: 'c14', name: 'ร้านคุณเชษฐ์', zone: 'ภูเก็ต' },
