@@ -290,6 +290,11 @@ try {
   const first = resolveLineCustomerByName('Firstseafood', CUSTOMERS);
   assert(first.id === 'c7', 'Firstseafood → ร้านเฟิร์ส (alias)');
 
+  const patongSmall = CUSTOMERS.filter((c) => c.zone === 'ป่าตอง' && c.defaultRiverSize === 'เล็ก');
+  const patongMedium = CUSTOMERS.filter((c) => c.zone === 'ป่าตอง' && c.defaultRiverSize === 'กลาง');
+  assert(patongSmall.length === 6, 'ป่าตอง 6 ร้านใช้กุ้งแม่น้ำเล็ก');
+  assert(patongMedium.length === 4, 'ป่าตอง 4 ร้านใช้กุ้งแม่น้ำกลาง');
+
   const { customerFieldsFromForm } = await import('../src/lib/customerAliases.js');
   const parsed = customerFieldsFromForm({
     name: 'ร้านเฟิร์ส',
