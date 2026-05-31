@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { formatReceiveDayLabel, groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
 import { computeLotReport } from '../lib/lotReport';
@@ -9,6 +9,17 @@ import {
 import DateNavBar from './DateNavBar';
 import LotExpensesPanel from './LotExpensesPanel';
 import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
+
+/** Returns the dateKey of the oldest lot that is not closed and not excluded. */
+function getOldestActiveLot(lotDays, closedLotKeys, excluding = null) {
+  // lotDays is sorted newest→oldest; iterate from end to get oldest first
+  for (let i = lotDays.length - 1; i >= 0; i--) {
+    const d = lotDays[i];
+    if (d.dateKey === excluding) continue;
+    if (!closedLotKeys.has(d.dateKey)) return d.dateKey;
+  }
+  return null;
+}
 
 function fmtKg(n) {
   return `${(parseFloat(n) || 0).toFixed(2)} กก.`;
@@ -165,10 +176,23 @@ export default function LotReportPanel({
     pondLines: [],
   });
 
+  // Fallback: if the current lot disappears from the list entirely
   useEffect(() => {
     if (lotDays.some((d) => d.dateKey === lotDateKey)) return;
     if (defaultLotKey) setLotDateKey(defaultLotKey);
   }, [lotDays, lotDateKey, defaultLotKey]);
+
+  // On initial closedLotKeys load: if the default selection is already closed,
+  // auto-advance to the oldest active (non-closed) lot.
+  const didInitAutoSelect = useRef(false);
+  useEffect(() => {
+    if (didInitAutoSelect.current) return;
+    if (closedLotKeys.size === 0) return;
+    didInitAutoSelect.current = true;
+    if (!closedLotKeys.has(lotDateKey)) return;
+    const next = getOldestActiveLot(lotDays, closedLotKeys);
+    if (next) setLotDateKey(next);
+  }, [closedLotKeys, lotDateKey, lotDays]);
 
   const loadReportData = useCallback(async () => {
     if (!lotDateKey || lotDateKey > endDateKey) return;
@@ -260,6 +284,10 @@ export default function LotReportPanel({
       alert(`✅ ปิดล็อต ${formatReceiveDayLabel(lotDateKey)} แล้ว${carry ? `\nยกยอด ${remaining.toFixed(2)} กก. → ล็อต ${targetLabel}` : ''}`);
       onLotClosed?.(lotDateKey);
       await loadReportData();
+
+      // Auto-advance to the next oldest active lot (exclude the one just closed)
+      const next = getOldestActiveLot(lotDays, closedLotKeys, lotDateKey);
+      if (next) setLotDateKey(next);
     } catch (e) {
       console.error(e);
       alert(e?.message || 'ปิดล็อตไม่สำเร็จ');
