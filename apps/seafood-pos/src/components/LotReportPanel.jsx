@@ -614,6 +614,13 @@ export default function LotReportPanel({
           </span>
         </div>
 
+        {report.otherRevenueBaht > 0 && (
+          <div className="flex justify-between items-center text-sm text-cyan-200">
+            <span>+ รายการอื่นในบิล (ไม่ตัดสต๊อกกุ้ง)</span>
+            <span className="font-bold">{fmtBaht(report.otherRevenueBaht)}</span>
+          </div>
+        )}
+
         {/* รายการหักเพิ่มเติม (ที่จดแล้ว — ไม่รวมอยู่ใน per-line แล้ว) */}
         {report.spoilageTotalBaht > 0 && (
           <div className="flex justify-between items-center text-sm text-amber-300">

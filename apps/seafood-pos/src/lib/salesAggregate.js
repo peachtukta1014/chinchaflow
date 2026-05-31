@@ -15,16 +15,23 @@ export function normalizeBillItems(bill) {
   }));
 }
 
+function isOtherBillItem(item) {
+  return item.type === 'other' || item.productId === 'custom';
+}
+
 export function aggregateDailySales(bills) {
   const gradeKg = { large: 0, medium: 0, small: 0 };
   let liveKg = 0;
   let liveRevenue = 0;
   let deadKg = 0;
   let deadRevenue = 0;
+  let otherRevenue = 0;
 
   for (const bill of bills) {
     for (const item of normalizeBillItems(bill)) {
-      if (item.type === 'dead') {
+      if (isOtherBillItem(item)) {
+        otherRevenue += item.lineTotal;
+      } else if (item.type === 'dead') {
         deadKg += item.weightKg;
         deadRevenue += item.lineTotal;
       } else {
@@ -42,6 +49,7 @@ export function aggregateDailySales(bills) {
     liveRevenue,
     deadKg,
     deadRevenue,
+    otherRevenue,
     gradeKg,
     gradeTotalKg: gradeKg.large + gradeKg.medium + gradeKg.small,
   };

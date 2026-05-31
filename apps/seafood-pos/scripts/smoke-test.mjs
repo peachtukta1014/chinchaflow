@@ -226,6 +226,23 @@ try {
 }
 
 try {
+  const { aggregateDailySales } = await import('../src/lib/salesAggregate.js');
+  const agg = aggregateDailySales([
+    {
+      total: 5480,
+      items: [
+        { type: 'live', productId: 'large', weight: 10, total: 5000 },
+        { type: 'other', productId: 'custom', weight: 2, total: 480 },
+      ],
+    },
+  ]);
+  assert(agg.liveKg === 10 && agg.liveRevenue === 5000, 'aggregate: live only shrimp kg/revenue');
+  assert(agg.otherRevenue === 480 && agg.deadKg === 0, 'aggregate: other not in live/dead kg');
+} catch (e) {
+  fail('aggregateDailySales other', e);
+}
+
+try {
   const liveGross = 10000 - 7000;
   const deadGross = 4000 - 1500;
   const liveNet = liveGross - 500 - 0;

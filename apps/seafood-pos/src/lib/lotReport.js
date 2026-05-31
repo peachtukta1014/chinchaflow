@@ -209,8 +209,10 @@ export function computeLotReport({
   const combinedLineNetBaht = liveLineNetBaht + deadLineNetBaht;
 
   // ── สุทธิสุดท้าย (ไม่นับซ้ำ) ────────────────────────────────────────────────
-  // รวมสองสาย − เสียหาย(จด) − ชั่งปิด(จด)
-  const netAfterMisc = combinedLineNetBaht - spoilageTotalBaht - adj.stockCountBaht;
+  // รวมสองสาย + รายได้รายการอื่น (ไม่มี COGS กุ้ง) − เสียหาย(จด) − ชั่งปิด(จด)
+  const otherRevenueBaht = baht(salesAgg.otherRevenue);
+  const netAfterMisc =
+    combinedLineNetBaht + otherRevenueBaht - spoilageTotalBaht - adj.stockCountBaht;
 
   // legacy alias
   const totalLossBaht = shrinkageBaht;
@@ -274,6 +276,7 @@ export function computeLotReport({
     soldTotalKg,
     liveRevenue: salesAgg.liveRevenue,
     deadRevenue: salesAgg.deadRevenue,
+    otherRevenueBaht,
     revenue,
     billCount: salesAgg.billCount,
     liveCogs,
