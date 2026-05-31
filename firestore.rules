@@ -93,6 +93,16 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ลงเวรพนักงานรายวัน — แอดมินบันทึก · ทุกคนอ่านได้
+    match /dailyStaffAttendance/{docId} {
+      allow read: if isApproved();
+      allow create, update: if isAdmin()
+        && request.resource.data.dateKey is string
+        && request.resource.data.staffUid is string
+        && request.resource.data.present == true;
+      allow delete: if isAdmin();
+    }
+
     match /products/{docId} {
       allow read: if isApproved();
       allow create, update, delete: if isAdmin();

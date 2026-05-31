@@ -87,6 +87,26 @@ export async function fsPatch(path, data) {
 }
 
 /** สร้าง/อัปเดตเอกสาร users/{uid} — ใช้ตอนสมัคร (ไม่อนุญาตตั้ง admin จาก client) */
+/** สร้างหรืออัปเดตเอกสารด้วย documentId ที่กำหนด */
+export async function fsUpsertDoc(col, docId, data) {
+  if (!FS_BASE) throw new Error('Firestore not configured');
+  const fields = fsObj(data);
+  const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  let r = await fetch(`${FS_BASE}/${col}/${docId}?${qs}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (r.ok) return { id: docId, ...data };
+  r = await fetch(`${FS_BASE}/${col}?documentId=${encodeURIComponent(docId)}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`${col}/${docId} HTTP ${r.status}`);
+  return { id: docId, ...data };
+}
+
 export async function fsSetUserProfile(uid, data) {
   if (!FS_BASE) throw new Error('Firestore not configured');
   const fields = fsObj(data);
@@ -189,6 +209,46 @@ export async function fsQueryExpenses(dateKey) {
     const ta = typeof a.createdAt === 'string' ? a.createdAt : (a.createdAt || '');
     const tb = typeof b.createdAt === 'string' ? b.createdAt : (b.createdAt || '');
     return ta.localeCompare(tb);
+  });
+}
+
+export async function fsQueryStaffAttendanceByDate(dateKey) {
+  return fsRunQuery({
+    from: [{ collectionId: 'dailyStaffAttendance' }],
+    where: { fieldFilter: { field: { fieldPath: 'dateKey' }, op: 'EQUAL', value: { stringValue: dateKey } } },
+    limit: 50,
+  });
+}
+
+export async function fsQueryStaffAttendanceForMonth(yearMonth) {
+  const start = `${yearMonth}-01`;
+  const [y, m] = yearMonth.split('-').map((x) => parseInt(x, 10));
+  const lastDay = new Date(y, m, 0).getDate();
+  const end = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+  return fsRunQuery({
+    from: [{ collectionId: 'dailyStaffAttendance' }],
+    where: {
+      compositeFilter: {
+        op: 'AND',
+        filters: [
+          {
+            fieldFilter: {
+              field: { fieldPath: 'dateKey' },
+              op: 'GREATER_THAN_OR_EQUAL',
+              value: { stringValue: start },
+            },
+          },
+          {
+            fieldFilter: {
+              field: { fieldPath: 'dateKey' },
+              op: 'LESS_THAN_OR_EQUAL',
+              value: { stringValue: end },
+            },
+          },
+        ],
+      },
+    },
+    limit: 500,
   });
 }
 
