@@ -134,7 +134,7 @@ export default function POSMobile({
       billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;
     } catch (err) {
       console.error(err);
-      alert('⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
+      alert(err?.message || '⚠️ บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
     } finally {
       setSaving(false);
     }
