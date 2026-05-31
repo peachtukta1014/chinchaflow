@@ -6,6 +6,7 @@ import {
   fsListStockAdjustments,
   fsQuerySalesBetween,
 } from '../lib/firestoreRest';
+import { STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
 import DateNavBar from './DateNavBar';
 import LotExpensesPanel from './LotExpensesPanel';
 import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
@@ -63,7 +64,9 @@ function LineSummaryCard({
   const cogs = isLive ? report.liveCogs : report.deadCogs;
   const expenses = isLive ? report.pondExpensesBaht : report.marketExpensesBaht;
   const expenseLines = isLive ? expenseLineItems?.pondLines : expenseLineItems?.marketLines;
-  const expenseLabel = isLive ? 'รายจ่ายบ่อ / ส่งเป็น' : 'รายจ่ายแผงตลาด';
+  const expenseLabel = isLive
+    ? `รายจ่ายบ่อ / ${STOCK_LINE.live.label}`
+    : `รายจ่ายแผงตลาด (${STOCK_LINE.dead.label})`;
   const lineNet = isLive ? report.liveLineNetBaht : report.deadLineNetBaht;
   const gross = isLive ? report.liveGrossProfit : report.deadGrossProfit;
   const weightLossKg = isLive ? report.liveWeightLossKg : report.deadWeightLossKg;
@@ -308,7 +311,7 @@ export default function LotReportPanel({
           <div>
             <h2 className="font-black text-slate-800 text-lg">สรุปล็อต</h2>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              แยก 2 สาย (เป็น / ตาย) · บวกในแต่ละสาย แล้วหักทีเดียวตอนท้าย
+              แยก 2 สาย ({STOCK_LINE.live.tag} / {STOCK_LINE.dead.tag}) · บวกในแต่ละสาย แล้วหักทีเดียวตอนท้าย
             </p>
           </div>
           <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg shrink-0">
@@ -390,7 +393,7 @@ export default function LotReportPanel({
           {' '}
           (แยก: ปริศนา / เสียหาย / ชั่งปิด)
           {' '}
-          · ย้ายบ่อ→ตาย ≠ สูญหาย
+          · ย้ายบ่อ→{STOCK_LINE.dead.tag} ≠ สูญหาย
         </p>
         <p className="text-slate-400">
           {periodLabel}
@@ -413,7 +416,7 @@ export default function LotReportPanel({
       )}
 
       <LineSummaryCard
-        title="สายกุ้งเป็น"
+        title={STOCK_LINE.live.full}
         emoji="🔵"
         borderCls="border-blue-200"
         headerCls="text-blue-700"
@@ -423,7 +426,7 @@ export default function LotReportPanel({
       />
 
       <LineSummaryCard
-        title="สายกุ้งตาย"
+        title={STOCK_LINE.dead.full}
         emoji="🟠"
         borderCls="border-orange-200"
         headerCls="text-orange-700"
@@ -436,11 +439,11 @@ export default function LotReportPanel({
         <p className="text-sm font-black text-red-800 mb-2">น้ำหนัก — สมดุลมวลล็อต</p>
         <div className="bg-white/80 rounded-xl p-3 space-y-2 text-xs text-slate-700">
           <div className="flex justify-between gap-2">
-            <span>รับเข้ารวม (เป็น + ตาย)</span>
+            <span>รับเข้ารวม ({STOCK_LINE.live.tag} + {STOCK_LINE.dead.tag})</span>
             <span className="font-bold">{fmtKg(report.receivedTotalKg)}</span>
           </div>
           <div className="flex justify-between gap-2 text-blue-700">
-            <span>− ขายรวม (บิลเป็น + บิลตาย)</span>
+            <span>− ขายรวม (บิล {STOCK_LINE.live.tag} + บิล {STOCK_LINE.dead.tag})</span>
             <span className="font-bold">{fmtKg(report.soldTotalKg)}</span>
           </div>
           <div className="flex justify-between gap-2 text-blue-700">
@@ -449,7 +452,7 @@ export default function LotReportPanel({
           </div>
           {report.pondToDeadKg > 0.01 && (
             <div className="flex justify-between gap-2 text-slate-500 text-[10px] italic">
-              <span>ย้ายบ่อ→ตาย (เปลี่ยนประเภท ไม่ใช่สูญหาย)</span>
+              <span>ย้ายบ่อ→{STOCK_LINE.dead.label} (เปลี่ยนประเภท ไม่ใช่สูญหาย)</span>
               <span>{fmtKg(report.pondToDeadKg)}</span>
             </div>
           )}
@@ -512,13 +515,13 @@ export default function LotReportPanel({
         <p className="text-xs font-bold text-cyan-300">สุทธิรวมล็อต</p>
 
         <div className="flex justify-between items-center text-sm">
-          <span className="text-slate-400">สุทธิสายเป็น</span>
+          <span className="text-slate-400">สุทธิ {STOCK_LINE.live.full}</span>
           <span className={`font-bold ${report.liveLineNetBaht >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtBaht(report.liveLineNetBaht)}
           </span>
         </div>
         <div className="flex justify-between items-center text-sm">
-          <span className="text-slate-400">สุทธิสายตาย</span>
+          <span className="text-slate-400">สุทธิ {STOCK_LINE.dead.full}</span>
           <span className={`font-bold ${report.deadLineNetBaht >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmtBaht(report.deadLineNetBaht)}
           </span>
@@ -575,7 +578,7 @@ export default function LotReportPanel({
           <div className="pt-3 space-y-2 text-xs">
             <p className="font-bold text-slate-600">การเคลื่อนไหวที่บันทึกแล้ว</p>
             <p className="flex justify-between">
-              <span className="text-slate-500">ย้ายบ่อ → ตาย (เปลี่ยนประเภท)</span>
+              <span className="text-slate-500">ย้ายบ่อ → {STOCK_LINE.dead.full}</span>
               <span className="font-bold">{fmtKg(report.pondToDeadKg)}</span>
             </p>
             <p className="flex justify-between">
@@ -605,7 +608,7 @@ export default function LotReportPanel({
               <span className="font-bold">
                 {fmtKg(report.remainingTotalKg)}
                 {' '}
-                (เป็น {report.remainingLive.toFixed(2)} · ตาย {report.remainingDead.toFixed(2)})
+                ({STOCK_LINE.live.tag} {report.remainingLive.toFixed(2)} · {STOCK_LINE.dead.tag} {report.remainingDead.toFixed(2)})
               </span>
             </p>
           </div>
@@ -614,7 +617,7 @@ export default function LotReportPanel({
             <p className="text-xs font-bold text-slate-600">ชั่งปิดจริง (ก่อนรับล็อตใหม่)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-bold text-slate-500">กุ้งเป็น คงเหลือจริง</label>
+                <label className="text-[10px] font-bold text-slate-500">{STOCK_LINE.live.full} คงเหลือจริง</label>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -625,7 +628,7 @@ export default function LotReportPanel({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-500">กุ้งตาย คงเหลือจริง</label>
+                <label className="text-[10px] font-bold text-slate-500">{STOCK_LINE.dead.full} คงเหลือจริง</label>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -669,7 +672,7 @@ export default function LotReportPanel({
           {report.remainingTotalKg > 0.001 && (
             <div className="bg-blue-50 rounded-xl p-3 text-xs space-y-2">
               <p className="font-bold text-blue-800">
-                คงเหลือที่จะยกไป: เป็น {report.remainingLive.toFixed(2)} + ตาย {report.remainingDead.toFixed(2)} กก.
+                คงเหลือที่จะยกไป: {formatStockPairShort(report.remainingLive, report.remainingDead)}
               </p>
               {lotDays.filter((d) => d.dateKey !== lotDateKey).length > 0 ? (
                 <>

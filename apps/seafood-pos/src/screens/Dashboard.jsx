@@ -13,6 +13,7 @@ import { PAY } from '../constants';
 import { deleteSaleBill, updateSalePayment } from '../services/salesService';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
+import { STOCK_LINE } from '../constants/stockLines';
 
 export default function Dashboard({
   localBills = [],
@@ -146,7 +147,7 @@ export default function Dashboard({
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm">
-        <h3 className="font-bold text-slate-800 mb-3">น้ำหนักขาย (กุ้งเป็น)</h3>
+        <h3 className="font-bold text-slate-800 mb-3">น้ำหนักขาย ({STOCK_LINE.live.full})</h3>
         <div className="grid grid-cols-4 gap-2 text-center text-xs">
           {[['large', 'A'], ['medium', 'B'], ['small', 'C']].map(([id, label]) => (
             <div key={id} className="bg-blue-50 rounded-xl p-2">
@@ -163,12 +164,12 @@ export default function Dashboard({
         </div>
         <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-slate-500 text-xs">ยอดขายกุ้งเป็น</p>
+            <p className="text-slate-500 text-xs">ยอดขาย {STOCK_LINE.live.full}</p>
             <p className="font-black text-emerald-600">฿{salesSummary.liveRevenue.toLocaleString()}</p>
             <p className="text-[10px] text-slate-400">{salesSummary.liveKg.toFixed(1)} กก.</p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">ยอดขายกุ้งตาย</p>
+            <p className="text-slate-500 text-xs">ยอดขาย {STOCK_LINE.dead.full}</p>
             <p className="font-black text-orange-600">฿{salesSummary.deadRevenue.toLocaleString()}</p>
             <p className="text-[10px] text-slate-400">{salesSummary.deadKg.toFixed(1)} กก.</p>
           </div>

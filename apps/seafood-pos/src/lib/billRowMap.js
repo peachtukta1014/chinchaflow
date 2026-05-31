@@ -35,6 +35,8 @@ export function resolveBillRowIndex(item) {
   const row = normalizeLineItem(item);
   const productId = item.productId || item.id;
 
+  if (productId === 'custom') return null;
+
   if (productId === 'large') return BILL_PRINTED_ROWS.large;
   if (productId === 'medium') return BILL_PRINTED_ROWS.medium;
   if (productId === 'small') return BILL_PRINTED_ROWS.small;

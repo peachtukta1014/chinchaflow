@@ -257,7 +257,7 @@ export default function InventoryScreen({
         const day = formatReceiveDayLabel(a.receiveDateKey);
         const note = a.batchNote ? ` · ${a.batchNote}` : '';
         if (a.deadAdded > 0) {
-          return `${i + 1}. ล็อตรับ ${day}${note}: เป็น −${a.liveTaken.toFixed(2)} → ตาย +${a.deadAdded.toFixed(2)} กก.`;
+          return `${i + 1}. ล็อตรับ ${day}${note}: ${STOCK_LINE.live.tag} −${a.liveTaken.toFixed(2)} → ${STOCK_LINE.dead.tag} +${a.deadAdded.toFixed(2)} กก.`;
         }
         return `${i + 1}. ล็อตรับ ${day}${note}: ตัดทิ้ง ${a.liveTaken.toFixed(2)} กก.`;
       })
@@ -277,12 +277,12 @@ export default function InventoryScreen({
       if (deadMode === 'pond_to_dead') {
         allocations = await transferPondDeath(stock, w, updateMainStock, stockBatches, meta);
         alert(
-          `✅ ส่งยอด ${w} กก. จากสายเป็น → สายตาย (ขายได้)\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+          `✅ ส่งยอด ${w} กก. จาก ${STOCK_LINE.live.full} → ${STOCK_LINE.dead.full}\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
         );
       } else {
         allocations = await recordSpoilageLoss(stock, w, updateMainStock, stockBatches, meta);
         alert(
-          `✅ บันทึกเสียหาย ${w} กก. (ไม่เพิ่มกุ้งตายขาย)\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+          `✅ บันทึกเสียหาย ${w} กก. (ไม่เพิ่ม${STOCK_LINE.dead.label})\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
         );
       }
       setDeadWeight('');

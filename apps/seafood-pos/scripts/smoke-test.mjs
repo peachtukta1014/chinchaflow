@@ -16,6 +16,9 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
+import { customRowsToCartItems } from '../src/lib/customCartItem.js';
+import { sumCartStockKg } from '../src/lib/cartStock.js';
+import { STOCK_LINE } from '../src/constants/stockLines.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -74,6 +77,32 @@ try {
   assert(credit.remainingAmount === 1000 && credit.paidAmount === 0, 'computePaymentAmounts credit');
 } catch (e) {
   fail('computePaymentAmounts', e);
+}
+
+try {
+  assert(STOCK_LINE.live.full === 'กุ้งแม่น้ำเป็น (Live)', 'STOCK_LINE.live.full');
+  assert(STOCK_LINE.dead.full === 'กุ้งแม่น้ำตาย (Dead)', 'STOCK_LINE.dead.full');
+  const custom = customRowsToCartItems([
+    { label: 'ปลาหมึก', price: '500' },
+    { label: '', price: '' },
+  ]);
+  assert(custom.length === 1 && custom[0].type === 'other', 'customRowsToCartItems');
+  const kg = sumCartStockKg([
+    { type: 'live', weight: 2 },
+    { type: 'dead', weight: 1 },
+    { type: 'other', weight: 99, total: 500 },
+  ]);
+  assert(kg.liveKg === 2 && kg.deadKg === 1, 'sumCartStockKg ignores other');
+  const billCustom = saleToBillData({
+    billNo: 'C001',
+    customerName: 'ทดสอบ',
+    dateKey: '2026-05-26',
+    items: [{ productId: 'custom', productName: 'ค่าขนส่ง', type: 'other', lineTotal: 300 }],
+    total: 300,
+  });
+  assert(billCustom.extraLines?.[0]?.name === 'ค่าขนส่ง', 'custom → extraLines on bill');
+} catch (e) {
+  fail('stockLines/customCart', e);
 }
 
 try {

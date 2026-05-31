@@ -17,6 +17,7 @@ import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
 import StockLineSwitcher from '../components/StockLineSwitcher';
+import PosCustomLinesPanel from '../components/PosCustomLinesPanel';
 import { STOCK_LINE } from '../constants/stockLines';
 
 export default function POSMobile({
@@ -57,7 +58,7 @@ export default function POSMobile({
     ? (parseFloat(customPrice) || 0)
     : (parseFloat(weight) || 0) * (parseFloat(customPrice) || 0);
   const cartTotal = cart.reduce((s, i) => s + i.total, 0);
-  const cartHasLive = cart.some((i) => i.type !== 'dead');
+  const cartHasLive = cart.some((i) => i.type === 'live');
   const cartHasDead = cart.some((i) => i.type === 'dead');
   const cartIsMixed = cartHasLive && cartHasDead;
 
@@ -317,7 +318,9 @@ export default function POSMobile({
           </strong>
           ได้
           {cartIsMixed && (
-            <span className="ml-1 text-emerald-700 font-bold">· ตะกร้ามีทั้ง Live และ Dead แล้ว</span>
+            <span className="ml-1 text-emerald-700 font-bold">
+              · ตะกร้ามีทั้ง {STOCK_LINE.live.full} และ {STOCK_LINE.dead.full} แล้ว
+            </span>
           )}
         </p>
 
@@ -330,7 +333,7 @@ export default function POSMobile({
                 className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-blue-600 text-white font-bold text-xs shadow-md active:scale-[0.98]"
               >
                 <Package size={18} />
-                รับเข้า Live
+                รับเข้า · {STOCK_LINE.live.tag}
               </button>
             )}
             {onOpenReceiveDead && (
@@ -340,7 +343,7 @@ export default function POSMobile({
                 className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs shadow-md active:scale-[0.98]"
               >
                 <Package size={18} />
-                รับเข้า Dead
+                รับเข้า · {STOCK_LINE.dead.tag}
               </button>
             )}
           </div>
@@ -355,18 +358,24 @@ export default function POSMobile({
                 className={`flex justify-between items-center p-3 rounded-2xl border-2 ${
                   item.type === 'dead'
                     ? 'bg-red-50 border-red-100'
-                    : 'bg-blue-50 border-blue-100'
+                    : item.type === 'other'
+                      ? 'bg-slate-50 border-slate-200'
+                      : 'bg-blue-50 border-blue-100'
                 }`}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800">
                     {idx + 1}. {item.productName}
-                    <span className={`ml-1.5 text-[10px] font-bold ${item.type === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
-                      ({item.type === 'dead' ? STOCK_LINE.dead.tag : STOCK_LINE.live.tag})
-                    </span>
+                    {item.type !== 'other' && (
+                      <span className={`ml-1.5 text-[10px] font-bold ${item.type === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
+                        ({item.type === 'dead' ? STOCK_LINE.dead.tag : STOCK_LINE.live.tag})
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {item.weight} กก.{item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}
+                    {item.type === 'other'
+                      ? `฿${item.total.toLocaleString()}`
+                      : `${item.weight} กก.${item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}`}
                     {item.note && <span className="text-orange-500 ml-1">*{item.note}</span>}
                   </p>
                 </div>
@@ -441,6 +450,8 @@ export default function POSMobile({
           )}
         </div>
       </div>
+
+      <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
 
       {/* ลูกค้า + ขนาดกุ้ง (แถวเดียว) */}
       <div className="px-3 py-3 flex gap-2 items-stretch shrink-0 min-h-[52px]">

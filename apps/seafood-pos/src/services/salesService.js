@@ -13,6 +13,8 @@ import {
 } from '../lib/firestoreRest';
 import { normalizeBillItems } from '../lib/salesAggregate';
 import { incrementCustomerDebt } from './debtService';
+import { STOCK_LINE } from '../constants/stockLines';
+import { sumCartStockKg } from '../lib/cartStock';
 import {
   deductFifoFromBatches,
   getEffectiveStock,
@@ -27,11 +29,7 @@ function withTimeout(promise, ms = 10000) {
   ]);
 }
 
-export function sumCartStockKg(cartItems) {
-  const liveKg = cartItems.reduce((s, i) => (i.type !== 'dead' ? s + i.weight : s), 0);
-  const deadKg = cartItems.reduce((s, i) => (i.type === 'dead' ? s + i.weight : s), 0);
-  return { liveKg, deadKg };
-}
+export { sumCartStockKg } from '../lib/cartStock';
 
 export function validateStockForSale(cartItems, stock, stockBatches = []) {
   const avail = getEffectiveStock(stock, stockBatches);
@@ -39,13 +37,13 @@ export function validateStockForSale(cartItems, stock, stockBatches = []) {
   if (liveKg > avail.live) {
     return {
       ok: false,
-      message: `⚠️ กุ้งเป็นในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ ${STOCK_LINE.live.full} ในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
   if (deadKg > avail.dead) {
     return {
       ok: false,
-      message: `⚠️ กุ้งตายในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ ${STOCK_LINE.dead.full} ในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
   return { ok: true, liveKg, deadKg };
