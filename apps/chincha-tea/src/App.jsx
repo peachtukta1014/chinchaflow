@@ -16,7 +16,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
-import { fetchPendingRestockCount } from './lib/restockNotifyService';
+import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 
@@ -54,13 +54,14 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed) return;
-    refreshOrders();
-  }, [isAuthed, refreshOrders]);
+    if (tab === 'history' || tab === 'summary') refreshOrders();
+  }, [isAuthed, tab, refreshOrders]);
 
-  const refreshPendingRestocks = useCallback(async () => {
+  const refreshPendingRestocks = useCallback(async (force = false) => {
     if (!isAuthed || member?.role !== 'admin') return;
     try {
-      const n = await fetchPendingRestockCount(todayKey);
+      if (force) invalidatePendingRestockCache(todayKey);
+      const n = await fetchPendingRestockCount(todayKey, { force });
       setPendingRestocks(n);
     } catch {
       /* ignore */
@@ -71,15 +72,11 @@ export default function App() {
     if (!isAuthed || member.role !== 'admin') return undefined;
     ensureNotifyPermission();
     refreshPendingRestocks();
-    const id = setInterval(refreshPendingRestocks, 30000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') refreshPendingRestocks();
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [isAuthed, member?.role, refreshPendingRestocks]);
 
   useEffect(() => {
@@ -184,8 +181,9 @@ export default function App() {
         badges={isAdmin && tab !== 'restock' ? { restock: pendingRestocks } : {}}
         onSelect={(id) => {
           setTab(id);
-          if (id === 'admin' || id === 'catalog' || id === 'order') refreshCatalog();
+          if (id === 'admin' || id === 'catalog') refreshCatalog();
           if (id === 'history' || id === 'summary') refreshOrders();
+          if (id === 'restock' && isAdmin) refreshPendingRestocks();
         }}
       />
 
@@ -227,7 +225,14 @@ export default function App() {
             isAdmin={isAdmin}
           />
         )}
-        {tab === 'restock' && <RestockTab member={member} t={t} lang={lang} />}
+        {tab === 'restock' && (
+          <RestockTab
+            member={member}
+            t={t}
+            lang={lang}
+            onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
+          />
+        )}
         {tab === 'admin' && isAdmin && (
           <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
         )}

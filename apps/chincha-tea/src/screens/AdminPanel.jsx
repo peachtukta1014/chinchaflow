@@ -23,10 +23,13 @@ import {
   importDefaultMenuToFirestore,
   importDefaultToppingsToFirestore,
   listMenuNotInFirestore,
+  normalizeProductForm,
+  normalizeToppingForm,
   saveProduct,
   saveTopping,
   updateProductPrice,
 } from '../lib/productService';
+import { invalidateAttendanceStaffCache } from '../lib/staffAttendanceService';
 import { FIREBASE_PROJECT_ID } from '../lib/viteEnv.js';
 
 const PROJECT_ID = FIREBASE_PROJECT_ID;
@@ -52,24 +55,34 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   const [importBusy, setImportBusy] = useState(false);
   const [flash, setFlash] = useState('');
 
+  const refreshCatalogSection = useCallback(async () => {
+    try {
+      const [p, tp] = await Promise.all([fsQueryProducts(), fsQueryToppings()]);
+      setProducts(p);
+      setToppings(tp);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const refreshMembers = useCallback(async () => {
+    try {
+      setUsers(await fsQueryUsers());
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      if (catalogOnly) {
-        const [p, tp] = await Promise.all([fsQueryProducts(), fsQueryToppings()]);
-        setProducts(p);
-        setToppings(tp);
-      } else {
-        const [u, p, tp] = await Promise.all([fsQueryUsers(), fsQueryProducts(), fsQueryToppings()]);
-        setUsers(u);
-        setProducts(p);
-        setToppings(tp);
-      }
+      if (catalogOnly) await refreshCatalogSection();
+      else await Promise.all([refreshMembers(), refreshCatalogSection()]);
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
-  }, [catalogOnly]);
+  }, [catalogOnly, refreshCatalogSection, refreshMembers]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -80,7 +93,8 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
 
   const updateUser = async (uid, patch) => {
     await fsPatch(`users/${uid}`, patch);
-    await refresh();
+    setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, ...patch } : u)));
+    if (patch.role != null || patch.approved != null) invalidateAttendanceStaffCache();
     showFlash('✅ อัปเดตสมาชิกแล้ว');
   };
 
@@ -102,7 +116,8 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
     if (!window.confirm(msg)) return;
     try {
       await fsDelete(`users/${u.id}`);
-      await refresh();
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      invalidateAttendanceStaffCache();
       showFlash(t('memberDeleted'));
     } catch (e) {
       console.error(e);
@@ -111,22 +126,40 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   };
 
   const saveProductHandler = async (form, id) => {
-    await saveProduct(form, id);
-    await refresh();
+    const saved = await saveProduct(form, id);
+    const row = { ...normalizeProductForm(form), id: saved.id || id };
+    setProducts((prev) => {
+      const idx = prev.findIndex((p) => p.id === row.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      }
+      return [...prev, row];
+    });
     onCatalogChanged?.();
     showFlash(t('productSaved'));
   };
 
   const saveToppingHandler = async (form, id) => {
-    await saveTopping(form, id);
-    await refresh();
+    const saved = await saveTopping(form, id);
+    const row = { ...normalizeToppingForm(form), id: saved.id || id };
+    setToppings((prev) => {
+      const idx = prev.findIndex((p) => p.id === row.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      }
+      return [...prev, row];
+    });
     onCatalogChanged?.();
     showFlash(t('toppingSaved'));
   };
 
   const quickPriceHandler = async (id, basePrice) => {
-    await updateProductPrice(id, basePrice);
-    await refresh();
+    const price = await updateProductPrice(id, basePrice);
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, basePrice: price } : p)));
     onCatalogChanged?.();
     showFlash(t('priceUpdated'));
   };
@@ -190,8 +223,14 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
           onSaveProduct={saveProductHandler}
           onSaveTopping={saveToppingHandler}
           onQuickPrice={quickPriceHandler}
-          onDeleteProduct={(id) => fsDelete(`products/${id}`).then(() => { refresh(); onCatalogChanged?.(); })}
-          onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(() => { refresh(); onCatalogChanged?.(); })}
+          onDeleteProduct={(id) => fsDelete(`products/${id}`).then(() => {
+            setProducts((prev) => prev.filter((p) => p.id !== id));
+            onCatalogChanged?.();
+          })}
+          onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(() => {
+            setToppings((prev) => prev.filter((p) => p.id !== id));
+            onCatalogChanged?.();
+          })}
         />
       ) : section === 'orders' ? (
         <OrdersSection t={t} lang={lang} menuItems={menuItems} onChanged={onOrdersChanged} />

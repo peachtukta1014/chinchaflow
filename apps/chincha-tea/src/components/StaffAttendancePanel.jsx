@@ -19,26 +19,36 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
 
   const yearMonth = yearMonthFromDateKey(viewDateKey);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refreshDayAndMonth = useCallback(async ({ forceMonth = false } = {}) => {
     try {
-      const [staff, rows, month] = await Promise.all([
-        listAttendanceStaff(),
+      const [rows, month] = await Promise.all([
         getAttendanceForDate(viewDateKey),
-        getMonthlyAttendanceSummary(yearMonth),
+        getMonthlyAttendanceSummary(yearMonth, { force: forceMonth }),
       ]);
-      setStaffList(staff);
       setDayRows(rows);
       setMonthSummary(month);
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
   }, [viewDateKey, yearMonth]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let active = true;
+    listAttendanceStaff()
+      .then((staff) => { if (active) setStaffList(staff); })
+      .catch((e) => console.error(e));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!staffList.length) return undefined;
+    let active = true;
+    setLoading(true);
+    refreshDayAndMonth()
+      .catch((e) => console.error(e))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [viewDateKey, yearMonth, staffList.length, refreshDayAndMonth]);
 
   const toggle = async (staff, checked) => {
     if (!isAdmin) return;
@@ -53,7 +63,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
         markedBy: member?.name || member?.email,
         markedByUid: member?.uid || member?.id,
       });
-      await refresh();
+      await refreshDayAndMonth({ forceMonth: true });
       setFlash(checked ? t('attendanceSaved') : t('attendanceRemoved'));
       setTimeout(() => setFlash(''), 2000);
     } catch (e) {
