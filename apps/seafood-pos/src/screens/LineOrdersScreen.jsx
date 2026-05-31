@@ -3,7 +3,7 @@ import { Bell } from 'lucide-react';
 import { dateKeyBangkok } from '../lib/date';
 import { formatDateThaiShort } from '../lib/date';
 import { deliveryDateLabel, orderDeliveryDateKey } from '../lib/lineOrderDate';
-import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
+import { FS_BASE, formatFirestoreSaveError, fsAuthHeaders } from '../lib/firestoreRest';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
 import { mergeCustomerLists, refreshCustomersMap, subscribeCustomers } from '../services/customerService';
@@ -151,14 +151,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
           console.error('restore stock after LINE save failed', restoreErr);
         }
       }
-      const msg = String(err?.message || '');
-      if (/403|PERMISSION_DENIED/i.test(msg)) {
-        alert('บันทึกไม่สำเร็จ (สิทธิ์ระบบ) — แจ้งแอดมินให้อัปเดต Firestore rules แล้วลองใหม่');
-      } else if (/timeout|Failed to fetch|NetworkError/i.test(msg)) {
-        alert('เชื่อมต่อไม่สำเร็จ — รอเน็ตกลับแล้วลองอีกครั้ง\nถ้าไม่แน่ใจว่าบันทึกแล้ว ให้เช็ครายการขายก่อนกดซ้ำ');
-      } else {
-        alert('บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ');
-      }
+      alert(formatFirestoreSaveError(err));
     } finally {
       setSavingId(null);
     }

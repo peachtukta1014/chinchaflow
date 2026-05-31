@@ -38,6 +38,43 @@ export function fsObj(o) {
   );
 }
 
+/** ฟิลด์น้ำหนักกก. ใน stockBatches — ใช้ doubleValue เสมอ (หลีกเลี่ยง commit 400 จาก integer/double mismatch) */
+const STOCK_KG_FIELD_NAMES = ['liveKg', 'deadKg', 'remainingLiveKg', 'remainingDeadKg'];
+
+export function fsStockKgVal(kg) {
+  const n = parseFloat(Number(kg).toFixed(3));
+  if (!Number.isFinite(n)) {
+    throw new Error(`ค่าน้ำหนักไม่ถูกต้อง: ${kg}`);
+  }
+  return { doubleValue: n };
+}
+
+export function fsObjStockFields(data) {
+  const fields = fsObj(data);
+  for (const key of STOCK_KG_FIELD_NAMES) {
+    if (data[key] !== undefined && data[key] !== null) {
+      fields[key] = fsStockKgVal(data[key]);
+    }
+  }
+  return fields;
+}
+
+/** ข้อความ error สำหรับผู้ใช้เมื่อบันทึก/ตัดสต๊อกล้ม */
+export function formatFirestoreSaveError(err) {
+  const msg = String(err?.message || err || '');
+  if (/fsAtomicStockBatchCommit HTTP 400/i.test(msg)) {
+    return 'ตัดสต๊อกไม่สำเร็จ — รีเฟรชหน้าแล้วลองอีกครั้ง (อย่ากดซ้ำถ้าไม่แน่ใจว่าสำเร็จ)';
+  }
+  if (/403|PERMISSION_DENIED/i.test(msg)) {
+    return 'บันทึกไม่สำเร็จ (สิทธิ์ระบบ) — แจ้งแอดมินให้อัปเดต Firestore rules';
+  }
+  if (/timeout|Failed to fetch|NetworkError/i.test(msg)) {
+    return 'เชื่อมต่อไม่สำเร็จ — รอเน็ตกลับแล้วลองอีกครั้ง';
+  }
+  if (/สต๊อกในล็อตไม่พอ|ขายเกินสต๊อก/i.test(msg)) return msg;
+  return 'บันทึกไม่สำเร็จ กรุณาลองอีกครั้งครับ';
+}
+
 export function fromFsVal(v) {
   if (!v || 'nullValue' in v) return null;
   if ('booleanValue' in v) return v.booleanValue;
@@ -78,10 +115,11 @@ export async function fsGetDoc(path) {
 }
 
 export async function fsPost(col, data) {
+  const fields = col === 'stockBatches' ? fsObjStockFields(data) : fsObj(data);
   const r = await fetch(`${FS_BASE}/${col}`, {
     method: 'POST',
     headers: await fsAuthHeaders(),
-    body: JSON.stringify({ fields: fsObj(data) }),
+    body: JSON.stringify({ fields }),
   });
   if (!r.ok) throw new Error(`Firestore /${col} POST failed (HTTP ${r.status})`);
   const json = await r.json().catch(() => null);
@@ -115,7 +153,7 @@ export async function fsSetShrimpUser(uid, data) {
 }
 
 export async function fsPatch(path, data) {
-  const fields = fsObj(data);
+  const fields = path.startsWith('stockBatches/') ? fsObjStockFields(data) : fsObj(data);
   const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
   const r = await fetch(`${FS_BASE}/${path}?${qs}`, {
     method: 'PATCH',
@@ -477,11 +515,24 @@ export async function fsIncrementDebt(customerId, meta, delta) {
  * patches: [{ id, remainingLiveKg, remainingDeadKg }, ...]
  */
 export async function fsAtomicStockBatchCommit(patches) {
-  if (!FS_BASE || !patches.length) return;
-  const writes = patches.map((p) => ({
+  if (!FS_BASE || !patches?.length) return;
+
+  const byId = new Map();
+  for (const p of patches) {
+    if (!p?.id) {
+      throw new Error('stockBatch ไม่มี id — รีเฟรชหน้าแล้วลองอีกครั้ง');
+    }
+    byId.set(p.id, p);
+  }
+  const unique = [...byId.values()];
+
+  const writes = unique.map((p) => ({
     update: {
       name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
-      fields: fsObj({ remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg }),
+      fields: {
+        remainingLiveKg: fsStockKgVal(p.remainingLiveKg),
+        remainingDeadKg: fsStockKgVal(p.remainingDeadKg),
+      },
     },
     updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
   }));
@@ -490,5 +541,10 @@ export async function fsAtomicStockBatchCommit(patches) {
     headers: await fsAuthHeaders(),
     body: JSON.stringify({ writes }),
   });
-  if (!r.ok) throw new Error(`fsAtomicStockBatchCommit HTTP ${r.status}`);
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    throw new Error(
+      `fsAtomicStockBatchCommit HTTP ${r.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`,
+    );
+  }
 }
