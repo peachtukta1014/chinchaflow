@@ -15,6 +15,8 @@ export function resolveTemplateRowName(item) {
   const row = normalizeLineItem(item);
   const productId = item.productId || item.id;
 
+  if (productId === 'custom') return null;
+
   if (productId === 'large') return TEMPLATE_ROW_NAMES.large;
   if (productId === 'medium') return TEMPLATE_ROW_NAMES.medium;
   if (productId === 'small') return TEMPLATE_ROW_NAMES.small;

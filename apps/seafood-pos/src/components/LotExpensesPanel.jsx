@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { STOCK_LINE } from '../constants/stockLines';
 import { dateKeyBangkok } from '../lib/date';
 import {
   emptyExpenseLineForm,
@@ -211,7 +212,7 @@ export default function LotExpensesPanel({
         <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
           <h2 className="font-black text-slate-800 text-lg">รายจ่ายล็อต</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            แยกฝั่งแผงตลาด (ขายกุ้งตาย) กับฝั่งบ่อ/ส่งของเป็น · กรอกทีละรายการแล้วรวมยอด · ค่ารถใส่ตอนรับเข้า
+            แยกฝั่งแผงตลาด ({STOCK_LINE.dead.full}) กับฝั่งบ่อ ({STOCK_LINE.live.full}) · กรอกทีละรายการแล้วรวมยอด · ค่ารถใส่ตอนรับเข้า
           </p>
           <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับเข้า)</label>
           <select
@@ -247,7 +248,7 @@ export default function LotExpensesPanel({
       </div>
 
       <ExpenseLineBlock
-        title="บ่อ / ส่งของเป็น"
+        title={`บ่อ / ${STOCK_LINE.live.full}`}
         hintItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
         formLines={pondForm}
         onChangeLines={setPondForm}
@@ -255,7 +256,7 @@ export default function LotExpensesPanel({
       />
 
       <ExpenseLineBlock
-        title="ตลาดนัด — ขายกุ้งตาย"
+        title={`ตลาดนัด — ${STOCK_LINE.dead.full}`}
         hintItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
         formLines={marketForm}
         onChangeLines={setMarketForm}

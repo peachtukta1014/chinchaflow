@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
+import { STOCK_LINE } from '../constants/stockLines';
 import DateNavBar from './DateNavBar';
 
 function formatBatchPurchaseDate(value) {
@@ -65,7 +66,7 @@ export default function StockLotTimeline({ stockBatches = [], viewDate, onViewDa
             <div className="text-right">
               <p className="text-[10px] text-slate-400">คงเหลือรวมวันนี้</p>
               <p className="font-black text-blue-700 text-sm">
-                เป็น {day.remainingLive.toFixed(1)} · ตาย {day.remainingDead.toFixed(1)} กก.
+                {STOCK_LINE.live.label} {day.remainingLive.toFixed(1)} · {STOCK_LINE.dead.label} {day.remainingDead.toFixed(1)} กก.
               </p>
             </div>
           </div>
@@ -82,8 +83,8 @@ export default function StockLotTimeline({ stockBatches = [], viewDate, onViewDa
                   </p>
                 </div>
                 <div className="flex gap-3 mt-1.5 text-[11px] text-slate-600">
-                  <span>สด {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(1)} กก.</span>
-                  <span>ตาย {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(1)} กก.</span>
+                  <span>{STOCK_LINE.live.tag} {(parseFloat(b.remainingLiveKg ?? b.liveKg) || 0).toFixed(1)} กก.</span>
+                  <span>{STOCK_LINE.dead.tag} {(parseFloat(b.remainingDeadKg ?? b.deadKg) || 0).toFixed(1)} กก.</span>
                   <span className="text-slate-400">รับ {formatBatchPurchaseDate(b.purchaseDate)}</span>
                 </div>
                 {b.sizeBreakdown && b.sizeBreakdown.mode === 'by_size' && (

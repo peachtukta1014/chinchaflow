@@ -16,14 +16,29 @@ import { saveBillWithCart as saveBillWithCartService } from '../services/salesSe
 import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
+import StockLineSwitcher from '../components/StockLineSwitcher';
+import PosCustomLinesPanel from '../components/PosCustomLinesPanel';
+import { STOCK_LINE } from '../constants/stockLines';
 
 export default function POSMobile({
-  user, stock, stockBatches = [], updateMainStock, onSaveBill, onOpenReceive,
+  user,
+  stock,
+  stockBatches = [],
+  updateMainStock,
+  onSaveBill,
+  onOpenReceiveLive,
+  onOpenReceiveDead,
 }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cart, setCart]             = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
+  const [salesLine, setSalesLine] = useState('live');
+  const lineProducts = useMemo(
+    () => PRODUCTS.filter((p) => p.type === salesLine),
+    [salesLine],
+  );
+  const defaultProductId = lineProducts[0]?.id || PRODUCTS[0].id;
+  const [selectedProduct, setSelectedProduct] = useState(defaultProductId);
   const [weight, setWeight]         = useState('');
   const [customPrice, setCustomPrice] = useState(PRODUCTS[0].price.toString());
   const [loadedPrices, setLoadedPrices] = useState({});
@@ -42,7 +57,10 @@ export default function POSMobile({
   const currentItemTotal = isDeadShrimp
     ? (parseFloat(customPrice) || 0)
     : (parseFloat(weight) || 0) * (parseFloat(customPrice) || 0);
-  const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+  const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+  const cartHasLive = cart.some((i) => i.type === 'live');
+  const cartHasDead = cart.some((i) => i.type === 'dead');
+  const cartIsMixed = cartHasLive && cartHasDead;
 
   const paidAmt = paymentType === 'cash' || paymentType === 'transfer'
     ? cartTotal
@@ -74,10 +92,30 @@ export default function POSMobile({
   const handleProductChange = (productId) => {
     setSelectedProduct(productId);
     const prod = PRODUCTS.find(p => p.id === productId);
+    if (!prod || prod.type !== salesLine) return;
     setWeight(''); setNote('');
     if (prod.type === 'dead') { setCustomPrice(''); setInputMode('price'); }
     else { setCustomPrice(priceOf(productId).toString()); setInputMode('weight'); }
   };
+
+  /** สลับสายเพื่อเลือกสินค้าเพิ่ม — ตะกร้า/บิลลูกค้ารวมเป็น+ตายในบิลเดียวได้ */
+  const switchSalesLine = (line) => {
+    if (line === salesLine) return;
+    setSalesLine(line);
+    const first = PRODUCTS.find((p) => p.type === line);
+    if (first) {
+      setSelectedProduct(first.id);
+      setWeight('');
+      setNote('');
+      if (first.type === 'dead') {
+        setCustomPrice('');
+        setInputMode('price');
+      } else {
+        setCustomPrice(priceOf(first.id).toString());
+        setInputMode('weight');
+      }
+    }
+  };
 
   const handleNumpad = (num) => {
     if (inputMode === 'weight') {
@@ -149,6 +187,7 @@ export default function POSMobile({
     if (draft.customerId) setSelectedCustomer(draft.customerId);
     if (draft.productId) {
       const prod = PRODUCTS.find((p) => p.id === draft.productId);
+      if (prod && prod.type !== salesLine) switchSalesLine(prod.type);
       setSelectedProduct(draft.productId);
       setNote('');
       if (prod?.type === 'dead') {
@@ -265,26 +304,78 @@ export default function POSMobile({
         />
       )}
       <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
-        {onOpenReceive && (
-          <button
-            type="button"
-            onClick={onOpenReceive}
-            className="w-full flex items-center justify-center gap-2 mb-3 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm shadow-md active:scale-[0.98]"
-          >
-            <Package size={20} />
-            รับเข้า / รับสต๊อก
-          </button>
+        <StockLineSwitcher line={salesLine} onChange={switchSalesLine} className="mb-2" />
+        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed px-0.5">
+          สลับสายเพื่อเลือกสินค้าเพิ่ม · บิลลูกค้า
+          <strong>
+            {' '}
+            รวม
+            {STOCK_LINE.live.tag}
+            +
+            {STOCK_LINE.dead.tag}
+            {' '}
+            ในบิลเดียว
+          </strong>
+          ได้
+          {cartIsMixed && (
+            <span className="ml-1 text-emerald-700 font-bold">
+              · ตะกร้ามีทั้ง {STOCK_LINE.live.full} และ {STOCK_LINE.dead.full} แล้ว
+            </span>
+          )}
+        </p>
+
+        {(onOpenReceiveLive || onOpenReceiveDead) && (
+          <div className="flex gap-2 mb-3">
+            {onOpenReceiveLive && (
+              <button
+                type="button"
+                onClick={onOpenReceiveLive}
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-blue-600 text-white font-bold text-xs shadow-md active:scale-[0.98]"
+              >
+                <Package size={18} />
+                รับเข้า · {STOCK_LINE.live.tag}
+              </button>
+            )}
+            {onOpenReceiveDead && (
+              <button
+                type="button"
+                onClick={onOpenReceiveDead}
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs shadow-md active:scale-[0.98]"
+              >
+                <Package size={18} />
+                รับเข้า · {STOCK_LINE.dead.tag}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Cart items */}
         {cart.length > 0 && (
           <div className="max-h-40 overflow-y-auto mb-3 space-y-2 border-t border-slate-100 pt-3">
             {cart.map((item, idx) => (
-              <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div
+                key={item.id}
+                className={`flex justify-between items-center p-3 rounded-2xl border-2 ${
+                  item.type === 'dead'
+                    ? 'bg-red-50 border-red-100'
+                    : item.type === 'other'
+                      ? 'bg-slate-50 border-slate-200'
+                      : 'bg-blue-50 border-blue-100'
+                }`}
+              >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800">{idx + 1}. {item.productName}</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {idx + 1}. {item.productName}
+                    {item.type !== 'other' && (
+                      <span className={`ml-1.5 text-[10px] font-bold ${item.type === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
+                        ({item.type === 'dead' ? STOCK_LINE.dead.tag : STOCK_LINE.live.tag})
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {item.weight} กก.{item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}
+                    {item.type === 'other'
+                      ? `฿${item.total.toLocaleString()}`
+                      : `${item.weight} กก.${item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}`}
                     {item.note && <span className="text-orange-500 ml-1">*{item.note}</span>}
                   </p>
                 </div>
@@ -360,6 +451,8 @@ export default function POSMobile({
         </div>
       </div>
 
+      <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
+
       {/* ลูกค้า + ขนาดกุ้ง (แถวเดียว) */}
       <div className="px-3 py-3 flex gap-2 items-stretch shrink-0 min-h-[52px]">
         <div className="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm shrink-0 w-[38%] max-w-[9.5rem] min-w-[7.5rem]">
@@ -381,7 +474,7 @@ export default function POSMobile({
           <ChevronDown className="text-slate-400 mr-1.5 shrink-0" size={16} />
         </div>
         <div className="flex-1 overflow-x-auto whitespace-nowrap flex gap-2 items-center">
-          {PRODUCTS.map((p) => (
+          {lineProducts.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -445,7 +538,9 @@ export default function POSMobile({
 
         <div className="flex justify-between items-center mb-3">
           <p className="text-slate-400 font-bold text-sm">ยอดรายการนี้</p>
-          <p className="text-2xl font-black text-blue-600">฿{currentItemTotal.toLocaleString()}</p>
+          <p className={`text-2xl font-black ${salesLine === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
+            ฿{currentItemTotal.toLocaleString()}
+          </p>
         </div>
 
         <div className="grid grid-cols-4 gap-2 flex-1">
@@ -464,7 +559,9 @@ export default function POSMobile({
             </button>
           </div>
           <button onClick={addToCart}
-            className="col-span-1 bg-blue-600 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95">
+            className={`col-span-1 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95 ${
+              salesLine === 'dead' ? 'bg-red-500' : 'bg-blue-600'
+            }`}>
             <PlusCircle size={32} /><span className="text-sm">เพิ่ม</span>
           </button>
         </div>
@@ -472,5 +569,3 @@ export default function POSMobile({
     </div>
   );
 };
-
-// ─── Inventory Screen ─────────────────────────────────────────────────────────

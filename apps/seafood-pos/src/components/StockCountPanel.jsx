@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
 import { reconcileStockToActual } from '../services/stockService';
 
 export default function StockCountPanel({
@@ -20,12 +21,12 @@ export default function StockCountPanel({
     const live = actualLive === '' ? null : parseFloat(actualLive);
     const dead = actualDead === '' ? null : parseFloat(actualDead);
     if (!Number.isFinite(live) || !Number.isFinite(dead)) {
-      alert('ใส่น้ำหนักชั่งจริงทั้งกุ้งเป็นและกุ้งตายครับ');
+      alert(`ใส่น้ำหนักชั่งจริงทั้ง${STOCK_LINE.live.full} และ${STOCK_LINE.dead.full} ครับ`);
       return;
     }
     if (
       !window.confirm(
-        `ยืนยันชั่งปิดสต๊อกทั้งระบบ?\n\nระบบตอนนี้: เป็น ${systemLive.toFixed(2)} · ตาย ${systemDead.toFixed(2)} กก.\nชั่งจริง: เป็น ${live.toFixed(2)} · ตาย ${dead.toFixed(2)} กก.`,
+        `ยืนยันชั่งปิดสต๊อกทั้งระบบ?\n\nระบบตอนนี้: ${formatStockPairShort(systemLive, systemDead)}\nชั่งจริง: ${formatStockPairShort(live, dead)}`,
       )
     ) {
       return;
@@ -78,12 +79,12 @@ export default function StockCountPanel({
         <div className="bg-slate-50 rounded-xl p-3 text-sm">
           <p className="text-slate-500 text-xs">ยอดในระบบตอนนี้</p>
           <p className="font-black text-slate-800 mt-0.5">
-            เป็น {systemLive.toFixed(2)} กก. · ตาย {systemDead.toFixed(2)} กก.
+            {formatStockPairShort(systemLive, systemDead)}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-bold text-slate-500">ชั่งจริง — กุ้งเป็น (กก.)</label>
+            <label className="text-xs font-bold text-slate-500">ชั่งจริง — {STOCK_LINE.live.full} (กก.)</label>
             <input
               type="number"
               inputMode="decimal"
@@ -94,7 +95,7 @@ export default function StockCountPanel({
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-500">ชั่งจริง — กุ้งตาย (กก.)</label>
+            <label className="text-xs font-bold text-slate-500">ชั่งจริง — {STOCK_LINE.dead.full} (กก.)</label>
             <input
               type="number"
               inputMode="decimal"

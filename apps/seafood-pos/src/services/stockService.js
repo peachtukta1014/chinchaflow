@@ -2,6 +2,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
 import { fsPatch, fsPost, fsSetStockDoc, fsAtomicStockBatchCommit } from '../lib/firestoreRest';
+import { STOCK_LINE } from '../constants/stockLines';
 import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
 
 function withTimeout(promise, ms = 10000) {
@@ -47,7 +48,7 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
 
   if (liveLeft > 0.001 || deadLeft > 0.001) {
     throw new Error(
-      `สต๊อกในล็อตไม่พอ (ขาดเป็น ${liveLeft.toFixed(2)} กก. / ตาย ${deadLeft.toFixed(2)} กก.)`,
+      `สต๊อกในล็อตไม่พอ (ขาด ${STOCK_LINE.live.tag} ${liveLeft.toFixed(2)} กก. / ${STOCK_LINE.dead.tag} ${deadLeft.toFixed(2)} กก.)`,
     );
   }
 
@@ -84,7 +85,7 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
   }
 
   if (left > 0.001) {
-    throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(transferKg - left).toFixed(2)} กก. (ต้องการ ${transferKg} กก.)`);
+    throw new Error(`${STOCK_LINE.live.full} ในล็อตมีแค่ ${(transferKg - left).toFixed(2)} กก. (ต้องการ ${transferKg} กก.)`);
   }
 
   await fsAtomicStockBatchCommit(patches);
@@ -120,7 +121,7 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
   }
 
   if (left > 0.001) {
-    throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
+    throw new Error(`${STOCK_LINE.live.full} ในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
   await fsAtomicStockBatchCommit(patches);
@@ -173,7 +174,7 @@ async function deductDeadSpoilageFromBatches(batches, lossKg) {
   }
 
   if (left > 0.001) {
-    throw new Error(`กุ้งตายในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
+    throw new Error(`${STOCK_LINE.dead.full} ในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
   await fsAtomicStockBatchCommit(patches);

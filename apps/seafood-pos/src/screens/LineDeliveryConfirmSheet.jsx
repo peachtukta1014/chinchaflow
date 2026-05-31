@@ -13,6 +13,7 @@ import {
   resolveLineCustomer,
   suggestCustomersForLineName,
 } from '../lib/lineOrderToSale';
+import { STOCK_LINE } from '../constants/stockLines';
 import { getEffectiveStock } from '../services/stockService';
 
 export function LineDeliveryConfirmSheet({
@@ -125,11 +126,11 @@ export function LineDeliveryConfirmSheet({
       return;
     }
     if (liveKg > avail.live) {
-      alert(`กุ้งเป็นในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      alert(`⚠️ ${STOCK_LINE.live.full} ในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
       return;
     }
     if (deadKg > avail.dead) {
-      alert(`กุ้งตายในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
+      alert(`⚠️ ${STOCK_LINE.dead.full} ในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`);
       return;
     }
     onConfirm({ cartItems: lines, customer, total, liveKg, deadKg });
@@ -306,7 +307,7 @@ export function LineDeliveryConfirmSheet({
             <span className="font-black text-lg text-slate-800">฿{total.toLocaleString()}</span>
           </div>
           <p className="text-[10px] text-slate-400 text-center">
-            ตัดสต๊อก เป็น {liveKg} กก. · ตาย {deadKg} กก.
+            ตัดสต๊อก {STOCK_LINE.live.label} {liveKg} กก. · {STOCK_LINE.dead.label} {deadKg} กก.
           </p>
           {mismatch && (
             <label className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 rounded-xl p-3 cursor-pointer">
