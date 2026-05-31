@@ -124,10 +124,17 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
 
   const profileRow = resolveCustomerProfileForBill(customer, bill, allCustomers);
   const profileUid = normalizeLineUserId(profileRow?.lineUserId);
-  const nameMatchUid = findUidInCustomerList(allCustomers, name);
+  const profileResolvedShop = Boolean(profileRow?.id && profileRow.id !== 'general');
+  const profileLinked = isValidLineUserId(profileUid);
+  /** ลบ UID ในรายชื่อแล้ว — ไม่ดึงจากบิลเก่า/ออเดอร์ย้อนหลังมาแทน */
+  const allowHistoricalUid = !profileResolvedShop || profileLinked;
+
+  const nameMatchUid = allowHistoricalUid
+    ? findUidInCustomerList(allCustomers, name)
+    : '';
 
   let orderUid = '';
-  if (bill?.lineOrderId) {
+  if (allowHistoricalUid && bill?.lineOrderId) {
     try {
       const order = await fsGetDoc(`lineOrders/${bill.lineOrderId}`);
       const uid = normalizeLineUserId(order?.lineUserId);
@@ -138,7 +145,7 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
   }
 
   let historyUid = '';
-  if (name) {
+  if (allowHistoricalUid && name) {
     try {
       historyUid = await findLineUserIdForCustomerName(name, { directOnly: true }) || '';
     } catch {
@@ -149,9 +156,9 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
   const picked = pickLineUidForBillPush({
     profileUid,
     nameMatchUid,
-    billUid,
-    orderUid,
-    historyUid,
+    billUid: allowHistoricalUid ? billUid : '',
+    orderUid: allowHistoricalUid ? orderUid : '',
+    historyUid: allowHistoricalUid ? historyUid : '',
   });
 
   let profileName = profileRow?.name || '';
