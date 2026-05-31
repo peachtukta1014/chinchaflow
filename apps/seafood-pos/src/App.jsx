@@ -62,6 +62,7 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [salesRefresh, setSalesRefresh] = useState(0);
   const [stockRefresh, setStockRefresh] = useState(0);
+  const [stockOverlayLine, setStockOverlayLine] = useState('live');
   const [pendingOrders, setPendingOrders] = useState(0);
   const prevPendingOrdersRef = useRef(null);
 
@@ -258,7 +259,11 @@ export default function App() {
               <ArrowLeft size={20} />
             </button>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black truncate">{OVERLAY_TITLES[activeTab] || 'เมนู'}</p>
+              <p className="text-sm font-black truncate">
+                {activeTab === 'stock'
+                  ? (stockOverlayLine === 'dead' ? 'คลัง — สายกุ้งตาย' : 'คลัง — สายกุ้งเป็น')
+                  : (OVERLAY_TITLES[activeTab] || 'เมนู')}
+              </p>
               <p className="text-[10px] text-slate-400 truncate">{member.name}</p>
             </div>
           </div>
@@ -325,7 +330,14 @@ export default function App() {
             stock={stock}
             stockBatches={stockBatches}
             updateMainStock={updateMainStock}
-            onOpenReceive={() => openOverlay('stock')}
+            onOpenReceiveLive={() => {
+              setStockOverlayLine('live');
+              openOverlay('stock');
+            }}
+            onOpenReceiveDead={() => {
+              setStockOverlayLine('dead');
+              openOverlay('stock');
+            }}
             onSaveBill={(b) => {
               setTransactions((prev) => [b, ...prev]);
               bumpSalesAndStock();
@@ -376,6 +388,7 @@ export default function App() {
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
               member={member}
+              initialStockLine={stockOverlayLine}
               onReceived={() => setStockRefresh((n) => n + 1)}
               onStockMoved={() => setStockRefresh((n) => n + 1)}
             />

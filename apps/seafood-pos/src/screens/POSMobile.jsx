@@ -16,14 +16,27 @@ import { saveBillWithCart as saveBillWithCartService } from '../services/salesSe
 import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
+import StockLineSwitcher from '../components/StockLineSwitcher';
 
 export default function POSMobile({
-  user, stock, stockBatches = [], updateMainStock, onSaveBill, onOpenReceive,
+  user,
+  stock,
+  stockBatches = [],
+  updateMainStock,
+  onSaveBill,
+  onOpenReceiveLive,
+  onOpenReceiveDead,
 }) {
   const [selectedCustomer, setSelectedCustomer] = useState('general');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cart, setCart]             = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
+  const [salesLine, setSalesLine] = useState('live');
+  const lineProducts = useMemo(
+    () => PRODUCTS.filter((p) => p.type === salesLine),
+    [salesLine],
+  );
+  const defaultProductId = lineProducts[0]?.id || PRODUCTS[0].id;
+  const [selectedProduct, setSelectedProduct] = useState(defaultProductId);
   const [weight, setWeight]         = useState('');
   const [customPrice, setCustomPrice] = useState(PRODUCTS[0].price.toString());
   const [loadedPrices, setLoadedPrices] = useState({});
@@ -74,10 +87,33 @@ export default function POSMobile({
   const handleProductChange = (productId) => {
     setSelectedProduct(productId);
     const prod = PRODUCTS.find(p => p.id === productId);
+    if (!prod || prod.type !== salesLine) return;
     setWeight(''); setNote('');
     if (prod.type === 'dead') { setCustomPrice(''); setInputMode('price'); }
     else { setCustomPrice(priceOf(productId).toString()); setInputMode('weight'); }
   };
+
+  const switchSalesLine = (line) => {
+    if (line === salesLine) return;
+    if (cart.length > 0 && cart.some((i) => i.type !== line)) {
+      if (!window.confirm('เปลี่ยนสายขายจะล้างตะกร้า — ต้องการต่อไหมครับ?')) return;
+      setCart([]);
+    }
+    setSalesLine(line);
+    const first = PRODUCTS.find((p) => p.type === line);
+    if (first) {
+      setSelectedProduct(first.id);
+      setWeight('');
+      setNote('');
+      if (first.type === 'dead') {
+        setCustomPrice('');
+        setInputMode('price');
+      } else {
+        setCustomPrice(priceOf(first.id).toString());
+        setInputMode('weight');
+      }
+    }
+  };
 
   const handleNumpad = (num) => {
     if (inputMode === 'weight') {
@@ -90,6 +126,7 @@ export default function POSMobile({
   };
 
   const addToCart = () => {
+    if (activeProduct?.type !== salesLine) return alert('สินค้าไม่ตรงสายขายที่เลือกครับ');
     if (!isDeadShrimp && !weight) return alert('ใส่น้ำหนักก่อนนะครับ');
     if (!customPrice) return alert('ใส่ราคาก่อนครับ');
     setCart([...cart, {
@@ -149,6 +186,7 @@ export default function POSMobile({
     if (draft.customerId) setSelectedCustomer(draft.customerId);
     if (draft.productId) {
       const prod = PRODUCTS.find((p) => p.id === draft.productId);
+      if (prod && prod.type !== salesLine) switchSalesLine(prod.type);
       setSelectedProduct(draft.productId);
       setNote('');
       if (prod?.type === 'dead') {
@@ -265,15 +303,31 @@ export default function POSMobile({
         />
       )}
       <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
-        {onOpenReceive && (
-          <button
-            type="button"
-            onClick={onOpenReceive}
-            className="w-full flex items-center justify-center gap-2 mb-3 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm shadow-md active:scale-[0.98]"
-          >
-            <Package size={20} />
-            รับเข้า / รับสต๊อก
-          </button>
+        <StockLineSwitcher line={salesLine} onChange={switchSalesLine} className="mb-3" />
+
+        {(onOpenReceiveLive || onOpenReceiveDead) && (
+          <div className="flex gap-2 mb-3">
+            {onOpenReceiveLive && (
+              <button
+                type="button"
+                onClick={onOpenReceiveLive}
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-blue-600 text-white font-bold text-xs shadow-md active:scale-[0.98]"
+              >
+                <Package size={18} />
+                รับเข้า — เป็น
+              </button>
+            )}
+            {onOpenReceiveDead && (
+              <button
+                type="button"
+                onClick={onOpenReceiveDead}
+                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs shadow-md active:scale-[0.98]"
+              >
+                <Package size={18} />
+                รับเข้า — ตาย
+              </button>
+            )}
+          </div>
         )}
 
         {/* Cart items */}
@@ -381,7 +435,7 @@ export default function POSMobile({
           <ChevronDown className="text-slate-400 mr-1.5 shrink-0" size={16} />
         </div>
         <div className="flex-1 overflow-x-auto whitespace-nowrap flex gap-2 items-center">
-          {PRODUCTS.map((p) => (
+          {lineProducts.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -445,7 +499,9 @@ export default function POSMobile({
 
         <div className="flex justify-between items-center mb-3">
           <p className="text-slate-400 font-bold text-sm">ยอดรายการนี้</p>
-          <p className="text-2xl font-black text-blue-600">฿{currentItemTotal.toLocaleString()}</p>
+          <p className={`text-2xl font-black ${salesLine === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
+            ฿{currentItemTotal.toLocaleString()}
+          </p>
         </div>
 
         <div className="grid grid-cols-4 gap-2 flex-1">
@@ -464,7 +520,9 @@ export default function POSMobile({
             </button>
           </div>
           <button onClick={addToCart}
-            className="col-span-1 bg-blue-600 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95">
+            className={`col-span-1 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95 ${
+              salesLine === 'dead' ? 'bg-red-500' : 'bg-blue-600'
+            }`}>
             <PlusCircle size={32} /><span className="text-sm">เพิ่ม</span>
           </button>
         </div>
@@ -472,5 +530,3 @@ export default function POSMobile({
     </div>
   );
 };
-
-// ─── Inventory Screen ─────────────────────────────────────────────────────────
