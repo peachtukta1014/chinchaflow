@@ -7,7 +7,6 @@ import {
   fsDelete,
   fsGetDoc,
   fsPatch,
-  fsPrefetchDebt,
   fsPost,
   fsQueryOpenSales,
   fsQuerySalesByCustomer,
@@ -178,10 +177,6 @@ export async function persistSaleBill({
   if (!isFirebaseReady) throw new Error('Firebase config ไม่ครบ — บันทึกบิลไม่ได้');
   const now = new Date().toISOString();
 
-  // Pre-fetch ยอดหนี้ปัจจุบันควบคู่กับ POST sale (ทั้งสอง endpoint อิสระจากกัน)
-  const debtKey = remain > 0 ? debtCustomerKey(selectedCustomer, customer.name) : null;
-  const debtPrefetchPromise = debtKey ? fsPrefetchDebt(debtKey) : Promise.resolve(undefined);
-
   await withTimeout(fsPost('sales', {
     ...billData,
     dateKey,
@@ -199,14 +194,13 @@ export async function persistSaleBill({
   }));
 
   if (remain > 0) {
-    const prefetched = await debtPrefetchPromise;
     await withTimeout(incrementCustomerDebt(selectedCustomer, {
       customerId: selectedCustomer,
       customerName: customer.name,
       zone: customer.zone,
       lastBillNo: billNo,
       lastUpdated: now,
-    }, remain, prefetched));
+    }, remain));
   }
 }
 

@@ -288,13 +288,26 @@ export async function fsQueryStockBatches(limit = 30) {
 }
 
 export async function fsListCollection(col, pageSize = 200) {
-  const r = await fetch(`${FS_BASE}/${col}?pageSize=${pageSize}`, { headers: await fsAuthHeaders() });
-  if (!r.ok) return [];
-  const json = await r.json();
-  return (json.documents || []).map((doc) => {
-    const parts = doc.name.split('/');
-    return { id: parts[parts.length - 1], ...fromFsFields(doc.fields || {}) };
-  });
+  const allDocs = [];
+  let pageToken = null;
+  let pages = 0;
+  const MAX_PAGES = 10;
+  do {
+    const qs = pageToken
+      ? `?pageSize=${pageSize}&pageToken=${encodeURIComponent(pageToken)}`
+      : `?pageSize=${pageSize}`;
+    const r = await fetch(`${FS_BASE}/${col}${qs}`, { headers: await fsAuthHeaders() });
+    if (!r.ok) break;
+    const json = await r.json();
+    const docs = (json.documents || []).map((doc) => {
+      const parts = doc.name.split('/');
+      return { id: parts[parts.length - 1], ...fromFsFields(doc.fields || {}) };
+    });
+    allDocs.push(...docs);
+    pageToken = json.nextPageToken || null;
+    pages += 1;
+  } while (pageToken && pages < MAX_PAGES);
+  return allDocs;
 }
 
 function sortSalesDesc(docs) {
@@ -418,73 +431,64 @@ export async function fsQuerySalesByCustomer(customerId, limit = 80) {
   return sortSalesDesc(open.filter((d) => d.customerId === customerId));
 }
 
-export async function fsIncrementDebt(customerId, meta, delta, prefetched = undefined) {
+/**
+ * อัปเดตยอดลูกหนี้แบบ atomic — ใช้ Firestore server-side increment ผ่าน :commit
+ * ป้องกัน lost update เมื่อมีหลายรายการพร้อมกัน (ไม่ต้อง read-modify-write)
+ */
+export async function fsIncrementDebt(customerId, meta, delta) {
   if (!FS_BASE || !customerId) return;
   const deltaN = parseFloat(delta) || 0;
   if (deltaN === 0) return;
 
-  const path = `customerDebts/${customerId}`;
-  const headers = await fsAuthHeaders();
-  let current = 0;
-  let docExists = false;
+  const docName = `projects/${projectId}/databases/(default)/documents/customerDebts/${customerId}`;
+  const body = {
+    writes: [{
+      update: {
+        name: docName,
+        fields: fsObj({
+          customerId,
+          customerName: meta.customerName || '',
+          zone: meta.zone || 'ทั่วไป',
+          lastBillNo: meta.lastBillNo || '',
+          lastUpdated: meta.lastUpdated || new Date().toISOString(),
+        }),
+      },
+      updateMask: {
+        fieldPaths: ['customerId', 'customerName', 'zone', 'lastBillNo', 'lastUpdated'],
+      },
+      updateTransforms: [{
+        fieldPath: 'totalDebt',
+        increment: { doubleValue: deltaN },
+      }],
+    }],
+  };
 
-  if (prefetched !== undefined) {
-    current = prefetched.current;
-    docExists = prefetched.exists;
-  } else {
-    const r = await fetch(`${FS_BASE}/${path}`, { headers });
-    if (r.ok) {
-      docExists = true;
-      const j = await r.json();
-      const fv = j.fields?.totalDebt;
-      current = parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0);
-    } else if (r.status !== 404) {
-      throw new Error(`GET ${path} HTTP ${r.status}`);
-    }
-  }
-
-  const totalDebt = current + deltaN;
-  const fields = fsObj({
-    customerId,
-    customerName: meta.customerName || '',
-    zone: meta.zone || 'ทั่วไป',
-    lastBillNo: meta.lastBillNo || '',
-    lastUpdated: meta.lastUpdated || new Date().toISOString(),
-    totalDebt,
+  const r = await fetch(`${FS_BASE}:commit`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify(body),
   });
-
-  if (docExists) {
-    return fsPatch(path, {
-      customerName: meta.customerName,
-      zone: meta.zone,
-      lastBillNo: meta.lastBillNo,
-      lastUpdated: meta.lastUpdated,
-      totalDebt,
-    });
-  }
-
-  const create = await fetch(
-    `${FS_BASE}/customerDebts?documentId=${encodeURIComponent(customerId)}`,
-    { method: 'POST', headers, body: JSON.stringify({ fields }) },
-  );
-  if (!create.ok) throw new Error(`สร้างลูกหนี้ไม่สำเร็จ HTTP ${create.status}`);
+  if (!r.ok) throw new Error(`fsIncrementDebt HTTP ${r.status}`);
 }
 
-/** Pre-fetch ยอดหนี้ปัจจุบัน (ก่อน POST sale) เพื่อลดจำนวน serial round trip */
-export async function fsPrefetchDebt(customerId) {
-  if (!FS_BASE || !customerId) return undefined;
-  const path = `customerDebts/${customerId}`;
-  const headers = await fsAuthHeaders();
-  try {
-    const r = await fetch(`${FS_BASE}/${path}`, { headers });
-    if (r.ok) {
-      const j = await r.json();
-      const fv = j.fields?.totalDebt;
-      return { exists: true, current: parseFloat(fv?.doubleValue ?? fv?.integerValue ?? 0) };
-    }
-    if (r.status === 404) return { exists: false, current: 0 };
-  } catch {
-    /* ignore prefetch errors — fall back to normal path */
-  }
-  return undefined;
+/**
+ * Atomic commit สำหรับ stockBatch หลายล็อตพร้อมกัน — ทั้งหมดสำเร็จหรือล้มพร้อมกัน
+ * ป้องกันการตัดสต๊อกค้างกลางทาง (บางล็อตตัดแล้วแต่บางล็อตยังไม่ตัด)
+ * patches: [{ id, remainingLiveKg, remainingDeadKg }, ...]
+ */
+export async function fsAtomicStockBatchCommit(patches) {
+  if (!FS_BASE || !patches.length) return;
+  const writes = patches.map((p) => ({
+    update: {
+      name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
+      fields: fsObj({ remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg }),
+    },
+    updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
+  }));
+  const r = await fetch(`${FS_BASE}:commit`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ writes }),
+  });
+  if (!r.ok) throw new Error(`fsAtomicStockBatchCommit HTTP ${r.status}`);
 }
