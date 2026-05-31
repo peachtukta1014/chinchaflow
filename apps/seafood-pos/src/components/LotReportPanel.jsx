@@ -8,7 +8,8 @@ import {
 } from '../lib/firestoreRest';
 import { STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
 import DateNavBar from './DateNavBar';
-import LotExpensesPanel from './LotExpensesPanel';
+import LotExpensesSyncPanel from './LotExpensesSyncPanel';
+import { fetchLotExpenses } from '../services/lotExpenseService';
 import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
 
 /** Returns the dateKey of the oldest lot that is not closed and not excluded. */
@@ -178,6 +179,7 @@ export default function LotReportPanel({
     pondNote: '',
     pondLines: [],
   });
+  const reloadExpensesRef = useRef(null);
 
   // Fallback: if the current lot disappears from the list entirely
   useEffect(() => {
@@ -277,10 +279,25 @@ export default function LotReportPanel({
     if (!window.confirm(msg)) return;
     setClosingLot(true);
     try {
+      const freshExpenses = (await reloadExpensesRef.current?.()) || (await fetchLotExpenses(lotDateKey));
+      setLotExpenses(freshExpenses);
+      const cLive = countedLive === '' ? null : parseFloat(countedLive);
+      const cDead = countedDead === '' ? null : parseFloat(countedDead);
+      const reportForClose = computeLotReport({
+        lotDateKey,
+        endDateKey,
+        batches: stockBatches,
+        sales,
+        adjustments,
+        countedLive: Number.isFinite(cLive) ? cLive : null,
+        countedDead: Number.isFinite(cDead) ? cDead : null,
+        marketExpenses: freshExpenses.marketExpenses,
+        pondExpenses: freshExpenses.pondExpenses,
+      });
       await closeLotAndCarryForward({
         lotDateKey,
         batches: stockBatches,
-        report,
+        report: reportForClose,
         targetLotDateKey: carry ? carryTargetKey : null,
         closedBy: member?.name || '',
       });
@@ -504,11 +521,10 @@ export default function LotReportPanel({
         )}
       </div>
 
-      <LotExpensesPanel
-        stockBatches={stockBatches}
+      <LotExpensesSyncPanel
         lotDateKey={lotDateKey}
-        onLotDateKeyChange={setLotDateKey}
-        onExpensesChange={setLotExpenses}
+        onExpensesLoaded={setLotExpenses}
+        refreshRef={reloadExpensesRef}
       />
 
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-3">
