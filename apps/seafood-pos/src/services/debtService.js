@@ -2,10 +2,10 @@ import { debtCustomerKey } from '../lib/debtCustomerKey';
 import { fsIncrementDebt, fsPatch, fsPost, fsObj, FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 
 /** เพิ่ม/ลดยอดลูกหนี้ (REST wrapper) */
-export async function incrementCustomerDebt(customerId, meta, delta, prefetched = undefined) {
+export async function incrementCustomerDebt(customerId, meta, delta) {
   const key = debtCustomerKey(customerId, meta.customerName);
   if (!key) return;
-  return fsIncrementDebt(key, { ...meta, customerId: key }, delta, prefetched);
+  return fsIncrementDebt(key, { ...meta, customerId: key }, delta);
 }
 
 async function upsertDebtDoc(customerId, meta, totalDebt) {

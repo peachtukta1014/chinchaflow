@@ -12,6 +12,7 @@ export {
   fsQuerySales,
   fsListCollection,
   fsIncrementDebt,
+  fsAtomicStockBatchCommit,
 } from './firestoreRest';
 
 export {

@@ -158,19 +158,33 @@ service cloud.firestore {
     // Sales — approved staff can read/create; admin can update/delete
     match /sales/{docId} {
       allow read, create: if isApprovedShrimp();
-      allow update: if isApprovedShrimp();
+      // staff can only adjust payment status — not tamper with totals, items, or customer
+      allow update: if isAdminShrimp()
+        || (isApprovedShrimp()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['paymentType', 'paidAmount', 'remainingAmount', 'photoUrl']));
       allow delete: if isAdminShrimp();
     }
 
-    // Customer debts — staff read/create/update; admin delete
+    // Customer debts — staff read/create/update (atomic increment via Cloud); admin delete
     match /customerDebts/{docId} {
-      allow read, create, update: if isApprovedShrimp();
+      allow read, create: if isApprovedShrimp();
+      // staff can only update debt tracking fields — not inject arbitrary values
+      allow update: if isAdminShrimp()
+        || (isApprovedShrimp()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['totalDebt', 'lastBillNo', 'lastUpdated', 'customerName', 'zone', 'customerId']));
       allow delete: if isAdminShrimp();
     }
 
     // Stock batches — พนักงานอัปเดตคงเหลือตอนขาย/ย้ายบ่อ (FIFO)
     match /stockBatches/{docId} {
-      allow read, create, update: if isApprovedShrimp();
+      allow read, create: if isApprovedShrimp();
+      // staff can only update remaining quantities — not purchase cost or lot metadata
+      allow update: if isAdminShrimp()
+        || (isApprovedShrimp()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['remainingLiveKg', 'remainingDeadKg']));
       allow delete: if isAdminShrimp();
     }
 
@@ -204,8 +218,14 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow write: if isAdmin() || isAdminShrimp();
-      // พนักงานกุ้งรับสต็อก → อัปเดตยอดกุ้งเป็น/ตาย (เฉพาะ config/stock)
-      allow update, create: if isApprovedShrimp() && docId == 'stock';
+      // staff อัปเดต config/stock ได้เฉพาะ live/dead/updatedAt เท่านั้น
+      allow create: if isApprovedShrimp()
+        && docId == 'stock'
+        && request.resource.data.keys().hasOnly(['live', 'dead', 'updatedAt']);
+      allow update: if isApprovedShrimp()
+        && docId == 'stock'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['live', 'dead', 'updatedAt']);
     }
 
     // Product settings (shrimp prices) — approved read; admin write
@@ -218,7 +238,11 @@ service cloud.firestore {
     match /lineOrders/{docId} {
       allow read: if isApproved() || isApprovedShrimp();
       allow create: if isApprovedShrimp();
-      allow update: if isApprovedShrimp();
+      // staff สามารถ mark done เท่านั้น — ไม่แก้วันส่ง/ราคา/ลูกค้า
+      allow update: if isAdmin() || isAdminShrimp()
+        || (isApprovedShrimp()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'salesId', 'billNo', 'completedAt']));
       allow delete: if isAdmin() || isAdminShrimp();
     }
 

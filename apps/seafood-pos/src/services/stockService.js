@@ -1,7 +1,7 @@
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsPatch, fsPost, fsSetStockDoc } from '../lib/firestoreRest';
+import { fsPatch, fsPost, fsSetStockDoc, fsAtomicStockBatchCommit } from '../lib/firestoreRest';
 import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
 
 function withTimeout(promise, ms = 10000) {
@@ -50,10 +50,7 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
     );
   }
 
-  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
-    remainingLiveKg: p.remainingLiveKg,
-    remainingDeadKg: p.remainingDeadKg,
-  })));
+  await fsAtomicStockBatchCommit(patches);
 
   return patches;
 }
@@ -89,10 +86,7 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
     throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(transferKg - left).toFixed(2)} กก. (ต้องการ ${transferKg} กก.)`);
   }
 
-  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
-    remainingLiveKg: p.remainingLiveKg,
-    remainingDeadKg: p.remainingDeadKg,
-  })));
+  await fsAtomicStockBatchCommit(patches);
   return { patches, allocations };
 }
 
@@ -127,10 +121,7 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
     throw new Error(`กุ้งเป็นในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
-  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
-    remainingLiveKg: p.remainingLiveKg,
-    remainingDeadKg: p.remainingDeadKg,
-  })));
+  await fsAtomicStockBatchCommit(patches);
   return { patches, allocations };
 }
 
@@ -182,10 +173,7 @@ async function deductDeadSpoilageFromBatches(batches, lossKg) {
     throw new Error(`กุ้งตายในล็อตมีแค่ ${(lossKg - left).toFixed(2)} กก. (ต้องการ ${lossKg} กก.)`);
   }
 
-  await Promise.all(patches.map((p) => fsPatch(`stockBatches/${p.id}`, {
-    remainingLiveKg: p.remainingLiveKg,
-    remainingDeadKg: p.remainingDeadKg,
-  })));
+  await fsAtomicStockBatchCommit(patches);
   return { patches, allocations };
 }
 
