@@ -1,5 +1,11 @@
 const { normalizeLineUserId } = require('./shrimpLinePush');
 
+/** ร้านหลัก c1–c27 — ต้องผูก LINE ครบก่อนเปิดกฎถามชื่อ/เบอร์ลูกค้าใหม่ */
+const MAIN_CATALOG_SHOP_IDS = new Set(
+  Array.from({ length: 27 }, (_, i) => `c${i + 1}`),
+);
+const PROFILE_GATE_MIN_LINKED_SHOPS = 27;
+
 function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
 }
@@ -38,6 +44,22 @@ async function findCustomerByLineUserId(db, lineUserId) {
   if (snap.empty) return null;
   const doc = snap.docs[0];
   return { id: doc.id, ...doc.data() };
+}
+
+async function countLinkedMainCatalogShops(db) {
+  const snap = await db.collection('customers').get();
+  let count = 0;
+  for (const doc of snap.docs) {
+    if (!MAIN_CATALOG_SHOP_IDS.has(doc.id)) continue;
+    if (normalizeLineUserId(doc.data()?.lineUserId)) count += 1;
+  }
+  return count;
+}
+
+/** เปิดถามชื่อ/เบอร์/จุดส่งเมื่อผูกร้านหลักครบ 27 แล้วเท่านั้น */
+async function isNewCustomerProfileGateActive(db) {
+  const linked = await countLinkedMainCatalogShops(db);
+  return linked >= PROFILE_GATE_MIN_LINKED_SHOPS;
 }
 
 async function findCustomerByName(db, customerName) {
@@ -184,8 +206,12 @@ async function upsertCustomerProfile(db, admin, { customer, lineUserId, customer
 }
 
 module.exports = {
+  MAIN_CATALOG_SHOP_IDS,
+  PROFILE_GATE_MIN_LINKED_SHOPS,
   profileMissingFields,
   isProfileComplete,
+  countLinkedMainCatalogShops,
+  isNewCustomerProfileGateActive,
   assessLineCustomerProfile,
   parseProfileFields,
   formatMissingProfilePrompt,

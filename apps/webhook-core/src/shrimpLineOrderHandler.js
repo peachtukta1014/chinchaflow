@@ -17,6 +17,7 @@ const {
   parseProfileFields,
   upsertCustomerProfile,
   isProfileComplete,
+  isNewCustomerProfileGateActive,
 } = require('./shrimpLineCustomerProfile');
 const { prepareOrderInput } = require('./prepareOrderInput');
 const {
@@ -90,15 +91,16 @@ function primaryCustomerNameFromItems(items) {
   return null;
 }
 
-function shouldVerifyCustomerProfile(groupId) {
-  return !groupId;
+async function shouldVerifyCustomerProfile(db, groupId) {
+  if (groupId) return false;
+  return isNewCustomerProfileGateActive(db);
 }
 
 async function tryCompleteOrder(db, admin, session, ts, ctx) {
   const { items, text, userId, groupId, deliveryDate, replyLang } = ctx;
   const summary = formatItemsSummary(items, replyLang);
 
-  if (shouldVerifyCustomerProfile(groupId)) {
+  if (await shouldVerifyCustomerProfile(db, groupId)) {
     const customerName = primaryCustomerNameFromItems(items)
       || (await findCustomerNameByLineUserId(db, userId));
     const { customer, missing } = await assessLineCustomerProfile(db, {
