@@ -8,6 +8,9 @@ export default defineConfig({
   define: {
     __APP_BUILD_ISO__: JSON.stringify(appBuildIso),
   },
+  resolve: {
+    dedupe: ['firebase', 'firebase/app', 'firebase/auth', 'firebase/storage'],
+  },
   build: {
     outDir: 'dist',
   },

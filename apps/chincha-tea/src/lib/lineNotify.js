@@ -1,10 +1,13 @@
-import { getFirebaseIdToken } from '../firebase';
+import { fbReady, getFirebaseIdToken } from '../firebase';
 import { FIREBASE_PROJECT_ID, viteEnv } from './viteEnv.js';
 
 const projectId = FIREBASE_PROJECT_ID;
 const region = viteEnv('VITE_FUNCTIONS_REGION') || 'asia-southeast1';
 
 export async function pushTeaLineSummary(dateKey) {
+  if (!fbReady) {
+    throw new Error('Firebase ยังไม่พร้อม — กดปุ่มรีเฟรชที่มุมขวาบนแล้วลองใหม่');
+  }
   if (!projectId) throw new Error('VITE_FIREBASE_PROJECT_ID ไม่ได้ตั้งค่า');
 
   const idToken = await getFirebaseIdToken();
