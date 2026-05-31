@@ -187,6 +187,12 @@ service cloud.firestore {
       allow delete: if isAdminShrimp();
     }
 
+    // สรุปล็อตที่ปิดแล้ว — แอดมินปิด/แก้ไข, พนักงานอ่านได้
+    match /lotSummaries/{lotDateKey} {
+      allow read: if isApprovedShrimp();
+      allow write: if isAdminShrimp();
+    }
+
     // Customers list — staff CRUD ลูกค้าที่เพิ่มเอง (cx_*); แอดมินลบได้ทุก doc
     match /customers/{docId} {
       allow read, create, update: if isApprovedShrimp();
