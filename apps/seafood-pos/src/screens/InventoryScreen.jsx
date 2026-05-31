@@ -15,11 +15,11 @@ import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
 import StockLineSwitcher from '../components/StockLineSwitcher';
 import SubTabBar from '../components/SubTabBar';
-import { STOCK_LINE } from '../constants/stockLines';
+import { SHRIMP_DAMAGE, STOCK_LINE } from '../constants/stockLines';
 
 const ADJUST_LABELS = {
   pond_to_dead: { title: 'ส่งยอดจากบ่อ (ขายได้)', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
-  spoilage_loss: { title: 'เสียหายตัดทิ้ง', emoji: '⚠️', cls: 'text-amber-800 bg-amber-50' },
+  spoilage_loss: { title: SHRIMP_DAMAGE.full, emoji: '⚠️', cls: 'text-amber-800 bg-amber-50' },
 };
 
 const LIVE_SUB_TABS = [
@@ -259,7 +259,7 @@ export default function InventoryScreen({
         if (a.deadAdded > 0) {
           return `${i + 1}. ล็อตรับ ${day}${note}: ${STOCK_LINE.live.tag} −${a.liveTaken.toFixed(2)} → ${STOCK_LINE.dead.tag} +${a.deadAdded.toFixed(2)} กก.`;
         }
-        return `${i + 1}. ล็อตรับ ${day}${note}: ตัดทิ้ง ${a.liveTaken.toFixed(2)} กก.`;
+        return `${i + 1}. ล็อตรับ ${day}${note}: ${SHRIMP_DAMAGE.full} ${a.liveTaken.toFixed(2)} กก.`;
       })
       .join('\n');
   };
@@ -282,7 +282,7 @@ export default function InventoryScreen({
       } else {
         allocations = await recordSpoilageLoss(stock, w, updateMainStock, stockBatches, meta);
         alert(
-          `✅ บันทึกเสียหาย ${w} กก. (ไม่เพิ่ม${STOCK_LINE.dead.label})\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+          `✅ บันทึก${SHRIMP_DAMAGE.full} ${w} กก. (ไม่เพิ่ม${STOCK_LINE.dead.label})\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
         );
       }
       setDeadWeight('');
@@ -498,13 +498,13 @@ export default function InventoryScreen({
                     : 'border-slate-200 text-slate-500'
                 }`}
               >
-                เสียหายตัดทิ้ง
+                {SHRIMP_DAMAGE.full}
               </button>
             </div>
             <p className="text-[10px] text-slate-400">
               {deadMode === 'pond_to_dead'
                 ? `${STOCK_LINE.live.label} ลด · ${STOCK_LINE.dead.label} เพิ่ม (ขายได้)`
-                : `${STOCK_LINE.live.label} ลดเท่านั้น · ไม่เพิ่ม${STOCK_LINE.dead.label} (เน่า/เสียหาย)`}
+                : `${STOCK_LINE.live.label} ลดเท่านั้น · ไม่เพิ่ม${STOCK_LINE.dead.label} (${SHRIMP_DAMAGE.label})`}
             </p>
             <div className="bg-blue-50 p-4 rounded-2xl">
               <span className="text-sm text-blue-900">
@@ -539,7 +539,7 @@ export default function InventoryScreen({
                 ? 'กำลังบันทึก...'
                 : deadMode === 'pond_to_dead'
                   ? 'บันทึก — ส่งยอดไประบบตาย'
-                  : 'บันทึกเสียหายตัดทิ้ง'}
+                  : `บันทึก — ${SHRIMP_DAMAGE.full}`}
             </button>
           </div>
 

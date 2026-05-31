@@ -18,7 +18,7 @@ import { billAmount } from '../src/lib/salesAggregate.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
 import { customRowsToCartItems } from '../src/lib/customCartItem.js';
 import { sumCartStockKg } from '../src/lib/cartStock.js';
-import { STOCK_LINE } from '../src/constants/stockLines.js';
+import { SHRIMP_DAMAGE, STOCK_LINE } from '../src/constants/stockLines.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -82,6 +82,7 @@ try {
 try {
   assert(STOCK_LINE.live.full === 'กุ้งแม่น้ำเป็น (Live)', 'STOCK_LINE.live.full');
   assert(STOCK_LINE.dead.full === 'กุ้งแม่น้ำตาย (Dead)', 'STOCK_LINE.dead.full');
+  assert(SHRIMP_DAMAGE.full === 'กุ้งตายเสียหาย (ตัดทิ้ง)', 'SHRIMP_DAMAGE.full');
   const custom = customRowsToCartItems([
     { label: 'แอนตี้โฟม', weight: '2', pricePerKg: '240' },
     { label: '', weight: '', pricePerKg: '' },

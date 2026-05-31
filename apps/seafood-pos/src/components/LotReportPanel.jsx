@@ -6,7 +6,7 @@ import {
   fsListStockAdjustments,
   fsQuerySalesBetween,
 } from '../lib/firestoreRest';
-import { STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
+import { SHRIMP_DAMAGE, STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
 import DateNavBar from './DateNavBar';
 import LotExpensesSyncPanel from './LotExpensesSyncPanel';
 import { fetchLotExpenses } from '../services/lotExpenseService';
@@ -131,10 +131,10 @@ function LineSummaryCard({
         )}
         <WeightStep label="− ขายแล้ว" kg={soldKg} sign="minus" />
         {pondOutKg > 0.01 && (
-          <WeightStep label={`− ย้ายไป ${STOCK_LINE.dead.label} (ไม่ใช่ตัดทิ้ง)`} kg={pondOutKg} sign="minus" />
+          <WeightStep label={`− ย้ายไป ${STOCK_LINE.dead.label} (ขายได้)`} kg={pondOutKg} sign="minus" />
         )}
         {spoilageKg > 0.01 && (
-          <WeightStep label="− ตัดทิ้ง/เสียหาย (จดแล้ว)" kg={spoilageKg} sign="minus" />
+          <WeightStep label={`− ${SHRIMP_DAMAGE.full} (จดแล้ว)`} kg={spoilageKg} sign="minus" />
         )}
         {stockCountKg > 0.01 && (
           <WeightStep label="− ชั่งปิดสต๊อก (จดแล้ว)" kg={stockCountKg} sign="minus" />
@@ -153,7 +153,7 @@ function LineSummaryCard({
         </div>
         {weightLossKg > 0.01 && (
           <p className="text-[10px] text-amber-800 leading-relaxed pt-1">
-            มักเกิดในบ่อ (กุ้งกินกัน → ตัวตายเหลือหัว น้ำหนักหายโดยปริยาย) — ย้ายไปสายตายด้วย「ส่งยอดจากบ่อ」หรือจด「ตัดทิ้ง」ถ้ารู้ยอด
+            มักเกิดในบ่อ (กุ้งกินกัน → ตัวตายเหลือหัว) — ให้จด「{SHRIMP_DAMAGE.full}」ที่แท็บสต๊อก · ในบ่อ
             จะไม่ค้างเป็นขาดยังไม่จด
           </p>
         )}
@@ -455,14 +455,14 @@ export default function LotReportPanel({
         <p>
           <strong className="text-white">สุทธิสุดท้าย</strong>
           {' '}
-          = รวมสองสาย − เสียหาย(จด) − ชั่งปิด(จด)
+          = รวมสองสาย − {SHRIMP_DAMAGE.label}(จด) − ชั่งปิด(จด)
         </p>
         <p>
           <strong className="text-white">น้ำหนัก:</strong>
           {' '}
           รับ − ขาย − คงเหลือ = สูญเสียรวม
           {' '}
-          (แยก: ปริศนา / เสียหาย / ชั่งปิด)
+          (แยก: ขาดยังไม่จด / {SHRIMP_DAMAGE.label} / ชั่งปิด)
           {' '}
           · ย้ายบ่อ→{STOCK_LINE.dead.tag} ≠ สูญหาย
         </p>
@@ -544,14 +544,17 @@ export default function LotReportPanel({
             )}
             {report.unaccountedShrinkageKg > 0.01 && (
               <p className="text-[10px] text-amber-900 leading-relaxed">
-                ย้ายบ่อ→ตายไม่นับเป็นขาดหาย · ถ้าขาดหลังย้ายไปขายได้แล้ว ให้จด「ตัดทิ้ง」ที่สต๊อกสาย
-                {' '}
-                {STOCK_LINE.dead.label}
+                ย้ายบ่อ→ตาย = ขายได้ ไม่ใช่{SHRIMP_DAMAGE.label} · น้ำหนักขาดจากกินกันในบ่อ → จด{SHRIMP_DAMAGE.full} ที่สต๊อก
               </p>
             )}
             {report.spoilageKg > 0.01 && (
               <div className="flex justify-between gap-2 text-amber-700">
-                <span>📋 เสียหาย/ตัดทิ้ง (จดแล้ว)</span>
+                <span>
+                  📋
+                  {SHRIMP_DAMAGE.full}
+                  {' '}
+                  (จดแล้ว)
+                </span>
                 <span className="font-bold">{fmtKg(report.spoilageKg)}</span>
               </div>
             )}
@@ -576,7 +579,7 @@ export default function LotReportPanel({
             <strong>{fmtBaht(report.shrinkageBaht)}</strong>
             {' '}
             (ปริศนา {fmtBaht(report.liveWeightLossBaht + report.deadWeightLossBaht)}
-            {report.spoilageTotalBaht > 0 ? ` · เสียหาย ${fmtBaht(report.spoilageTotalBaht)}` : ''}
+            {report.spoilageTotalBaht > 0 ? ` · ${SHRIMP_DAMAGE.label} ${fmtBaht(report.spoilageTotalBaht)}` : ''}
             {report.stockCountBaht > 0 ? ` · ชั่งปิด ${fmtBaht(report.stockCountBaht)}` : ''})
           </p>
         )}
@@ -614,7 +617,14 @@ export default function LotReportPanel({
         {/* รายการหักเพิ่มเติม (ที่จดแล้ว — ไม่รวมอยู่ใน per-line แล้ว) */}
         {report.spoilageTotalBaht > 0 && (
           <div className="flex justify-between items-center text-sm text-amber-300">
-            <span>− เสียหาย/ตัดทิ้ง {fmtKg(report.spoilageKg)} (จดแล้ว)</span>
+            <span>
+              −
+              {SHRIMP_DAMAGE.full}
+              {' '}
+              {fmtKg(report.spoilageKg)}
+              {' '}
+              (จดแล้ว)
+            </span>
             <span>{fmtBaht(report.spoilageTotalBaht)}</span>
           </div>
         )}
@@ -649,7 +659,7 @@ export default function LotReportPanel({
 
       <details className="bg-white rounded-[2rem] shadow-sm overflow-hidden">
         <summary className="p-4 text-xs font-bold text-slate-500 cursor-pointer">
-          รายละเอียดเพิ่ม (ชั่งปิดจริง · ย้ายบ่อ · เสียหายจดแล้ว)
+          รายละเอียดเพิ่ม (ชั่งปิดจริง · ย้ายบ่อ · {SHRIMP_DAMAGE.label}จดแล้ว)
         </summary>
         <div className="px-5 pb-5 space-y-4 border-t border-slate-100">
           <div className="pt-3 space-y-2 text-xs">
@@ -659,7 +669,11 @@ export default function LotReportPanel({
               <span className="font-bold">{fmtKg(report.pondToDeadKg)}</span>
             </p>
             <p className="flex justify-between">
-              <span className="text-slate-500">เสียหาย / ตัดทิ้ง (จดแล้ว)</span>
+              <span className="text-slate-500">
+                {SHRIMP_DAMAGE.full}
+                {' '}
+                (จดแล้ว)
+              </span>
               <span className="font-bold">{fmtKg(report.spoilageKg)}</span>
             </p>
             {report.stockCountKg > 0 && (
