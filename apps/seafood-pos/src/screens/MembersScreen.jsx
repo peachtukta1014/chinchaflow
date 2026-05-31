@@ -11,7 +11,7 @@ import {
   suggestLineUserIdFromOrders,
   subscribeCustomers,
 } from '../services/customerService';
-import { isValidLineUserId } from '../lib/lineUserId';
+import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
 
 export default function MembersScreen({ isAdmin = false }) {
@@ -55,12 +55,16 @@ export default function MembersScreen({ isAdmin = false }) {
     }
   };
 
-  const fillLineFromOrders = async (target, setData, customerName) => {
+  const fillLineFromOrders = async (target, setData, customerName, currentLineUserId = '') => {
+    if (isValidLineUserId(normalizeLineUserId(currentLineUserId))) {
+      showFlash('มี LINE UID ในช่องแล้ว — กด「บันทึก」ได้เลย (ไม่ต้องดึงจากออเดอร์)');
+      return;
+    }
     setSuggestBusy(target);
     try {
       const id = await suggestLineUserIdFromOrders(customerName);
       if (!id) {
-        showFlash('ไม่พบ LINE ID — ชื่อต้องตรงกับออเดอร์ LINE ทุกตัวอักษร');
+        showFlash('ไม่พบ LINE ID จากออเดอร์ — วาง UID เองแล้วกด「บันทึก」ได้ (ยกเลิกออเดอร์แล้วก็ยังใช้ได้)');
         return;
       }
       setData((p) => ({ ...p, lineUserId: id }));
@@ -214,7 +218,7 @@ export default function MembersScreen({ isAdmin = false }) {
             <button
               type="button"
               disabled={suggestBusy === 'add' || !newCus.name.trim()}
-              onClick={() => fillLineFromOrders('add', setNewCus, newCus.name)}
+              onClick={() => fillLineFromOrders('add', setNewCus, newCus.name, newCus.lineUserId)}
               className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
             >
               {suggestBusy === 'add' ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
@@ -280,7 +284,7 @@ export default function MembersScreen({ isAdmin = false }) {
                     <button
                       type="button"
                       disabled={suggestBusy === c.id || !cusEditData.name.trim()}
-                      onClick={() => fillLineFromOrders(c.id, setCusEditData, cusEditData.name)}
+                      onClick={() => fillLineFromOrders(c.id, setCusEditData, cusEditData.name, cusEditData.lineUserId)}
                       className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
                     >
                       {suggestBusy === c.id ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
