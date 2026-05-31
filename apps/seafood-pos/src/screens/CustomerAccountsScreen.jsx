@@ -245,6 +245,8 @@ export default function CustomerAccountsScreen({
   const [openSalesIndex, setOpenSalesIndex] = useState([]);
   const [daySales, setDaySales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [debtLoadError, setDebtLoadError] = useState(false);
+  const [daySalesLoadError, setDaySalesLoadError] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState(null);
@@ -254,8 +256,10 @@ export default function CustomerAccountsScreen({
     try {
       const rows = await fsListCollection('customerDebts', 200);
       setCustomerDebts(rows.filter((d) => (parseFloat(d.totalDebt) || 0) > 0));
+      setDebtLoadError(false);
     } catch (e) {
       console.warn('customerDebts', e);
+      setDebtLoadError(true);
     }
   }, []);
 
@@ -272,8 +276,10 @@ export default function CustomerAccountsScreen({
     if (!background) setLoading(true);
     try {
       setDaySales(await fsQuerySales(viewDate));
+      setDaySalesLoadError(false);
     } catch (e) {
       console.warn('fsQuerySales', e);
+      setDaySalesLoadError(true);
       if (!background) setDaySales((prev) => prev);
     } finally {
       if (!background) setLoading(false);

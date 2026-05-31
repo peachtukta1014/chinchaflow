@@ -119,7 +119,8 @@ export default function LotExpensesPanel({
 }) {
   const todayKey = dateKeyBangkok();
   const lotDays = useMemo(() => groupBatchesByReceiveDay(stockBatches), [stockBatches]);
-  const defaultLotKey = lotDays.length ? lotDays[lotDays.length - 1].dateKey : todayKey;
+  // lotDays is sorted newest→oldest; default to newest lot (ล็อตปัจจุบัน = รับล่าสุด)
+  const defaultLotKey = lotDays.length ? lotDays[0].dateKey : todayKey;
 
   const [internalLotKey, setInternalLotKey] = useState(defaultLotKey);
   const lotDateKey = controlledLotKey ?? internalLotKey;
