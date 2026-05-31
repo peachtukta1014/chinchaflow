@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
-import { formatReceiveDayLabel, groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
+import {
+  formatLotDayOptionLabel,
+  formatReceiveDayLabel,
+  groupBatchesByReceiveDay,
+  newestLotDateKey,
+  pickDefaultLotDateKey,
+} from '../lib/stockBatchUtils';
 import { computeLotReport } from '../lib/lotReport';
 import {
   fsListStockAdjustments,
@@ -11,17 +17,6 @@ import DateNavBar from './DateNavBar';
 import LotExpensesSyncPanel from './LotExpensesSyncPanel';
 import { fetchLotExpenses } from '../services/lotExpenseService';
 import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
-
-/** Returns the dateKey of the oldest lot that is not closed and not excluded. */
-function getOldestActiveLot(lotDays, closedLotKeys, excluding = null) {
-  // lotDays is sorted newest→oldest; iterate from end to get oldest first
-  for (let i = lotDays.length - 1; i >= 0; i--) {
-    const d = lotDays[i];
-    if (d.dateKey === excluding) continue;
-    if (!closedLotKeys.has(d.dateKey)) return d.dateKey;
-  }
-  return null;
-}
 
 function fmtKg(n) {
   return `${(parseFloat(n) || 0).toFixed(2)} กก.`;
@@ -213,9 +208,13 @@ export default function LotReportPanel({
 }) {
   const todayKey = dateKeyBangkok();
   const lotDays = useMemo(() => groupBatchesByReceiveDay(stockBatches), [stockBatches]);
-  const defaultLotKey = lotDays.length ? lotDays[lotDays.length - 1].dateKey : todayKey;
+  const newestKey = useMemo(() => newestLotDateKey(lotDays), [lotDays]);
+  const defaultLotKey = useMemo(
+    () => pickDefaultLotDateKey(lotDays, closedLotKeys),
+    [lotDays, closedLotKeys],
+  );
 
-  const [lotDateKey, setLotDateKey] = useState(defaultLotKey);
+  const [lotDateKey, setLotDateKey] = useState(() => defaultLotKey);
   const [endDateKey, setEndDateKey] = useState(todayKey);
   const [sales, setSales] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
@@ -235,23 +234,22 @@ export default function LotReportPanel({
   });
   const reloadExpensesRef = useRef(null);
 
-  // Fallback: if the current lot disappears from the list entirely
+  const lotBootstrapped = useRef(false);
   useEffect(() => {
-    if (lotDays.some((d) => d.dateKey === lotDateKey)) return;
-    if (defaultLotKey) setLotDateKey(defaultLotKey);
-  }, [lotDays, lotDateKey, defaultLotKey]);
-
-  // On initial closedLotKeys load: if the default selection is already closed,
-  // auto-advance to the oldest active (non-closed) lot.
-  const didInitAutoSelect = useRef(false);
-  useEffect(() => {
-    if (didInitAutoSelect.current) return;
-    if (closedLotKeys.size === 0) return;
-    didInitAutoSelect.current = true;
-    if (!closedLotKeys.has(lotDateKey)) return;
-    const next = getOldestActiveLot(lotDays, closedLotKeys);
-    if (next) setLotDateKey(next);
-  }, [closedLotKeys, lotDateKey, lotDays]);
+    if (!lotDays.length) return;
+    if (!lotBootstrapped.current) {
+      lotBootstrapped.current = true;
+      setLotDateKey(defaultLotKey);
+      return;
+    }
+    if (!lotDays.some((d) => d.dateKey === lotDateKey)) {
+      setLotDateKey(defaultLotKey);
+      return;
+    }
+    if (closedLotKeys.has(lotDateKey)) {
+      setLotDateKey(defaultLotKey);
+    }
+  }, [lotDays, lotDateKey, defaultLotKey, closedLotKeys]);
 
   const loadReportData = useCallback(async () => {
     if (!lotDateKey || lotDateKey > endDateKey) return;
@@ -359,9 +357,9 @@ export default function LotReportPanel({
       onLotClosed?.(lotDateKey);
       await loadReportData();
 
-      // Auto-advance to the next oldest active lot (exclude the one just closed)
-      const next = getOldestActiveLot(lotDays, closedLotKeys, lotDateKey);
-      if (next) setLotDateKey(next);
+      const nextClosed = new Set(closedLotKeys);
+      nextClosed.add(lotDateKey);
+      setLotDateKey(pickDefaultLotDateKey(lotDays, nextClosed));
     } catch (e) {
       console.error(e);
       alert(e?.message || 'ปิดล็อตไม่สำเร็จ');
@@ -391,6 +389,7 @@ export default function LotReportPanel({
         </div>
 
         <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับรถ)</label>
+        <p className="text-[10px] text-slate-400 mb-1">ค่าเริ่มต้น = ล็อตล่าสุด (ตรงแท็บรายจ่าย)</p>
         <select
           value={lotDateKey}
           onChange={(e) => {
@@ -405,7 +404,7 @@ export default function LotReportPanel({
           ) : (
             lotDays.map((d) => (
               <option key={d.dateKey} value={d.dateKey}>
-                {d.label}
+                {formatLotDayOptionLabel(d, { newestKey, closedLotKeys })}
               </option>
             ))
           )}

@@ -45,7 +45,10 @@ function sumAdjustmentsForLot(adjustments = [], batchIds) {
     if (adj.type === 'pond_to_dead') {
       for (const a of allocs) pondToDeadKg += kg(a.deadAdded ?? a.liveTaken);
     } else if (adj.type === 'spoilage_loss') {
-      for (const a of allocs) spoilageLiveKg += kg(a.liveTaken);
+      for (const a of allocs) {
+        spoilageLiveKg += kg(a.liveTaken);
+        spoilageDeadKg += kg(a.deadTaken);
+      }
     } else if (adj.type === 'stock_count') {
       for (const a of allocs) {
         stockCountLiveKg += kg(a.liveTaken);

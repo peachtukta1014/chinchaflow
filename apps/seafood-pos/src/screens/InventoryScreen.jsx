@@ -8,6 +8,7 @@ import {
 } from '../lib/stockBatchUtils';
 import {
   createStockBatchRecord,
+  recordDeadSpoilageLoss,
   recordSpoilageLoss,
   transferPondDeath,
 } from '../services/stockService';
@@ -30,6 +31,7 @@ const LIVE_SUB_TABS = [
 
 const DEAD_SUB_TABS = [
   { id: 'receive', label: 'รับตายตรง', activeClass: 'bg-white text-red-600 shadow-sm' },
+  { id: 'spoilage', label: 'กุ้งตายเสียหาย', activeClass: 'bg-white text-amber-700 shadow-sm' },
   { id: 'history', label: 'ประวัติรับ', activeClass: 'bg-white text-red-600 shadow-sm' },
   { id: 'lots', label: 'ล็อตกุ้ง', activeClass: 'bg-white text-amber-600 shadow-sm' },
 ];
@@ -69,6 +71,8 @@ export default function InventoryScreen({
   const [deadMode, setDeadMode] = useState('pond_to_dead');
   const [deadWeight, setDeadWeight] = useState('');
   const [deadNote, setDeadNote] = useState('');
+  const [deadSpoilWeight, setDeadSpoilWeight] = useState('');
+  const [deadSpoilNote, setDeadSpoilNote] = useState('');
   const [pondHistory, setPondHistory] = useState([]);
   const [deadInboundHistory, setDeadInboundHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -155,13 +159,18 @@ export default function InventoryScreen({
           ),
         ),
       ]);
+      const spoilageDead = adjustRows.filter((r) => {
+        if (r.type !== 'spoilage_loss') return false;
+        return (r.allocations || []).some((a) => (parseFloat(a.deadTaken) || 0) > 0);
+      });
       setDeadInboundHistory({
         fromPond: adjustRows.filter((r) => r.type === 'pond_to_dead'),
+        spoilageDead,
         directReceives: batchesOnDay,
       });
     } catch (e) {
       console.warn('loadDeadInboundHistory', e);
-      setDeadInboundHistory({ fromPond: [], directReceives: [] });
+      setDeadInboundHistory({ fromPond: [], spoilageDead: [], directReceives: [] });
     } finally {
       setHistoryLoading(false);
     }
@@ -174,6 +183,11 @@ export default function InventoryScreen({
 
   useEffect(() => {
     if (stockLine !== 'dead' || tab !== 'history') return;
+    loadDeadInboundHistory();
+  }, [stockLine, tab, historyViewDate, loadDeadInboundHistory]);
+
+  useEffect(() => {
+    if (stockLine !== 'dead' || tab !== 'spoilage') return;
     loadDeadInboundHistory();
   }, [stockLine, tab, historyViewDate, loadDeadInboundHistory]);
 
@@ -259,7 +273,10 @@ export default function InventoryScreen({
         if (a.deadAdded > 0) {
           return `${i + 1}. ล็อตรับ ${day}${note}: ${STOCK_LINE.live.tag} −${a.liveTaken.toFixed(2)} → ${STOCK_LINE.dead.tag} +${a.deadAdded.toFixed(2)} กก.`;
         }
-        return `${i + 1}. ล็อตรับ ${day}${note}: ${SHRIMP_DAMAGE.full} ${a.liveTaken.toFixed(2)} กก.`;
+        if ((a.deadTaken || 0) > 0) {
+          return `${i + 1}. ล็อตรับ ${day}${note}: ${SHRIMP_DAMAGE.full} · ${STOCK_LINE.dead.tag} −${a.deadTaken.toFixed(2)} กก.`;
+        }
+        return `${i + 1}. ล็อตรับ ${day}${note}: ${SHRIMP_DAMAGE.full} · ${STOCK_LINE.live.tag} −${a.liveTaken.toFixed(2)} กก.`;
       })
       .join('\n');
   };
@@ -289,6 +306,36 @@ export default function InventoryScreen({
       setDeadNote('');
       onStockMoved?.();
       await loadPondHistory();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeadSpoilSave = async () => {
+    if (!deadSpoilWeight) return;
+    const w = parseFloat(deadSpoilWeight);
+    if (!Number.isFinite(w) || w <= 0) return alert('ใส่น้ำหนักครับ');
+    if (w > stock.dead) return alert(`ยอดมากกว่า${STOCK_LINE.dead.label}คงเหลือครับ`);
+
+    setSaving(true);
+    try {
+      const allocations = await recordDeadSpoilageLoss(
+        stock,
+        w,
+        updateMainStock,
+        stockBatches,
+        { note: deadSpoilNote, recordedBy: member?.name || '' },
+      );
+      alert(
+        `✅ บันทึก${SHRIMP_DAMAGE.full} · ${STOCK_LINE.dead.tag} ${w} กก.\n\nหักจากล็อต (เก่าก่อน):\n${formatAllocationLines(allocations)}`,
+      );
+      setDeadSpoilWeight('');
+      setDeadSpoilNote('');
+      onStockMoved?.();
+      await loadDeadInboundHistory();
     } catch (e) {
       console.error(e);
       alert(e?.message || 'บันทึกไม่สำเร็จ');
@@ -499,12 +546,14 @@ export default function InventoryScreen({
                 }`}
               >
                 {SHRIMP_DAMAGE.full}
+                {' '}
+                (สายเป็น)
               </button>
             </div>
             <p className="text-[10px] text-slate-400">
               {deadMode === 'pond_to_dead'
                 ? `${STOCK_LINE.live.label} ลด · ${STOCK_LINE.dead.label} เพิ่ม (ขายได้)`
-                : `${STOCK_LINE.live.label} ลดเท่านั้น · ไม่เพิ่ม${STOCK_LINE.dead.label} (${SHRIMP_DAMAGE.label})`}
+                : `${STOCK_LINE.live.label} ลดเท่านั้น · ในบ่อ/สายเป็น — สายตายใช้แท็บ「กุ้งตายเสียหาย」`}
             </p>
             <div className="bg-blue-50 p-4 rounded-2xl">
               <span className="text-sm text-blue-900">
@@ -577,6 +626,75 @@ export default function InventoryScreen({
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stockLine === 'dead' && tab === 'spoilage' && (
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
+          <h2 className="font-black text-amber-800 text-xl">
+            {SHRIMP_DAMAGE.full}
+            {' '}
+            ·
+            {' '}
+            {STOCK_LINE.dead.full}
+          </h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            เน่า/ทิ้งในสายตายโดยตรง — หักเฉพาะ{STOCK_LINE.dead.label} ไม่แตะ{STOCK_LINE.live.label}
+            {' '}
+            (ต่างจากในบ่อที่หักสายเป็น)
+          </p>
+          <div className="bg-red-50 p-3 rounded-xl text-[11px] text-red-800">
+            {STOCK_LINE.dead.label} คงเหลือ:{' '}
+            <strong>{stock.dead.toFixed(1)} กก.</strong>
+          </div>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={deadSpoilWeight}
+            onChange={(e) => setDeadSpoilWeight(e.target.value)}
+            placeholder="0.000"
+            className="w-full p-5 bg-amber-50 border-2 border-amber-200 text-amber-900 font-black text-3xl text-center rounded-2xl outline-none"
+          />
+          <input
+            type="text"
+            value={deadSpoilNote}
+            onChange={(e) => setDeadSpoilNote(e.target.value)}
+            placeholder="หมายเหตุ เช่น เน่าในตลาด"
+            className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleDeadSpoilSave}
+            disabled={saving}
+            className="w-full font-bold py-5 rounded-2xl text-white bg-amber-600 disabled:opacity-60"
+          >
+            {saving ? 'กำลังบันทึก...' : `บันทึก — ${SHRIMP_DAMAGE.full} (${STOCK_LINE.dead.tag})`}
+          </button>
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="font-bold text-slate-800 mb-2 text-sm">ประวัติวันนี้ (สายตาย)</h3>
+            <DateNavBar
+              dateKey={historyViewDate}
+              onDateChange={setHistoryViewDate}
+              subtitle={historyLoading ? 'โหลด...' : ''}
+            />
+            {historyLoading ? (
+              <p className="text-center text-slate-400 py-4 text-sm">กำลังโหลด...</p>
+            ) : (deadInboundHistory.spoilageDead?.length ?? 0) === 0 ? (
+              <p className="text-center text-slate-400 py-4 text-sm">ยังไม่มีรายการ</p>
+            ) : (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {deadInboundHistory.spoilageDead.map((row) => (
+                  <div key={row.id} className="border border-amber-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-amber-800">{SHRIMP_DAMAGE.full}</p>
+                    <p className="font-black text-amber-900 text-lg">
+                      {(parseFloat(row.weightKg) || 0).toFixed(2)} กก.
+                    </p>
+                    {row.note && <p className="text-xs text-slate-500">{row.note}</p>}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -693,6 +811,20 @@ export default function InventoryScreen({
                   ))}
                 </div>
               )}
+              {deadInboundHistory.spoilageDead?.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-2">{SHRIMP_DAMAGE.full}</p>
+                  {deadInboundHistory.spoilageDead.map((row) => (
+                    <div key={row.id} className="border border-amber-100 rounded-xl p-3 mb-2">
+                      <p className="text-[10px] font-bold text-amber-800">⚠️ สายตาย</p>
+                      <p className="font-black text-amber-900 text-lg">
+                        {(parseFloat(row.weightKg) || 0).toFixed(2)} กก.
+                      </p>
+                      {row.note && <p className="text-xs text-slate-500">{row.note}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
               {deadInboundHistory.fromPond?.length > 0 && (
                 <div>
                   <p className="text-xs font-bold text-slate-500 mb-2">ส่งมาจากบ่อ (สายเป็น)</p>
@@ -712,7 +844,9 @@ export default function InventoryScreen({
                   ))}
                 </div>
               )}
-              {!deadInboundHistory.directReceives?.length && !deadInboundHistory.fromPond?.length && (
+              {!deadInboundHistory.directReceives?.length
+                && !deadInboundHistory.fromPond?.length
+                && !deadInboundHistory.spoilageDead?.length && (
                 <p className="text-center text-slate-400 py-6 text-sm">
                   ไม่มีรายการ
                   {' '}

@@ -353,6 +353,44 @@ export async function recordSpoilageLoss(
     note: meta.note,
     recordedBy: meta.recordedBy,
     allocations,
+    extra: { spoilageLine: 'live' },
+  });
+  return allocations;
+}
+
+/** กุ้งตายเสียหาย — หักเฉพาะสายตาย (ไม่แตะกุ้งเป็น) */
+export async function recordDeadSpoilageLoss(
+  stock,
+  lossKg,
+  updateMainStock,
+  batches = [],
+  meta = {},
+) {
+  let allocations = [];
+  if (batches.length > 0) {
+    const result = await deductDeadSpoilageFromBatches(batches, lossKg);
+    allocations = result.allocations;
+    const patchById = Object.fromEntries(result.patches.map((p) => [p.id, p]));
+    const summed = sumStockFromBatches(
+      batches.map((b) => {
+        const p = patchById[b.id];
+        return p ? { ...b, remainingLiveKg: p.remainingLiveKg, remainingDeadKg: p.remainingDeadKg } : b;
+      }),
+    );
+    await updateMainStock(summed.live, summed.dead);
+  } else {
+    await updateMainStock(
+      stock.live,
+      Math.max(0, stock.dead - lossKg),
+    );
+  }
+  await logStockAdjustment({
+    type: 'spoilage_loss',
+    weightKg: lossKg,
+    note: meta.note,
+    recordedBy: meta.recordedBy,
+    allocations,
+    extra: { spoilageLine: 'dead' },
   });
   return allocations;
 }
