@@ -1,20 +1,15 @@
-import { compactNameMatch, exactCustomerNameMatch, uidCustomerNameMatch } from './customerNameMatch.js';
+import { compactNameMatch, uidCustomerNameMatch } from './customerNameMatch.js';
+import { collectCustomerSearchNames, customerMatchesLabel } from './customerAliases.js';
 import { findCustomersInText } from './voiceParse.js';
 
 function compactName(s) {
   return (s || '').replace(/\s+/g, '').toLowerCase();
 }
 
+export { collectCustomerSearchNames };
+
 export function isLineGroupOrder(lineGroupId) {
   return !!String(lineGroupId || '').trim();
-}
-
-export function collectCustomerSearchNames(customer) {
-  const aliases = Array.isArray(customer?.aliases) ? customer.aliases : [];
-  return [customer?.name, customer?.nickname, customer?.shortName, ...aliases]
-    .flatMap((n) => String(n || '').split(/[,，、]/))
-    .map((n) => n.trim())
-    .filter(Boolean);
 }
 
 export function suggestCustomersForLineName(customerName, allCustomers) {
@@ -25,6 +20,10 @@ export function suggestCustomersForLineName(customerName, allCustomers) {
   const hits = new Map();
 
   for (const c of list) {
+    if (customerMatchesLabel(c, want)) {
+      hits.set(c.id, { customer: c, reason: 'ชื่อตรง', score: 3 });
+      continue;
+    }
     for (const label of collectCustomerSearchNames(c)) {
       if (uidCustomerNameMatch(label, want)) {
         hits.set(c.id, { customer: c, reason: 'ชื่อตรง', score: 3 });

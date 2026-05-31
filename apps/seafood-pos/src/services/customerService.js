@@ -1,6 +1,11 @@
 import { CUSTOMERS } from '../constants';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { fsDelete, fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
+import {
+  customerFieldsFromForm,
+  customerMatchesLabel,
+  labelsFromCustomerForm,
+} from '../lib/customerAliases';
 import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
 
 function compactName(s) {
@@ -114,13 +119,17 @@ export function isBuiltinCustomer(c) {
   return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
 }
 
-function customerPayload({ name, zone, phone, notes, lineUserId, hidden }) {
+function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases, aliasesText, defaultRiverSize }) {
+  const parsed = customerFieldsFromForm({ name, aliasesText, aliases });
   const payload = {
-    name: String(name || '').trim(),
+    name: parsed.name,
     zone: String(zone || '').trim(),
     phone: String(phone || '').trim(),
     notes: String(notes || '').trim(),
   };
+  payload.aliases = parsed.aliases;
+  const riverDefault = String(defaultRiverSize || '').trim();
+  if (riverDefault) payload.defaultRiverSize = riverDefault;
   const line = normalizeLineUserId(lineUserId);
   payload.lineUserId = line || '';
   if (hidden === true) payload.hidden = true;
@@ -159,6 +168,9 @@ function mergeCustomerFields(base, data) {
   const pick = (key) => (key in data ? data[key] : base[key]);
   return {
     name: pick('name'),
+    aliases: pick('aliases'),
+    aliasesText: pick('aliasesText'),
+    defaultRiverSize: pick('defaultRiverSize'),
     zone: pick('zone'),
     phone: pick('phone'),
     notes: pick('notes'),
@@ -282,6 +294,7 @@ export async function hideCustomerFromList(id) {
 }
 
 function orderNameMatchesCustomer(orderName, customerName) {
+  if (customerMatchesLabel({ name: customerName }, orderName)) return true;
   if (exactCustomerNameMatch(orderName, customerName)) return true;
   const compact = (s) => String(s || '').replace(/\s+/g, '').toLowerCase();
   const cn = compact(customerName);
@@ -295,11 +308,21 @@ function orderNameMatchesCustomer(orderName, customerName) {
   return false;
 }
 
+function orderMatchesAnyLabel(order, labels) {
+  const names = [
+    order.customerName,
+    ...(order.items || []).map((i) => i.customerName),
+  ].filter(Boolean);
+  return names.some((orderName) => labels.some((label) => orderNameMatchesCustomer(orderName, label)));
+}
+
 /** ดึง LINE UID จากออเดอร์แชทตรง OA (รวมที่ยกเลิกแล้ว — ใช้ตอนกดปุ่มในรายชื่อลูกค้า) */
-export async function suggestLineUserIdFromOrders(customerName) {
+export async function suggestLineUserIdFromOrders(customerNameOrForm) {
   const orders = await fsListCollection('lineOrders', 200);
-  const name = (customerName || '').trim();
-  if (!name) return null;
+  const labels = typeof customerNameOrForm === 'string'
+    ? labelsFromCustomerForm({ name: customerNameOrForm, aliasesText: '' })
+    : labelsFromCustomerForm(customerNameOrForm || {});
+  if (!labels.length) return null;
 
   const sorted = [...orders].sort((a, b) => {
     const ta = a.createdAt || '';
@@ -310,15 +333,10 @@ export async function suggestLineUserIdFromOrders(customerName) {
   for (const o of sorted) {
     if (!o.lineUserId) continue;
     if (o.lineGroupId) continue;
-    if (orderNameMatchesCustomer(o.customerName, name)) {
+    if (orderMatchesAnyLabel(o, labels)) {
       return normalizeLineUserId(o.lineUserId);
     }
-    for (const item of o.items || []) {
-      if (orderNameMatchesCustomer(item.customerName, name)) {
-        return normalizeLineUserId(o.lineUserId);
-      }
-    }
-    if (orderNameMatchesCustomer(o.rawText, name)) {
+    if (labels.some((label) => orderNameMatchesCustomer(o.rawText, label))) {
       return normalizeLineUserId(o.lineUserId);
     }
   }

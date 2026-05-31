@@ -286,6 +286,25 @@ try {
 
   const jaekhiad = resolveLineCustomerByName('จ๊ะเขียด', CUSTOMERS);
   assert(jaekhiad.id === 'c1', 'จ๊ะเขียด (สะกด เขียด) → c1 ไม่ใช่ general');
+
+  const first = resolveLineCustomerByName('Firstseafood', CUSTOMERS);
+  assert(first.id === 'c7', 'Firstseafood → ร้านเฟิร์ส (alias)');
+
+  const patongSmall = CUSTOMERS.filter((c) => c.zone === 'ป่าตอง' && c.defaultRiverSize === 'เล็ก');
+  const patongMedium = CUSTOMERS.filter((c) => c.zone === 'ป่าตอง' && c.defaultRiverSize === 'กลาง');
+  assert(patongSmall.length === 6, 'ป่าตอง 6 ร้านใช้กุ้งแม่น้ำเล็ก');
+  assert(patongMedium.length === 4, 'ป่าตอง 4 ร้านใช้กุ้งแม่น้ำกลาง');
+
+  const kathu = CUSTOMERS.find((c) => c.id === 'c11');
+  assert(kathu?.defaultRiverSize === 'เล็ก', 'น้องเล็กสอง กะทู้ ใช้กุ้งแม่น้ำเล็ก');
+
+  const { customerFieldsFromForm } = await import('../src/lib/customerAliases.js');
+  const parsed = customerFieldsFromForm({
+    name: 'ร้านเฟิร์ส',
+    aliasesText: 'Firstseafood, เฟิร์ส, พี่ต้อม',
+  });
+  assert(parsed.name === 'ร้านเฟิร์ส', 'ชื่อบนบิลไม่ผสม alias');
+  assert(parsed.aliases.includes('Firstseafood'), 'เก็บชื่อเรียกอื่นใน aliases');
 } catch (e) {
   fail('lineCustomerResolve', e);
 }

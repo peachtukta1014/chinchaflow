@@ -12,11 +12,13 @@ const {
 } = require('./parseDeliveryDate');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
 const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
+const { resolveRiverDefaultProduct } = require('./customerRiverDefault');
 const {
   assessLineCustomerProfile,
   parseProfileFields,
   upsertCustomerProfile,
   isProfileComplete,
+  isNewCustomerProfileGateActive,
 } = require('./shrimpLineCustomerProfile');
 const { prepareOrderInput } = require('./prepareOrderInput');
 const {
@@ -90,15 +92,16 @@ function primaryCustomerNameFromItems(items) {
   return null;
 }
 
-function shouldVerifyCustomerProfile(groupId) {
-  return !groupId;
+async function shouldVerifyCustomerProfile(db, groupId) {
+  if (groupId) return false;
+  return isNewCustomerProfileGateActive(db);
 }
 
 async function tryCompleteOrder(db, admin, session, ts, ctx) {
   const { items, text, userId, groupId, deliveryDate, replyLang } = ctx;
   const summary = formatItemsSummary(items, replyLang);
 
-  if (shouldVerifyCustomerProfile(groupId)) {
+  if (await shouldVerifyCustomerProfile(db, groupId)) {
     const customerName = primaryCustomerNameFromItems(items)
       || (await findCustomerNameByLineUserId(db, userId));
     const { customer, missing } = await assessLineCustomerProfile(db, {
@@ -315,25 +318,39 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     const it = simpleToOrderItem(simple);
     if (it) items = [it];
   } else if (riverPending?.kind === 'pending_river' && items.length === 0) {
-    await setLineOrderSession(
-      db,
-      session.id,
-      {
-        deliveryDate,
-        replyLang,
-        pending: {
-          variant: 'river_prawn',
-          customerName: riverPending.customerName,
-          qty: riverPending.qty,
-          unit: riverPending.unit,
+    const linkedName = riverPending.customerName
+      || (!groupId && userId ? await findCustomerNameByLineUserId(db, userId) : null);
+    const autoProduct = await resolveRiverDefaultProduct(db, {
+      lineUserId: userId,
+      customerName: linkedName,
+      groupId,
+    });
+    if (autoProduct) {
+      items = pendingToItems(
+        { ...riverPending, customerName: linkedName },
+        autoProduct,
+      );
+    } else {
+      await setLineOrderSession(
+        db,
+        session.id,
+        {
+          deliveryDate,
+          replyLang,
+          pending: {
+            variant: 'river_prawn',
+            customerName: linkedName || riverPending.customerName,
+            qty: riverPending.qty,
+            unit: riverPending.unit,
+          },
         },
-      },
-      ts,
-    );
-    return {
-      ok: true,
-      reply: replyRiverPrompt(replyLang, riverPending, deliveryDate),
-    };
+        ts,
+      );
+      return {
+        ok: true,
+        reply: replyRiverPrompt(replyLang, { ...riverPending, customerName: linkedName }, deliveryDate),
+      };
+    }
   } else if (simple?.kind === 'pending') {
     await setLineOrderSession(
       db,

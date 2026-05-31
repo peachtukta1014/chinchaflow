@@ -1,4 +1,5 @@
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const { customerMatchesName } = require('./customerNameAliases');
 
 function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
@@ -113,7 +114,7 @@ async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames })
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     const name = data.name || '';
-    const matched = names.some((n) => exactCustomerNameMatch(name, n));
+    const matched = names.some((n) => customerMatchesName({ name, aliases: data.aliases }, n));
     if (!matched) continue;
     if (data.lineUserId === uid) continue;
     batch.set(doc.ref, { lineUserId: uid, lineUserIdLinkedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });

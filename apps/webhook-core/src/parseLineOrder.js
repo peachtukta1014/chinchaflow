@@ -74,6 +74,7 @@ function normalizeUnit(raw) {
 
 function normalizeOrderText(text) {
   let t = normalizeQuantityText(String(text || '').trim());
+  t = t.replace(/^(สั่ง|จอง|order)\s+/i, '');
   t = t.replace(/ครับ|ค่ะ|คะ|นะ|ด้วย|ลงบันทึก|บันทึกให้|บันทึก|ช่วย|หน่อย|please/gi, ' ');
   Object.entries(THAI_NUM).forEach(([word, n]) => {
     t = t.replace(new RegExp(word, 'gi'), String(n));
@@ -81,6 +82,9 @@ function normalizeOrderText(text) {
   t = t.replace(/(\d)\s*โล/g, '$1 โล');
   t = t.replace(/หนึ่ง\s*โล/gi, '1 โล');
   t = t.replace(/([^\s])(กุ้ง)/gi, '$1 $2');
+  if (!/กุ้ง\s*แม่น้ำ|กุ้งแม่น้ำ/i.test(t)) {
+    t = t.replace(/แม่น้ำ/gi, 'กุ้งแม่น้ำ');
+  }
   return t.replace(/\s+/g, ' ').trim();
 }
 
