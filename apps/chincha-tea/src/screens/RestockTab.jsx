@@ -39,7 +39,7 @@ function RestockItemName({ name, lang }) {
   );
 }
 
-export function RestockTab({ member, t, lang = 'th' }) {
+export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [items, setItems] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -64,6 +64,8 @@ export function RestockTab({ member, t, lang = 'th' }) {
     () => groupCatalogByCategory(catalog, t, lang),
     [catalog, t, lang],
   );
+
+  const notifyRestockChange = () => onRestockListChange?.();
 
   const refreshRecent = () => fsQueryRestocks(20).then(setRecentRequests).catch(() => {});
 
@@ -159,6 +161,7 @@ export function RestockTab({ member, t, lang = 'th' }) {
       setItems([]);
       setFlash(t('restockSent'));
       await Promise.all([refreshRecent(), refreshCatalog()]);
+      notifyRestockChange();
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
       console.error(e);
@@ -174,6 +177,7 @@ export function RestockTab({ member, t, lang = 'th' }) {
     try {
       await deleteRestockRequest(req.id);
       setRecentRequests((prev) => prev.filter((r) => r.id !== req.id));
+      notifyRestockChange();
       setFlash(t('restockDeleted'));
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
@@ -194,6 +198,7 @@ export function RestockTab({ member, t, lang = 'th' }) {
       } else {
         setRecentRequests((prev) => prev.filter((r) => r.id !== req.id));
       }
+      notifyRestockChange();
       setFlash(t('restockDeleted'));
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
@@ -216,6 +221,7 @@ export function RestockTab({ member, t, lang = 'th' }) {
         purchasedBy: member?.name || '—',
       });
       setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
+      notifyRestockChange();
       setPurchaseEditId(null);
       setPurchaseAmount('');
       setFlash(t('restockPurchaseSaved'));

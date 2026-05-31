@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DEFAULT_MENU, DEFAULT_TOPPINGS } from './constants';
+import { cachedFetch, invalidateCache } from './fetchCache';
 import { fsQueryProducts, fsQueryToppings } from './firestoreRest';
+
+const CATALOG_CACHE_KEY = 'catalog:products+toppings';
+const CATALOG_TTL_MS = 5 * 60 * 1000;
 
 export function useCatalog(enabled) {
   const [menuItems, setMenuItems] = useState(DEFAULT_MENU);
   const [toppingsList, setToppingsList] = useState(DEFAULT_TOPPINGS);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!enabled) return;
     try {
-      const [products, toppings] = await Promise.all([fsQueryProducts(), fsQueryToppings()]);
+      if (force) invalidateCache(CATALOG_CACHE_KEY);
+      const [products, toppings] = await cachedFetch(
+        CATALOG_CACHE_KEY,
+        () => Promise.all([fsQueryProducts(), fsQueryToppings()]),
+        CATALOG_TTL_MS,
+      );
       if (products.length) setMenuItems(products);
       if (toppings.length) setToppingsList(toppings.filter((t) => t.active !== false));
     } catch (e) {
@@ -19,5 +28,5 @@ export function useCatalog(enabled) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  return { menuItems, toppingsList, refreshCatalog: refresh };
+  return { menuItems, toppingsList, refreshCatalog: () => refresh(true) };
 }
