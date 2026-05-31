@@ -8,10 +8,12 @@ const {
   parseRiverPrawnPendingLine,
 } = require('./parseLineOrder');
 const { parseDeliveryDateFromText } = require('./parseDeliveryDate');
+const { translateOrderTextToThai } = require('./translateOrderText');
+const { hasMyanmarScript } = require('./orderMessageLang');
 const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummary');
 const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
 
-const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order)(\s|$)/i;
+const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order|ပယ်ဖျက်)(\s|$)/i;
 
 const UNIT_RE = /(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)/i;
 const ORDER_VERB_RE = /^(สั่ง|จอง|ใส่|บันทึก|ออเดอร์|order)\b/i;
@@ -44,22 +46,30 @@ function isShrimpOrderCommand(text) {
     return false;
   }
 
-  const { dateKey, textWithoutDate } = parseDeliveryDateFromText(raw);
-  if (dateKey && !hasOrderBody(raw)) return true;
+  const translated = translateOrderTextToThai(raw);
+  const candidates = translated !== raw ? [raw, translated] : [raw];
 
-  const body = (textWithoutDate || raw).trim();
-  const t = normalizeOrderText(body);
+  for (const candidate of candidates) {
+    const { dateKey, textWithoutDate } = parseDeliveryDateFromText(candidate);
+    if (dateKey && !hasOrderBody(candidate)) return true;
 
-  if (parseSimpleOrderLine(body)) return true;
-  if (parseRiverPrawnPendingLine(body)) return true;
+    const body = (textWithoutDate || candidate).trim();
+    const t = normalizeOrderText(body);
 
-  if (!/กุ้ง/.test(t)) return false;
-  if (!UNIT_RE.test(t)) return false;
+    if (parseSimpleOrderLine(body)) return true;
+    if (parseRiverPrawnPendingLine(body)) return true;
 
-  if (ORDER_VERB_RE.test(t)) return true;
+    if (hasMyanmarScript(candidate) && UNIT_RE.test(body)) return true;
 
-  const items = parseOrderItems(raw);
-  return items.length > 0;
+    if (!/กุ้ง/.test(t) && !UNIT_RE.test(body)) continue;
+    if (!/กุ้ง/.test(t) && !UNIT_RE.test(t)) continue;
+
+    if (ORDER_VERB_RE.test(t)) return true;
+
+    const items = parseOrderItems(candidate);
+    if (items.length > 0) return true;
+  }
+  return false;
 }
 
 function isShrimpCancelCommand(text) {

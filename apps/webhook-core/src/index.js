@@ -25,10 +25,9 @@ const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webho
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
-const {
-  buildShrimpSummaryForDate,
-  SHRIMP_HELP_TEXT,
-} = require('./shrimpDailySummary');
+const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
+const { detectMessageLang } = require('./orderMessageLang');
+const { replyHelp, replyCancelFail } = require('./shrimpLineReply');
 const {
   buildShrimpTodayOrdersSummary,
   cancelLatestPendingOrderForUser,
@@ -87,7 +86,7 @@ exports.lineWebhook = functions
         }
 
         if (intent === 'help') {
-          await lineReply(replyToken, SHRIMP_HELP_TEXT, token);
+          await lineReply(replyToken, replyHelp(detectMessageLang(text)), token);
           await completeLineEvent(db(), event);
           continue;
         }
@@ -127,7 +126,7 @@ exports.lineWebhook = functions
             await lineReply(replyToken, message, token);
           } catch (err) {
             console.error('shrimp cancel order', err);
-            await lineReply(replyToken, '⚠️ ยกเลิกออเดอร์ไม่สำเร็จ ลองใหม่หรือแจ้งพนักงานโดยตรงครับ', token);
+            await lineReply(replyToken, replyCancelFail(detectMessageLang(text)), token);
           }
           await completeLineEvent(db(), event);
           continue;

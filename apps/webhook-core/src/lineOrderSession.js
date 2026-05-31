@@ -15,7 +15,14 @@ async function getLineOrderSession(db, groupId, userId) {
   const id = sessionDocId(groupId, userId);
   const snap = await db.collection('lineOrderSessions').doc(id).get();
   if (!snap.exists) {
-    return { id, deliveryDate: null, pending: null, orderDraft: null, profileCollect: null };
+    return {
+      id,
+      deliveryDate: null,
+      pending: null,
+      orderDraft: null,
+      profileCollect: null,
+      replyLang: null,
+    };
   }
   const data = snap.data() || {};
   const updatedAt = data.updatedAt?.toDate?.() || (data.updatedAt ? new Date(data.updatedAt) : null);
@@ -26,6 +33,7 @@ async function getLineOrderSession(db, groupId, userId) {
       pending: null,
       orderDraft: null,
       profileCollect: null,
+      replyLang: null,
       stale: true,
     };
   }
@@ -35,6 +43,7 @@ async function getLineOrderSession(db, groupId, userId) {
     pending: data.pending || null,
     orderDraft: data.orderDraft || null,
     profileCollect: data.profileCollect || null,
+    replyLang: data.replyLang || null,
   };
 }
 
