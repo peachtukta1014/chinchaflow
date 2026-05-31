@@ -27,8 +27,9 @@ import {
   saveTopping,
   updateProductPrice,
 } from '../lib/productService';
+import { FIREBASE_PROJECT_ID } from '../lib/viteEnv.js';
 
-const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
+const PROJECT_ID = FIREBASE_PROJECT_ID;
 const DEFAULT_LINE_CONFIG = {
   webhookFunction: 'lineWebhookTea',
   webhookRegion: 'asia-southeast1',

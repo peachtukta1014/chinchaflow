@@ -12,6 +12,7 @@ import {
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
 import { getAppBuildLabel } from './lib/appBuildInfo';
+import { FIREBASE_PROJECT_ID } from './lib/viteEnv.js';
 import { useIntervalWhen } from './lib/useIntervalWhen';
 import NavButton from './components/NavButton';
 import AppHeaderMenu from './components/AppHeaderMenu';
@@ -107,7 +108,7 @@ export default function App() {
   }, []);
 
   const loadStockFromRest = useCallback(async () => {
-    if (!import.meta.env.VITE_FIREBASE_PROJECT_ID || !member) return;
+    if (!FIREBASE_PROJECT_ID || !member) return;
     try {
       const [cfg, rows] = await Promise.all([
         fsGetDoc('config/stock'),
@@ -148,7 +149,7 @@ export default function App() {
     [stock, stockBatches],
   );
 
-  const canPollOrders = Boolean(member && import.meta.env.VITE_FIREBASE_PROJECT_ID);
+  const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID);
 
   const refreshPendingOrderBadge = useCallback(() => {
     if (!canPollOrders) return;

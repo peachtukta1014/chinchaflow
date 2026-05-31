@@ -1,6 +1,7 @@
 import { auth } from '../firebase';
+import { FIREBASE_PROJECT_ID } from './viteEnv.js';
 
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const projectId = FIREBASE_PROJECT_ID;
 export const FS_BASE = projectId
   ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
   : null;

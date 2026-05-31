@@ -264,6 +264,13 @@ try {
   fail('firestore lineOrders rules', e);
 }
 
+try {
+  const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+  assert(trim('\nchincha-eeed6\n') === 'chincha-eeed6', 'trim project ID กัน Firestore commit 400');
+} catch (e) {
+  fail('viteEnv trim', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

@@ -1,6 +1,8 @@
 import { auth } from '../firebase';
 
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+import { FIREBASE_PROJECT_ID } from './viteEnv.js';
+
+const projectId = FIREBASE_PROJECT_ID;
 const region = import.meta.env.VITE_FUNCTIONS_REGION || 'asia-southeast1';
 
 function blobToBase64(blob) {

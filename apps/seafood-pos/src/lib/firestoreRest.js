@@ -4,8 +4,9 @@
 import { auth } from '../firebase';
 import { dateKeysBetween, saleDateKeyFromBill } from './date.js';
 import { sortSalesFifoAsc } from './saleFifo.js';
+import { FIREBASE_PROJECT_ID } from './viteEnv.js';
 
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const projectId = FIREBASE_PROJECT_ID;
 export const FS_BASE = projectId
   ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
   : null;
@@ -90,6 +91,9 @@ function docFieldsToModel(fields, id) {
 /** ข้อความ error สำหรับผู้ใช้เมื่อบันทึก/ตัดสต๊อกล้ม */
 export function formatFirestoreSaveError(err) {
   const msg = String(err?.message || err || '');
+  if (/Invalid project ID/i.test(msg)) {
+    return 'ตั้งค่า Firebase ผิด (project ID มีช่องว่าง/ขึ้นบรรทัดใหม่) — แจ้งแอดมินให้ deploy ใหม่';
+  }
   if (/fsAtomicStockBatchCommit HTTP 400/i.test(msg)) {
     return 'ตัดสต๊อกไม่สำเร็จ — รีเฟรชหน้าแล้วลองอีกครั้ง (อย่ากดซ้ำถ้าไม่แน่ใจว่าสำเร็จ)';
   }

@@ -1,16 +1,15 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
-
-const env = import.meta.env;
+import { viteEnv } from './lib/viteEnv.js';
 
 export const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: env.VITE_FIREBASE_APP_ID,
+  apiKey: viteEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: viteEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: viteEnv('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: viteEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: viteEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: viteEnv('VITE_FIREBASE_APP_ID'),
 };
 
 const required = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'];
