@@ -55,7 +55,10 @@ export default function POSMobile({
   const currentItemTotal = isDeadShrimp
     ? (parseFloat(customPrice) || 0)
     : (parseFloat(weight) || 0) * (parseFloat(customPrice) || 0);
-  const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+  const cartTotal = cart.reduce((s, i) => s + i.total, 0);
+  const cartHasLive = cart.some((i) => i.type !== 'dead');
+  const cartHasDead = cart.some((i) => i.type === 'dead');
+  const cartIsMixed = cartHasLive && cartHasDead;
 
   const paidAmt = paymentType === 'cash' || paymentType === 'transfer'
     ? cartTotal
@@ -93,12 +96,9 @@ export default function POSMobile({
     else { setCustomPrice(priceOf(productId).toString()); setInputMode('weight'); }
   };
 
+  /** สลับสายเพื่อเลือกสินค้าเพิ่ม — ตะกร้า/บิลลูกค้ารวมเป็น+ตายในบิลเดียวได้ */
   const switchSalesLine = (line) => {
     if (line === salesLine) return;
-    if (cart.length > 0 && cart.some((i) => i.type !== line)) {
-      if (!window.confirm('เปลี่ยนสายขายจะล้างตะกร้า — ต้องการต่อไหมครับ?')) return;
-      setCart([]);
-    }
     setSalesLine(line);
     const first = PRODUCTS.find((p) => p.type === line);
     if (first) {
@@ -126,7 +126,6 @@ export default function POSMobile({
   };
 
   const addToCart = () => {
-    if (activeProduct?.type !== salesLine) return alert('สินค้าไม่ตรงสายขายที่เลือกครับ');
     if (!isDeadShrimp && !weight) return alert('ใส่น้ำหนักก่อนนะครับ');
     if (!customPrice) return alert('ใส่ราคาก่อนครับ');
     setCart([...cart, {
@@ -303,7 +302,15 @@ export default function POSMobile({
         />
       )}
       <div className="bg-white p-4 rounded-b-3xl shadow-sm z-10">
-        <StockLineSwitcher line={salesLine} onChange={switchSalesLine} className="mb-3" />
+        <StockLineSwitcher line={salesLine} onChange={switchSalesLine} className="mb-2" />
+        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed px-0.5">
+          สลับสายเพื่อเลือกสินค้าเพิ่ม · บิลลูกค้า
+          <strong> รวมเป็น+ตายในบิลเดียว</strong>
+          ได้
+          {cartIsMixed && (
+            <span className="ml-1 text-emerald-700 font-bold">· ตะกร้านี้มีทั้งสองสายแล้ว</span>
+          )}
+        </p>
 
         {(onOpenReceiveLive || onOpenReceiveDead) && (
           <div className="flex gap-2 mb-3">
@@ -334,9 +341,21 @@ export default function POSMobile({
         {cart.length > 0 && (
           <div className="max-h-40 overflow-y-auto mb-3 space-y-2 border-t border-slate-100 pt-3">
             {cart.map((item, idx) => (
-              <div key={item.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div
+                key={item.id}
+                className={`flex justify-between items-center p-3 rounded-2xl border-2 ${
+                  item.type === 'dead'
+                    ? 'bg-red-50 border-red-100'
+                    : 'bg-blue-50 border-blue-100'
+                }`}
+              >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800">{idx + 1}. {item.productName}</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {idx + 1}. {item.productName}
+                    <span className={`ml-1.5 text-[10px] font-bold ${item.type === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
+                      ({item.type === 'dead' ? 'ตาย' : 'เป็น'})
+                    </span>
+                  </p>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {item.weight} กก.{item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}
                     {item.note && <span className="text-orange-500 ml-1">*{item.note}</span>}
