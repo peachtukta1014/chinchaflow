@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
-import { ADMIN_EMAIL } from '../constants';
+import { isBootstrapAdminEmail } from '../constants';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
@@ -22,7 +22,7 @@ export default function LoginScreen({ onLogin }) {
       if (mode === 'register') {
         const em = email.trim().toLowerCase();
         const { user } = await createUserWithEmailAndPassword(auth, em, password);
-        const grantAdmin = em === ADMIN_EMAIL.toLowerCase();
+        const grantAdmin = isBootstrapAdminEmail(em);
         await fsSetShrimpUser(user.uid, {
           name: name.trim(),
           email: em,
@@ -45,7 +45,7 @@ export default function LoginScreen({ onLogin }) {
         // Bootstrap elevation applies only on first login (profile not yet approved).
         // Re-elevation after admin-initiated demotion/block is intentionally disabled
         // to prevent the hardcoded email from being a persistent privilege escalation path.
-        const isBootstrap = em === ADMIN_EMAIL.toLowerCase();
+        const isBootstrap = isBootstrapAdminEmail(em);
         if (isBootstrap && !approved) {
           await fsPatch(`shrimp_users/${user.uid}`, { role: 'admin', approved: true });
           onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: 'admin' });

@@ -45,7 +45,10 @@ service cloud.firestore {
     function isChinchaBootstrapAdmin() {
       return signedIn()
         && request.auth.token.email != null
-        && request.auth.token.email == 'gmc-peach@chincha.pos';
+        && (
+          request.auth.token.email == 'gmc-peach@chincha.pos'
+          || request.auth.token.email == 'peachtukta14@gmail.com'
+        );
     }
 
     function isShrimpBootstrapAdmin() {

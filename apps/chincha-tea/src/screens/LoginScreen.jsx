@@ -10,12 +10,8 @@ import {
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
 import { fsGetDoc, fsPatch, fsSetUserProfile } from '../lib/firestoreRest';
-import { BOOTSTRAP_ADMIN_EMAIL } from '../lib/constants';
+import { isBootstrapAdminEmail } from '../lib/constants';
 import { T } from '../lib/i18n';
-
-function isBootstrapAdminEmail(email) {
-  return email.trim().toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
-}
 
 function authErrorKey(code) {
   if (!code) return null;
