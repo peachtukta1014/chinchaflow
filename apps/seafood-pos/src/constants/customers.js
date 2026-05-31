@@ -12,7 +12,12 @@ export const CUSTOMERS = [
   { id: 'c4', name: 'น้องเล็กหนึ่ง', zone: 'ป่าตอง' },
   { id: 'c5', name: 'ปุ้ย', zone: 'ป่าตอง' },
   { id: 'c6', name: 'พี่แหวว,ป้าแหวว', zone: 'ป่าตอง' },
-  { id: 'c7', name: 'ร้านเฟิร์ส', zone: 'ป่าตอง' },
+  {
+    id: 'c7',
+    name: 'ร้านเฟิร์ส',
+    zone: 'ป่าตอง',
+    aliases: ['Firstseafood', 'เฟิร์ส', 'พี่ต้อม', 'First seafood'],
+  },
   { id: 'c8', name: 'ร้านสองพี่น้องหนึ่ง', zone: 'ป่าตอง' },
   { id: 'c9', name: 'ร้านสองพี่น้องสอง', zone: 'ป่าตอง' },
   { id: 'c10', name: 'ร้านแสนสบาย', zone: 'ป่าตอง' },

@@ -1,4 +1,5 @@
 const { normalizeLineUserId } = require('./shrimpLinePush');
+const { customerMatchesName } = require('./customerNameAliases');
 
 /** ร้านหลัก c1–c27 — ต้องผูก LINE ครบก่อนเปิดกฎถามชื่อ/เบอร์ลูกค้าใหม่ */
 const MAIN_CATALOG_SHOP_IDS = new Set(
@@ -68,7 +69,7 @@ async function findCustomerByName(db, customerName) {
   const snap = await db.collection('customers').get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
-    if (exactCustomerNameMatch(data.name, want)) {
+    if (customerMatchesName(data, want)) {
       return { id: doc.id, ...data };
     }
   }

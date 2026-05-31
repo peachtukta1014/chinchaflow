@@ -13,6 +13,7 @@ import {
 } from '../services/customerService';
 import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
+import { collectCustomerSearchNames, formatCustomerNameForEdit } from '../lib/customerAliases';
 
 export default function MembersScreen({ isAdmin = false }) {
   const [subTab, setSubTab] = useState('list');
@@ -175,6 +176,8 @@ export default function MembersScreen({ isAdmin = false }) {
         <p className="text-[10px] text-slate-500 leading-relaxed">
           รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย
           ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」
+          <br />
+          ช่องชื่อ: ชื่อหลัก, ชื่อเรียกอื่น, … (คั่นด้วยจุลภาค) — บอท LINE ใช้จับคู่ออเดอร์
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
@@ -192,10 +195,13 @@ export default function MembersScreen({ isAdmin = false }) {
             <input
               value={newCus.name}
               onChange={(e) => setNewCus((p) => ({ ...p, name: e.target.value }))}
-              placeholder="ชื่อลูกค้า *"
+              placeholder="ชื่อหลัก, ชื่อเรียกอื่น (คั่นด้วย ,)"
               autoFocus
               className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
             />
+            <p className="text-[10px] text-blue-700/80 leading-snug">
+              ตัวอย่าง: ร้านเฟิร์ส, Firstseafood, เฟิร์ส, พี่ต้อม
+            </p>
             <input
               value={newCus.zone}
               onChange={(e) => setNewCus((p) => ({ ...p, zone: e.target.value }))}
@@ -258,10 +264,13 @@ export default function MembersScreen({ isAdmin = false }) {
                     <input
                       value={cusEditData.name}
                       onChange={(e) => setCusEditData((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="ชื่อลูกค้า"
+                      placeholder="ชื่อหลัก, ชื่อเรียกอื่น (คั่นด้วย ,)"
                       autoFocus
                       className="w-full border border-blue-400 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
                     />
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      ชื่อแรก = ชื่อหลักในระบบ · ที่เหลือ = ชื่อที่บอทจับจาก LINE
+                    </p>
                     <input
                       value={cusEditData.zone}
                       onChange={(e) => setCusEditData((p) => ({ ...p, zone: e.target.value }))}
@@ -333,6 +342,11 @@ export default function MembersScreen({ isAdmin = false }) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-slate-800 truncate">{c.name}</p>
+                      {collectCustomerSearchNames(c).length > 1 && (
+                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          เรียก: {collectCustomerSearchNames(c).slice(1).join(' · ')}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {c.duplicate && (
                           <span className="text-[10px] bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">
@@ -367,7 +381,7 @@ export default function MembersScreen({ isAdmin = false }) {
                         onClick={() => {
                           setCusEditId(c.id);
                           setCusEditData({
-                            name: c.name,
+                            name: formatCustomerNameForEdit(c),
                             zone: c.zone || '',
                             phone: c.phone || '',
                             lineUserId: c.lineUserId || '',

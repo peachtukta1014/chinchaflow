@@ -23,13 +23,14 @@ function compact(s) {
   return (s || '').replace(/\s+/g, '').toLowerCase();
 }
 
+import { collectCustomerSearchNames } from './customerAliases.js';
+
 /** จับคู่ชื่อลูกค้าแบบยืดหยุ่น (รองรับ STT ผิดเล็กน้อย) */
 export function findCustomersInText(text, customers) {
   const found = [];
   const tCompact = compact(text);
   for (const c of customers) {
-    const aliases = Array.isArray(c.aliases) ? c.aliases : [];
-    const names = [c.name, c.nickname, c.shortName, ...aliases].filter(Boolean);
+    const names = collectCustomerSearchNames(c);
     for (const rawName of names) {
       const n = normalizeText(rawName);
       const nCompact = compact(n);

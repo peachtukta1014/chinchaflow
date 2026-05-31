@@ -1,7 +1,8 @@
 import { CUSTOMERS } from '../constants/customers.js';
 import { fsListCollection } from '../lib/firestoreRest';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
-import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
+import { customerMatchesLabel } from '../lib/customerAliases';
+import { compactNameMatch } from '../lib/customerNameMatch';
 
 function orderTime(o) {
   return String(o.createdAt || o.deliveryDate || '');
@@ -131,7 +132,7 @@ export function suggestMainCatalogLinks(contact, fsCustomers = {}) {
 
   for (const orderName of names) {
     for (const c of catalog) {
-      if (exactCustomerNameMatch(c.name, orderName)) {
+      if (customerMatchesLabel(c, orderName)) {
         hits.set(c.id, { customer: c, reason: 'ชื่อตรง', score: 3 });
       } else if (compactNameMatch(c.name, orderName)) {
         const prev = hits.get(c.id);
