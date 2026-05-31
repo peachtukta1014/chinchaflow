@@ -41,22 +41,50 @@ export function fsObj(o) {
 /** ฟิลด์น้ำหนักกก. ใน stockBatches — ใช้ doubleValue เสมอ (หลีกเลี่ยง commit 400 จาก integer/double mismatch) */
 const STOCK_KG_FIELD_NAMES = ['liveKg', 'deadKg', 'remainingLiveKg', 'remainingDeadKg'];
 
-export function fsStockKgVal(kg) {
+/** @param {'integer'|'double'} kind — ต้องตรงกับที่เก็บใน Firestore (ล็อตเก่ามักเป็น integer) */
+export function fsStockKgVal(kg, kind = 'double') {
   const n = parseFloat(Number(kg).toFixed(3));
   if (!Number.isFinite(n)) {
     throw new Error(`ค่าน้ำหนักไม่ถูกต้อง: ${kg}`);
   }
+  if (kind === 'integer') {
+    return { integerValue: String(Math.round(n)) };
+  }
   return { doubleValue: n };
+}
+
+export function fsKgTypesFromFields(fields) {
+  const types = {};
+  for (const key of STOCK_KG_FIELD_NAMES) {
+    const raw = fields?.[key];
+    if (!raw) continue;
+    if ('integerValue' in raw) types[key] = 'integer';
+    else if ('doubleValue' in raw) types[key] = 'double';
+  }
+  return types;
+}
+
+export function stockKgFirestoreValue(kg, fieldKey, kgTypes = {}) {
+  return fsStockKgVal(kg, kgTypes[fieldKey] || 'double');
 }
 
 export function fsObjStockFields(data) {
   const fields = fsObj(data);
+  const kgTypes = data._fsKgTypes || data._kgTypes || {};
   for (const key of STOCK_KG_FIELD_NAMES) {
     if (data[key] !== undefined && data[key] !== null) {
-      fields[key] = fsStockKgVal(data[key]);
+      fields[key] = stockKgFirestoreValue(data[key], key, kgTypes);
     }
   }
   return fields;
+}
+
+function docFieldsToModel(fields, id) {
+  return {
+    id,
+    ...fromFsFields(fields),
+    _fsKgTypes: fsKgTypesFromFields(fields),
+  };
 }
 
 /** ข้อความ error สำหรับผู้ใช้เมื่อบันทึก/ตัดสต๊อกล้ม */
@@ -93,12 +121,7 @@ export function fromFsVal(v) {
 
 function docFromRow(row) {
   const parts = row.document.name.split('/');
-  return {
-    id: parts[parts.length - 1],
-    ...Object.fromEntries(
-      Object.entries(row.document.fields || {}).map(([k, v]) => [k, fromFsVal(v)]),
-    ),
-  };
+  return docFieldsToModel(row.document.fields || {}, parts[parts.length - 1]);
 }
 
 export function fromFsFields(fields) {
@@ -111,7 +134,7 @@ export async function fsGetDoc(path) {
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  return { id: parts[parts.length - 1], ...fromFsFields(json.fields) };
+  return docFieldsToModel(json.fields || {}, parts[parts.length - 1]);
 }
 
 export async function fsPost(col, data) {
@@ -313,16 +336,17 @@ export async function fsQueryStockAdjustments(dateKey, limit = 80) {
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
-export async function fsQueryStockBatches(limit = 30) {
+/** โหลดล็อตรับเข้าทั้งหมด (ต้องครบเพื่อ FIFO — ห้ามตัดเหลือแค่ล็อตใหม่สุด) */
+export async function fsQueryStockBatches() {
+  const all = await fsListCollection('stockBatches', 200);
+  if (all.length > 0) return sortStockBatchesDesc(all);
+
   const rows = await fsRunQuery({
     from: [{ collectionId: 'stockBatches' }],
     orderBy: [{ field: { fieldPath: 'purchaseDate' }, direction: 'DESCENDING' }],
-    limit,
+    limit: 500,
   });
-  if (rows.length > 0) return sortStockBatchesDesc(rows).slice(0, limit);
-
-  const all = await fsListCollection('stockBatches', 200);
-  return sortStockBatchesDesc(all).slice(0, limit);
+  return sortStockBatchesDesc(rows);
 }
 
 export async function fsListCollection(col, pageSize = 200) {
@@ -339,7 +363,7 @@ export async function fsListCollection(col, pageSize = 200) {
     const json = await r.json();
     const docs = (json.documents || []).map((doc) => {
       const parts = doc.name.split('/');
-      return { id: parts[parts.length - 1], ...fromFsFields(doc.fields || {}) };
+      return docFieldsToModel(doc.fields || {}, parts[parts.length - 1]);
     });
     allDocs.push(...docs);
     pageToken = json.nextPageToken || null;
@@ -530,8 +554,16 @@ export async function fsAtomicStockBatchCommit(patches) {
     update: {
       name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
       fields: {
-        remainingLiveKg: fsStockKgVal(p.remainingLiveKg),
-        remainingDeadKg: fsStockKgVal(p.remainingDeadKg),
+        remainingLiveKg: stockKgFirestoreValue(
+          p.remainingLiveKg,
+          'remainingLiveKg',
+          p._kgTypes || p._fsKgTypes,
+        ),
+        remainingDeadKg: stockKgFirestoreValue(
+          p.remainingDeadKg,
+          'remainingDeadKg',
+          p._kgTypes || p._fsKgTypes,
+        ),
       },
     },
     updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
