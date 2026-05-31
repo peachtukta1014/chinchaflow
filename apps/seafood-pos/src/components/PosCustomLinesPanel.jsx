@@ -4,11 +4,11 @@ import {
   customRowsToCartItems,
   emptyCustomLineRow,
   MAX_CUSTOM_LINES,
+  previewCustomLineTotal,
 } from '../lib/customCartItem';
 
-/** รายการอื่นในบิล (ไม่ใช่กุ้งแม่น้ำ) — สูงสุด 3 แถว */
+/** รายการอื่นในบิล — ใต้ปุ่มกุ้งแม่น้ำ · น้ำหนัก + โลละ เหมือนกุ้งเป็น */
 export default function PosCustomLinesPanel({ onAddItems }) {
-  const [open, setOpen] = useState(false);
   const [rows, setRows] = useState(
     () => Array.from({ length: MAX_CUSTOM_LINES }, emptyCustomLineRow),
   );
@@ -20,58 +20,73 @@ export default function PosCustomLinesPanel({ onAddItems }) {
   const handleAdd = () => {
     const items = customRowsToCartItems(rows);
     if (items.length === 0) {
-      alert('กรอกชื่อรายการและราคา (฿) อย่างน้อย 1 แถวครับ');
+      alert('กรอกชื่อรายการ + น้ำหนัก (กก.) + ราคา/กก. อย่างน้อย 1 แถวครับ');
       return;
     }
     onAddItems(items);
     setRows(Array.from({ length: MAX_CUSTOM_LINES }, emptyCustomLineRow));
-    setOpen(false);
   };
 
   return (
-    <div className="px-3 pb-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-slate-600 text-xs font-bold bg-white"
-      >
-        {open ? '▲ ซ่อนรายการอื่น' : '▼ รายการอื่น (ไม่ใช่กุ้งแม่น้ำ) — สูงสุด 3 รายการ'}
-      </button>
-      {open && (
-        <div className="mt-2 bg-white border border-slate-200 rounded-2xl p-3 space-y-3 shadow-sm">
-          <p className="text-[10px] text-slate-500 leading-relaxed">
-            กรอกชื่อสิ่งที่ส่ง + ราคา (฿) · รวมในยอดบิลลูกค้าปกติ · ไม่ตัดสต๊อกกุ้งแม่น้ำ
-          </p>
-          {rows.map((row, idx) => (
-            <div key={idx} className="space-y-1.5">
+    <div className="px-3 py-2 border-t border-slate-200 bg-slate-50/80">
+      <p className="text-[11px] font-bold text-slate-600 mb-1">รายการอื่น (ไม่ใช่กุ้งแม่น้ำ)</p>
+      <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+        อยู่ใต้รายการกุ้ง · กรอกเหมือนกุ้งเป็น (กก. × โลละ) · รวมบิล · ไม่ตัดสต๊อก
+      </p>
+      <div className="space-y-2.5">
+        {rows.map((row, idx) => {
+          const lineTotal = previewCustomLineTotal(row);
+          return (
+            <div key={idx} className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
               <p className="text-[10px] font-bold text-slate-400">รายการ {idx + 1}</p>
               <input
                 type="text"
                 value={row.label}
                 onChange={(e) => updateRow(idx, 'label', e.target.value)}
-                placeholder="เช่น ปลาหมึก / ค่าขนส่งพิเศษ"
-                className="w-full p-2.5 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                placeholder="เช่น แอนตี้โฟม / ปลาหมึก"
+                className="w-full p-2 bg-slate-50 rounded-lg text-sm font-bold outline-none"
               />
-              <input
-                type="number"
-                inputMode="decimal"
-                value={row.price}
-                onChange={(e) => updateRow(idx, 'price', e.target.value)}
-                placeholder="ราคา (฿)"
-                className="w-full p-2.5 bg-slate-50 rounded-xl text-sm font-black text-emerald-700 outline-none"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">น้ำหนัก (กก.)</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={row.weight}
+                    onChange={(e) => updateRow(idx, 'weight', e.target.value)}
+                    placeholder="0.000"
+                    className="w-full p-2 bg-slate-50 rounded-lg text-sm font-bold text-center outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">โลละ (฿/กก.)</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={row.pricePerKg}
+                    onChange={(e) => updateRow(idx, 'pricePerKg', e.target.value)}
+                    placeholder="0"
+                    className="w-full p-2 bg-slate-50 rounded-lg text-sm font-bold text-center outline-none"
+                  />
+                </div>
+              </div>
+              {lineTotal > 0 && (
+                <p className="text-[10px] text-right font-bold text-emerald-700">
+                  = ฿{lineTotal.toLocaleString()}
+                </p>
+              )}
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={handleAdd}
-            className="w-full py-3 rounded-xl bg-slate-800 text-white font-bold text-sm flex items-center justify-center gap-2"
-          >
-            <PlusCircle size={18} />
-            เพิ่มลงตะกร้า
-          </button>
-        </div>
-      )}
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={handleAdd}
+        className="w-full mt-2 py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2"
+      >
+        <PlusCircle size={16} />
+        เพิ่มรายการที่กรอกแล้ว
+      </button>
     </div>
   );
 }

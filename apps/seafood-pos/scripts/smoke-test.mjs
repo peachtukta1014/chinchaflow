@@ -83,10 +83,11 @@ try {
   assert(STOCK_LINE.live.full === 'กุ้งแม่น้ำเป็น (Live)', 'STOCK_LINE.live.full');
   assert(STOCK_LINE.dead.full === 'กุ้งแม่น้ำตาย (Dead)', 'STOCK_LINE.dead.full');
   const custom = customRowsToCartItems([
-    { label: 'ปลาหมึก', price: '500' },
-    { label: '', price: '' },
+    { label: 'แอนตี้โฟม', weight: '2', pricePerKg: '240' },
+    { label: '', weight: '', pricePerKg: '' },
   ]);
   assert(custom.length === 1 && custom[0].type === 'other', 'customRowsToCartItems');
+  assert(custom[0].weight === 2 && custom[0].pricePerKg === 240 && custom[0].total === 480, 'custom kg × ppk');
   const kg = sumCartStockKg([
     { type: 'live', weight: 2 },
     { type: 'dead', weight: 1 },
@@ -97,10 +98,19 @@ try {
     billNo: 'C001',
     customerName: 'ทดสอบ',
     dateKey: '2026-05-26',
-    items: [{ productId: 'custom', productName: 'ค่าขนส่ง', type: 'other', lineTotal: 300 }],
-    total: 300,
+    items: [{
+      productId: 'custom',
+      productName: 'แอนตี้โฟม',
+      type: 'other',
+      weight: 2,
+      pricePerKg: 240,
+      lineTotal: 480,
+    }],
+    total: 480,
   });
-  assert(billCustom.extraLines?.[0]?.name === 'ค่าขนส่ง', 'custom → extraLines on bill');
+  assert(billCustom.extraLines?.[0]?.name === 'แอนตี้โฟม', 'custom → extraLines on bill');
+  assert(billCustom.extraLines?.[0]?.quantity === '2', 'custom qty on bill');
+  assert(billCustom.extraLines?.[0]?.pricePerUnit === 240, 'custom ppk on bill');
 } catch (e) {
   fail('stockLines/customCart', e);
 }
