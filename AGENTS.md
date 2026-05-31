@@ -1,5 +1,12 @@
 # Agent instructions
 
+## Cursor Cloud Agent (Slack / cursor.com/agents)
+
+- **Setup checklist (ไทย):** `docs/CURSOR_AGENT_SETUP_TH.md` — ขั้น 1 Dashboard, 2 `@cursor settings`, 3 `.cursor/environment.json`, 4 ทดสอบ
+- **กุ้ง:** `apps/seafood-pos` · **ชา:** `apps/chincha-tea` · **LINE functions:** `apps/webhook-core`
+- Slack default model: **Claude 4.6 Sonnet** (Dashboard → Cloud Agents → My Settings). Composer in Slack: `@cursor with composer, …`
+- Dependencies on boot: `npm install` (see `.cursor/environment.json`)
+
 ## Cursor Cloud specific instructions
 
 ### Product overview
