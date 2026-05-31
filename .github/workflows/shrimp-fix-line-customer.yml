@@ -1,0 +1,54 @@
+name: Shrimp Fix LINE Customer Link
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run only (no writes)'
+        type: boolean
+        default: true
+      target_id:
+        description: 'Customer doc id (default c1 = จ๊ะขียด)'
+        type: string
+        default: 'c1'
+      bill_no:
+        description: 'Optional: delete sale by billNo (e.g. LINE-16060567)'
+        type: string
+        default: ''
+      delete_sale_date:
+        description: 'Optional: delete sales on dateKey YYYY-MM-DD'
+        type: string
+        default: ''
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin
+
+      - name: Link LINE UID to customer
+        env:
+          FIREBASE_PROJECT_ID: chincha-eeed6
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          ARGS="--target-id ${{ inputs.target_id }}"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="--dry-run $ARGS"
+          else
+            ARGS="--confirm $ARGS"
+          fi
+          if [ -n "${{ inputs.bill_no }}" ]; then
+            ARGS="$ARGS --bill-no ${{ inputs.bill_no }}"
+          fi
+          if [ -n "${{ inputs.delete_sale_date }}" ]; then
+            ARGS="$ARGS --delete-sale-date ${{ inputs.delete_sale_date }}"
+          fi
+          node scripts/shrimp-fix-customer-line.mjs $ARGS

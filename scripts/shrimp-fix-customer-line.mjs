@@ -96,6 +96,32 @@ async function loadCustomers() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+function nameMatchesJaekhiad(name) {
+  const n = compact(name);
+  if (!n) return false;
+  return n.includes('ขียด') || n.includes('เขียน') || (n.includes('จ๊ะ') && n.includes('ข'));
+}
+
+/** หา LINE UID จากออเดอร์แชทตรง OA (ไม่ใช่กลุ่ม) */
+async function discoverLineUserIdFromOrders() {
+  const snap = await db.collection('lineOrders').orderBy('createdAt', 'desc').limit(300).get();
+  for (const d of snap.docs) {
+    const o = d.data();
+    if (o.lineGroupId) continue;
+    const uid = normalizeLineUserId(o.lineUserId);
+    if (!uid) continue;
+    const names = new Set();
+    if (o.customerName) names.add(String(o.customerName).trim());
+    for (const it of o.items || []) {
+      if (it.customerName) names.add(String(it.customerName).trim());
+    }
+    for (const n of names) {
+      if (nameMatchesJaekhiad(n)) return { uid, fromOrder: d.id, orderName: n };
+    }
+  }
+  return null;
+}
+
 async function adjustDebt(key, meta, delta) {
   if (!key || !delta) return;
   const ref = db.collection('customerDebts').doc(key);
@@ -185,8 +211,28 @@ async function main() {
     process.exit(1);
   }
 
-  const targetUid = normalizeLineUserId(target.lineUserId);
-  const uidOwners = customers.filter((c) => normalizeLineUserId(c.lineUserId) === targetUid && targetUid);
+  let targetUid = normalizeLineUserId(target.lineUserId);
+
+  if (!targetUid) {
+    const fromCx = customers.find((c) => c.id !== targetId && normalizeLineUserId(c.lineUserId) && nameMatchesJaekhiad(c.name));
+    if (fromCx) {
+      targetUid = normalizeLineUserId(fromCx.lineUserId);
+      console.log(`\nพบ UID จากลูกค้าซ้ำ ${fromCx.id} (${fromCx.name})`);
+    }
+  }
+  if (!targetUid) {
+    const discovered = await discoverLineUserIdFromOrders();
+    if (discovered) {
+      targetUid = discovered.uid;
+      console.log(`\nพบ UID จาก lineOrders/${discovered.fromOrder} (ชื่อ "${discovered.orderName}")`);
+    }
+  }
+  if (!targetUid) {
+    console.error('\nไม่พบ LINE UID — ใส่ใน customers/c1 ก่อน หรือมีออเดอร์แชทตรง LINE OA');
+    process.exit(1);
+  }
+
+  const uidOwners = customers.filter((c) => normalizeLineUserId(c.lineUserId) === targetUid);
   const duplicates = customers.filter((c) => {
     if (c.id === targetId) return false;
     const uid = normalizeLineUserId(c.lineUserId);
@@ -226,12 +272,21 @@ async function main() {
     }
   }
 
-  if (targetUid && !dryRun && confirm) {
-    await db.collection('customers').doc(targetId).set({
-      lineUserId: targetUid,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    console.log(`\n✓ ยืนยัน UID ที่ customers/${targetId}`);
+  if (targetUid && confirm) {
+    if (dryRun) {
+      console.log(`\n[dry-run] จะผูก ${targetUid} → customers/${targetId} (${target.name})`);
+    } else {
+      await db.collection('customers').doc(targetId).set({
+        lineUserId: targetUid,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      const check = await db.collection('customers').doc(targetId).get();
+      const saved = normalizeLineUserId(check.data()?.lineUserId);
+      if (saved !== targetUid) {
+        throw new Error('บันทึก lineUserId ไม่สำเร็จ');
+      }
+      console.log(`\n✓ ผูก LINE UID กับ customers/${targetId} (${target.name}) แล้ว`);
+    }
   }
 
   const relatedIds = new Set([targetId, ...duplicates.map((c) => c.id)]);
