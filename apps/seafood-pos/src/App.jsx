@@ -111,7 +111,7 @@ export default function App() {
     try {
       const [cfg, rows] = await Promise.all([
         fsGetDoc('config/stock'),
-        fsQueryStockBatches(80),
+        fsQueryStockBatches(),
       ]);
       if (cfg) {
         setStock(normalizeStockValues(cfg.live, cfg.dead));

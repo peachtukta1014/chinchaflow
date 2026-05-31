@@ -40,6 +40,7 @@ export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
         id: b.id,
         remainingLiveKg: normalizeStockValues(newLive, 0).live,
         remainingDeadKg: normalizeStockValues(0, newDead).dead,
+        _kgTypes: b._fsKgTypes || {},
       });
     }
   }
@@ -71,7 +72,7 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
       remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
       remainingDeadKg: normalizeStockValues(0, remDead + take).dead,
     };
-    patches.push({ id: b.id, ...next });
+    patches.push({ id: b.id, ...next, _kgTypes: b._fsKgTypes || {} });
     allocations.push({
       batchId: b.id,
       receiveDateKey: receiveDateKeyOf(b),
@@ -106,6 +107,7 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
       id: b.id,
       remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
       remainingDeadKg: remDead,
+      _kgTypes: b._fsKgTypes || {},
     });
     allocations.push({
       batchId: b.id,
@@ -157,6 +159,7 @@ async function deductDeadSpoilageFromBatches(batches, lossKg) {
       id: b.id,
       remainingLiveKg: remLive,
       remainingDeadKg: normalizeStockValues(0, remDead - take).dead,
+      _kgTypes: b._fsKgTypes || {},
     });
     allocations.push({
       batchId: b.id,
@@ -388,6 +391,7 @@ export async function restoreStockForSale(stock, liveKg, deadKg, updateMainStock
       await fsPatch(`stockBatches/${newest.id}`, {
         remainingLiveKg: patched.live,
         remainingDeadKg: patched.dead,
+        _fsKgTypes: newest._fsKgTypes || {},
       });
       const summed = sumStockFromBatches(
         batches.map((b) => (b.id === newest.id
@@ -482,10 +486,11 @@ export async function persistStock(val) {
 /**
  * รับกุ้งเข้า — บันทึกล็อต FIFO (เรียกหลังอัปเดตสต๊อกแล้ว)
  *
- * sizeBreakdown ตัวเลือก (ข้อมูลอ้างอิง ไม่กระทบ FIFO):
+ * sizeBreakdown ตัวเลือก (บันทึกแยก A/B/C หรือรวมไซซ์ — ใช้ดูประวัติเท่านั้น ไม่กระทบการตัด FIFO):
  *   { mode: 'mixed'|'by_size', A: kg, B: kg, C: kg }
  *   - mode='mixed'  → รวมไซต์ (ไม่ระบุขนาดย่อย)
  *   - mode='by_size' → แยก A/B/C โดยรวม A+B+C ต้องเท่ากับ liveKg
+ *   ตัดสต๊อกตอนขาย/LINE ใช้เฉพาะ remainingLiveKg / remainingDeadKg รวมทั้งล็อต
  */
 export async function createStockBatchRecord({
   liveKg,

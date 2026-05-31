@@ -234,11 +234,21 @@ try {
 }
 
 try {
-  // mirror firestoreRest.fsStockKgVal (ไม่ import — firestoreRest ผูก firebase)
-  const fsStockKgVal = (kg) => ({ doubleValue: parseFloat(Number(kg).toFixed(3)) });
-  const whole = fsStockKgVal(141);
-  assert('doubleValue' in whole && !('integerValue' in whole), 'fsStockKgVal ใช้ doubleValue เสมอ (กัน commit 400)');
-  assert(fsStockKgVal(5.8).doubleValue === 5.8, 'fsStockKgVal รองรับทศนิยม');
+  const fsStockKgVal = (kg, kind = 'double') => {
+    const n = parseFloat(Number(kg).toFixed(3));
+    if (kind === 'integer') return { integerValue: String(Math.round(n)) };
+    return { doubleValue: n };
+  };
+  assert('integerValue' in fsStockKgVal(141, 'integer'), 'ล็อตเก่า (integer) ส่ง integerValue');
+  assert('doubleValue' in fsStockKgVal(5.8, 'double'), 'ล็อตใหม่ (double) ส่ง doubleValue');
+  const fields = { remainingLiveKg: { integerValue: '100' } };
+  const types = {};
+  for (const k of ['remainingLiveKg', 'remainingDeadKg', 'liveKg', 'deadKg']) {
+    const raw = fields[k];
+    if (raw && 'integerValue' in raw) types[k] = 'integer';
+    else if (raw && 'doubleValue' in raw) types[k] = 'double';
+  }
+  assert(types.remainingLiveKg === 'integer', 'จำชนิดฟิลด์จาก Firestore ได้');
 } catch (e) {
   fail('fsStockKgVal', e);
 }
