@@ -283,8 +283,34 @@ try {
   ));
   const byAlias = resolveLineCustomerByName('ร้านปุ้ย', aliasList);
   assert(byAlias.id === 'c5', 'จับคู่ชื่อ alias กับร้านปุ้ย');
+
+  const jaekhiad = resolveLineCustomerByName('จ๊ะเขียด', CUSTOMERS);
+  assert(jaekhiad.id === 'c1', 'จ๊ะเขียด (สะกด เขียด) → c1 ไม่ใช่ general');
 } catch (e) {
   fail('lineCustomerResolve', e);
+}
+
+try {
+  const { suggestCustomersForLineName } = await import('../src/lib/lineCustomerResolve.js');
+  const { CUSTOMERS } = await import('../src/constants/customers.js');
+  const { pickLineUidForBillPush } = await import('../src/lib/resolveLineUserIdPick.js');
+  const generalUid = 'U6db855aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const shopUid = 'Uf4e57ad17d3cc89de38609a1994bf4f9';
+  const all = CUSTOMERS.map((c) => {
+    if (c.id === 'general') return { ...c, lineUserId: generalUid };
+    if (c.id === 'c1') return { ...c, lineUserId: shopUid };
+    return c;
+  });
+  const sug = suggestCustomersForLineName('จ๊ะเขียด', all);
+  assert(sug[0]?.customer?.id === 'c1', 'constants: จ๊ะเขียด → c1');
+  const pickedJaek = pickLineUidForBillPush({
+    profileUid: '',
+    nameMatchUid: shopUid,
+    billUid: generalUid,
+  });
+  assert(pickedJaek.uid === shopUid, 'ไม่ใช้ UID ลูกค้าทั่วไปเมื่อจับ c1 ได้');
+} catch (e) {
+  fail('jaekhiad uid pick', e);
 }
 
 try {

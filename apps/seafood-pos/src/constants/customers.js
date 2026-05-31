@@ -1,7 +1,12 @@
 /** ลูกค้าเริ่มต้น — merge กับ Firestore collection `customers` ใน runtime */
 export const CUSTOMERS = [
   { id: 'general', name: 'ลูกค้าทั่วไปและตลาดนัด', zone: 'ทั่วไป' },
-  { id: 'c1', name: 'จ๊ะขียด', zone: 'ป่าตอง' },
+  {
+    id: 'c1',
+    name: 'จ๊ะขียด',
+    zone: 'ป่าตอง',
+    aliases: ['จ๊ะเขียด', 'จะเขียด', 'เจ๊เขียด', 'เจ๊ขียด'],
+  },
   { id: 'c2', name: 'ตาจุ้ยหนึ่ง', zone: 'ป่าตอง' },
   { id: 'c3', name: 'ตาจุ้ยสอง', zone: 'ป่าตอง' },
   { id: 'c4', name: 'น้องเล็กหนึ่ง', zone: 'ป่าตอง' },

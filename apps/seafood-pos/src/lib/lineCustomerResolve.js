@@ -1,4 +1,4 @@
-import { compactNameMatch, exactCustomerNameMatch } from './customerNameMatch.js';
+import { compactNameMatch, exactCustomerNameMatch, uidCustomerNameMatch } from './customerNameMatch.js';
 import { findCustomersInText } from './voiceParse.js';
 
 function compactName(s) {
@@ -12,7 +12,8 @@ export function isLineGroupOrder(lineGroupId) {
 export function collectCustomerSearchNames(customer) {
   const aliases = Array.isArray(customer?.aliases) ? customer.aliases : [];
   return [customer?.name, customer?.nickname, customer?.shortName, ...aliases]
-    .map((n) => String(n || '').trim())
+    .flatMap((n) => String(n || '').split(/[,，、]/))
+    .map((n) => n.trim())
     .filter(Boolean);
 }
 
@@ -25,7 +26,7 @@ export function suggestCustomersForLineName(customerName, allCustomers) {
 
   for (const c of list) {
     for (const label of collectCustomerSearchNames(c)) {
-      if (exactCustomerNameMatch(label, want)) {
+      if (uidCustomerNameMatch(label, want)) {
         hits.set(c.id, { customer: c, reason: 'ชื่อตรง', score: 3 });
         break;
       }

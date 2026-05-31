@@ -1,5 +1,5 @@
 import { CUSTOMERS } from '../constants/customers.js';
-import { compactNameMatch, exactCustomerNameMatch } from './customerNameMatch';
+import { uidCustomerNameMatch } from './customerNameMatch';
 import { fsGetDoc, fsListCollection } from './firestoreRest';
 import { mergeCustomerLists } from '../services/customerService';
 import { findLineUserIdForCustomerName } from '../services/lineOaCustomerService';
@@ -10,6 +10,12 @@ import {
 } from './lineCustomerResolve';
 import { normalizeLineUserId, isValidLineUserId } from './lineUserId';
 import { pickLineUidForBillPush } from './resolveLineUserIdPick';
+
+function isMarketGeneralDisplayName(name) {
+  const n = String(name || '').trim();
+  if (!n) return true;
+  return /ลูกค้าทั่วไป|ตลาดนัด|^ทั่วไป$/i.test(n);
+}
 
 /** UID ที่ฝังในบิล/พร็อพที่ส่งเข้ามา (อาจเก่ากว่ารายชื่อลูกค้า) */
 export function lineUidFromBillProps(customer, bill) {
@@ -54,7 +60,7 @@ function findUidInCustomerList(allCustomers, name) {
   for (const c of allCustomers) {
     if (!c?.id || c.id === 'general' || !isValidLineUserId(c.lineUserId)) continue;
     for (const label of collectCustomerSearchNames(c)) {
-      if (exactCustomerNameMatch(label, n) || compactNameMatch(label, n)) {
+      if (uidCustomerNameMatch(label, n)) {
         hits.push(c);
         break;
       }
@@ -88,7 +94,7 @@ export function resolveCustomerProfileForBill(customer, bill, allCustomers) {
       const row = findProfileById(allCustomers, suggestions[0].customer.id);
       if (row?.id && row.id !== 'general') return row;
     }
-    if (suggestions.length > 0 && suggestions[0].score >= 3) {
+    if (suggestions.length > 0 && suggestions[0].score >= 2) {
       const row = findProfileById(allCustomers, suggestions[0].customer.id);
       if (row?.id && row.id !== 'general') return row;
     }
@@ -97,6 +103,10 @@ export function resolveCustomerProfileForBill(customer, bill, allCustomers) {
     if (resolved?.id && resolved.id !== 'general') {
       return findProfileById(allCustomers, resolved.id) || resolved;
     }
+  }
+
+  if (billCustomerId === 'general' && name && !isMarketGeneralDisplayName(name)) {
+    return { id: 'general', name, zone: 'ทั่วไป', lineUserId: '' };
   }
 
   if (billCustomerId) {
@@ -123,15 +133,34 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
   }
 
   const profileRow = resolveCustomerProfileForBill(customer, bill, allCustomers);
-  const profileUid = normalizeLineUserId(profileRow?.lineUserId);
-  const profileResolvedShop = Boolean(profileRow?.id && profileRow.id !== 'general');
+  const generalRow = allCustomers.find((c) => c.id === 'general');
+  const generalUid = normalizeLineUserId(generalRow?.lineUserId);
+  const billIsNamedShop = Boolean(name && !isMarketGeneralDisplayName(name));
+  const billUsesGeneralBucket = (bill?.customerId || customer?.id) === 'general';
+
+  let profileUid = normalizeLineUserId(profileRow?.lineUserId);
+  let profileName = profileRow?.name || '';
+
+  if (profileRow?.id === 'general' && billIsNamedShop) {
+    profileUid = '';
+    const shop = suggestCustomersForLineName(name, allCustomers)[0]?.customer;
+    profileName = shop?.name || name;
+  }
+
+  const profileResolvedShop = Boolean(profileRow?.id && profileRow.id !== 'general')
+    || (billIsNamedShop && isValidLineUserId(profileUid));
   const profileLinked = isValidLineUserId(profileUid);
   /** ลบ UID ในรายชื่อแล้ว — ไม่ดึงจากบิลเก่า/ออเดอร์ย้อนหลังมาแทน */
   const allowHistoricalUid = !profileResolvedShop || profileLinked;
 
-  const nameMatchUid = allowHistoricalUid
+  const nameMatchUid = billIsNamedShop || allowHistoricalUid
     ? findUidInCustomerList(allCustomers, name)
     : '';
+
+  let effectiveBillUid = allowHistoricalUid ? billUid : '';
+  if (billUsesGeneralBucket && billIsNamedShop && effectiveBillUid === generalUid) {
+    effectiveBillUid = '';
+  }
 
   let orderUid = '';
   if (allowHistoricalUid && bill?.lineOrderId) {
@@ -156,12 +185,11 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
   const picked = pickLineUidForBillPush({
     profileUid,
     nameMatchUid,
-    billUid: allowHistoricalUid ? billUid : '',
+    billUid: effectiveBillUid,
     orderUid: allowHistoricalUid ? orderUid : '',
     historyUid: allowHistoricalUid ? historyUid : '',
   });
 
-  let profileName = profileRow?.name || '';
   if (!profileName && picked.profileUid) {
     const row = allCustomers.find(
       (c) => normalizeLineUserId(c.lineUserId) === picked.profileUid,
