@@ -3,6 +3,7 @@ const {
   coalesceSessionDeliveryDate,
   resolveLineOrderDeliveryDate,
   defaultDeliveryDateKeyBangkok,
+  parseDeliveryDateFromText,
 } = require('../src/parseDeliveryDate');
 
 function assert(cond, msg) {
@@ -12,6 +13,9 @@ function assert(cond, msg) {
   }
   console.log('ok:', msg);
 }
+
+const dec = parseDeliveryDateFromText('river prawn 2.5 kg');
+assert(dec.dateKey === null && dec.textWithoutDate.includes('2.5'), '2.5 kg is not a date');
 
 assert(coalesceSessionDeliveryDate('2026-05-26', '2026-05-28') === null, 'stale session');
 assert(coalesceSessionDeliveryDate('2026-05-28', '2026-05-28') === '2026-05-28', 'today session');

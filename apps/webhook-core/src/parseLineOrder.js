@@ -1,7 +1,8 @@
 /**
- * แยกรายการสั่งจากข้อความ LINE (ภาษาไทย)
- * รองรับ: กุ้งใหญ่ 2 กก | ตาจุ้ย กุ้งเล็ก หนึ่งโล | 2 กก กุ้งกลาง
+ * แยกรายการสั่งจากข้อความ LINE
+ * ข้อความเข้ามาแปลเป็นไทยก่อน (prepareOrderInput) — เก็บใน Firestore เป็นไทย
  */
+const { normalizeQuantityText } = require('./translateOrderText');
 
 const UNIT_ALIASES = {
   'กก': 'กก',
@@ -54,7 +55,7 @@ function normalizeUnit(raw) {
 }
 
 function normalizeOrderText(text) {
-  let t = String(text || '').trim();
+  let t = normalizeQuantityText(String(text || '').trim());
   t = t.replace(/ครับ|ค่ะ|คะ|นะ|ด้วย|ลงบันทึก|บันทึกให้|บันทึก|ช่วย|หน่อย|please/gi, ' ');
   Object.entries(THAI_NUM).forEach(([word, n]) => {
     t = t.replace(new RegExp(word, 'gi'), String(n));
@@ -93,11 +94,11 @@ function parseRiverPrawnWithSize(line) {
     customerName = before.replace(/^(ถึง|สำหรับ|ลูกค้า)\s*/i, '').trim() || null;
   }
 
-  const unitMatch = normalized.match(new RegExp(`([\\d.]+)\\s*(${UNIT_PATTERN})`, 'i'));
+  const unitMatch = normalized.match(new RegExp(`([\\d.,]+)\\s*(${UNIT_PATTERN})`, 'i'));
   if (!unitMatch) return [];
 
   const items = [];
-  pushItem(items, product, parseFloat(unitMatch[1]), unitMatch[2], customerName);
+  pushItem(items, product, parseFloat(unitMatch[1].replace(',', '.')), unitMatch[2], customerName);
   return items;
 }
 
@@ -107,10 +108,10 @@ function parseRiverPrawnPendingLine(line) {
   if (!RIVER_PRAWN_RE.test(normalized)) return null;
   if (RIVER_PRAWN_SIZED_RE.test(normalized)) return null;
 
-  const unitMatch = normalized.match(new RegExp(`([\\d.]+)\\s*(${UNIT_PATTERN})`, 'i'));
+  const unitMatch = normalized.match(new RegExp(`([\\d.,]+)\\s*(${UNIT_PATTERN})`, 'i'));
   if (!unitMatch) return null;
 
-  const qty = parseFloat(unitMatch[1]);
+  const qty = parseFloat(unitMatch[1].replace(',', '.'));
   if (!Number.isFinite(qty) || qty <= 0) return null;
 
   const riverIdx = normalized.search(RIVER_PRAWN_RE);
@@ -244,6 +245,13 @@ const SIZE_TO_PRODUCT = {
   a: 'กุ้งใหญ่',
   b: 'กุ้งกลาง',
   c: 'กุ้งเล็ก',
+  large: 'กุ้งใหญ่',
+  medium: 'กุ้งกลาง',
+  small: 'กุ้งเล็ก',
+  dead: 'กุ้งตาย',
+  s: 'กุ้งเล็ก',
+  m: 'กุ้งกลาง',
+  l: 'กุ้งใหญ่',
 };
 
 const DEFAULT_SIMPLE_PRODUCT = 'กุ้งกลาง';
@@ -258,7 +266,7 @@ function parseSimpleOrderLine(line) {
   const raw = String(line || '').trim();
   if (!raw || /กุ้ง/.test(raw)) return null;
 
-  const sizeOnly = raw.match(/^(ใหญ่|กลาง|เล็ก|ตาย|a|b|c)$/i);
+  const sizeOnly = raw.match(/^(ใหญ่|กลาง|เล็ก|ตาย|a|b|c|large|medium|small|s|m|l)$/i);
   if (sizeOnly) {
     return { kind: 'size_only', product: sizeWordToProduct(sizeOnly[1]) };
   }
@@ -267,7 +275,9 @@ function parseSimpleOrderLine(line) {
   t = t.replace(/^(ออเดอร์|จอง|สั่ง|order)\s*/i, '').trim();
   if (!t) return null;
 
-  let m = t.match(/^([฀-๿][฀-๿\s]{0,24}?)\s+(ใหญ่|กลาง|เล็ก|ตาย)\s*([\d.]+)\s*(กก|โล|kg|บาท|฿)?$/i);
+  let m = t.match(
+    /^([฀-๿A-Za-z0-9][฀-๿A-Za-z0-9\s.'-]{0,28}?)\s+(ใหญ่|กลาง|เล็ก|ตาย|large|medium|small|a|b|c|s|m|l)\s*([\d.,]+)\s*(กก|โล|kg|บาท|฿)?$/i,
+  );
   if (m) {
     const product = sizeWordToProduct(m[2]);
     if (!product) return null;
@@ -275,17 +285,17 @@ function parseSimpleOrderLine(line) {
       kind: 'item',
       customerName: m[1].trim(),
       product,
-      qty: parseFloat(m[3]),
+      qty: parseFloat(String(m[3]).replace(',', '.')),
       unit: m[4] || 'กก',
     };
   }
 
-  m = t.match(/^([฀-๿][฀-๿\s]{0,24}?)\s+([\d.]+)\s*(กก|โล|kg|บาท|฿)?$/);
+  m = t.match(/^([฀-๿A-Za-z0-9][฀-๿A-Za-z0-9\s.'-]{0,28}?)\s+([\d.,]+)\s*(กก|โล|kg|บาท|฿)?$/);
   if (m && m[1].trim().length >= 2) {
     return {
       kind: 'pending',
       customerName: m[1].trim(),
-      qty: parseFloat(m[2]),
+      qty: parseFloat(String(m[2]).replace(',', '.')),
       unit: m[3] || 'กก',
     };
   }
@@ -295,7 +305,7 @@ function parseSimpleOrderLine(line) {
     return {
       kind: 'pending',
       customerName: m[1].trim(),
-      qty: parseFloat(m[2]),
+      qty: parseFloat(String(m[2]).replace(',', '.')),
       unit: m[3] || 'กก',
     };
   }

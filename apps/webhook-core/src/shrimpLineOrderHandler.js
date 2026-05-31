@@ -1,15 +1,12 @@
 const {
   parseOrderItems,
-  groupItemsByCustomer,
-  ORDER_FORMAT_HELP,
   parseSimpleOrderLine,
   parseRiverPrawnPendingLine,
   simpleToOrderItem,
   pendingToItems,
-  formatRiverSizePrompt,
+  groupItemsByCustomer,
 } = require('./parseLineOrder');
 const {
-  parseDeliveryDateFromText,
   formatDateThai,
   resolveLineOrderDeliveryDate,
 } = require('./parseDeliveryDate');
@@ -18,10 +15,21 @@ const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shr
 const {
   assessLineCustomerProfile,
   parseProfileFields,
-  formatMissingProfilePrompt,
   upsertCustomerProfile,
   isProfileComplete,
 } = require('./shrimpLineCustomerProfile');
+const { prepareOrderInput } = require('./prepareOrderInput');
+const {
+  replyOrderOk,
+  replyParseFail,
+  replyDeliverySet,
+  replySimplePending,
+  replySizeOnlyFirst,
+  replyRiverPrompt,
+  replyMissingProfile,
+  formatItemsSummary,
+  deliveryLabelForLang,
+} = require('./shrimpLineReply');
 
 async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
   const groups = groupItemsByCustomer(items);
@@ -73,15 +81,6 @@ async function saveLineOrders(db, admin, { items, text, userId, groupId, deliver
   return groups.size;
 }
 
-function formatItemsSummary(items) {
-  return items
-    .map((i) => {
-      const who = i.customerName ? `${i.customerName} · ` : '';
-      return `• ${who}${i.product} ${i.qty} ${i.unit}`;
-    })
-    .join('\n');
-}
-
 function primaryCustomerNameFromItems(items) {
   for (const it of items) {
     if (it.customerName) return it.customerName;
@@ -94,9 +93,8 @@ function shouldVerifyCustomerProfile(groupId) {
 }
 
 async function tryCompleteOrder(db, admin, session, ts, ctx) {
-  const { items, text, userId, groupId, deliveryDate } = ctx;
-  const deliveryLabel = `${formatDateThai(deliveryDate)} (${deliveryDate})`;
-  const summary = formatItemsSummary(items);
+  const { items, text, userId, groupId, deliveryDate, replyLang } = ctx;
+  const summary = formatItemsSummary(items, replyLang);
 
   if (shouldVerifyCustomerProfile(groupId)) {
     const customerName = primaryCustomerNameFromItems(items)
@@ -113,8 +111,9 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
         session.id,
         {
           deliveryDate,
+          replyLang,
           pending: null,
-          orderDraft: { items, text, userId, groupId, deliveryDate },
+          orderDraft: { items, text, userId, groupId, deliveryDate, replyLang },
           profileCollect: {
             missing,
             customerId: customer?.id || null,
@@ -125,9 +124,9 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
       );
       return {
         ok: true,
-        reply: formatMissingProfilePrompt(missing, {
+        reply: replyMissingProfile(replyLang, missing, {
           itemsSummary: summary,
-          deliveryDateLabel: deliveryLabel,
+          deliveryDateLabel: deliveryLabelForLang(deliveryDate, replyLang),
         }),
       };
     }
@@ -144,22 +143,24 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
   await setLineOrderSession(
     db,
     session.id,
-    { deliveryDate, pending: null, orderDraft: null, profileCollect: null },
+    { deliveryDate, replyLang, pending: null, orderDraft: null, profileCollect: null },
     ts,
   );
 
   return {
     ok: true,
-    reply: `✅ รับออเดอร์แล้วครับ (${orderCount} ราย)\n📅 ส่ง ${deliveryLabel}\n\n${summary}`,
+    reply: replyOrderOk(replyLang, orderCount, deliveryDate, items),
   };
 }
 
-async function handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body }) {
+async function handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body, replyLang }) {
   const draft = session.orderDraft;
   const collect = session.profileCollect;
+  const lang = replyLang || session.replyLang || 'th';
+
   if (!draft?.items?.length || !collect?.missing?.length) {
     await setLineOrderSession(db, session.id, { orderDraft: null, profileCollect: null }, ts);
-    return { ok: false, reply: `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}` };
+    return { ok: false, reply: replyParseFail(lang) };
   }
 
   const parsed = parseProfileFields(body || text);
@@ -204,14 +205,15 @@ async function handleProfileCollect(db, admin, session, ts, { text, userId, grou
           customerName: saved.name,
           missing: stillMissing,
         },
+        replyLang: lang,
       },
       ts,
     );
     return {
       ok: true,
-      reply: formatMissingProfilePrompt(stillMissing, {
-        itemsSummary: formatItemsSummary(draft.items),
-        deliveryDateLabel: `${formatDateThai(draft.deliveryDate)} (${draft.deliveryDate})`,
+      reply: replyMissingProfile(lang, stillMissing, {
+        itemsSummary: formatItemsSummary(draft.items, lang),
+        deliveryDateLabel: deliveryLabelForLang(draft.deliveryDate, lang),
       }),
     };
   }
@@ -219,9 +221,9 @@ async function handleProfileCollect(db, admin, session, ts, { text, userId, grou
   if (!isProfileComplete(saved)) {
     return {
       ok: true,
-      reply: formatMissingProfilePrompt(['name', 'phone', 'notes'], {
-        itemsSummary: formatItemsSummary(draft.items),
-        deliveryDateLabel: `${formatDateThai(draft.deliveryDate)} (${draft.deliveryDate})`,
+      reply: replyMissingProfile(lang, ['name', 'phone', 'notes'], {
+        itemsSummary: formatItemsSummary(draft.items, lang),
+        deliveryDateLabel: deliveryLabelForLang(draft.deliveryDate, lang),
       }),
     };
   }
@@ -233,6 +235,7 @@ async function handleProfileCollect(db, admin, session, ts, { text, userId, grou
     userId: draft.userId || userId,
     groupId: draft.groupId || groupId,
     deliveryDate: draft.deliveryDate,
+    replyLang: draft.replyLang || lang,
   });
 }
 
@@ -242,11 +245,19 @@ async function handleProfileCollect(db, admin, session, ts, { text, userId, grou
 async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const ts = admin.firestore.FieldValue.serverTimestamp();
   const session = await getLineOrderSession(db, groupId, userId);
-  const { dateKey: parsedDate, textWithoutDate } = parseDeliveryDateFromText(text);
-  const body = (textWithoutDate || text).trim();
+  const prep = prepareOrderInput(text, session);
+  const replyLang = prep.replyLang;
+  const body = prep.body;
+  const parsedDate = prep.parsedDate;
 
   if (session.profileCollect && session.orderDraft) {
-    return handleProfileCollect(db, admin, session, ts, { text, userId, groupId, body });
+    return handleProfileCollect(db, admin, session, ts, {
+      text,
+      userId,
+      groupId,
+      body,
+      replyLang: session.replyLang || replyLang,
+    });
   }
 
   const lockSessionDate = Boolean(session.pending);
@@ -257,25 +268,24 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   });
 
   if (parsedDate) {
-    await setLineOrderSession(db, session.id, { deliveryDate: parsedDate }, ts);
+    await setLineOrderSession(db, session.id, { deliveryDate: parsedDate, replyLang }, ts);
     deliveryDate = parsedDate;
   }
 
   if (parsedDate && !body) {
     return {
       ok: true,
-      reply: `📅 ตั้งวันส่ง ${formatDateThai(deliveryDate)} (${deliveryDate})\nพิมพ์ชื่อลูกค้า น้ำหนัก หรือ ใหญ่/กลาง/เล็ก ได้เลยครับ`,
+      reply: replyDeliverySet(replyLang, deliveryDate),
     };
   }
 
-  const deliveryLabel = `${formatDateThai(deliveryDate)} (${deliveryDate})`;
-  const riverPending = parseRiverPrawnPendingLine(body || text);
-  let items = parseOrderItems(body || text);
+  const riverPending = parseRiverPrawnPendingLine(body);
+  let items = parseOrderItems(body);
   const simple = parseSimpleOrderLine(body);
 
   if (simple?.kind === 'size_only' && session.pending) {
     items = pendingToItems(session.pending, simple.product);
-    await setLineOrderSession(db, session.id, { pending: null }, ts);
+    await setLineOrderSession(db, session.id, { pending: null, replyLang }, ts);
   } else if (simple?.kind === 'item') {
     const it = simpleToOrderItem(simple);
     if (it) items = [it];
@@ -285,6 +295,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
       session.id,
       {
         deliveryDate,
+        replyLang,
         pending: {
           variant: 'river_prawn',
           customerName: riverPending.customerName,
@@ -296,7 +307,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     );
     return {
       ok: true,
-      reply: formatRiverSizePrompt(riverPending, deliveryLabel),
+      reply: replyRiverPrompt(replyLang, riverPending, deliveryDate),
     };
   } else if (simple?.kind === 'pending') {
     await setLineOrderSession(
@@ -304,6 +315,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
       session.id,
       {
         deliveryDate,
+        replyLang,
         pending: {
           customerName: simple.customerName,
           qty: simple.qty,
@@ -314,7 +326,13 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     );
     return {
       ok: true,
-      reply: `📝 รับ ${simple.customerName} ${simple.qty} ${simple.unit || 'กก'}\nส่ง ${formatDateThai(deliveryDate)} — พิมพ์ ใหญ่ / กลาง / เล็ก ต่อได้ครับ`,
+      reply: replySimplePending(
+        replyLang,
+        simple.customerName,
+        simple.qty,
+        simple.unit || 'กก',
+        deliveryDate,
+      ),
     };
   }
 
@@ -322,24 +340,25 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     if (simple?.kind === 'size_only') {
       return {
         ok: false,
-        reply: 'พิมพ์ชื่อลูกค้าและน้ำหนักก่อน แล้วค่อยส่ง กลาง/ใหญ่/เล็ก ครับ',
+        reply: replySizeOnlyFirst(replyLang),
       };
     }
     if (riverPending) {
       return {
         ok: true,
-        reply: formatRiverSizePrompt(riverPending, deliveryLabel),
+        reply: replyRiverPrompt(replyLang, riverPending, deliveryDate),
       };
     }
-    return { ok: false, reply: `ยังอ่านรายการไม่ได้ครับ\n\n${ORDER_FORMAT_HELP}` };
+    return { ok: false, reply: replyParseFail(replyLang) };
   }
 
   return tryCompleteOrder(db, admin, session, ts, {
     items,
-    text,
+    text: prep.raw,
     userId,
     groupId,
     deliveryDate,
+    replyLang,
   });
 }
 
