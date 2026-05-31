@@ -1,6 +1,18 @@
-import { PRODUCTS } from '../constants';
+import { PRODUCTS } from '../constants/products.js';
 import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
-import { findCustomersInText } from './voiceParse';
+import {
+  isLineGroupOrder,
+  lineCustomerNeedsManualPick,
+  resolveLineCustomerByName,
+  suggestCustomersForLineName,
+} from './lineCustomerResolve.js';
+
+export {
+  isLineGroupOrder,
+  lineCustomerNeedsManualPick,
+  suggestCustomersForLineName,
+  collectCustomerSearchNames,
+} from './lineCustomerResolve.js';
 
 export const LIVE_PRODUCTS = PRODUCTS.filter((p) => p.type === 'live');
 
@@ -14,37 +26,19 @@ export function mapLineProductName(product) {
   return null;
 }
 
-function compactName(s) {
-  return (s || '').replace(/\s+/g, '').toLowerCase();
-}
-
-/** จับคู่ชื่อลูกค้าจาก LINE กับรายชื่อในแอป */
-export function resolveLineCustomer(customerName, allCustomers, lineUserId) {
+/**
+ * จับคู่ชื่อลูกค้าจาก LINE กับรายชื่อในแอป
+ * @param {string} [lineGroupId] — ถ้ามีค่า = ออเดอร์จากกลุ่ม LINE (ไม่ใช้ lineUserId ของคนพิมพ์)
+ */
+export function resolveLineCustomer(customerName, allCustomers, lineUserId, lineGroupId) {
   const list = allCustomers || [];
-  const general = list.find((c) => c.id === 'general') || {
-    id: 'general',
-    name: 'ลูกค้าทั่วไปและตลาดนัด',
-    zone: 'ทั่วไป',
-  };
 
-  const byUid = findCustomerByLineUserId(list, lineUserId);
-  if (byUid) return byUid;
-
-  if (!customerName?.trim()) return general;
-
-  const found = findCustomersInText(customerName, list);
-  if (found.length) {
-    return list.find((c) => c.id === found[0].id) || { id: found[0].id, name: found[0].name, zone: 'ทั่วไป' };
+  if (!isLineGroupOrder(lineGroupId)) {
+    const byUid = findCustomerByLineUserId(list, lineUserId);
+    if (byUid) return byUid;
   }
 
-  const cn = compactName(customerName);
-  const partial = list.find((c) => {
-    const n = compactName(c.name);
-    return n.includes(cn) || cn.includes(n);
-  });
-  if (partial) return partial;
-
-  return { id: 'general', name: customerName.trim(), zone: 'ทั่วไป' };
+  return resolveLineCustomerByName(customerName, list);
 }
 
 /**

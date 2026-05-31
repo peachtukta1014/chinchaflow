@@ -28,7 +28,8 @@ export function findCustomersInText(text, customers) {
   const found = [];
   const tCompact = compact(text);
   for (const c of customers) {
-    const names = [c.name, c.nickname, c.shortName].filter(Boolean);
+    const aliases = Array.isArray(c.aliases) ? c.aliases : [];
+    const names = [c.name, c.nickname, c.shortName, ...aliases].filter(Boolean);
     for (const rawName of names) {
       const n = normalizeText(rawName);
       const nCompact = compact(n);

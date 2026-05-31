@@ -1,4 +1,4 @@
-import { CUSTOMERS } from '../constants';
+import { CUSTOMERS } from '../constants/customers.js';
 import { fsListCollection } from '../lib/firestoreRest';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   actualQtyOf,
@@ -7,9 +7,11 @@ import {
   applySizeToCartItem,
   cartStockKg,
   hasAnyQtyMismatch,
+  lineCustomerNeedsManualPick,
   LIVE_PRODUCTS,
   qtyDiffersFromOrder,
   resolveLineCustomer,
+  suggestCustomersForLineName,
 } from '../lib/lineOrderToSale';
 import { getEffectiveStock } from '../services/stockService';
 
@@ -29,15 +31,42 @@ export function LineDeliveryConfirmSheet({
   const [draftQty, setDraftQty] = useState({});
   const [draftPrice, setDraftPrice] = useState({});
   const [ackMismatch, setAckMismatch] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
+  const autoCustomer = useMemo(
+    () => resolveLineCustomer(
+      order.customerName,
+      allCustomers,
+      order.lineUserId,
+      order.lineGroupId,
+    ),
+    [order.customerName, order.lineUserId, order.lineGroupId, allCustomers],
+  );
+
+  const suggestions = useMemo(
+    () => suggestCustomersForLineName(order.customerName, allCustomers),
+    [order.customerName, allCustomers],
+  );
 
   useEffect(() => {
     setLines(initialCart);
     setDraftQty({});
     setDraftPrice({});
     setAckMismatch(false);
-  }, [initialCart, order?.id]);
+    const initialId = lineCustomerNeedsManualPick(autoCustomer) && suggestions[0]
+      ? suggestions[0].customer.id
+      : autoCustomer.id;
+    setSelectedCustomerId(initialId || autoCustomer.id || '');
+  }, [initialCart, order?.id, autoCustomer.id, suggestions]);
 
-  const customer = resolveLineCustomer(order.customerName, allCustomers, order.lineUserId);
+  const customer = useMemo(() => {
+    const hit = allCustomers.find((c) => c.id === selectedCustomerId);
+    if (hit) return hit;
+    return autoCustomer;
+  }, [allCustomers, selectedCustomerId, autoCustomer]);
+
+  const needsPick = lineCustomerNeedsManualPick(customer)
+    || (suggestions.length > 1 && lineCustomerNeedsManualPick(autoCustomer));
   const avail = getEffectiveStock(stock, stockBatches);
   const { liveKg, deadKg, total } = cartStockKg(lines);
   const mismatch = hasAnyQtyMismatch(lines);
@@ -79,6 +108,10 @@ export function LineDeliveryConfirmSheet({
   };
 
   const handleConfirm = () => {
+    if (lineCustomerNeedsManualPick(customer)) {
+      alert('กรุณาเลือกลูกค้าในรายชื่อก่อนบันทึก\n(ถ้าไม่เลือก ยอดจะไปลูกหนี้คนละก้อนกับเดิม)');
+      return;
+    }
     const invalid = lines.some((row) => {
       const a = actualQtyOf(row);
       return !Number.isFinite(a) || a <= 0;
@@ -109,7 +142,11 @@ export function LineDeliveryConfirmSheet({
           <div className="flex justify-between items-start gap-2">
             <div className="min-w-0">
               <p className="text-sm font-black text-slate-800">ยืนยันน้ำหนักและราคาส่งจริง</p>
-              <p className="text-xs text-slate-500 mt-0.5 truncate">{customer.name}</p>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                {order.customerName && order.customerName !== customer.name
+                  ? `LINE: "${order.customerName}" → ${customer.name}`
+                  : customer.name}
+              </p>
               {order.rawText && (
                 <p className="text-[10px] text-slate-400 mt-1 italic truncate">&quot;{order.rawText}&quot;</p>
               )}
@@ -122,6 +159,48 @@ export function LineDeliveryConfirmSheet({
             <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-2">
               ข้ามรายการที่แปลงไม่ได้: {unknownProducts.join(', ')}
             </p>
+          )}
+          {(needsPick || order.lineGroupId) && (
+            <div className={`mt-2 rounded-xl p-2.5 border ${needsPick ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+              <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                ลูกค้าในระบบ (ยอดไปลูกหนี้รายนี้)
+              </label>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                className="w-full text-sm font-bold border-2 border-slate-200 rounded-xl px-3 py-2 bg-white"
+              >
+                <option value="general" disabled={!needsPick}>
+                  — เลือกลูกค้า —
+                </option>
+                {suggestions.length > 0 && (
+                  <optgroup label="แนะนำจากชื่อใน LINE">
+                    {suggestions.map(({ customer: c, reason }) => (
+                      <option key={`s-${c.id}`} value={c.id}>
+                        {c.name} ({reason})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {[...new Map(allCustomers.filter((c) => c.id !== 'general').map((c) => [c.id, c])).values()]
+                  .sort((a, b) => (a.zone || '').localeCompare(b.zone || '') || a.name.localeCompare(b.name, 'th'))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.zone ? `${c.zone} · ` : ''}{c.name}
+                    </option>
+                  ))}
+              </select>
+              {needsPick && (
+                <p className="text-[10px] text-amber-800 mt-1.5 leading-snug">
+                  ชื่อในกลุ่ม LINE ไม่ตรงรายชื่อ — เลือกร้านที่ถูกก่อนกดบันทึก มิฉะนั้นจะสร้างลูกหนี้ใหม่แยกจากยอดค้างเดิม
+                </p>
+              )}
+              {order.lineGroupId && !needsPick && (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  ออเดอร์จากกลุ่ม LINE — ตรวจชื่อลูกค้าอีกครั้งก่อนบันทึก
+                </p>
+              )}
+            </div>
           )}
         </div>
 

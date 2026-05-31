@@ -271,6 +271,22 @@ try {
   fail('viteEnv trim', e);
 }
 
+try {
+  const { resolveLineCustomerByName } = await import('../src/lib/lineCustomerResolve.js');
+  const { CUSTOMERS } = await import('../src/constants/customers.js');
+
+  const byName = resolveLineCustomerByName('ปุ้ย', CUSTOMERS);
+  assert(byName.id === 'c5', 'จับคู่ชื่อปุ้ยกับรายชื่อหลัก');
+
+  const aliasList = CUSTOMERS.map((c) => (
+    c.id === 'c5' ? { ...c, aliases: ['ร้านปุ้ย'] } : c
+  ));
+  const byAlias = resolveLineCustomerByName('ร้านปุ้ย', aliasList);
+  assert(byAlias.id === 'c5', 'จับคู่ชื่อ alias กับร้านปุ้ย');
+} catch (e) {
+  fail('lineCustomerResolve', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
