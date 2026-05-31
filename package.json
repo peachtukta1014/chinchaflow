@@ -17,7 +17,9 @@
     "shrimp:stock-reset": "node scripts/shrimp-stock-reset.mjs --confirm",
     "shrimp:stock-reset:dry": "node scripts/shrimp-stock-reset.mjs --dry-run",
     "shrimp:stock-reset:full": "node scripts/shrimp-stock-reset.mjs --confirm --full",
-    "shrimp:full-reset:dry": "node scripts/shrimp-stock-reset.mjs --dry-run --full"
+    "shrimp:full-reset:dry": "node scripts/shrimp-stock-reset.mjs --dry-run --full",
+    "shrimp:fix-line:dry": "node scripts/shrimp-fix-customer-line.mjs --dry-run",
+    "shrimp:fix-line": "node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1"
   },
   "devDependencies": {
     "firebase-admin": "^13.0.0"

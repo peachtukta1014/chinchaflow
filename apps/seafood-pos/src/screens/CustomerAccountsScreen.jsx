@@ -23,6 +23,13 @@ function CustomerFifoPanel({
   onRefresh,
   expandedKey,
   setExpandedKey,
+  isAdmin = false,
+  stock,
+  stockBatches = [],
+  updateMainStock,
+  onSaleDeleted,
+  deleteBusyId,
+  onDeleteSale,
 }) {
   const [payInput, setPayInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -211,6 +218,18 @@ function CustomerFifoPanel({
                       </button>
                     ))}
                   </div>
+                  {isAdmin && tx.id && onDeleteSale && (
+                    <button
+                      type="button"
+                      disabled={deleteBusyId === tx.id || busy}
+                      onClick={() => onDeleteSale(tx)}
+                      className="mt-2 w-full py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                      title="ลบบิล (แอดมิน) — คืนสต๊อกและเปิดออเดอร์ LINE กลับเป็นรอส่ง"
+                    >
+                      <Trash2 size={14} />
+                      {deleteBusyId === tx.id ? 'กำลังลบ…' : 'ลบบิลนี้'}
+                    </button>
+                  )}
                 </div>
               );
             })
@@ -570,6 +589,12 @@ export default function CustomerAccountsScreen({
                 onRefresh={refreshAll}
                 expandedKey={expandedKey}
                 setExpandedKey={setExpandedKey}
+                isAdmin={isAdmin}
+                stock={stock}
+                stockBatches={stockBatches}
+                updateMainStock={updateMainStock}
+                deleteBusyId={deleteBusyId}
+                onDeleteSale={handleDeleteSale}
               />
             ))}
           </div>

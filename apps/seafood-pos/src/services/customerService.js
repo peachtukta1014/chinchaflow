@@ -167,6 +167,42 @@ function mergeCustomerFields(base, data) {
   };
 }
 
+/**
+ * ถ้า UID ถูกผูกกับลูกค้าอื่นอยู่แล้ว ให้ถอดออก (กันแท็บ LINE OA / ลูกหนี้ชี้ผิดคน)
+ * ลูกค้า cx_* ที่ซ้ำ UID จะถูกลบถาวร — มักเกิดจากกด「เพิ่มใหม่」แทน「ผูกลูกค้าเดิม」
+ */
+export async function releaseLineUserIdFromOthers(lineUserId, keepCustomerId) {
+  const uid = normalizeLineUserId(lineUserId);
+  if (!uid || !keepCustomerId) return { cleared: [], deleted: [] };
+
+  const map = await fetchCustomersMap();
+  const cleared = [];
+  const deleted = [];
+
+  for (const [otherId, doc] of Object.entries(map)) {
+    if (otherId === keepCustomerId) continue;
+    if (normalizeLineUserId(doc.lineUserId) !== uid) continue;
+
+    if (isDeletableCustomer({ id: otherId })) {
+      await withTimeout(fsDelete(`customers/${otherId}`));
+      const still = await fsGetDoc(`customers/${otherId}`);
+      if (still) throw new Error(`ลบลูกค้าซ้ำ ${otherId} ไม่สำเร็จ`);
+      deleted.push(otherId);
+      continue;
+    }
+
+    const base = await loadCustomerBase(otherId);
+    const want = customerPayload(mergeCustomerFields(base, { lineUserId: '' }));
+    await withTimeout(fsSetDoc(`customers/${otherId}`, {
+      ...want,
+      updatedAt: new Date().toISOString(),
+    }));
+    cleared.push(otherId);
+  }
+
+  return { cleared, deleted };
+}
+
 export async function updateCustomer(id, data, { merge = false } = {}) {
   if (!id) throw new Error('ไม่พบรหัสลูกค้า');
   const merged = merge ? mergeCustomerFields(await loadCustomerBase(id), data) : data;
@@ -175,6 +211,9 @@ export async function updateCustomer(id, data, { merge = false } = {}) {
     ...want,
     updatedAt: new Date().toISOString(),
   }));
+  if (want.lineUserId) {
+    await releaseLineUserIdFromOthers(want.lineUserId, id);
+  }
   const doc = await withTimeout(fsGetDoc(`customers/${id}`));
   return assertSaved(doc, want, id);
 }
