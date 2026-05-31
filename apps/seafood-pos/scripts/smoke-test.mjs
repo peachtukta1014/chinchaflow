@@ -298,6 +298,36 @@ try {
   fail('pickLineUidForBillPush', e);
 }
 
+try {
+  const { suggestCustomersForLineName } = await import('../src/lib/lineCustomerResolve.js');
+  const { pickLineUidForBillPush } = await import('../src/lib/resolveLineUserIdPick.js');
+  const shopUid = 'Uf4e57ad17d3cc89de38609a1994bf4f9';
+  const generalUid = 'U6db855aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const allCustomers = [
+    {
+      id: 'general',
+      name: 'ลูกค้าทั่วไปและตลาดนัด',
+      zone: 'ทั่วไป',
+      lineUserId: generalUid,
+    },
+    {
+      id: 'c1',
+      name: 'จ๊ะเขียด,เจ๊เขียด',
+      zone: 'ป่าตอง',
+      lineUserId: shopUid,
+    },
+  ];
+  const suggestions = suggestCustomersForLineName('จ๊ะเขียด', allCustomers);
+  assert(suggestions.length === 1 && suggestions[0].customer.id === 'c1', 'ชื่อบนบิลจับคู่ร้าน c1');
+  const picked = pickLineUidForBillPush({
+    profileUid: shopUid,
+    billUid: generalUid,
+  });
+  assert(picked.uid === shopUid, 'บิล general+ชื่อร้าน ใช้ UID ร้าน ไม่ใช่ลูกค้าทั่วไป');
+} catch (e) {
+  fail('line bill profile match', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

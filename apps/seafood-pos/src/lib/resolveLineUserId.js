@@ -1,8 +1,13 @@
-import { CUSTOMERS } from '../constants';
-import { exactCustomerNameMatch } from './customerNameMatch';
+import { CUSTOMERS } from '../constants/customers.js';
+import { compactNameMatch, exactCustomerNameMatch } from './customerNameMatch';
 import { fsGetDoc, fsListCollection } from './firestoreRest';
 import { mergeCustomerLists } from '../services/customerService';
 import { findLineUserIdForCustomerName } from '../services/lineOaCustomerService';
+import {
+  collectCustomerSearchNames,
+  resolveLineCustomerByName,
+  suggestCustomersForLineName,
+} from './lineCustomerResolve';
 import { normalizeLineUserId, isValidLineUserId } from './lineUserId';
 import { pickLineUidForBillPush } from './resolveLineUserIdPick';
 
@@ -34,15 +39,70 @@ async function loadMergedCustomers() {
 function findUidInCustomerList(allCustomers, name) {
   const n = (name || '').trim();
   if (!n) return '';
-  const hit = allCustomers.find(
-    (c) => isValidLineUserId(c.lineUserId) && exactCustomerNameMatch(c.name, n),
-  );
-  return hit ? normalizeLineUserId(hit.lineUserId) : '';
+
+  const suggestions = suggestCustomersForLineName(name, allCustomers);
+  if (suggestions.length === 1) {
+    const uid = normalizeLineUserId(suggestions[0].customer?.lineUserId);
+    if (isValidLineUserId(uid)) return uid;
+  }
+  if (suggestions.length > 0 && suggestions[0].score >= 3) {
+    const uid = normalizeLineUserId(suggestions[0].customer?.lineUserId);
+    if (isValidLineUserId(uid)) return uid;
+  }
+
+  const hits = [];
+  for (const c of allCustomers) {
+    if (!c?.id || c.id === 'general' || !isValidLineUserId(c.lineUserId)) continue;
+    for (const label of collectCustomerSearchNames(c)) {
+      if (exactCustomerNameMatch(label, n) || compactNameMatch(label, n)) {
+        hits.push(c);
+        break;
+      }
+    }
+  }
+  if (hits.length === 1) return normalizeLineUserId(hits[0].lineUserId);
+  return '';
 }
 
 function findProfileById(allCustomers, customerId) {
   if (!customerId) return null;
   return allCustomers.find((c) => c.id === customerId) || null;
+}
+
+/**
+ * บิลจาก LINE มักเป็น customerId=general แต่ชื่อบนบิลเป็นร้านจริง —
+ * ห้ามใช้ UID ของ「ลูกค้าทั่วไป」เมื่อจับคู่ร้านจากชื่อได้
+ */
+export function resolveCustomerProfileForBill(customer, bill, allCustomers) {
+  const billCustomerId = bill?.customerId || customer?.id;
+  const name = (bill?.customerName || customer?.name || '').trim();
+
+  if (billCustomerId && billCustomerId !== 'general') {
+    const row = findProfileById(allCustomers, billCustomerId);
+    if (row) return row;
+  }
+
+  if (name) {
+    const suggestions = suggestCustomersForLineName(name, allCustomers);
+    if (suggestions.length === 1) {
+      const row = findProfileById(allCustomers, suggestions[0].customer.id);
+      if (row?.id && row.id !== 'general') return row;
+    }
+    if (suggestions.length > 0 && suggestions[0].score >= 3) {
+      const row = findProfileById(allCustomers, suggestions[0].customer.id);
+      if (row?.id && row.id !== 'general') return row;
+    }
+
+    const resolved = resolveLineCustomerByName(name, allCustomers);
+    if (resolved?.id && resolved.id !== 'general') {
+      return findProfileById(allCustomers, resolved.id) || resolved;
+    }
+  }
+
+  if (billCustomerId) {
+    return findProfileById(allCustomers, billCustomerId) || customer || null;
+  }
+  return customer || null;
 }
 
 /**
@@ -62,7 +122,7 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
     }
   }
 
-  const profileRow = findProfileById(allCustomers, customer?.id);
+  const profileRow = resolveCustomerProfileForBill(customer, bill, allCustomers);
   const profileUid = normalizeLineUserId(profileRow?.lineUserId);
   const nameMatchUid = findUidInCustomerList(allCustomers, name);
 
