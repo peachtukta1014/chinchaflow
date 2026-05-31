@@ -1,4 +1,4 @@
-import { dateKeyBangkok } from './date';
+import { dateKeyBangkok } from './date.js';
 
 /** วันที่รับเข้า (ล็อต = 1 วัน) — รองรับข้อมูลเก่าที่ไม่มี receiveDateKey */
 export function receiveDateKeyOf(batch) {
@@ -71,4 +71,26 @@ export function sortBatchesFifoOrder(batches = []) {
 
 export function countReceivesOnDate(batches, dateKey) {
   return batches.filter((b) => receiveDateKeyOf(b) === dateKey).length;
+}
+
+/** วันรับล่าสุดในรายการล็อต (lotDays เรียงใหม่→เก่า) */
+export function newestLotDateKey(lotDays = []) {
+  return lotDays[0]?.dateKey ?? null;
+}
+
+/**
+ * ล็อตเริ่มต้น = รถ/วันรับล่าสุดที่ยังไม่ปิด (ใช้ทั้งแอดมินและรายจ่าย)
+ */
+export function pickDefaultLotDateKey(lotDays = [], closedLotKeys = new Set()) {
+  if (!lotDays.length) return dateKeyBangkok();
+  const open = lotDays.find((d) => !closedLotKeys.has(d.dateKey));
+  return open?.dateKey ?? lotDays[0].dateKey;
+}
+
+/** ป้ายใน dropdown ล็อต */
+export function formatLotDayOptionLabel(day, { newestKey, closedLotKeys = new Set() } = {}) {
+  const parts = [day.label];
+  if (newestKey && day.dateKey === newestKey) parts.push('ล็อตล่าสุด');
+  if (closedLotKeys.has(day.dateKey)) parts.push('ปิดแล้ว');
+  return parts.join(' · ');
 }

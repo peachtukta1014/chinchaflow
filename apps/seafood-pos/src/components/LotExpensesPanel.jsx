@@ -8,7 +8,13 @@ import {
   linesToFormState,
   sumExpenseLines,
 } from '../lib/lotExpenseLines';
-import { formatReceiveDayLabel, groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
+import {
+  formatLotDayOptionLabel,
+  formatReceiveDayLabel,
+  groupBatchesByReceiveDay,
+  newestLotDateKey,
+  pickDefaultLotDateKey,
+} from '../lib/stockBatchUtils';
 import {
   fetchLotExpenses,
   saveLotExpenses,
@@ -121,10 +127,10 @@ export default function LotExpensesPanel({
 }) {
   const todayKey = dateKeyBangkok();
   const lotDays = useMemo(() => groupBatchesByReceiveDay(stockBatches), [stockBatches]);
-  // lotDays is sorted newest→oldest; default to newest lot (ล็อตปัจจุบัน = รับล่าสุด)
-  const defaultLotKey = lotDays.length ? lotDays[0].dateKey : todayKey;
+  const newestKey = useMemo(() => newestLotDateKey(lotDays), [lotDays]);
+  const defaultLotKey = useMemo(() => pickDefaultLotDateKey(lotDays), [lotDays]);
 
-  const [internalLotKey, setInternalLotKey] = useState(defaultLotKey);
+  const [internalLotKey, setInternalLotKey] = useState(() => defaultLotKey);
   const lotDateKey = controlledLotKey ?? internalLotKey;
   const setLotDateKey = onLotDateKeyChange ?? setInternalLotKey;
 
@@ -217,7 +223,8 @@ export default function LotExpensesPanel({
             แยกสาย {STOCK_LINE.live.tag} / {STOCK_LINE.dead.tag} ด้านล่าง · กรอกทีละรายการแล้วกดบันทึก · ค่ารถใส่ตอนรับเข้า
           </p>
           <StockLineSwitcher line={expenseLine} onChange={setExpenseLine} />
-          <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับเข้า)</label>
+          <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับรถ)</label>
+          <p className="text-[10px] text-slate-400 mb-1">ค่าเริ่มต้น = ล็อตล่าสุด (ตรงหน้าสรุปแอดมิน)</p>
           <select
             value={lotDateKey}
             onChange={(e) => setLotDateKey(e.target.value)}
@@ -227,7 +234,9 @@ export default function LotExpensesPanel({
               <option value={todayKey}>ยังไม่มีรับเข้า</option>
             ) : (
               lotDays.map((d) => (
-                <option key={d.dateKey} value={d.dateKey}>{d.label}</option>
+                <option key={d.dateKey} value={d.dateKey}>
+                  {formatLotDayOptionLabel(d, { newestKey })}
+                </option>
               ))
             )}
           </select>

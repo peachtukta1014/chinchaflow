@@ -83,6 +83,13 @@ try {
   assert(STOCK_LINE.live.full === 'กุ้งแม่น้ำเป็น (Live)', 'STOCK_LINE.live.full');
   assert(STOCK_LINE.dead.full === 'กุ้งแม่น้ำตาย (Dead)', 'STOCK_LINE.dead.full');
   assert(SHRIMP_DAMAGE.full === 'กุ้งตายเสียหาย (ตัดทิ้ง)', 'SHRIMP_DAMAGE.full');
+  const { pickDefaultLotDateKey } = await import('../src/lib/stockBatchUtils.js');
+  const lotDays = [{ dateKey: '2026-05-31', label: '31 พ.ค.' }, { dateKey: '2026-05-28', label: '28 พ.ค.' }];
+  assert(pickDefaultLotDateKey(lotDays) === '2026-05-31', 'default lot = newest');
+  assert(
+    pickDefaultLotDateKey(lotDays, new Set(['2026-05-31'])) === '2026-05-28',
+    'default lot skips closed newest',
+  );
   const custom = customRowsToCartItems([
     { label: 'แอนตี้โฟม', weight: '2', pricePerKg: '240' },
     { label: '', weight: '', pricePerKg: '' },
