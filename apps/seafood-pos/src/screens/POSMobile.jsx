@@ -489,9 +489,7 @@ export default function POSMobile({
         </div>
       </div>
 
-      <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
-
-      {/* Numpad */}
+      {/* Numpad */}
       <div className="flex-1 bg-white p-5 flex flex-col rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.04)]"
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
         <div className="flex gap-2 mb-3">
@@ -558,14 +556,16 @@ export default function POSMobile({
               <Delete size={28} />
             </button>
           </div>
-          <button onClick={addToCart}
-            className={`col-span-1 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95 ${
+          <button onClick={addToCart}
+            className={`col-span-1 text-white rounded-2xl font-bold flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95 ${
               salesLine === 'dead' ? 'bg-red-500' : 'bg-blue-600'
             }`}>
-            <PlusCircle size={32} /><span className="text-sm">เพิ่ม</span>
-          </button>
-        </div>
-      </div>
-    </div>
+            <PlusCircle size={32} /><span className="text-sm">เพิ่ม</span>
+          </button>
+        </div>
+
+        <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
+      </div>
+    </div>
   );
 };
