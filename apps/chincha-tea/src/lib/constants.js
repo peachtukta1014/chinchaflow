@@ -1,7 +1,7 @@
 /** อีเมลแอดมินหลัก — สมัคร/ล็อกอินครั้งแรกได้ role admin + อนุมัติทันที (ตรง firestore.rules) */
 export const BOOTSTRAP_ADMIN_EMAILS = [
   'gmc-peach@chincha.pos',
-  'peachtukta14@gmail.com',
+  'peachtukta1014@gmail.com',
 ];
 
 /** @deprecated ใช้ isBootstrapAdminEmail() แทน */

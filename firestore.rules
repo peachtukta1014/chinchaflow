@@ -47,7 +47,7 @@ service cloud.firestore {
         && request.auth.token.email != null
         && (
           request.auth.token.email == 'gmc-peach@chincha.pos'
-          || request.auth.token.email == 'peachtukta14@gmail.com'
+          || request.auth.token.email == 'peachtukta1014@gmail.com'
         );
     }
 
