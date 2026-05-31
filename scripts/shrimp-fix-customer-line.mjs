@@ -6,6 +6,7 @@
  *
  *   node scripts/shrimp-fix-customer-line.mjs --dry-run
  *   node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1
+ *   node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1 --line-user-id Uf4e57...
  *   node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1 --delete-sale-date 2026-06-01
  */
 
@@ -43,6 +44,11 @@ function normalizeLineUserId(raw) {
   const m = s.match(/U[a-fA-F0-9]{32}/);
   return m ? m[0] : '';
 }
+
+const lineUserIdArg = (() => {
+  const i = process.argv.indexOf('--line-user-id');
+  return i >= 0 ? normalizeLineUserId(process.argv[i + 1]) : '';
+})();
 
 function saleDateKey(bill) {
   const dk = bill?.dateKey;
@@ -82,6 +88,7 @@ if (!dryRun && !confirm) {
   node scripts/shrimp-fix-customer-line.mjs --confirm --bill-no LINE-16060567
 
 --target-id     ร้านหลักที่ต้องการเก็บ UID (default: c1 = จ๊ะขียด)
+--line-user-id  UID ที่ต้องการผูก (ข้ามการค้นหาจากออเดอร์ — แนะนำเมื่อ copy จาก LINE OA)
 --delete-sale-date  ลบบิล sales ที่ dateKey ตรงนี้ของลูกค้าในเคส
 --bill-no       ลบบิลตามเลขบิล (เช่น LINE-16060567 จากออเดอร์ invite)
 `);
@@ -211,7 +218,10 @@ async function main() {
     process.exit(1);
   }
 
-  let targetUid = normalizeLineUserId(target.lineUserId);
+  let targetUid = lineUserIdArg || normalizeLineUserId(target.lineUserId);
+  if (lineUserIdArg) {
+    console.log(`\nใช้ LINE UID จาก --line-user-id (…${lineUserIdArg.slice(-6)})`);
+  }
 
   if (!targetUid) {
     const fromCx = customers.find((c) => c.id !== targetId && normalizeLineUserId(c.lineUserId) && nameMatchesJaekhiad(c.name));

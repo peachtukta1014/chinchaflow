@@ -11,6 +11,10 @@ on:
         description: 'Customer doc id (default c1 = จ๊ะขียด)'
         type: string
         default: 'c1'
+      line_user_id:
+        description: 'LINE UID to save (optional — skips auto-discover)'
+        type: string
+        default: ''
       bill_no:
         description: 'Optional: delete sale by billNo (e.g. LINE-16060567)'
         type: string
@@ -40,6 +44,9 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           ARGS="--target-id ${{ inputs.target_id }}"
+          if [ -n "${{ inputs.line_user_id }}" ]; then
+            ARGS="$ARGS --line-user-id ${{ inputs.line_user_id }}"
+          fi
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             ARGS="--dry-run $ARGS"
           else
