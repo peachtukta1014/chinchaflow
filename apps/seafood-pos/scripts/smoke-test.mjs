@@ -233,6 +233,27 @@ try {
   fail('lotReport dead COGS', e);
 }
 
+try {
+  // mirror firestoreRest.fsStockKgVal (ไม่ import — firestoreRest ผูก firebase)
+  const fsStockKgVal = (kg) => ({ doubleValue: parseFloat(Number(kg).toFixed(3)) });
+  const whole = fsStockKgVal(141);
+  assert('doubleValue' in whole && !('integerValue' in whole), 'fsStockKgVal ใช้ doubleValue เสมอ (กัน commit 400)');
+  assert(fsStockKgVal(5.8).doubleValue === 5.8, 'fsStockKgVal รองรับทศนิยม');
+} catch (e) {
+  fail('fsStockKgVal', e);
+}
+
+try {
+  const rulesPath = path.join(root, '../../firestore.rules');
+  const rules = fs.readFileSync(rulesPath, 'utf8');
+  assert(
+    rules.includes("'fulfilledItems'") && rules.includes("'cancelledAt'"),
+    'firestore.rules อนุญาต staff อัปเดต fulfilledItems / ยกเลิกออเดอร์ LINE',
+  );
+} catch (e) {
+  fail('firestore lineOrders rules', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
