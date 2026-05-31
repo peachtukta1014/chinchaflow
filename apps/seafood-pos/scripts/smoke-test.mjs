@@ -324,6 +324,14 @@ try {
     billUid: generalUid,
   });
   assert(picked.uid === shopUid, 'บิล general+ชื่อร้าน ใช้ UID ร้าน ไม่ใช่ลูกค้าทั่วไป');
+
+  const pickedAfterClear = pickLineUidForBillPush({
+    profileUid: '',
+    billUid: '',
+    orderUid: '',
+    historyUid: '',
+  });
+  assert(!pickedAfterClear.uid, 'ลบ UID ในรายชื่อแล้ว ไม่ใช้ UID จากบิลเก่า');
 } catch (e) {
   fail('line bill profile match', e);
 }

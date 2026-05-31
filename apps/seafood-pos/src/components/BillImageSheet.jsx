@@ -19,6 +19,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const [lineUidMeta, setLineUidMeta] = useState({
     billUid: '',
     profileName: '',
+    profileLinked: false,
     uidMismatch: false,
   });
   const [lineUidLoading, setLineUidLoading] = useState(true);
@@ -61,6 +62,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
       setLineUidMeta({
         billUid,
         profileName: details.profileName || '',
+        profileLinked: isValidLineUserId(details.profileUid || details.uid),
         uidMismatch: Boolean(
           isValidLineUserId(billUid)
           && isValidLineUserId(profileUid)
@@ -160,7 +162,9 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
               </>
             ) : (
               <p className="text-[10px] text-amber-600 mt-0.5 leading-relaxed">
-                ยังไม่มี LINE UID — แท็บลูกค้า →「ลูกค้า LINE OA」→ บันทึกเข้ารายชื่อ แล้วกดค้นหา UID ด้านล่าง
+                {lineUidMeta.profileName && !lineUidMeta.profileLinked
+                  ? `รายชื่อ「${lineUidMeta.profileName}」ยังไม่มี LINE UID — แก้ไขในแท็บสมาชิก → วาง UID → บันทึก (ระบบไม่ใช้ UID ในบิลเก่าเมื่อลบออกจากรายชื่อแล้ว)`
+                  : 'ยังไม่มี LINE UID — แท็บลูกค้า → วาง UID ในรายชื่อ → บันทึก แล้วกดค้นหาด้านล่าง'}
               </p>
             )}
           </div>
