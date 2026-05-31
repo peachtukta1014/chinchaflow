@@ -42,7 +42,8 @@ const DEFAULT_LINE_CONFIG = {
   instantRestockNotify: true,
 };
 
-export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged }) {
+/** @param {{ catalogOnly?: boolean }} props — catalogOnly: พนักงานเห็นเฉพาะจัดการสินค้า */
+export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged, catalogOnly = false }) {
   const [section, setSection] = useState('products');
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -54,15 +55,21 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, p, tp] = await Promise.all([fsQueryUsers(), fsQueryProducts(), fsQueryToppings()]);
-      setUsers(u);
-      setProducts(p);
-      setToppings(tp);
+      if (catalogOnly) {
+        const [p, tp] = await Promise.all([fsQueryProducts(), fsQueryToppings()]);
+        setProducts(p);
+        setToppings(tp);
+      } else {
+        const [u, p, tp] = await Promise.all([fsQueryUsers(), fsQueryProducts(), fsQueryToppings()]);
+        setUsers(u);
+        setProducts(p);
+        setToppings(tp);
+      }
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
-  }, []);
+  }, [catalogOnly]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -145,27 +152,34 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
+      {catalogOnly && (
+        <p className="text-[11px] text-sky-900 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 leading-relaxed">
+          {t('staffCatalogHint')}
+        </p>
+      )}
       {flash && (
         <div className="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">{flash}</div>
       )}
-      <div className="flex gap-1.5 flex-wrap">
-        {[['members', t('members')], ['products', t('products')], ['orders', t('orderHistory')], ['settings', t('lineSettings')]].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSection(id)}
-            className={`shrink-0 px-3 py-2 rounded-2xl font-bold text-[10px] ${section === id ? 'text-white' : 'bg-stone-200 text-stone-500'}`}
-            style={section === id ? { background: '#3d1f0f' } : {}}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {loading && (section === 'members' || section === 'products') ? (
+      {!catalogOnly && (
+        <div className="flex gap-1.5 flex-wrap">
+          {[['members', t('members')], ['products', t('products')], ['orders', t('orderHistory')], ['settings', t('lineSettings')]].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSection(id)}
+              className={`shrink-0 px-3 py-2 rounded-2xl font-bold text-[10px] ${section === id ? 'text-white' : 'bg-stone-200 text-stone-500'}`}
+              style={section === id ? { background: '#3d1f0f' } : {}}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {loading && (!catalogOnly && section === 'members' || section === 'products') ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
-      ) : section === 'members' ? (
+      ) : !catalogOnly && section === 'members' ? (
         <MembersSection users={users} t={t} onUpdate={updateUser} onDelete={deleteUser} />
-      ) : section === 'products' ? (
+      ) : section === 'products' || catalogOnly ? (
         <ProductsSection
           products={products}
           toppings={toppings}

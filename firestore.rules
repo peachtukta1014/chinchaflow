@@ -93,14 +93,15 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // เมนู/ท็อปปิ้ง — พนักงานที่อนุมัติแล้วแก้ได้ (ไม่ต้องเป็นแอดมิน)
     match /products/{docId} {
       allow read: if isApproved();
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isApproved();
     }
 
     match /toppings/{docId} {
       allow read: if isApproved();
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isApproved();
     }
 
     match /restocks/{docId} {
