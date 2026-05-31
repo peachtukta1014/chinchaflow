@@ -15,6 +15,7 @@ import DateNavBar from '../components/DateNavBar';
 import StockLotTimeline from '../components/StockLotTimeline';
 import StockLineSwitcher from '../components/StockLineSwitcher';
 import SubTabBar from '../components/SubTabBar';
+import { STOCK_LINE } from '../constants/stockLines';
 
 const ADJUST_LABELS = {
   pond_to_dead: { title: 'ส่งยอดจากบ่อ (ขายได้)', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
@@ -189,10 +190,10 @@ export default function InventoryScreen({
   };
 
   const handleReceiveLive = async () => {
-    if (!rcvLive || liveKg <= 0) return alert('ใส่น้ำหนักกุ้งเป็น (กก.) ครับ');
+    if (!rcvLive || liveKg <= 0) return alert(`ใส่น้ำหนัก${STOCK_LINE.live.full} (กก.) ครับ`);
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     if (sizeWarning) {
-      return alert(`ยอดรวมไซต์ (${sizeTotalKg.toFixed(3)} กก.) ไม่ตรงกับกุ้งเป็น (${liveKg.toFixed(3)} กก.) ครับ`);
+      return alert(`ยอดรวมไซต์ (${sizeTotalKg.toFixed(3)} กก.) ไม่ตรงกับ ${STOCK_LINE.live.label} (${liveKg.toFixed(3)} กก.) ครับ`);
     }
     setSaving(true);
     try {
@@ -206,7 +207,7 @@ export default function InventoryScreen({
       });
       await updateMainStock(stock.live + liveKg, stock.dead);
       alert(
-        `✅ บันทึกรับเข้า — สายกุ้งเป็น\n` +
+        `✅ บันทึกรับเข้า — ${STOCK_LINE.live.full}\n` +
           `${liveKg.toFixed(3)} กก. · ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ\n` +
           `ต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`,
       );
@@ -221,7 +222,7 @@ export default function InventoryScreen({
   };
 
   const handleReceiveDead = async () => {
-    if (!rcvDead || deadKg <= 0) return alert('ใส่น้ำหนักกุ้งตาย (กก.) ครับ');
+    if (!rcvDead || deadKg <= 0) return alert(`ใส่น้ำหนัก${STOCK_LINE.dead.full} (กก.) ครับ`);
     if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     setSaving(true);
     try {
@@ -235,7 +236,7 @@ export default function InventoryScreen({
       });
       await updateMainStock(stock.live, stock.dead + deadKg);
       alert(
-        `✅ บันทึกรับเข้า — สายกุ้งตาย (รับตรง)\n` +
+        `✅ บันทึกรับเข้า — ${STOCK_LINE.dead.full} (รับตรง)\n` +
           `${deadKg.toFixed(3)} กก. · ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ\n` +
           `ต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`,
       );
@@ -267,7 +268,7 @@ export default function InventoryScreen({
     if (!deadWeight) return;
     const w = parseFloat(deadWeight);
     if (!Number.isFinite(w) || w <= 0) return alert('ใส่น้ำหนักครับ');
-    if (w > stock.live) return alert('ยอดมากกว่ากุ้งเป็นคงเหลือครับ');
+    if (w > stock.live) return alert(`ยอดมากกว่า${STOCK_LINE.live.label}คงเหลือครับ`);
 
     const meta = { note: deadNote, recordedBy: member?.name || '' };
     setSaving(true);
@@ -304,8 +305,8 @@ export default function InventoryScreen({
 
       <p className="text-[11px] text-slate-500 leading-relaxed px-1">
         {stockLine === 'live'
-          ? 'สายกุ้งเป็น — รับเข้า · ตัดในบ่อแล้วส่งยอดไปสายตาย · ขายที่หน้าบันทึกการขาย (โหมดกุ้งเป็น)'
-          : 'สายกุ้งตาย — รับตายตรง · ดูยอดที่ส่งมาจากบ่อ · ขายที่หน้าบันทึกการขาย (โหมดกุ้งตาย)'}
+          ? `${STOCK_LINE.live.full} — รับเข้า · ตัดในบ่อแล้วส่งยอดไป${STOCK_LINE.dead.label} · ขายที่หน้าบันทึกการขาย`
+          : `${STOCK_LINE.dead.full} — รับตายตรง · ดูยอดจากบ่อ · ขายที่หน้าบันทึกการขาย`}
       </p>
 
       <SubTabBar tab={tab} onChange={setTab} items={subTabs} />
@@ -320,7 +321,7 @@ export default function InventoryScreen({
 
       {stockLine === 'live' && tab === 'receive' && (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h2 className="font-black text-blue-700 text-xl">รับเข้า — กุ้งเป็น</h2>
+          <h2 className="font-black text-blue-700 text-xl">รับเข้า — {STOCK_LINE.live.full}</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
             บันทึกลง
             <strong> วันนี้</strong>
@@ -341,7 +342,7 @@ export default function InventoryScreen({
             </p>
           )}
           <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งเป็น (กก.)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนัก {STOCK_LINE.live.full} (กก.)</label>
             <input
               type="number"
               inputMode="decimal"
@@ -385,7 +386,7 @@ export default function InventoryScreen({
           </div>
 
           <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
-            <p className="text-xs font-bold text-slate-500">ไซต์กุ้งเป็น</p>
+            <p className="text-xs font-bold text-slate-500">ไซต์ {STOCK_LINE.live.label}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -464,7 +465,7 @@ export default function InventoryScreen({
             disabled={saving}
             className="w-full bg-blue-600 text-white font-bold py-5 rounded-2xl disabled:opacity-60"
           >
-            {saving ? 'กำลังบันทึก...' : 'บันทึกรับเข้า — กุ้งเป็น'}
+            {saving ? 'กำลังบันทึก...' : `บันทึกรับเข้า — ${STOCK_LINE.live.label}`}
           </button>
         </div>
       )}
@@ -474,7 +475,7 @@ export default function InventoryScreen({
           <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
             <h2 className="font-black text-blue-700 text-xl">ในบ่อ — ส่งยอดไประบบตาย</h2>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              ยังอยู่<strong>สายกุ้งเป็น</strong> จนกดบันทึก · ระบบหักล็อตรับเก่าก่อน (FIFO) แล้วส่งยอดไปกุ้งตายเมื่อเลือก「ขายได้」
+              ยังอยู่<strong>{STOCK_LINE.live.full}</strong> จนกดบันทึก · หักล็อตเก่าก่อน (FIFO) แล้วส่งยอดไป{STOCK_LINE.dead.full} เมื่อเลือก「ขายได้」
             </p>
             <div className="flex gap-2">
               <button
@@ -502,12 +503,12 @@ export default function InventoryScreen({
             </div>
             <p className="text-[10px] text-slate-400">
               {deadMode === 'pond_to_dead'
-                ? 'กุ้งเป็นลด · กุ้งตายเพิ่ม (ไปสายตายขายได้)'
-                : 'กุ้งเป็นลดเท่านั้น · ไม่เพิ่มกุ้งตาย (เน่า/เสียหาย)'}
+                ? `${STOCK_LINE.live.label} ลด · ${STOCK_LINE.dead.label} เพิ่ม (ขายได้)`
+                : `${STOCK_LINE.live.label} ลดเท่านั้น · ไม่เพิ่ม${STOCK_LINE.dead.label} (เน่า/เสียหาย)`}
             </p>
             <div className="bg-blue-50 p-4 rounded-2xl">
               <span className="text-sm text-blue-900">
-                กุ้งเป็นคงเหลือ:{' '}
+                {STOCK_LINE.live.label} คงเหลือ:{' '}
                 <span className="font-black text-xl">{stock.live.toFixed(1)} กก.</span>
               </span>
             </div>
@@ -584,19 +585,19 @@ export default function InventoryScreen({
 
       {stockLine === 'dead' && tab === 'receive' && (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-          <h2 className="font-black text-red-600 text-xl">รับเข้า — กุ้งตาย (รับตรง)</h2>
+          <h2 className="font-black text-red-600 text-xl">รับเข้า — {STOCK_LINE.dead.full} (รับตรง)</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
             รับตายจากแหล่งอื่นโดยตรง (ไม่ผ่านบ่อ) · วันนี้ (
             {formatViewDateLabel(todayKey)}
             )
           </p>
           <div className="bg-red-50 p-3 rounded-xl text-[11px] text-red-800">
-            กุ้งตายคงเหลือ: <strong>{stock.dead.toFixed(1)} กก.</strong>
+            {STOCK_LINE.dead.label} คงเหลือ: <strong>{stock.dead.toFixed(1)} กก.</strong>
             {' '}
             · ยอดจากบ่อดูที่แท็บ「ประวัติรับ」
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนักกุ้งตาย (กก.)</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนัก {STOCK_LINE.dead.full} (กก.)</label>
             <input
               type="number"
               inputMode="decimal"
@@ -660,15 +661,15 @@ export default function InventoryScreen({
             disabled={saving}
             className="w-full bg-red-500 text-white font-bold py-5 rounded-2xl disabled:opacity-60"
           >
-            {saving ? 'กำลังบันทึก...' : 'บันทึกรับเข้า — กุ้งตาย'}
+            {saving ? 'กำลังบันทึก...' : `บันทึกรับเข้า — ${STOCK_LINE.dead.label}`}
           </button>
         </div>
       )}
 
       {stockLine === 'dead' && tab === 'history' && (
         <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-4">
-          <h3 className="font-bold text-red-700">ประวัติรับเข้าสายตาย</h3>
-          <p className="text-[11px] text-slate-500">รับตรง + ยอดที่ส่งมาจากบ่อ (สายเป็น)</p>
+          <h3 className="font-bold text-red-700">ประวัติรับ — {STOCK_LINE.dead.label}</h3>
+          <p className="text-[11px] text-slate-500">รับตรง + ยอดจากบ่อ ({STOCK_LINE.live.tag})</p>
           <DateNavBar
             dateKey={historyViewDate}
             onDateChange={setHistoryViewDate}

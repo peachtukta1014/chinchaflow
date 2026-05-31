@@ -24,6 +24,7 @@ import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
+import { stockLineFull } from './constants/stockLines';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -261,7 +262,7 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-black truncate">
                 {activeTab === 'stock'
-                  ? (stockOverlayLine === 'dead' ? 'คลัง — สายกุ้งตาย' : 'คลัง — สายกุ้งเป็น')
+                  ? `คลัง — ${stockLineFull(stockOverlayLine)}`
                   : (OVERLAY_TITLES[activeTab] || 'เมนู')}
               </p>
               <p className="text-[10px] text-slate-400 truncate">{member.name}</p>

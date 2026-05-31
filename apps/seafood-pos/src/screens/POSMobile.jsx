@@ -17,6 +17,7 @@ import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
 import StockLineSwitcher from '../components/StockLineSwitcher';
+import { STOCK_LINE } from '../constants/stockLines';
 
 export default function POSMobile({
   user,
@@ -305,10 +306,18 @@ export default function POSMobile({
         <StockLineSwitcher line={salesLine} onChange={switchSalesLine} className="mb-2" />
         <p className="text-[10px] text-slate-500 mb-3 leading-relaxed px-0.5">
           สลับสายเพื่อเลือกสินค้าเพิ่ม · บิลลูกค้า
-          <strong> รวมเป็น+ตายในบิลเดียว</strong>
+          <strong>
+            {' '}
+            รวม
+            {STOCK_LINE.live.tag}
+            +
+            {STOCK_LINE.dead.tag}
+            {' '}
+            ในบิลเดียว
+          </strong>
           ได้
           {cartIsMixed && (
-            <span className="ml-1 text-emerald-700 font-bold">· ตะกร้านี้มีทั้งสองสายแล้ว</span>
+            <span className="ml-1 text-emerald-700 font-bold">· ตะกร้ามีทั้ง Live และ Dead แล้ว</span>
           )}
         </p>
 
@@ -321,7 +330,7 @@ export default function POSMobile({
                 className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-blue-600 text-white font-bold text-xs shadow-md active:scale-[0.98]"
               >
                 <Package size={18} />
-                รับเข้า — เป็น
+                รับเข้า Live
               </button>
             )}
             {onOpenReceiveDead && (
@@ -331,7 +340,7 @@ export default function POSMobile({
                 className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs shadow-md active:scale-[0.98]"
               >
                 <Package size={18} />
-                รับเข้า — ตาย
+                รับเข้า Dead
               </button>
             )}
           </div>
@@ -353,7 +362,7 @@ export default function POSMobile({
                   <p className="text-sm font-bold text-slate-800">
                     {idx + 1}. {item.productName}
                     <span className={`ml-1.5 text-[10px] font-bold ${item.type === 'dead' ? 'text-red-600' : 'text-blue-600'}`}>
-                      ({item.type === 'dead' ? 'ตาย' : 'เป็น'})
+                      ({item.type === 'dead' ? STOCK_LINE.dead.tag : STOCK_LINE.live.tag})
                     </span>
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
