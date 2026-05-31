@@ -15,7 +15,6 @@ import { normalizeBillItems } from '../lib/salesAggregate';
 import { incrementCustomerDebt } from './debtService';
 import {
   deductFifoFromBatches,
-  deductStockForSale,
   getEffectiveStock,
   restoreStockForSale,
   sumStockFromBatches,
@@ -164,8 +163,10 @@ export async function saveBillWithCart({
       persistSaleBill({ billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey }),
     ]);
   } catch (writeErr) {
+    // ส่ง post-deduction stock เพื่อให้ restoreStockForSale คำนวณถูก:
+    // nextLive = newLive + liveKg = avail.live (กลับไปก่อนตัด)
     try {
-      await restoreStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
+      await restoreStockForSale({ live: newLive, dead: newDead }, liveKg, deadKg, updateMainStock, stockBatches);
     } catch (restoreErr) {
       console.error('Stock compensation failed', restoreErr);
       throw new Error(

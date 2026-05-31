@@ -452,6 +452,10 @@ export default function CustomerAccountsScreen({
             )}
             {loading ? (
               <p className="text-center text-slate-400 py-8 text-sm">กำลังโหลด...</p>
+            ) : daySalesLoadError && sortedDaySales.length === 0 ? (
+              <p className="text-center text-yellow-600 py-8 text-sm font-bold">
+                ⚠ โหลดบิลไม่ได้ — กดรีเฟรชเพื่อลองใหม่
+              </p>
             ) : sortedDaySales.length === 0 ? (
               <p className="text-center text-slate-400 py-8 text-sm">
                 ไม่มีบิล
@@ -549,8 +553,13 @@ export default function CustomerAccountsScreen({
         <p className="text-[10px] text-slate-400 mb-4">
           แตะลูกค้า → ใส่ยอดที่รับ → ระบบหักบิลเก่าสุดก่อน (ค้าง/ผ่อน)
         </p>
+        {debtLoadError && (
+          <p className="text-center text-yellow-600 text-xs font-bold py-2 mb-3 bg-yellow-50 rounded-xl border border-yellow-200">
+            ⚠ โหลดข้อมูลลูกหนี้ไม่ได้ — กดรีเฟรชเพื่อลองใหม่
+          </p>
+        )}
         {customerRows.length === 0 ? (
-          <p className="text-center text-emerald-500 font-bold py-8">ไม่มีลูกหนี้ 🎉</p>
+          <p className="text-center text-emerald-500 font-bold py-8">{debtLoadError ? '—' : 'ไม่มีลูกหนี้ 🎉'}</p>
         ) : (
           <div className="space-y-3">
             {customerRows.map((row) => (
