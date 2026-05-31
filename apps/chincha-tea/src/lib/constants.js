@@ -1,5 +1,16 @@
-/** อีเมลแอดมินหลัก — สมัครครั้งแรกได้ role admin + อนุมัติทันที (ตรง firestore.rules) */
-export const BOOTSTRAP_ADMIN_EMAIL = 'gmc-peach@chincha.pos';
+/** อีเมลแอดมินหลัก — สมัคร/ล็อกอินครั้งแรกได้ role admin + อนุมัติทันที (ตรง firestore.rules) */
+export const BOOTSTRAP_ADMIN_EMAILS = [
+  'gmc-peach@chincha.pos',
+  'peachtukta14@gmail.com',
+];
+
+/** @deprecated ใช้ isBootstrapAdminEmail() แทน */
+export const BOOTSTRAP_ADMIN_EMAIL = BOOTSTRAP_ADMIN_EMAILS[0];
+
+export function isBootstrapAdminEmail(email) {
+  const em = (email || '').trim().toLowerCase();
+  return BOOTSTRAP_ADMIN_EMAILS.some((e) => e.toLowerCase() === em);
+}
 
 /** ค่าแรงพนักงานต่อวันที่มาทำงาน (บาท) */
 export const STAFF_DAILY_WAGE = 400;
