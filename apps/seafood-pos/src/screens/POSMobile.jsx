@@ -374,7 +374,7 @@ export default function POSMobile({
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {item.type === 'other'
-                      ? `฿${item.total.toLocaleString()}`
+                      ? `${item.weight} กก. × ฿${item.pricePerKg}`
                       : `${item.weight} กก.${item.type === 'live' ? ` × ฿${item.pricePerKg}` : ' (เหมา)'}`}
                     {item.note && <span className="text-orange-500 ml-1">*{item.note}</span>}
                   </p>
@@ -451,8 +451,6 @@ export default function POSMobile({
         </div>
       </div>
 
-      <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
-
       {/* ลูกค้า + ขนาดกุ้ง (แถวเดียว) */}
       <div className="px-3 py-3 flex gap-2 items-stretch shrink-0 min-h-[52px]">
         <div className="flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm shrink-0 w-[38%] max-w-[9.5rem] min-w-[7.5rem]">
@@ -490,6 +488,8 @@ export default function POSMobile({
           ))}
         </div>
       </div>
+
+      <PosCustomLinesPanel onAddItems={(items) => setCart((prev) => [...prev, ...items])} />
 
       {/* Numpad */}
       <div className="flex-1 bg-white p-5 flex flex-col rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.04)]"
