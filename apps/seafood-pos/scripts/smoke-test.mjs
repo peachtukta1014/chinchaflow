@@ -287,6 +287,17 @@ try {
   fail('lineCustomerResolve', e);
 }
 
+try {
+  const { pickLineUidForBillPush } = await import('../src/lib/resolveLineUserIdPick.js');
+  const profileUid = 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
+  const billUid = 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';
+  const picked = pickLineUidForBillPush({ profileUid, billUid });
+  assert(picked.uid === profileUid, 'ส่งบิลใช้ UID จากรายชื่อลูกค้า ไม่ใช่ UID ในบิลเก่า');
+  assert(picked.billUid === billUid && picked.profileUid === profileUid, 'เก็บ UID บิล vs โปรไฟล์แยกได้');
+} catch (e) {
+  fail('pickLineUidForBillPush', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
