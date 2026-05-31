@@ -2,6 +2,7 @@ export { CUSTOMERS } from './customers';
 export { PRODUCTS } from './products';
 export {
   STOCK_LINE,
+  SHRIMP_DAMAGE,
   stockLineFull,
   stockLineLabel,
   stockLineTag,

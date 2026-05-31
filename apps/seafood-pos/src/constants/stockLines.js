@@ -36,3 +36,9 @@ export function formatStockPairShort(liveKg, deadKg, { decimals = 2 } = {}) {
   const f = (n) => Number(n).toFixed(decimals);
   return `${STOCK_LINE.live.label} ${f(liveKg)} · ${STOCK_LINE.dead.label} ${f(deadKg)} กก.`;
 }
+
+/** spoilage_loss — กุ้งตายในบ่อ/เน่า ไม่นำไปขาย (ระบบเดิมเรียกตัดทิ้ง) */
+export const SHRIMP_DAMAGE = {
+  label: 'กุ้งตายเสียหาย',
+  full: 'กุ้งตายเสียหาย (ตัดทิ้ง)',
+};
