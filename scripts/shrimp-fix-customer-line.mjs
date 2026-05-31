@@ -27,6 +27,10 @@ const deleteSaleDate = (() => {
   const i = process.argv.indexOf('--delete-sale-date');
   return i >= 0 ? process.argv[i + 1] : '';
 })();
+const billNo = (() => {
+  const i = process.argv.indexOf('--bill-no');
+  return i >= 0 ? process.argv[i + 1] : '';
+})();
 
 function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
@@ -75,9 +79,11 @@ if (!dryRun && !confirm) {
   node scripts/shrimp-fix-customer-line.mjs --dry-run
   node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1
   node scripts/shrimp-fix-customer-line.mjs --confirm --target-id c1 --delete-sale-date YYYY-MM-DD
+  node scripts/shrimp-fix-customer-line.mjs --confirm --bill-no LINE-16060567
 
 --target-id     ร้านหลักที่ต้องการเก็บ UID (default: c1 = จ๊ะขียด)
---delete-sale-date  ลบบิล sales ที่ dateKey ตรงนี้ของลูกค้าในเคส (ถ้าไม่ใส่ แสดงรายการอย่างเดียว)
+--delete-sale-date  ลบบิล sales ที่ dateKey ตรงนี้ของลูกค้าในเคส
+--bill-no       ลบบิลตามเลขบิล (เช่น LINE-16060567 จากออเดอร์ invite)
 `);
   process.exit(1);
 }
@@ -238,6 +244,12 @@ async function main() {
       return n && (n.includes('ขียด') || n.includes('เขียน'));
     });
 
+  const billNoCandidates = billNo
+    ? salesSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((s) => String(s.billNo || '') === billNo)
+    : [];
+
   const tomorrowCandidates = deleteSaleDate
     ? relatedSales.filter((s) => saleDateKey(s) === deleteSaleDate)
     : relatedSales.filter((s) => saleDateKey(s) > new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date()));
@@ -247,7 +259,16 @@ async function main() {
     console.log(`  ${s.id} · ${saleDateKey(s)} · ${s.customerId} · ${s.customerName} · ฿${s.total ?? '—'}`);
   });
 
-  if (deleteSaleDate && tomorrowCandidates.length) {
+  if (billNo) {
+    if (billNoCandidates.length) {
+      console.log(`\n── ลบบิล ${billNo} ──`);
+      for (const s of billNoCandidates) {
+        await deleteSale(s);
+      }
+    } else {
+      console.log(`\nไม่พบบิล billNo=${billNo}`);
+    }
+  } else if (deleteSaleDate && tomorrowCandidates.length) {
     console.log(`\n── ลบบิลวันที่ ${deleteSaleDate} ──`);
     for (const s of tomorrowCandidates) {
       await deleteSale(s);
@@ -255,7 +276,7 @@ async function main() {
   } else if (deleteSaleDate) {
     console.log(`\nไม่พบบิลวันที่ ${deleteSaleDate} สำหรับเคสนี้`);
   } else if (tomorrowCandidates.length) {
-    console.log('\n(มีบิลวันในอนาคต — ใส่ --delete-sale-date YYYY-MM-DD เพื่อลบ)');
+    console.log('\n(มีบิลวันในอนาคต — ใส่ --delete-sale-date หรือ --bill-no เพื่อลบ)');
   }
 
   console.log('\nเสร็จ');
