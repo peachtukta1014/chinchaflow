@@ -1,16 +1,26 @@
 import { canonicalCustomerNameKey, exactCustomerNameMatch, uidCustomerNameMatch } from './customerNameMatch.js';
 
-const NAME_SPLIT_RE = /[,，、]/;
+const ALIAS_SPLIT_RE = /[,，、]/;
 
-/** แยกชื่อหลักกับชื่อเรียกอื่นจากช่องเดียว (คั่นด้วย comma) */
-export function splitCustomerNameInput(raw) {
-  const parts = String(raw || '')
-    .split(NAME_SPLIT_RE)
+/** แยกชื่อเรียกอื่นจากช่อง aliases (คั่นด้วย comma เท่านั้น) */
+export function parseAliasesInput(raw) {
+  return String(raw || '')
+    .split(ALIAS_SPLIT_RE)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!parts.length) return { name: '', aliases: [] };
-  const [name, ...aliases] = parts;
-  return { name, aliases };
+}
+
+/** ข้อมูลเก่าที่เคยใส่ comma ในช่องชื่อเดียว — แยกตอนโหลดฟอร์ม */
+export function splitLegacyCommaName(raw) {
+  const parts = String(raw || '')
+    .split(ALIAS_SPLIT_RE)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) {
+    return { name: parts[0] || '', legacyAliases: [] };
+  }
+  const [name, ...legacyAliases] = parts;
+  return { name, legacyAliases };
 }
 
 function dedupeAliasLabels(primary, extras) {
@@ -33,12 +43,21 @@ function dedupeAliasLabels(primary, extras) {
   return out;
 }
 
-/** ทุกชื่อที่ใช้จับคู่ออเดอร์ LINE / เสียง / บอท */
+function normalizeAliasList(name, aliasesInput) {
+  const list = Array.isArray(aliasesInput)
+    ? aliasesInput
+    : parseAliasesInput(aliasesInput);
+  const primary = String(name || '').trim();
+  const merged = dedupeAliasLabels(primary, list);
+  return merged.length > 1 ? merged.slice(1) : [];
+}
+
+/** ทุกชื่อที่ใช้จับคู่ออเดอร์ LINE / เสียง / บอท (ไม่รวมในบิล) */
 export function collectCustomerSearchNames(customer) {
-  const split = splitCustomerNameInput(customer?.name || '');
-  const primary = split.name || String(customer?.name || '').trim();
+  const legacy = splitLegacyCommaName(customer?.name || '');
+  const primary = legacy.name || String(customer?.name || '').trim();
   const extras = [
-    ...split.aliases,
+    ...legacy.legacyAliases,
     ...(Array.isArray(customer?.aliases) ? customer.aliases : []),
     customer?.nickname,
     customer?.shortName,
@@ -46,21 +65,35 @@ export function collectCustomerSearchNames(customer) {
   return dedupeAliasLabels(primary, extras);
 }
 
-/** รวมชื่อหลัก + ชื่อเรียกอื่น สำหรับแสดงในช่องแก้ไข */
-export function formatCustomerNameForEdit(customer) {
-  const names = collectCustomerSearchNames(customer);
-  return names.join(', ');
+/** ชื่อเรียกอื่น → ข้อความในช่องฟอร์ม */
+export function formatAliasesForEdit(customer) {
+  const labels = collectCustomerSearchNames(customer);
+  if (labels.length <= 1) return '';
+  return labels.slice(1).join(', ');
 }
 
-/** แปลงฟอร์ม → เก็บ Firestore (ชื่อหลัก + aliases[]) */
-export function customerFieldsFromNameInput(rawName, existingAliases = []) {
-  const { name, aliases } = splitCustomerNameInput(rawName);
-  const merged = dedupeAliasLabels(name, [...aliases, ...existingAliases]);
-  const primary = merged[0] || String(name || '').trim();
-  const aliasOnly = merged.length > 1 ? merged.slice(1) : [];
+/** โหลดลูกค้า → ค่าในฟอร์ม 2 ช่อง */
+export function customerToFormFields(customer) {
+  const legacy = splitLegacyCommaName(customer?.name || '');
+  const billName = legacy.name || String(customer?.name || '').trim();
+  const stored = Array.isArray(customer?.aliases) ? customer.aliases : [];
+  const aliasOnly = normalizeAliasList(billName, [...legacy.legacyAliases, ...stored]);
   return {
-    name: primary,
-    aliases: aliasOnly.length ? aliasOnly : [],
+    name: billName,
+    aliasesText: aliasOnly.join(', '),
+    zone: customer?.zone || '',
+    phone: customer?.phone || '',
+    lineUserId: customer?.lineUserId || '',
+  };
+}
+
+/** ฟอร์ม → เก็บ Firestore */
+export function customerFieldsFromForm({ name, aliasesText, aliases }) {
+  const billName = String(name || '').trim();
+  const aliasOnly = normalizeAliasList(billName, aliases ?? aliasesText);
+  return {
+    name: billName,
+    aliases: aliasOnly,
   };
 }
 
@@ -72,7 +105,8 @@ export function customerMatchesLabel(customer, want) {
   );
 }
 
-/** ชื่อจากช่องฟอร์ม (อาจมี comma) → รายการที่ลองจับกับออเดอร์ */
-export function labelsFromCustomerInput(raw) {
-  return collectCustomerSearchNames({ name: raw, aliases: [] });
+/** รายการชื่อสำหรับจับออเดอร์ LINE จากฟอร์ม */
+export function labelsFromCustomerForm({ name, aliasesText, aliases }) {
+  const { name: billName, aliases: list } = customerFieldsFromForm({ name, aliasesText, aliases });
+  return dedupeAliasLabels(billName, list);
 }

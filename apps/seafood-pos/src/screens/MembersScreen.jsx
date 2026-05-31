@@ -13,16 +13,24 @@ import {
 } from '../services/customerService';
 import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
-import { collectCustomerSearchNames, formatCustomerNameForEdit } from '../lib/customerAliases';
+import { customerToFormFields, formatAliasesForEdit } from '../lib/customerAliases';
+
+const EMPTY_CUSTOMER_FORM = {
+  name: '',
+  aliasesText: '',
+  zone: '',
+  phone: '',
+  lineUserId: '',
+};
 
 export default function MembersScreen({ isAdmin = false }) {
   const [subTab, setSubTab] = useState('list');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cusLoading, setCusLoading] = useState(true);
   const [cusEditId, setCusEditId] = useState(null);
-  const [cusEditData, setCusEditData] = useState({ name: '', zone: '', phone: '', lineUserId: '' });
+  const [cusEditData, setCusEditData] = useState(EMPTY_CUSTOMER_FORM);
   const [showAdd, setShowAdd] = useState(false);
-  const [newCus, setNewCus] = useState({ name: '', zone: '', phone: '', lineUserId: '' });
+  const [newCus, setNewCus] = useState(EMPTY_CUSTOMER_FORM);
   const [suggestBusy, setSuggestBusy] = useState(null);
   const [saveBusy, setSaveBusy] = useState(false);
   const [lineOaPending, setLineOaPending] = useState(0);
@@ -56,14 +64,14 @@ export default function MembersScreen({ isAdmin = false }) {
     }
   };
 
-  const fillLineFromOrders = async (target, setData, customerName, currentLineUserId = '') => {
+  const fillLineFromOrders = async (target, setData, form, currentLineUserId = '') => {
     if (isValidLineUserId(normalizeLineUserId(currentLineUserId))) {
       showFlash('มี LINE UID ในช่องแล้ว — กด「บันทึก」ได้เลย (ไม่ต้องดึงจากออเดอร์)');
       return;
     }
     setSuggestBusy(target);
     try {
-      const id = await suggestLineUserIdFromOrders(customerName);
+      const id = await suggestLineUserIdFromOrders(form);
       if (!id) {
         showFlash('ไม่พบ LINE ID จากออเดอร์ — วาง UID เองแล้วกด「บันทึก」ได้ (ยกเลิกออเดอร์แล้วก็ยังใช้ได้)');
         return;
@@ -87,7 +95,7 @@ export default function MembersScreen({ isAdmin = false }) {
     try {
       const { map } = await createCustomerVerified(newCus);
       setFsCustomers(map);
-      setNewCus({ name: '', zone: '', phone: '', lineUserId: '' });
+      setNewCus(EMPTY_CUSTOMER_FORM);
       setShowAdd(false);
       showFlash('✅ เพิ่มลูกค้าสำเร็จแล้วครับ');
     } catch (e) {
@@ -177,7 +185,7 @@ export default function MembersScreen({ isAdmin = false }) {
           รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย
           ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」
           <br />
-          ช่องชื่อ: ชื่อหลัก, ชื่อเรียกอื่น, … (คั่นด้วยจุลภาค) — บอท LINE ใช้จับคู่ออเดอร์
+          ชื่อบนบิล = ช่องแรก · ชื่อเรียกอื่น = ช่องที่สอง (บอท LINE จับคู่เท่านั้น ไม่ขึ้นบิล)
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
@@ -195,12 +203,18 @@ export default function MembersScreen({ isAdmin = false }) {
             <input
               value={newCus.name}
               onChange={(e) => setNewCus((p) => ({ ...p, name: e.target.value }))}
-              placeholder="ชื่อหลัก, ชื่อเรียกอื่น (คั่นด้วย ,)"
+              placeholder="ชื่อบนบิล / ส่งลูกค้า *"
               autoFocus
               className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
             />
+            <input
+              value={newCus.aliasesText}
+              onChange={(e) => setNewCus((p) => ({ ...p, aliasesText: e.target.value }))}
+              placeholder="ชื่อเรียกอื่น (คั่นด้วย ,) — สำหรับบอท LINE"
+              className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm outline-none"
+            />
             <p className="text-[10px] text-blue-700/80 leading-snug">
-              ตัวอย่าง: ร้านเฟิร์ส, Firstseafood, เฟิร์ส, พี่ต้อม
+              ตัวอย่างชื่อเรียก: Firstseafood, เฟิร์ส, พี่ต้อม
             </p>
             <input
               value={newCus.zone}
@@ -224,7 +238,7 @@ export default function MembersScreen({ isAdmin = false }) {
             <button
               type="button"
               disabled={suggestBusy === 'add' || !newCus.name.trim()}
-              onClick={() => fillLineFromOrders('add', setNewCus, newCus.name, newCus.lineUserId)}
+              onClick={() => fillLineFromOrders('add', setNewCus, newCus, newCus.lineUserId)}
               className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
             >
               {suggestBusy === 'add' ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
@@ -264,12 +278,18 @@ export default function MembersScreen({ isAdmin = false }) {
                     <input
                       value={cusEditData.name}
                       onChange={(e) => setCusEditData((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="ชื่อหลัก, ชื่อเรียกอื่น (คั่นด้วย ,)"
+                      placeholder="ชื่อบนบิล / ส่งลูกค้า"
                       autoFocus
                       className="w-full border border-blue-400 rounded-xl px-3 py-2.5 text-sm font-bold outline-none"
                     />
+                    <input
+                      value={cusEditData.aliasesText}
+                      onChange={(e) => setCusEditData((p) => ({ ...p, aliasesText: e.target.value }))}
+                      placeholder="ชื่อเรียกอื่น (คั่นด้วย ,) — สำหรับบอท LINE"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
                     <p className="text-[10px] text-slate-500 leading-snug">
-                      ชื่อแรก = ชื่อหลักในระบบ · ที่เหลือ = ชื่อที่บอทจับจาก LINE
+                      ชื่อบนบิลใช้แค่ช่องบน — ชื่อเรียกอื่นไม่ขึ้นบิล
                     </p>
                     <input
                       value={cusEditData.zone}
@@ -293,7 +313,7 @@ export default function MembersScreen({ isAdmin = false }) {
                     <button
                       type="button"
                       disabled={suggestBusy === c.id || !cusEditData.name.trim()}
-                      onClick={() => fillLineFromOrders(c.id, setCusEditData, cusEditData.name, cusEditData.lineUserId)}
+                      onClick={() => fillLineFromOrders(c.id, setCusEditData, cusEditData, cusEditData.lineUserId)}
                       className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
                     >
                       {suggestBusy === c.id ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
@@ -342,9 +362,9 @@ export default function MembersScreen({ isAdmin = false }) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-slate-800 truncate">{c.name}</p>
-                      {collectCustomerSearchNames(c).length > 1 && (
+                      {formatAliasesForEdit(c) && (
                         <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                          เรียก: {collectCustomerSearchNames(c).slice(1).join(' · ')}
+                          เรียก: {formatAliasesForEdit(c)}
                         </p>
                       )}
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -380,12 +400,7 @@ export default function MembersScreen({ isAdmin = false }) {
                         type="button"
                         onClick={() => {
                           setCusEditId(c.id);
-                          setCusEditData({
-                            name: formatCustomerNameForEdit(c),
-                            zone: c.zone || '',
-                            phone: c.phone || '',
-                            lineUserId: c.lineUserId || '',
-                          });
+                          setCusEditData(customerToFormFields(c));
                         }}
                         className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg"
                       >

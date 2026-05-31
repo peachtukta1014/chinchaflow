@@ -2,9 +2,9 @@ import { CUSTOMERS } from '../constants';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { fsDelete, fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
 import {
-  customerFieldsFromNameInput,
+  customerFieldsFromForm,
   customerMatchesLabel,
-  labelsFromCustomerInput,
+  labelsFromCustomerForm,
 } from '../lib/customerAliases';
 import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
 
@@ -119,15 +119,15 @@ export function isBuiltinCustomer(c) {
   return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
 }
 
-function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases }) {
-  const parsed = customerFieldsFromNameInput(name, Array.isArray(aliases) ? aliases : []);
+function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases, aliasesText }) {
+  const parsed = customerFieldsFromForm({ name, aliasesText, aliases });
   const payload = {
     name: parsed.name,
     zone: String(zone || '').trim(),
     phone: String(phone || '').trim(),
     notes: String(notes || '').trim(),
   };
-  if (parsed.aliases.length) payload.aliases = parsed.aliases;
+  payload.aliases = parsed.aliases;
   const line = normalizeLineUserId(lineUserId);
   payload.lineUserId = line || '';
   if (hidden === true) payload.hidden = true;
@@ -167,6 +167,7 @@ function mergeCustomerFields(base, data) {
   return {
     name: pick('name'),
     aliases: pick('aliases'),
+    aliasesText: pick('aliasesText'),
     zone: pick('zone'),
     phone: pick('phone'),
     notes: pick('notes'),
@@ -313,9 +314,11 @@ function orderMatchesAnyLabel(order, labels) {
 }
 
 /** ดึง LINE UID จากออเดอร์แชทตรง OA (รวมที่ยกเลิกแล้ว — ใช้ตอนกดปุ่มในรายชื่อลูกค้า) */
-export async function suggestLineUserIdFromOrders(customerName) {
+export async function suggestLineUserIdFromOrders(customerNameOrForm) {
   const orders = await fsListCollection('lineOrders', 200);
-  const labels = labelsFromCustomerInput(customerName);
+  const labels = typeof customerNameOrForm === 'string'
+    ? labelsFromCustomerForm({ name: customerNameOrForm, aliasesText: '' })
+    : labelsFromCustomerForm(customerNameOrForm || {});
   if (!labels.length) return null;
 
   const sorted = [...orders].sort((a, b) => {

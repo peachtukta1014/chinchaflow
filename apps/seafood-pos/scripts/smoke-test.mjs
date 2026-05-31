@@ -290,9 +290,12 @@ try {
   const first = resolveLineCustomerByName('Firstseafood', CUSTOMERS);
   assert(first.id === 'c7', 'Firstseafood → ร้านเฟิร์ส (alias)');
 
-  const { customerFieldsFromNameInput } = await import('../src/lib/customerAliases.js');
-  const parsed = customerFieldsFromNameInput('ร้านเฟิร์ส, Firstseafood, เฟิร์ส, พี่ต้อม');
-  assert(parsed.name === 'ร้านเฟิร์ส', 'แยกชื่อหลักจากช่อง comma');
+  const { customerFieldsFromForm } = await import('../src/lib/customerAliases.js');
+  const parsed = customerFieldsFromForm({
+    name: 'ร้านเฟิร์ส',
+    aliasesText: 'Firstseafood, เฟิร์ส, พี่ต้อม',
+  });
+  assert(parsed.name === 'ร้านเฟิร์ส', 'ชื่อบนบิลไม่ผสม alias');
   assert(parsed.aliases.includes('Firstseafood'), 'เก็บชื่อเรียกอื่นใน aliases');
 } catch (e) {
   fail('lineCustomerResolve', e);

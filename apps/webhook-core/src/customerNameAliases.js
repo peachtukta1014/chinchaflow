@@ -16,14 +16,14 @@ function exactCustomerNameMatch(a, b) {
   return canonicalCustomerNameKey(a) === canonicalCustomerNameKey(b);
 }
 
-function splitCustomerNameInput(raw) {
+function splitLegacyCommaName(raw) {
   const parts = String(raw || '')
     .split(NAME_SPLIT_RE)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!parts.length) return { name: '', aliases: [] };
-  const [name, ...aliases] = parts;
-  return { name, aliases };
+  if (parts.length <= 1) return { name: parts[0] || '', legacyAliases: [] };
+  const [name, ...legacyAliases] = parts;
+  return { name, legacyAliases };
 }
 
 function dedupeAliasLabels(primary, extras) {
@@ -47,10 +47,10 @@ function dedupeAliasLabels(primary, extras) {
 }
 
 function collectCustomerSearchNames(data) {
-  const split = splitCustomerNameInput(data?.name || '');
-  const primary = split.name || String(data?.name || '').trim();
+  const legacy = splitLegacyCommaName(data?.name || '');
+  const primary = legacy.name || String(data?.name || '').trim();
   const extras = [
-    ...split.aliases,
+    ...legacy.legacyAliases,
     ...(Array.isArray(data?.aliases) ? data.aliases : []),
     data?.nickname,
     data?.shortName,
