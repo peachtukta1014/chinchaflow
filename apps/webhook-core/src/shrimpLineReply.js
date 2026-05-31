@@ -1,4 +1,5 @@
 const { formatDateThai } = require('./parseDeliveryDate');
+const { MIN_WEIGHT_KG, MAX_WEIGHT_KG } = require('./orderWeight');
 
 const PRODUCT_LABEL = {
   th: {
@@ -137,27 +138,27 @@ const M = {
       '🤖 บอทร้านกุ้ง — โกอ้วน คลังซีฟู้ด',
       '',
       'สั่งออเดอร์ (ไทย / พม่า / English):',
-      '• ปุ้ย กลาง 2 กก · กุ้งแม่น้ำ 2.5 กก',
-      '• River prawn 2.5 kg → pick size',
-      '• 5 b 2.5 (รหัสร้าน 5 · กลาง · 2.5 กก)',
+      '• ปุ้ย กลาง 6 กก · กุ้งแม่น้ำ 6.6 กก',
+      '• Peach 6.6 kg m · River prawn 4 kg → pick size',
+      '• 5 b 4 (รหัสร้าน · กลาง · 4 กก)',
       '• help · ยกเลิก',
       '',
-      'ในแอปบันทึกเป็นภาษาไทย — ตอบกลับตามภาษาที่พิมพ์',
+      `น้ำหนัก ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} กก. · ในแอปบันทึกเป็นภาษาไทย — ตอบตามภาษาที่พิมพ์`,
     ].join('\n'),
     my: () => [
       '🤖 ကုန်ကြမ်း ဂဏန်း',
       '',
       'အော်ဒါ (မြန်မာ / English / ไทย):',
       '• ဖောက်သည်အမည် + ကိုယ်အလေးချိန် + သေး/လယ်/ကြီး',
-      '• မြစ်ပုစွန် 2.5 kg',
+      `• မြစ်ပုစွန် 6.6 kg · ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
       '• help · cancel',
     ].join('\n'),
     en: () => [
       '🤖 Ko Auan seafood bot',
       '',
       'Order (English / Myanmar / Thai):',
-      '• Customer name + weight + s/m/l',
-      '• River prawn 2.5 kg → then size',
+      '• Customer name + weight + s/m/l — e.g. Peach 6.6 kg m',
+      `• River prawn 6.6 kg → then size (${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg)`,
       '• help · cancel',
       '',
       'Saved in Thai in the app — replies match your language',
@@ -167,6 +168,17 @@ const M = {
     th: () => '⚠️ ยกเลิกออเดอร์ไม่สำเร็จ ลองใหม่หรือแจ้งพนักงานโดยตรงครับ',
     my: () => '⚠️ ပယ်ဖျက် မအောင်မြင်',
     en: () => '⚠️ Could not cancel — try again or contact staff',
+  },
+  invalidWeight: {
+    th: (qty, unit) =>
+      `⚠️ น้ำหนัก ${qty} ${unit || 'กก'} รับไม่ได้ครับ\n`
+      + `กรุณาระบุ ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} กก. (เช่น 6 · 6.6 · 2.5)`,
+    my: (qty, unit) =>
+      `⚠️ ${qty} ${unit || 'kg'} — လက်မခံ\n`
+      + `${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
+    en: (qty, unit) =>
+      `⚠️ Weight ${qty} ${unit || 'kg'} is out of range.\n`
+      + `Use ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg (e.g. 6 · 6.6 · 2.5).`,
   },
 };
 
@@ -239,6 +251,10 @@ function replyCancelFail(lang) {
   return M.cancelFail[L(lang)]();
 }
 
+function replyInvalidWeight(lang, qty, unit) {
+  return M.invalidWeight[L(lang)](qty, unit);
+}
+
 module.exports = {
   replyOrderOk,
   replyParseFail,
@@ -249,6 +265,7 @@ module.exports = {
   replyMissingProfile,
   replyHelp,
   replyCancelFail,
+  replyInvalidWeight,
   formatItemsSummary,
   deliveryLabelForLang,
   orderFormatHelp,
