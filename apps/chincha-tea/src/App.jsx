@@ -163,7 +163,7 @@ export default function App() {
     ['history', t('historyTab')],
     ['summary', t('summaryTab')],
     ['restock', t('restockTab')],
-    ...(isAdmin ? [['admin', t('adminTab')]] : []),
+    ...(isAdmin ? [['admin', t('adminTab')]] : [['catalog', t('catalogTab')]]),
   ];
 
   return (
@@ -184,7 +184,7 @@ export default function App() {
         badges={isAdmin && tab !== 'restock' ? { restock: pendingRestocks } : {}}
         onSelect={(id) => {
           setTab(id);
-          if (id === 'admin' || id === 'order') refreshCatalog();
+          if (id === 'admin' || id === 'catalog' || id === 'order') refreshCatalog();
           if (id === 'history' || id === 'summary') refreshOrders();
         }}
       />
@@ -231,9 +231,12 @@ export default function App() {
         {tab === 'admin' && isAdmin && (
           <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
         )}
+        {tab === 'catalog' && !isAdmin && (
+          <AdminPanel catalogOnly t={t} lang={lang} menuItems={menuItems} onCatalogChanged={refreshCatalog} />
+        )}
       </main>
 
-      {cart.length > 0 && tab !== 'admin' && (
+      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"
