@@ -1,7 +1,7 @@
 import { CUSTOMERS } from '../constants';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { fsDelete, fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
-import { exactCustomerNameMatch } from '../lib/customerNameMatch';
+import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
 
 function compactName(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
@@ -281,6 +281,21 @@ export async function hideCustomerFromList(id) {
   return map;
 }
 
+function orderNameMatchesCustomer(orderName, customerName) {
+  if (exactCustomerNameMatch(orderName, customerName)) return true;
+  const compact = (s) => String(s || '').replace(/\s+/g, '').toLowerCase();
+  const cn = compact(customerName);
+  const on = compact(orderName);
+  if (!cn || !on) return false;
+  if (compactNameMatch(orderName, customerName)) {
+    if (cn.includes('ขียด') || cn.includes('เขียน') || on.includes('ขียด') || on.includes('เขียน')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** ดึง LINE UID จากออเดอร์แชทตรง OA (รวมที่ยกเลิกแล้ว — ใช้ตอนกดปุ่มในรายชื่อลูกค้า) */
 export async function suggestLineUserIdFromOrders(customerName) {
   const orders = await fsListCollection('lineOrders', 200);
   const name = (customerName || '').trim();
@@ -295,13 +310,16 @@ export async function suggestLineUserIdFromOrders(customerName) {
   for (const o of sorted) {
     if (!o.lineUserId) continue;
     if (o.lineGroupId) continue;
-    if (exactCustomerNameMatch(o.customerName, name)) {
+    if (orderNameMatchesCustomer(o.customerName, name)) {
       return normalizeLineUserId(o.lineUserId);
     }
     for (const item of o.items || []) {
-      if (exactCustomerNameMatch(item.customerName, name)) {
+      if (orderNameMatchesCustomer(item.customerName, name)) {
         return normalizeLineUserId(o.lineUserId);
       }
+    }
+    if (orderNameMatchesCustomer(o.rawText, name)) {
+      return normalizeLineUserId(o.lineUserId);
     }
   }
   return null;
