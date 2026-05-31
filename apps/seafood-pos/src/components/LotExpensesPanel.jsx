@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { STOCK_LINE } from '../constants/stockLines';
+import StockLineSwitcher from './StockLineSwitcher';
 import { dateKeyBangkok } from '../lib/date';
 import {
   emptyExpenseLineForm,
@@ -129,6 +130,7 @@ export default function LotExpensesPanel({
 
   const [marketForm, setMarketForm] = useState([emptyExpenseLineForm()]);
   const [pondForm, setPondForm] = useState([emptyExpenseLineForm()]);
+  const [expenseLine, setExpenseLine] = useState('live');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -212,8 +214,9 @@ export default function LotExpensesPanel({
         <div className="bg-white p-5 rounded-[2rem] shadow-sm space-y-3">
           <h2 className="font-black text-slate-800 text-lg">รายจ่ายล็อต</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            แยกฝั่งแผงตลาด ({STOCK_LINE.dead.full}) กับฝั่งบ่อ ({STOCK_LINE.live.full}) · กรอกทีละรายการแล้วรวมยอด · ค่ารถใส่ตอนรับเข้า
+            แยกสาย {STOCK_LINE.live.tag} / {STOCK_LINE.dead.tag} ด้านล่าง · กรอกทีละรายการแล้วกดบันทึก · ค่ารถใส่ตอนรับเข้า
           </p>
+          <StockLineSwitcher line={expenseLine} onChange={setExpenseLine} />
           <label className="text-xs font-bold text-slate-500 block">ล็อต (วันรับเข้า)</label>
           <select
             value={lotDateKey}
@@ -247,21 +250,31 @@ export default function LotExpensesPanel({
         </p>
       </div>
 
-      <ExpenseLineBlock
-        title={`บ่อ / ${STOCK_LINE.live.full}`}
-        hintItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
-        formLines={pondForm}
-        onChangeLines={setPondForm}
-        accent="border-blue-200 bg-blue-50/80"
-      />
+      {(!standalone || expenseLine === 'live') && (
+        <ExpenseLineBlock
+          title={standalone ? STOCK_LINE.live.full : `บ่อ / ${STOCK_LINE.live.full}`}
+          hintItems={['ค่าจ้าง', 'ค่าน้ำมัน', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+          formLines={pondForm}
+          onChangeLines={setPondForm}
+          accent="border-blue-200 bg-blue-50/80"
+        />
+      )}
 
-      <ExpenseLineBlock
-        title={`ตลาดนัด — ${STOCK_LINE.dead.full}`}
-        hintItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
-        formLines={marketForm}
-        onChangeLines={setMarketForm}
-        accent="border-orange-200 bg-orange-50/80"
-      />
+      {(!standalone || expenseLine === 'dead') && (
+        <ExpenseLineBlock
+          title={standalone ? STOCK_LINE.dead.full : `ตลาดนัด — ${STOCK_LINE.dead.full}`}
+          hintItems={['ค่าจ้าง', 'ค่าน้ำแข็ง', 'อื่นๆ']}
+          formLines={marketForm}
+          onChangeLines={setMarketForm}
+          accent="border-orange-200 bg-orange-50/80"
+        />
+      )}
+
+      {standalone && (
+        <p className="text-[10px] text-center text-slate-400">
+          สลับแถบด้านบนเพื่อกรอกสายอีกฝั่ง · บันทึกครั้งเดียวรวมทั้งสองสาย
+        </p>
+      )}
 
       <div className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center">
         <span className="text-xs font-bold text-slate-600">รวมรายจ่ายจิปาถะ (แผง + บ่อ)</span>

@@ -289,6 +289,8 @@ export function computeLotReport({
     spoilageBaht,       // alias ของ spoilageTotalBaht
     spoilageTotalBaht,  // ต้นทุนเสียหาย/ตัดทิ้ง (จดแล้ว)
     stockCountKg: adj.stockCountKg,
+    stockCountLiveKg: adj.stockCountLiveKg,
+    stockCountDeadKg: adj.stockCountDeadKg,
     stockCountBaht: adj.stockCountBaht,
     carryForwardLiveKg: adj.carryForwardLiveKg,
     carryForwardDeadKg: adj.carryForwardDeadKg,

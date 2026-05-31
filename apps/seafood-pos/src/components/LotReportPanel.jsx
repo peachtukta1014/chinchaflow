@@ -8,7 +8,8 @@ import {
 } from '../lib/firestoreRest';
 import { STOCK_LINE, formatStockPairShort } from '../constants/stockLines';
 import DateNavBar from './DateNavBar';
-import LotExpensesPanel from './LotExpensesPanel';
+import LotExpensesSyncPanel from './LotExpensesSyncPanel';
+import { fetchLotExpenses } from '../services/lotExpenseService';
 import { closeLotAndCarryForward, pickCarryTarget } from '../services/lotCloseService';
 
 /** Returns the dateKey of the oldest lot that is not closed and not excluded. */
@@ -28,6 +29,18 @@ function fmtKg(n) {
 
 function fmtBaht(n) {
   return `฿${Math.round(parseFloat(n) || 0).toLocaleString()}`;
+}
+
+function WeightStep({ label, kg, sign }) {
+  const n = parseFloat(kg) || 0;
+  if (n <= 0.001 && sign !== 'plus') return null;
+  const prefix = sign === 'plus' ? '+ ' : sign === 'minus' ? '− ' : '';
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="min-w-0 leading-snug">{label}</span>
+      <span className="font-bold shrink-0 tabular-nums">{prefix}{n.toFixed(2)} กก.</span>
+    </div>
+  );
 }
 
 function StepRow({ label, value, sign, accent }) {
@@ -71,6 +84,12 @@ function LineSummaryCard({
   const gross = isLive ? report.liveGrossProfit : report.deadGrossProfit;
   const weightLossKg = isLive ? report.liveWeightLossKg : report.deadWeightLossKg;
   const weightLossBaht = isLive ? report.liveWeightLossBaht : report.deadWeightLossBaht;
+  const spoilageKg = isLive ? report.spoilageLiveKg : report.spoilageDeadKg;
+  const stockCountKg = isLive ? report.stockCountLiveKg : report.stockCountDeadKg;
+  const carryKg = isLive ? report.carryForwardLiveKg : report.carryForwardDeadKg;
+  const remainingKg = isLive ? report.remainingLive : report.remainingDead;
+  const pondInKg = !isLive ? report.pondToDeadKg : 0;
+  const pondOutKg = isLive ? report.pondToDeadKg : 0;
 
   return (
     <div className={`bg-white p-5 rounded-[2rem] shadow-sm border-2 ${borderCls}`}>
@@ -104,6 +123,45 @@ function LineSummaryCard({
         )}
       </div>
 
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">น้ำหนัก (สายนี้)</p>
+      <div className="text-[11px] text-slate-600 space-y-1 mb-3 bg-slate-50/80 rounded-xl p-2.5">
+        <WeightStep label="รับเข้าสายนี้" kg={receivedKg} />
+        {!isLive && pondInKg > 0.01 && (
+          <WeightStep label={`+ ย้ายจากบ่อ → ${STOCK_LINE.dead.label} (ขายได้)`} kg={pondInKg} sign="plus" />
+        )}
+        <WeightStep label="− ขายแล้ว" kg={soldKg} sign="minus" />
+        {pondOutKg > 0.01 && (
+          <WeightStep label={`− ย้ายไป ${STOCK_LINE.dead.label} (ไม่ใช่ตัดทิ้ง)`} kg={pondOutKg} sign="minus" />
+        )}
+        {spoilageKg > 0.01 && (
+          <WeightStep label="− ตัดทิ้ง/เสียหาย (จดแล้ว)" kg={spoilageKg} sign="minus" />
+        )}
+        {stockCountKg > 0.01 && (
+          <WeightStep label="− ชั่งปิดสต๊อก (จดแล้ว)" kg={stockCountKg} sign="minus" />
+        )}
+        {carryKg > 0.01 && (
+          <WeightStep label="− ยกไปล็อตถัดไป" kg={carryKg} sign="minus" />
+        )}
+        <WeightStep label="− คงเหลือในระบบ" kg={remainingKg} sign="minus" />
+        <div className="flex justify-between gap-2 pt-1.5 border-t border-slate-200 font-bold">
+          <span className={weightLossKg > 0.01 ? 'text-red-700' : 'text-emerald-700'}>
+            = น้ำหนักขาด (ยังไม่จด)
+          </span>
+          <span className={weightLossKg > 0.01 ? 'text-red-700' : 'text-emerald-700'}>
+            {fmtKg(weightLossKg)}
+          </span>
+        </div>
+        {weightLossKg > 0.01 && (
+          <p className="text-[10px] text-amber-800 leading-relaxed pt-1">
+            ส่วนใหญ่คือน้ำหนักที่ระเหย/หายตอนลากขึ้นรถ — ถ้ารู้ยอดแล้วให้บันทึก「เสียหายตัดทิ้ง」ที่แท็บสต๊อก
+            {' '}
+            {STOCK_LINE.live.full}
+            {' '}
+            จะไม่ขึ้นเป็นปริศนา
+          </p>
+        )}
+      </div>
+
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">เงิน (สายนี้)</p>
       <StepRow label="ขายได้" value={fmtBaht(revenue)} sign="plus" accent="text-emerald-700" />
       <StepRow
@@ -133,7 +191,7 @@ function LineSummaryCard({
       )}
       {weightLossKg > 0.01 && (
         <StepRow
-          label={`กุ้งหายปริศนา สายนี้ ${weightLossKg.toFixed(2)} กก.`}
+          label={`หักต้นทุนน้ำหนักขาด ${weightLossKg.toFixed(2)} กก.`}
           value={fmtBaht(weightLossBaht)}
           sign="minus"
           accent="text-red-600"
@@ -178,6 +236,7 @@ export default function LotReportPanel({
     pondNote: '',
     pondLines: [],
   });
+  const reloadExpensesRef = useRef(null);
 
   // Fallback: if the current lot disappears from the list entirely
   useEffect(() => {
@@ -277,10 +336,25 @@ export default function LotReportPanel({
     if (!window.confirm(msg)) return;
     setClosingLot(true);
     try {
+      const freshExpenses = (await reloadExpensesRef.current?.()) || (await fetchLotExpenses(lotDateKey));
+      setLotExpenses(freshExpenses);
+      const cLive = countedLive === '' ? null : parseFloat(countedLive);
+      const cDead = countedDead === '' ? null : parseFloat(countedDead);
+      const reportForClose = computeLotReport({
+        lotDateKey,
+        endDateKey,
+        batches: stockBatches,
+        sales,
+        adjustments,
+        countedLive: Number.isFinite(cLive) ? cLive : null,
+        countedDead: Number.isFinite(cDead) ? cDead : null,
+        marketExpenses: freshExpenses.marketExpenses,
+        pondExpenses: freshExpenses.pondExpenses,
+      });
       await closeLotAndCarryForward({
         lotDateKey,
         batches: stockBatches,
-        report,
+        report: reportForClose,
         targetLotDateKey: carry ? carryTargetKey : null,
         closedBy: member?.name || '',
       });
@@ -467,9 +541,16 @@ export default function LotReportPanel({
             <p className="font-bold text-slate-600 mb-1">แยกประเภทการสูญเสีย</p>
             {report.unaccountedShrinkageKg > 0.01 && (
               <div className="flex justify-between gap-2 text-red-700 font-bold">
-                <span>❓ หายปริศนา (ไม่ได้จด)</span>
+                <span>❓ น้ำหนักขาดยังไม่จด (เป็น + ตาย)</span>
                 <span>{fmtKg(report.unaccountedShrinkageKg)}</span>
               </div>
+            )}
+            {report.unaccountedShrinkageKg > 0.01 && (
+              <p className="text-[10px] text-amber-900 leading-relaxed">
+                ย้ายบ่อ→ตายไม่นับเป็นขาดหาย · ถ้าขาดหลังย้ายไปขายได้แล้ว ให้จด「ตัดทิ้ง」ที่สต๊อกสาย
+                {' '}
+                {STOCK_LINE.dead.label}
+              </p>
             )}
             {report.spoilageKg > 0.01 && (
               <div className="flex justify-between gap-2 text-amber-700">
@@ -504,11 +585,10 @@ export default function LotReportPanel({
         )}
       </div>
 
-      <LotExpensesPanel
-        stockBatches={stockBatches}
+      <LotExpensesSyncPanel
         lotDateKey={lotDateKey}
-        onLotDateKeyChange={setLotDateKey}
-        onExpensesChange={setLotExpenses}
+        onExpensesLoaded={setLotExpenses}
+        refreshRef={reloadExpensesRef}
       />
 
       <div className="bg-slate-900 text-white p-5 rounded-[2rem] shadow-lg space-y-3">
@@ -598,7 +678,7 @@ export default function LotReportPanel({
               </p>
             )}
             <p className="flex justify-between">
-              <span className="text-slate-500">กุ้งหายปริศนา (ไม่ได้จดไว้)</span>
+              <span className="text-slate-500">น้ำหนักขาดยังไม่จด (รวมสองสาย)</span>
               <span className={`font-bold ${report.unaccountedShrinkageKg > 0.01 ? 'text-red-600' : 'text-emerald-600'}`}>
                 {fmtKg(report.unaccountedShrinkageKg)}
               </span>
