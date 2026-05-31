@@ -6,6 +6,7 @@ export const CUSTOMERS = [
     name: 'จ๊ะขียด',
     zone: 'ป่าตอง',
     aliases: ['จ๊ะเขียด', 'จะเขียด', 'เจ๊เขียด', 'เจ๊ขียด'],
+    defaultRiverSize: 'เล็ก',
   },
   { id: 'c2', name: 'ตาจุ้ยหนึ่ง', zone: 'ป่าตอง' },
   { id: 'c3', name: 'ตาจุ้ยสอง', zone: 'ป่าตอง' },

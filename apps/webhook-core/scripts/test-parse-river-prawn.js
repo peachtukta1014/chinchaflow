@@ -19,6 +19,9 @@ function assert(cond, msg) {
 const pending = parseRiverPrawnPendingLine('กุ้งแม่น้ำ 4 โลนะ');
 assert(pending?.kind === 'pending_river' && pending.qty === 4, 'กุ้งแม่น้ำ 4 โล → pending');
 
+const shorthand = parseRiverPrawnPendingLine('สั่งแม่น้ำ 4 กก');
+assert(shorthand?.kind === 'pending_river' && shorthand.qty === 4, 'สั่งแม่น้ำ 4 กก → pending');
+
 const glued = parseRiverPrawnPendingLine('กุ้งแม่น้ำ4โลนะ');
 assert(glued?.kind === 'pending_river' && glued.qty === 4, 'กุ้งแม่น้ำ4โลนะ → pending');
 

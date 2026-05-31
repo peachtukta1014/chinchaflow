@@ -15,13 +15,35 @@ import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
 import { customerToFormFields, formatAliasesForEdit } from '../lib/customerAliases';
 
+const RIVER_DEFAULT_OPTIONS = [
+  { value: '', label: 'กุ้งแม่น้ำ — ถามขนาดทุกครั้ง' },
+  { value: 'เล็ก', label: 'กุ้งแม่น้ำเล็ก (รับออโต้)' },
+  { value: 'กลาง', label: 'กุ้งแม่น้ำกลาง (รับออโต้)' },
+  { value: 'ใหญ่', label: 'กุ้งแม่น้ำใหญ่ (รับออโต้)' },
+];
+
 const EMPTY_CUSTOMER_FORM = {
   name: '',
   aliasesText: '',
+  defaultRiverSize: '',
   zone: '',
   phone: '',
   lineUserId: '',
 };
+
+function RiverDefaultSelect({ value, onChange }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-white"
+    >
+      {RIVER_DEFAULT_OPTIONS.map((o) => (
+        <option key={o.value || 'ask'} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
 
 export default function MembersScreen({ isAdmin = false }) {
   const [subTab, setSubTab] = useState('list');
@@ -216,6 +238,10 @@ export default function MembersScreen({ isAdmin = false }) {
             <p className="text-[10px] text-blue-700/80 leading-snug">
               ตัวอย่างชื่อเรียก: Firstseafood, เฟิร์ส, พี่ต้อม
             </p>
+            <RiverDefaultSelect
+              value={newCus.defaultRiverSize}
+              onChange={(v) => setNewCus((p) => ({ ...p, defaultRiverSize: v }))}
+            />
             <input
               value={newCus.zone}
               onChange={(e) => setNewCus((p) => ({ ...p, zone: e.target.value }))}
@@ -254,7 +280,7 @@ export default function MembersScreen({ isAdmin = false }) {
               </button>
               <button
                 type="button"
-                onClick={() => { setShowAdd(false); setNewCus({ name: '', zone: '', phone: '', lineUserId: '' }); }}
+                onClick={() => { setShowAdd(false); setNewCus(EMPTY_CUSTOMER_FORM); }}
                 className="flex-1 bg-white border border-slate-200 text-slate-500 text-sm font-bold py-2.5 rounded-xl"
               >
                 ยกเลิก
@@ -291,6 +317,10 @@ export default function MembersScreen({ isAdmin = false }) {
                     <p className="text-[10px] text-slate-500 leading-snug">
                       ชื่อบนบิลใช้แค่ช่องบน — ชื่อเรียกอื่นไม่ขึ้นบิล
                     </p>
+                    <RiverDefaultSelect
+                      value={cusEditData.defaultRiverSize}
+                      onChange={(v) => setCusEditData((p) => ({ ...p, defaultRiverSize: v }))}
+                    />
                     <input
                       value={cusEditData.zone}
                       onChange={(e) => setCusEditData((p) => ({ ...p, zone: e.target.value }))}
@@ -376,6 +406,11 @@ export default function MembersScreen({ isAdmin = false }) {
                         {isBuiltinCustomer(c) && (
                           <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
                             ในแอป
+                          </span>
+                        )}
+                        {c.defaultRiverSize && (
+                          <span className="text-[10px] bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full font-bold">
+                            แม่น้ำ {c.defaultRiverSize}
                           </span>
                         )}
                         {c.zone && (

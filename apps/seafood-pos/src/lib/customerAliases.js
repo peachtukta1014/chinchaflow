@@ -81,6 +81,7 @@ export function customerToFormFields(customer) {
   return {
     name: billName,
     aliasesText: aliasOnly.join(', '),
+    defaultRiverSize: customer?.defaultRiverSize || '',
     zone: customer?.zone || '',
     phone: customer?.phone || '',
     lineUserId: customer?.lineUserId || '',

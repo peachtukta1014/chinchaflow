@@ -119,7 +119,7 @@ export function isBuiltinCustomer(c) {
   return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
 }
 
-function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases, aliasesText }) {
+function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases, aliasesText, defaultRiverSize }) {
   const parsed = customerFieldsFromForm({ name, aliasesText, aliases });
   const payload = {
     name: parsed.name,
@@ -128,6 +128,8 @@ function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases
     notes: String(notes || '').trim(),
   };
   payload.aliases = parsed.aliases;
+  const riverDefault = String(defaultRiverSize || '').trim();
+  if (riverDefault) payload.defaultRiverSize = riverDefault;
   const line = normalizeLineUserId(lineUserId);
   payload.lineUserId = line || '';
   if (hidden === true) payload.hidden = true;
@@ -168,6 +170,7 @@ function mergeCustomerFields(base, data) {
     name: pick('name'),
     aliases: pick('aliases'),
     aliasesText: pick('aliasesText'),
+    defaultRiverSize: pick('defaultRiverSize'),
     zone: pick('zone'),
     phone: pick('phone'),
     notes: pick('notes'),
