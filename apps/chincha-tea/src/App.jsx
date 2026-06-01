@@ -9,6 +9,7 @@ import { subscribeTeaMember } from './lib/authSession';
 import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
 import TabNav from './components/TabNav';
+import { getAppNavGroups } from './lib/navConfig';
 import CartSheet from './components/CartSheet';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
@@ -155,13 +156,7 @@ export default function App() {
   }
 
   const isAdmin = member.role === 'admin';
-  const tabs = [
-    ['order', t('orderTab')],
-    ['history', t('historyTab')],
-    ['summary', t('summaryTab')],
-    ['restock', t('restockTab')],
-    ...(isAdmin ? [['admin', t('adminTab')]] : [['catalog', t('catalogTab')]]),
-  ];
+  const navGroups = getAppNavGroups(isAdmin, t);
 
   return (
     <div className="max-w-md mx-auto h-screen flex flex-col relative overflow-hidden" style={{ background: '#fdf6f0' }}>
@@ -176,9 +171,9 @@ export default function App() {
       )}
 
       <TabNav
-        tabs={tabs}
+        groups={navGroups}
         activeTab={tab}
-        badges={isAdmin && tab !== 'restock' ? { restock: pendingRestocks } : {}}
+        badges={isAdmin ? { restock: pendingRestocks } : {}}
         onSelect={(id) => {
           setTab(id);
           if (id === 'admin' || id === 'catalog') refreshCatalog();
