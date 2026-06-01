@@ -1,4 +1,5 @@
 import { dateKeyBangkok } from './date.js';
+import { batchLineMetrics, batchVisibleOnStockLine } from './lotCostSplit.js';
 
 /** วันที่รับเข้า (ล็อต = 1 วัน) — รองรับข้อมูลเก่าที่ไม่มี receiveDateKey */
 export function receiveDateKeyOf(batch) {
@@ -71,6 +72,39 @@ export function sortBatchesFifoOrder(batches = []) {
 
 export function countReceivesOnDate(batches, dateKey) {
   return batches.filter((b) => receiveDateKeyOf(b) === dateKey).length;
+}
+
+/** จัดกลุ่มรับเข้าตามวัน — เฉพาะรายการที่มีในสาย live หรือ dead */
+export function groupBatchesByReceiveDayForLine(batches = [], line = 'live') {
+  return groupBatchesByReceiveDay(batches)
+    .map((day) => {
+      const items = day.items.filter((b) => batchVisibleOnStockLine(b, line));
+      if (!items.length) return null;
+
+      let remainingKg = 0;
+      let lineCostBaht = 0;
+      for (const b of items) {
+        const m = batchLineMetrics(b, line);
+        remainingKg += m.remainingKg;
+        lineCostBaht += m.lineReceivedCostBaht;
+      }
+
+      return {
+        ...day,
+        items,
+        itemCount: items.length,
+        remainingKg,
+        lineCostBaht,
+        stockLine: line,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function countReceivesOnDateForLine(batches, dateKey, line = 'live') {
+  return batches.filter(
+    (b) => receiveDateKeyOf(b) === dateKey && batchVisibleOnStockLine(b, line),
+  ).length;
 }
 
 /** วันรับล่าสุดในรายการล็อต (lotDays เรียงใหม่→เก่า) */

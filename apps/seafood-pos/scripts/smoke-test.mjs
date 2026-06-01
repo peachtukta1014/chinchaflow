@@ -476,6 +476,55 @@ try {
   fail('line bill profile match', e);
 }
 
+try {
+  const { batchLineMetrics, batchVisibleOnStockLine } = await import('../src/lib/lotCostSplit.js');
+  const { groupBatchesByReceiveDayForLine } = await import('../src/lib/stockBatchUtils.js');
+  const mixed = {
+    liveKg: 39,
+    deadKg: 47,
+    remainingLiveKg: 32,
+    remainingDeadKg: 59,
+    totalCost: 58100,
+    transport: 12500,
+    costPerKg: 380,
+  };
+  const liveM = batchLineMetrics(mixed, 'live');
+  const deadM = batchLineMetrics(mixed, 'dead');
+  assert(Math.abs(liveM.receivedKg - 39) < 0.01, 'batchLineMetrics live received');
+  assert(Math.abs(deadM.receivedKg - 47) < 0.01, 'batchLineMetrics dead received');
+  assert(
+    Math.abs(liveM.costPerKg - deadM.costPerKg) < 0.02,
+    'proportional cost split → same ฿/kg per line on mixed batch',
+  );
+  assert(
+    Math.abs(liveM.lineReceivedCostBaht + deadM.lineReceivedCostBaht - 58100) < 1,
+    'line costs sum to batch totalCost',
+  );
+  assert(batchVisibleOnStockLine(mixed, 'live'), 'mixed batch visible on live');
+  assert(batchVisibleOnStockLine(mixed, 'dead'), 'mixed batch visible on dead');
+  const deadOnly = { liveKg: 0, deadKg: 25, remainingLiveKg: 0, remainingDeadKg: 25, totalCost: 6930 };
+  assert(!batchVisibleOnStockLine(deadOnly, 'live'), 'dead-only hidden on live line');
+  assert(batchVisibleOnStockLine(deadOnly, 'dead'), 'dead-only visible on dead line');
+  const days = groupBatchesByReceiveDayForLine(
+    [
+      { ...mixed, id: 'a', receiveDateKey: '2026-05-31', purchaseDate: '2026-05-31' },
+      { ...deadOnly, id: 'b', receiveDateKey: '2026-05-31', purchaseDate: '2026-05-31' },
+    ],
+    'live',
+  );
+  assert(days.length === 1 && days[0].items.length === 1, 'live timeline filters dead-only batch');
+  const deadDays = groupBatchesByReceiveDayForLine(
+    [
+      { ...mixed, id: 'a', receiveDateKey: '2026-05-31', purchaseDate: '2026-05-31' },
+      { ...deadOnly, id: 'b', receiveDateKey: '2026-05-31', purchaseDate: '2026-05-31' },
+    ],
+    'dead',
+  );
+  assert(deadDays[0].items.length === 2, 'dead timeline includes both batches');
+} catch (e) {
+  fail('lot line split', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

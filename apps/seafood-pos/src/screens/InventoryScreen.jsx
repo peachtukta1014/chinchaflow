@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQueryStockAdjustments } from '../lib/firestoreRest';
+import { batchVisibleOnStockLine } from '../lib/lotCostSplit';
 import {
   countReceivesOnDate,
+  countReceivesOnDateForLine,
   formatReceiveDayLabel,
   receiveDateKeyOf,
 } from '../lib/stockBatchUtils';
@@ -75,6 +77,7 @@ export default function InventoryScreen({
   const [deadSpoilNote, setDeadSpoilNote] = useState('');
   const [pondHistory, setPondHistory] = useState([]);
   const [deadInboundHistory, setDeadInboundHistory] = useState([]);
+  const [lotPondTransfers, setLotPondTransfers] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -120,6 +123,7 @@ export default function InventoryScreen({
   };
 
   const lotDateBootstrapped = useRef(false);
+  const lotLineTabRef = useRef({ line: stockLine, tab });
 
   const pickLatestReceiveDateKey = useCallback(() => {
     const latest = [...stockBatches].sort(
@@ -131,9 +135,48 @@ export default function InventoryScreen({
   useEffect(() => {
     if (tab !== 'lots' || stockBatches.length === 0 || lotDateBootstrapped.current) return;
     lotDateBootstrapped.current = true;
-    if (countReceivesOnDate(stockBatches, lotViewDate) > 0) return;
+    if (countReceivesOnDateForLine(stockBatches, lotViewDate, stockLine) > 0) return;
     setLotViewDate(pickLatestReceiveDateKey());
-  }, [tab, stockBatches, lotViewDate, pickLatestReceiveDateKey]);
+  }, [tab, stockBatches, lotViewDate, pickLatestReceiveDateKey, stockLine]);
+
+  useEffect(() => {
+    if (stockLine !== 'dead' || tab !== 'lots') {
+      setLotPondTransfers([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await fsQueryStockAdjustments(lotViewDate);
+        if (!cancelled) {
+          setLotPondTransfers(rows.filter((r) => r.type === 'pond_to_dead'));
+        }
+      } catch (e) {
+        console.warn('lot pond transfers', e);
+        if (!cancelled) setLotPondTransfers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stockLine, tab, lotViewDate]);
+
+  useEffect(() => {
+    const switched =
+      lotLineTabRef.current.line !== stockLine || lotLineTabRef.current.tab !== tab;
+    lotLineTabRef.current = { line: stockLine, tab };
+    if (tab !== 'lots' || !switched || stockBatches.length === 0) return;
+    if (countReceivesOnDateForLine(stockBatches, lotViewDate, stockLine) > 0) return;
+    const dateKeys = [
+      ...new Set(
+        stockBatches
+          .filter((b) => batchVisibleOnStockLine(b, stockLine))
+          .map((b) => receiveDateKeyOf(b)),
+      ),
+    ].sort()
+      .reverse();
+    if (dateKeys[0]) setLotViewDate(dateKeys[0]);
+  }, [tab, stockLine, stockBatches, lotViewDate]);
 
   const loadPondHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -361,8 +404,10 @@ export default function InventoryScreen({
       {tab === 'lots' && (
         <StockLotTimeline
           stockBatches={stockBatches}
+          stockLine={stockLine}
           viewDate={lotViewDate}
           onViewDateChange={setLotViewDate}
+          pondTransfers={stockLine === 'dead' ? lotPondTransfers : []}
         />
       )}
 
