@@ -26,5 +26,6 @@ https://ko-seafood.top
 
 ## Skills (เฉพาะแอปนี้)
 
+- `.cursor/skills/auto-shrip/` — smoke + build อัตโนมัติ รายงาน Slack (เรียก `/auto-shrip`)
 - `.cursor/skills/deploy-shrimp/` — build, smoke test, deploy กุ้ง (เรียก `/deploy-shrimp`)
 - Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)

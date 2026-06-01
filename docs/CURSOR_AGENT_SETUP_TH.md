@@ -77,13 +77,14 @@ chincha/
 ├── .cursor/skills/              # ทั้ง repo (เช่น land-it)
 │   └── land-it/SKILL.md
 ├── apps/seafood-pos/.cursor/skills/   # เฉพาะกุ้ง
+│   ├── auto-shrip/SKILL.md
 │   └── deploy-shrimp/SKILL.md
 └── apps/chincha-tea/.cursor/skills/   # เฉพาะชา
     └── deploy-tea/SKILL.md
 ```
 
 - Skills ใต้ `apps/seafood-pos/` จะโผล่เมื่อ agent ทำงานกับไฟล์ในแอปกุ้งเท่านั้น (คล้าย scope ของช่อง `#chincha-shrimp-agent`)
-- เรียกเองในแชท: พิมพ์ `/` แล้วเลือกชื่อ skill (เช่น `/deploy-shrimp`, `/land-it`)
+- เรียกเองในแชท: พิมพ์ `/` แล้วเลือกชื่อ skill (เช่น `/auto-shrip`, `/deploy-shrimp`, `/land-it`)
 - เอกสาร: [cursor.com/docs/skills](https://cursor.com/docs/skills)
 
 ### Environment
