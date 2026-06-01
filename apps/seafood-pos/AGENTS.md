@@ -23,3 +23,8 @@ https://ko-seafood.top
 ## Firebase
 
 ใช้ `apps/seafood-pos/.env.local` (`VITE_FIREBASE_*`) — `VITE_FIREBASE_APP_ID` ของกุ้ง (ต่างจากชา)
+
+## Skills (เฉพาะแอปนี้)
+
+- `.cursor/skills/deploy-shrimp/` — build, smoke test, deploy กุ้ง (เรียก `/deploy-shrimp`)
+- Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)
