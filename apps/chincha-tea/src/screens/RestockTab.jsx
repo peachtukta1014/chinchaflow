@@ -12,17 +12,25 @@ import {
   restockPurchaseTotal,
 } from '../lib/restockService';
 import {
+  RESTOCK_CATEGORIES,
   bootstrapCatalogFromRestocks,
+  catalogReorderPatches,
   deleteRestockCatalogItem,
   fsQueryRestockCatalog,
   groupCatalogByCategory,
+  guessRestockCategory,
+  patchRestockCatalogItem,
+  restockCategoryLabel,
   restockNameKey,
   upsertRestockCatalogItems,
 } from '../lib/restockCatalogService';
 import { restockDisplayName } from '../lib/restockDisplay';
 
-function RestockItemName({ name, lang }) {
-  const { primary, sub, en } = restockDisplayName(name, lang);
+function RestockItemName({ name, lang, catalogItem }) {
+  const overrides = catalogItem
+    ? { nameEn: catalogItem.nameEn, nameMy: catalogItem.nameMy }
+    : undefined;
+  const { primary, sub, en } = restockDisplayName(name, lang, overrides);
   const englishLine = lang === 'my' ? (en || sub) : en;
   const showEnglish = englishLine && englishLine !== primary;
   const showSub = sub && sub !== primary && sub !== englishLine;
@@ -51,6 +59,10 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [deletingId, setDeletingId] = useState(null);
   const [purchaseEditId, setPurchaseEditId] = useState(null);
   const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [manageCatalog, setManageCatalog] = useState(false);
+  const [catalogSaving, setCatalogSaving] = useState(false);
+  const [nameEditId, setNameEditId] = useState(null);
+  const [nameDraft, setNameDraft] = useState({ nameEn: '', nameMy: '' });
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
   const isAdmin = member?.role === 'admin';
@@ -128,6 +140,76 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       console.error(e);
       alert(t('saveFailed'));
     }
+  };
+
+  const applyCatalogSortPatches = async (nextCatalog, patches) => {
+    if (!patches.length) return;
+    setCatalog(nextCatalog);
+    setCatalogSaving(true);
+    try {
+      await Promise.all(
+        patches.map((p) => patchRestockCatalogItem(p.id, { sortOrder: p.sortOrder })),
+      );
+    } catch (e) {
+      console.error(e);
+      alert(t('saveFailed'));
+      await refreshCatalog();
+    }
+    setCatalogSaving(false);
+  };
+
+  const handleMoveCatalogItem = (itemId, direction) => {
+    const { catalog: next, patches } = catalogReorderPatches(catalog, itemId, direction);
+    applyCatalogSortPatches(next, patches);
+  };
+
+  const handleCatalogCategoryChange = async (catItem, newCategory) => {
+    if (!newCategory || newCategory === (catItem.category || guessRestockCategory(catItem.name))) return;
+    const inNew = catalog.filter(
+      (c) =>
+        c.active !== false
+        && (c.category || guessRestockCategory(c.name)) === newCategory
+        && c.id !== catItem.id,
+    );
+    const maxOrder = inNew.reduce((m, c) => Math.max(m, typeof c.sortOrder === 'number' ? c.sortOrder : 0), 0);
+    const patch = { category: newCategory, sortOrder: maxOrder + 10 };
+    setCatalog((prev) => prev.map((c) => (c.id === catItem.id ? { ...c, ...patch } : c)));
+    setCatalogSaving(true);
+    try {
+      await patchRestockCatalogItem(catItem.id, patch);
+      setFlash(t('restockCategoryChanged'));
+      setTimeout(() => setFlash(''), 2500);
+    } catch (e) {
+      console.error(e);
+      alert(t('saveFailed'));
+      await refreshCatalog();
+    }
+    setCatalogSaving(false);
+  };
+
+  const openNameEdit = (catItem) => {
+    setNameEditId(catItem.id);
+    setNameDraft({ nameEn: catItem.nameEn || '', nameMy: catItem.nameMy || '' });
+  };
+
+  const handleSaveCatalogNames = async (catItem) => {
+    const patch = {
+      nameEn: nameDraft.nameEn.trim(),
+      nameMy: nameDraft.nameMy.trim(),
+    };
+    setCatalog((prev) => prev.map((c) => (c.id === catItem.id ? { ...c, ...patch } : c)));
+    setCatalogSaving(true);
+    try {
+      await patchRestockCatalogItem(catItem.id, patch);
+      setNameEditId(null);
+      setFlash(t('restockNamesSaved'));
+      setTimeout(() => setFlash(''), 2500);
+    } catch (e) {
+      console.error(e);
+      alert(t('saveFailed'));
+      await refreshCatalog();
+    }
+    setCatalogSaving(false);
   };
 
   const uploadOrderPhoto = async (file) => {
@@ -242,8 +324,30 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       {/* รายการประจำร้าน — ติ๊กเลือกตามหมวด */}
       <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-stone-100" style={{ background: '#faf5f0' }}>
-          <p className="font-black text-sm text-stone-800">📋 {t('restockSavedList')}</p>
-          <p className="text-[10px] text-stone-500 mt-0.5">{t('restockSavedHint')}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-black text-sm text-stone-800">📋 {t('restockSavedList')}</p>
+              <p className="text-[10px] text-stone-500 mt-0.5">
+                {manageCatalog ? t('restockManageHint') : t('restockSavedHint')}
+              </p>
+            </div>
+            {isAdmin && !catalogLoading && catalogGroups.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setManageCatalog((v) => !v);
+                  setNameEditId(null);
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black border-2 active:scale-95 ${
+                  manageCatalog
+                    ? 'bg-amber-800 text-white border-amber-900'
+                    : 'bg-white text-amber-900 border-amber-300'
+                }`}
+              >
+                {manageCatalog ? t('restockManageDone') : t('restockManageCatalog')}
+              </button>
+            )}
+          </div>
         </div>
         {catalogLoading ? (
           <p className="text-center text-stone-400 text-sm py-6">{t('loading')}</p>
@@ -257,23 +361,98 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                   {group.label}
                   <span className="ml-1.5 font-bold text-stone-400">({group.items.length})</span>
                 </p>
-                {group.items.map((catItem) => {
+                {group.items.map((catItem, itemIdx) => {
                   const checked = selectedKeys.has(restockNameKey(catItem.name));
-                  return (
-                    <label
-                      key={catItem.id}
-                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer active:bg-stone-50 ${checked ? 'bg-amber-50/40' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCatalogItem(catItem)}
-                        className="mt-1 w-5 h-5 rounded border-2 border-stone-300 accent-amber-700 shrink-0"
-                      />
-                      <span className="flex-1 min-w-0 text-sm font-bold text-stone-700">
-                        <RestockItemName name={catItem.name} lang={lang} />
-                      </span>
-                      {isAdmin && (
+                  const itemCat = catItem.category || guessRestockCategory(catItem.name);
+                  const editingNames = nameEditId === catItem.id;
+                  const rowBody = (
+                    <>
+                      {!manageCatalog ? (
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCatalogItem(catItem)}
+                          className="mt-1 w-5 h-5 rounded border-2 border-stone-300 accent-amber-700 shrink-0"
+                        />
+                      ) : (
+                        <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                          <button
+                            type="button"
+                            disabled={catalogSaving || itemIdx === 0}
+                            onClick={() => handleMoveCatalogItem(catItem.id, 'up')}
+                            className="w-7 h-6 rounded-lg bg-stone-100 text-stone-600 font-black text-xs disabled:opacity-30 active:scale-95"
+                            aria-label={t('restockMoveUp')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={catalogSaving || itemIdx === group.items.length - 1}
+                            onClick={() => handleMoveCatalogItem(catItem.id, 'down')}
+                            className="w-7 h-6 rounded-lg bg-stone-100 text-stone-600 font-black text-xs disabled:opacity-30 active:scale-95"
+                            aria-label={t('restockMoveDown')}
+                          >
+                            ↓
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-stone-700">
+                          <RestockItemName name={catItem.name} lang={lang} catalogItem={catItem} />
+                        </p>
+                        {manageCatalog && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <select
+                              value={itemCat}
+                              disabled={catalogSaving}
+                              onChange={(e) => handleCatalogCategoryChange(catItem, e.target.value)}
+                              className="text-[10px] font-bold border-2 border-amber-200 rounded-lg px-2 py-1 bg-white text-stone-700 max-w-full"
+                            >
+                              {RESTOCK_CATEGORIES.map((c) => (
+                                <option key={c} value={c}>
+                                  {restockCategoryLabel(c, t)}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              disabled={catalogSaving}
+                              onClick={() => (editingNames ? setNameEditId(null) : openNameEdit(catItem))}
+                              className="text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg active:scale-95"
+                            >
+                              {t('restockEditNames')}
+                            </button>
+                          </div>
+                        )}
+                        {manageCatalog && editingNames && (
+                          <div className="mt-2 space-y-1.5 p-2 rounded-xl bg-stone-50 border border-stone-200">
+                            <input
+                              type="text"
+                              value={nameDraft.nameEn}
+                              onChange={(e) => setNameDraft((d) => ({ ...d, nameEn: e.target.value }))}
+                              placeholder={t('nameEnLabel')}
+                              className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-xs"
+                            />
+                            <input
+                              type="text"
+                              value={nameDraft.nameMy}
+                              onChange={(e) => setNameDraft((d) => ({ ...d, nameMy: e.target.value }))}
+                              placeholder={t('nameMyLabel')}
+                              className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-xs"
+                            />
+                            <button
+                              type="button"
+                              disabled={catalogSaving}
+                              onClick={() => handleSaveCatalogNames(catItem)}
+                              className="w-full py-1.5 rounded-lg font-black text-white text-[10px]"
+                              style={{ background: '#3d1f0f' }}
+                            >
+                              {t('save')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {isAdmin && !manageCatalog && (
                         <button
                           type="button"
                           onClick={(e) => { e.preventDefault(); handleRemoveCatalog(catItem); }}
@@ -283,6 +462,35 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                           ×
                         </button>
                       )}
+                      {isAdmin && manageCatalog && (
+                        <button
+                          type="button"
+                          disabled={catalogSaving}
+                          onClick={() => handleRemoveCatalog(catItem)}
+                          className="text-red-300 hover:text-red-500 font-black text-xs px-1 shrink-0 self-start"
+                          aria-label={t('restockRemoveFromList')}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </>
+                  );
+                  if (manageCatalog) {
+                    return (
+                      <div
+                        key={catItem.id}
+                        className={`flex items-start gap-3 px-4 py-3 ${catalogSaving ? 'opacity-60' : ''}`}
+                      >
+                        {rowBody}
+                      </div>
+                    );
+                  }
+                  return (
+                    <label
+                      key={catItem.id}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer active:bg-stone-50 ${checked ? 'bg-amber-50/40' : ''}`}
+                    >
+                      {rowBody}
                     </label>
                   );
                 })}
