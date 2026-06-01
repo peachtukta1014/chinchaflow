@@ -69,7 +69,7 @@ If port 5173 is busy, Vite picks the next port; check the Vite banner in the ter
 
 ### Full E2E (login, orders, Firestore)
 
-Requires live Firebase + approved user in Firestore (`users/{uid}` with `approved: true`). Bootstrap admin email for tea is documented in `apps/chincha-tea/src/lib/constants.js` (`BOOTSTRAP_ADMIN_EMAIL`). Use team credentials; do not commit `.env.local`.
+Requires live Firebase + approved user in Firestore (`users/{uid}` with `approved: true`). Bootstrap admin email for tea is documented in `apps/chincha-tea/src/lib/constants.js` (`BOOTSTRAP_ADMIN_EMAIL`). Use your own credentials (Cloud Agent Secrets or local `.env.local`); do not commit `.env.local`.
 
 ### Gotchas
 

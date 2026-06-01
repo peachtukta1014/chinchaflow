@@ -24,7 +24,7 @@ chincha-business-os/
 │   ├── tea-db-reset.mjs           # เคลียร์ข้อมูลร้านชา
 │   └── shrimp-stock-reset.mjs     # รีเซ็ตสต๊อก/ข้อมูลกุ้ง
 │
-├── docs/                          # เอกสารทีม
+├── docs/                          # คู่มือ / โครงสร้าง (อ้างอิงใน repo)
 │   ├── PROJECT_STRUCTURE.md       # ไฟล์นี้
 │   ├── CLOUD_STATUS.md
 │   └── ENABLE_CLOUD_SCHEDULER.md

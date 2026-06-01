@@ -1,8 +1,9 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'lucide-react';
 import { auth } from './firebase';
-import { FS_BASE, fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
+import { subscribeShrimpMember } from './lib/authSession';
+import { fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
 import { fetchPendingLineOrderCount } from './services/lineOrderService';
 import {
   getEffectiveStock,
@@ -84,30 +85,7 @@ export default function App() {
     setActiveTab(lastMainTab);
   }, [lastMainTab]);
 
-  useEffect(() => {
-    if (!auth) { setMember(null); return; }
-    return onAuthStateChanged(auth, async (user) => {
-      if (!user) { setMember(null); return; }
-      try {
-        const token = await user.getIdToken();
-        const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!resp.ok) { await signOut(auth); return; }
-        const json = await resp.json();
-        const f = json.fields || {};
-        if (!f.approved?.booleanValue) { await signOut(auth); return; }
-        setMember({
-          uid: user.uid,
-          name: f.name?.stringValue || 'สมาชิก',
-          email: user.email || '',
-          role: f.role?.stringValue || 'staff',
-        });
-      } catch {
-        setMember(null);
-      }
-    });
-  }, []);
+  useEffect(() => subscribeShrimpMember(setMember), []);
 
   const loadStockFromRest = useCallback(async () => {
     if (!FIREBASE_PROJECT_ID || !member) return;
