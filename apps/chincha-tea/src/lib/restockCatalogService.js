@@ -33,7 +33,14 @@ export function restockCategoryLabel(category, t) {
   return t?.(key) || category;
 }
 
-/** เรียงหมวดตามลำดับที่กำหนด แล้วเรียงชื่อในแต่ละหมวด */
+export function compareRestockCatalogItems(a, b, locale = 'th') {
+  const oa = typeof a.sortOrder === 'number' ? a.sortOrder : 1_000_000;
+  const ob = typeof b.sortOrder === 'number' ? b.sortOrder : 1_000_000;
+  if (oa !== ob) return oa - ob;
+  return (a.name || '').localeCompare(b.name || '', locale, { sensitivity: 'base' });
+}
+
+/** เรียงหมวดตามลำดับที่กำหนด แล้ว sortOrder / ชื่อในแต่ละหมวด */
 export function groupCatalogByCategory(catalog, t, lang = 'th') {
   const locale = lang === 'my' ? 'my' : 'th';
   const groups = new Map(RESTOCK_CATEGORIES.map((c) => [c, []]));
@@ -50,10 +57,38 @@ export function groupCatalogByCategory(catalog, t, lang = 'th') {
     .map((cat) => ({
       id: cat,
       label: restockCategoryLabel(cat, t),
-      items: (groups.get(cat) || []).sort((a, b) =>
-        (a.name || '').localeCompare(b.name || '', locale, { sensitivity: 'base' }),
-      ),
+      items: (groups.get(cat) || []).sort((a, b) => compareRestockCatalogItems(a, b, locale)),
     }));
+}
+
+/** สลับลำดับในแต่ละหมวด — คืน catalog ใหม่ + patch สำหรับ Firestore */
+export function catalogReorderPatches(catalog, itemId, direction) {
+  const item = (catalog || []).find((c) => c.id === itemId);
+  if (!item) return { catalog: catalog || [], patches: [] };
+
+  const cat = item.category || guessRestockCategory(item.name);
+  const inCat = (catalog || [])
+    .filter((c) => c.active !== false && (c.category || guessRestockCategory(c.name)) === cat)
+    .sort((a, b) => compareRestockCatalogItems(a, b, 'th'));
+
+  const idx = inCat.findIndex((c) => c.id === itemId);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= inCat.length) {
+    return { catalog: catalog || [], patches: [] };
+  }
+
+  const reordered = [...inCat];
+  [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+  const patches = reordered.map((c, i) => ({ id: c.id, sortOrder: (i + 1) * 10 }));
+  const orderById = new Map(patches.map((p) => [p.id, p.sortOrder]));
+  const nextCatalog = (catalog || []).map((c) =>
+    (orderById.has(c.id) ? { ...c, sortOrder: orderById.get(c.id) } : c),
+  );
+  return { catalog: nextCatalog, patches };
+}
+
+export async function patchRestockCatalogItem(id, patch) {
+  await fsPatch(`restockCatalog/${id}`, patch);
 }
 
 export async function fsQueryRestockCatalog() {
@@ -65,7 +100,7 @@ export async function fsQueryRestockCatalog() {
       const catB = b.category || guessRestockCategory(b.name);
       const catCmp = RESTOCK_CATEGORIES.indexOf(catA) - RESTOCK_CATEGORIES.indexOf(catB);
       if (catCmp !== 0) return catCmp;
-      return (a.name || '').localeCompare(b.name || '', 'th', { sensitivity: 'base' });
+      return compareRestockCatalogItems(a, b, 'th');
     });
 }
 

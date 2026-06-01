@@ -59,14 +59,19 @@ export function restockNameToEnglish(name) {
 
 /**
  * ชื่อแสดงตามภาษา UI + บรรทัดรอง/อังกฤษ
+ * @param {string} name — ชื่อหลัก (ไทย) ใน catalog
+ * @param {string} lang — th | my | en
+ * @param {{ nameEn?: string, nameMy?: string }} [overrides] — แอดมินใส่เองใน Firestore (มีแล้วใช้ก่อน lexicon)
  * @returns {{ primary: string, sub: string, en: string }}
  */
-export function restockDisplayName(name, lang) {
+export function restockDisplayName(name, lang, overrides) {
   if (!name) return { primary: '', sub: '', en: '' };
 
   const nameTh = restockCanonicalThai(name) || name.trim();
-  const nameMy = restockNameToMyanmar(name);
-  const nameEn = restockNameToEnglish(name);
+  const manualEn = (overrides?.nameEn || '').trim();
+  const manualMy = (overrides?.nameMy || '').trim();
+  const nameMy = manualMy || restockNameToMyanmar(name);
+  const nameEn = manualEn || restockNameToEnglish(name);
   const original = name.trim();
 
   const enLine = nameEn && nameEn !== nameTh ? nameEn : '';
