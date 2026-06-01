@@ -35,7 +35,7 @@ function usage() {
 หมายเหตุ:
   - ใช้บิลเปล่า (ไม่มีชื่อลูกค้า/รายการ/ยอดเงิน) ระบบจะวาดทับด้วย canvas
   - QR LINE ไม่ต้องใส่ในแสกน — แอปวาดจาก bill-assets/line-oa-qr.png
-  - ถ้าตัวหนังสือเยื้องหลัง deploy แจ้งทีมปรับ LAYOUT ใน generateBillImage.js
+  - ถ้าตัวหนังสือเยื้องหลัง deploy ปรับ LAYOUT ใน generateBillImage.js (หรือสั่ง @cursor ใน #chincha-shrimp-agent)
 `);
 }
 
