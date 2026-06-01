@@ -192,6 +192,37 @@ try {
 
 try {
   const {
+    formatLineOrderWeightSummary,
+    summarizeLineOrderItemWeights,
+    summarizeLineOrdersWeights,
+  } = await import('../src/lib/lineOrderWeightSummary.js');
+  const row = summarizeLineOrderItemWeights([
+    { product: 'กุ้งเล็ก', qty: 4, unit: 'กก' },
+    { product: 'กุ้งกลาง', qty: 2, unit: 'กก' },
+    { product: 'กุ้งตาย', qty: 1.5, unit: 'กก' },
+  ]);
+  assert(row.small === 4 && row.medium === 2 && row.dead === 1.5, 'รวมน้ำหนักแยกไซซ์จากรายการ LINE');
+  const orders = summarizeLineOrdersWeights([
+    {
+      status: 'pending',
+      items: [{ product: 'กุ้งเล็ก', qty: 4, unit: 'กก' }],
+    },
+    {
+      status: 'done',
+      items: [{ product: 'กุ้งใหญ่', qty: 99, unit: 'กก' }],
+    },
+  ]);
+  assert(orders.small === 4 && orders.large === 0, 'สรุปหัวข้อนับเฉพาะออเดอร์รอจัดส่ง');
+  assert(
+    formatLineOrderWeightSummary({ large: 0, medium: 2, small: 4, dead: 0 }) === 'A=0 · B=2.0 · C=4.0 · ตาย=0 กก.',
+    'ข้อความสรุปน้ำหนักหัวข้อ LINE',
+  );
+} catch (e) {
+  fail('lineOrder weight summary', e);
+}
+
+try {
+  const {
     resolveLineOrderDeliveryDate,
     coalesceSessionDeliveryDate,
     defaultDeliveryDateKeyBangkok,

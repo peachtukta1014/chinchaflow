@@ -4,6 +4,10 @@ import { dateKeyBangkok } from '../lib/date';
 import { formatDateThaiShort } from '../lib/date';
 import { deliveryDateLabel, orderDeliveryDateKey } from '../lib/lineOrderDate';
 import { FS_BASE, formatFirestoreSaveError, fsAuthHeaders } from '../lib/firestoreRest';
+import {
+  formatLineOrderWeightSummary,
+  summarizeLineOrdersWeights,
+} from '../lib/lineOrderWeightSummary';
 import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
 import { mergeCustomerLists, refreshCustomersMap, subscribeCustomers } from '../services/customerService';
@@ -246,22 +250,30 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
   const renderSection = (title, items, accent = '') => {
     if (items.length === 0) return null;
     const pendingCount = items.filter(isPending).length;
+    const weightSummary = formatLineOrderWeightSummary(summarizeLineOrdersWeights(items));
     return (
       <div key={title}>
-        <p className={`text-xs font-bold mb-2 uppercase tracking-wide ${accent || 'text-slate-500'}`}>
-          {title}
-          {' '}
-          ·
-          {' '}
-          {items.length}
-          {' '}
-          ออเดอร์
+        <p className={`text-xs font-bold mb-2 uppercase tracking-wide flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${accent || 'text-slate-500'}`}>
+          <span>
+            {title}
+            {' '}
+            ·
+            {' '}
+            {items.length}
+            {' '}
+            ออเดอร์
+          </span>
           {pendingCount > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-              {pendingCount}
-              {' '}
-              รอ
-            </span>
+            <>
+              <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full normal-case tracking-normal">
+                {pendingCount}
+                {' '}
+                รอ
+              </span>
+              <span className="text-[10px] font-medium normal-case tracking-normal text-slate-500">
+                {weightSummary}
+              </span>
+            </>
           )}
         </p>
         <div className="space-y-2">{items.map(renderOrderCard)}</div>
