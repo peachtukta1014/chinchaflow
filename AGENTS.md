@@ -9,6 +9,32 @@
 - Dependencies on boot: `npm install` (see `.cursor/environment.json`)
 - **Agent Skills (monorepo):** repo-wide `.cursor/skills/` (e.g. `land-it`) · app-scoped `apps/seafood-pos/.cursor/skills/` (`auto-shrip`, `deploy-shrimp`) · `apps/chincha-tea/.cursor/skills/` (`deploy-tea`). Nested skills auto-apply only when working under that app directory.
 
+## ก่อนเพิ่มของใหม่ — แจ้งเตือนถ้าไม่จำเป็น (บังคับสำหรับเอเจนต์)
+
+เมื่อผู้ใช้หรือไอเดียจากแชทขอ **CI/CD ใหม่, workflow ใหม่, dependency ใหม่, สคริปต์ซ้ำ, หรือ infra ข้ามแอป** ให้ทำตามนี้ **ก่อนเขียนโค้ดหรือเปิด PR**:
+
+1. **ค้นหาใน repo** ว่ามีทางเดิมแล้วหรือไม่ (`.github/workflows/`, `scripts/`, `.cursor/skills/`, `AGENTS.md`, `docs/`).
+2. **ถ้ามีทางเดิมครอบคลุมแล้ว** — หยุด implement; **แจ้งผู้ใช้ชัดเจน** ว่า:
+   - ระบบมีอะไรอยู่แล้ว (คำสั่ง / skill / workflow)
+   - ทำไมการเพิ่มซ้ำ **ไม่จำเป็น** หรือ **เสี่ยง** (ความซับซ้อน, secret, เวลา CI, deploy ซ้ำซ้อน)
+   - **ทางแนะนำ** ที่ใช้ได้ทันที
+3. **ลงมือเพิ่ม** เฉพาะเมื่อผู้ใช้ยืนยันหลังได้คำเตือนแล้ว (เช่น “ทำเลย”, “merge ได้”, “ไม่เอา smoke มือให้ CI”).
+
+### สิ่งที่มีอยู่แล้ว (อ้างอิงเร็ว)
+
+| ความต้องการ | ของเดิมใน monorepo | หมายเหตุ |
+|-------------|-------------------|----------|
+| ตรวจ logic กุ้ง (ไม่ต้อง Firebase) | `node apps/seafood-pos/scripts/smoke-test.mjs` | ใช้ก่อน merge / ในแชท agent |
+| ตรวจกุ้ง + รายงาน Slack | skill `auto-shrip` (`/auto-shrip`) | ไม่แก้โค้ดถ้าแค่เช็กสุขภาพ |
+| build / deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` · skill `deploy-shrimp` | **ไม่มี** PR CI smoke ตามนโยบายทีม (ไม่จำเป็น — smoke มือ/skill พอ) |
+| deploy ชา | `deploy-hosting.yml` (target tea) · skill `deploy-tea` | |
+| deploy rules / functions | `deploy-rules.yml`, `deploy-functions.yml` | |
+| ปิดงาน PR | skill `land-it` | |
+
+### ตัวอย่างที่ทีมตัดสินแล้ว (ไม่ทำซ้ำ)
+
+- **GitHub Actions CI** รัน smoke + build กุ้งบนทุก PR — **ไม่จำเป็น**: มี smoke script + `auto-shrip` + deploy บน `main` อยู่แล้ว; PR #127 ปิดโดยไม่ merge.
+
 ## Cursor Cloud specific instructions
 
 ### Product overview

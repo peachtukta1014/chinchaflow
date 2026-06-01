@@ -29,3 +29,7 @@ https://ko-seafood.top
 - `.cursor/skills/auto-shrip/` — smoke + build อัตโนมัติ รายงาน Slack (เรียก `/auto-shrip`)
 - `.cursor/skills/deploy-shrimp/` — build, smoke test, deploy กุ้ง (เรียก `/deploy-shrimp`)
 - Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)
+
+## ก่อนเพิ่ม CI / automation ใหม่
+
+ถ้าขอ **GitHub Actions CI**, workflow ซ้ำ, หรือเครื่องมือตรวจอัตโนมัติเพิ่ม — อ่าน **`/AGENTS.md` → “ก่อนเพิ่มของใหม่”** แล้วแจ้งผู้ใช้ว่ามี smoke + `auto-shrip` + deploy บน `main` อยู่แล้ว **ไม่ต้องเพิ่ม CI PR** เว้นแต่ผู้ใช้ยืนยันหลังคำเตือน
