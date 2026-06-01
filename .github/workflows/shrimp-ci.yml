@@ -1,0 +1,45 @@
+# Shrimp POS — CI (smoke + build) ก่อน merge / หลัง push main
+name: Shrimp POS CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/seafood-pos/**'
+      - 'apps/webhook-core/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/shrimp-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/seafood-pos/**'
+      - 'apps/webhook-core/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/shrimp-ci.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  verify:
+    name: Smoke test & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Smoke test (logic, no Firebase)
+        run: node apps/seafood-pos/scripts/smoke-test.mjs
+
+      - name: Build seafood-pos
+        run: npm run build --workspace=seafood-pos
