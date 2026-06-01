@@ -69,7 +69,7 @@ export default function StockLotTimeline({
       <DateNavBar
         dateKey={viewDate}
         onDateChange={onViewDateChange}
-        subtitle={loadingSubtitle(receiveCount, lineCostBaht, lineMeta.label)}
+        subtitle={loadingSubtitle(receiveCount, lineCostBaht, lineMeta.label, stockLine)}
       />
 
       <p className="text-[11px] text-slate-500 px-1 leading-relaxed">
@@ -96,15 +96,7 @@ export default function StockLotTimeline({
 
       {stockLine === 'dead' && (
         <p className="text-[10px] text-red-800 bg-red-50 border border-red-100 rounded-xl px-3 py-2 leading-relaxed">
-          แสดงเฉพาะ
-          {' '}
-          <strong>รับตายตรง</strong>
-          {' '}
-          ในล็อตวันนี้ · ยอดจากบ่อ → ตาย (ทุนตัดที่
-          {' '}
-          {STOCK_LINE.live.label}
-          {' '}
-          แล้ว) ดูด้านล่างหรือแท็บ「ในบ่อ」
+          รับตายตรงในล็อต — แสดงต้นทุนตามรับเข้า · ยอดจากบ่อ (ด้านล่าง) แสดงเฉพาะน้ำหนัก
         </p>
       )}
 
@@ -232,14 +224,7 @@ export default function StockLotTimeline({
             {' '}
             {STOCK_LINE.dead.label}
             {' '}
-            (วันนี้)
-          </p>
-          <p className="text-[10px] text-orange-800 leading-relaxed">
-            ทุนตัดที่
-            {' '}
-            {STOCK_LINE.live.label}
-            {' '}
-            แล้ว — ไม่เพิ่มต้นทุนรับเข้าตายซ้ำ · ขายตายเพื่อคืนทุน/ลดขาดทุน
+            (วันนี้) · น้ำหนักอย่างเดียว
           </p>
           <p className="text-sm font-black text-orange-900">
             รวม
@@ -277,7 +262,10 @@ export default function StockLotTimeline({
   );
 }
 
-function loadingSubtitle(count, totalCost, lineLabel) {
+function loadingSubtitle(count, totalCost, lineLabel, stockLine) {
   if (!count) return `0 รายการรับเข้า · ${lineLabel}`;
+  if (stockLine === 'dead') {
+    return `${count} รายการรับตายตรง · ${lineLabel}`;
+  }
   return `${count} รายการ · ${lineLabel} · ฿${Number(totalCost).toLocaleString()}`;
 }
