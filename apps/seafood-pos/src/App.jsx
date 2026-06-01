@@ -25,7 +25,10 @@ import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
+import OfflineBanner from './components/OfflineBanner';
 import { stockLineFull } from './constants/stockLines';
+import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
+import { refreshPendingSummary, syncPendingSales } from './lib/offlineSaleQueue';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -67,6 +70,11 @@ export default function App() {
   const [stockOverlayLine, setStockOverlayLine] = useState('live');
   const [pendingOrders, setPendingOrders] = useState(0);
   const prevPendingOrdersRef = useRef(null);
+  const [isOnline, setIsOnline] = useState(() => isNetworkOnline());
+  const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+  const [pendingStockDeduction, setPendingStockDeduction] = useState({ live: 0, dead: 0 });
+  const [offlineSyncing, setOfflineSyncing] = useState(false);
+  const offlineSyncInFlightRef = useRef(false);
 
   const isMainTab = MAIN_TABS.has(activeTab);
   const isOverlayTab = !isMainTab;
@@ -195,6 +203,78 @@ export default function App() {
     await persistStock(val);
   };
 
+  const refreshOfflineQueue = useCallback(async () => {
+    try {
+      const summary = await refreshPendingSummary();
+      setOfflinePendingCount(summary.pendingCount);
+      setPendingStockDeduction(summary.pendingStock);
+    } catch (e) {
+      console.warn('refreshOfflineQueue', e);
+    }
+  }, []);
+
+  const runOfflineSync = useCallback(async () => {
+    if (!member || offlineSyncInFlightRef.current || !isNetworkOnline()) return;
+    offlineSyncInFlightRef.current = true;
+    setOfflineSyncing(true);
+    try {
+      const result = await syncPendingSales({
+        loadStockContext: async () => {
+          const [cfg, rows] = await Promise.all([
+            fsGetDoc('config/stock'),
+            fsQueryStockBatches(),
+          ]);
+          return {
+            stock: cfg ? normalizeStockValues(cfg.live, cfg.dead) : { live: 0, dead: 0 },
+            stockBatches: rows,
+          };
+        },
+        updateMainStock,
+        onItemSynced: (billData) => {
+          setTransactions((prev) => [billData, ...prev]);
+        },
+      });
+      if (result.synced > 0) {
+        setSalesRefresh((n) => n + 1);
+        setStockRefresh((n) => n + 1);
+        showWebNotify(
+          'ส่งบิล offline สำเร็จ',
+          result.synced === 1 ? 'อัปโหลด 1 บิลแล้ว' : `อัปโหลด ${result.synced} บิลแล้ว`,
+          { tag: 'offline-sync-ok' },
+        );
+      }
+      if (result.failed > 0) {
+        showWebNotify(
+          'ส่งบิล offline ไม่ครบ',
+          result.errors[0] || 'มีบิลที่ส่งไม่สำเร็จ — กด「ส่งเลย」เพื่อลองใหม่',
+          { tag: 'offline-sync-fail' },
+        );
+      }
+    } catch (e) {
+      console.warn('runOfflineSync', e);
+    } finally {
+      offlineSyncInFlightRef.current = false;
+      setOfflineSyncing(false);
+      await refreshOfflineQueue();
+    }
+  }, [member, refreshOfflineQueue]);
+
+  useEffect(() => subscribeNetworkStatus(setIsOnline), []);
+
+  useEffect(() => {
+    if (!member) {
+      setOfflinePendingCount(0);
+      setPendingStockDeduction({ live: 0, dead: 0 });
+      return;
+    }
+    refreshOfflineQueue();
+  }, [member, refreshOfflineQueue]);
+
+  useEffect(() => {
+    if (!member || !isOnline) return;
+    runOfflineSync();
+  }, [member, isOnline, runOfflineSync]);
+
   const bumpSalesAndStock = useCallback(() => {
     setSalesRefresh((n) => n + 1);
     setStockRefresh((n) => n + 1);
@@ -292,7 +372,20 @@ export default function App() {
         )}
       </div>
 
-      <LiveStockStickyBar live={effectiveStock.live} dead={effectiveStock.dead} loadError={stockLoadError} />
+      <OfflineBanner
+        isOnline={isOnline}
+        pendingCount={offlinePendingCount}
+        syncing={offlineSyncing}
+        onRetrySync={runOfflineSync}
+      />
+
+      <LiveStockStickyBar
+        live={effectiveStock.live}
+        dead={effectiveStock.dead}
+        loadError={stockLoadError}
+        pendingLive={pendingStockDeduction.live}
+        pendingDead={pendingStockDeduction.dead}
+      />
 
       {isMainTab && (
         <HeaderQuickLinks
@@ -321,6 +414,11 @@ export default function App() {
               setTransactions((prev) => [b, ...prev]);
               bumpSalesAndStock();
             }}
+            onBillQueued={(b) => {
+              setTransactions((prev) => [b, ...prev]);
+              refreshOfflineQueue();
+            }}
+            pendingStockDeduction={pendingStockDeduction}
           />
         )}
 
