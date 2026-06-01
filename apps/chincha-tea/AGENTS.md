@@ -22,3 +22,8 @@ https://chincha-tea.web.app
 ## Firebase
 
 ใช้ `apps/chincha-tea/.env.local` (`VITE_FIREBASE_*`) — `VITE_FIREBASE_APP_ID` ของชา (ต่างจากกุ้ง)
+
+## Skills (เฉพาะแอปนี้)
+
+- `.cursor/skills/deploy-tea/` — build และ deploy ชา (เรียก `/deploy-tea`)
+- Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)
