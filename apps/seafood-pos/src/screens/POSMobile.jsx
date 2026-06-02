@@ -12,7 +12,8 @@ import { FS_BASE, fsAuthHeaders } from '../lib/firestoreRest';
 import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
 import { formatFirestoreSaveError } from '../lib/firestoreRest';
-import { saveBillWithCart as saveBillWithCartService } from '../services/salesService';
+import { saveBillWithCartOrQueue } from '../lib/offlineSaleQueue';
+import { isNetworkOnline } from '../lib/networkStatus';
 import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
 import LineShareButton from '../components/LineShareButton';
@@ -26,6 +27,8 @@ export default function POSMobile({
   stockBatches = [],
   updateMainStock,
   onSaveBill,
+  onBillQueued,
+  pendingStockDeduction = { live: 0, dead: 0 },
   onOpenReceiveLive,
   onOpenReceiveDead,
 }) {
@@ -147,7 +150,7 @@ export default function POSMobile({
     const customer = allCustomers.find(c => c.id === selectedCustomer) || CUSTOMERS.find(c => c.id === selectedCustomer);
     setSaving(true);
     try {
-      const result = await saveBillWithCartService({
+      const result = await saveBillWithCartOrQueue({
         cartItems,
         stock,
         stockBatches,
@@ -159,15 +162,23 @@ export default function POSMobile({
         recordedBy: user.name,
         photoUrl: null,
         updateMainStock,
+        pendingStockDeduction,
       });
       if (!result.ok) {
         alert(result.message);
         return;
       }
-      const { billData, total, remain } = result;
-      onSaveBill(billData);
+      const { billData, total, remain, queued } = result;
+      if (queued) {
+        onBillQueued?.(billData);
+      } else {
+        onSaveBill(billData);
+      }
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
-      alert(`✅ บันทึกบิลสำเร็จ!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}`);
+      const offlineNote = queued
+        ? `\n\n📴 เก็บในคิว offline แล้ว — จะส่งขึ้นระบบอัตโนมัติเมื่อเน็ตกลับ${!isNetworkOnline() ? '' : ' (เน็ตไม่เสถียร)'}`
+        : '';
+      alert(`✅ ${queued ? 'บันทึกในคิวแล้ว' : 'บันทึกบิลสำเร็จ'}!\nยอด: ฿${total.toLocaleString()} | ${payLabel}${remain > 0 ? `\nค้าง ฿${remain.toLocaleString()}` : ''}${offlineNote}`);
       setCart([]); setSelectedCustomer('general');
       setPaymentType(DEFAULT_PAYMENT_TYPE); setPaidAmount('');
       billNoRef.current = `INV-${Date.now().toString().slice(-8)}`;

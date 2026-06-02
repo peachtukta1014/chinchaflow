@@ -525,6 +525,31 @@ try {
   fail('lot line split', e);
 }
 
+try {
+  const { isNetworkError } = await import('../src/lib/networkStatus.js');
+  assert(isNetworkError(new Error('Failed to fetch')), 'isNetworkError Failed to fetch');
+  assert(isNetworkError(new Error('timeout')), 'isNetworkError timeout');
+  assert(!isNetworkError(new Error('PERMISSION_DENIED')), 'isNetworkError not permission');
+} catch (e) {
+  fail('isNetworkError', e);
+}
+
+try {
+  const { sumPendingStockKg, countActionablePending, sellableStockAfterReservation } = await import('../src/lib/offlineQueueUtils.js');
+  const rows = [
+    { status: 'pending', payload: { liveKg: 2, deadKg: 1, cartItems: [] } },
+    { status: 'failed', payload: { cartItems: [{ type: 'live', weight: 1, productId: 'large' }] } },
+    { status: 'syncing', payload: { liveKg: 99, deadKg: 99 } },
+  ];
+  const kg = sumPendingStockKg(rows);
+  assert(kg.live === 3 && kg.dead === 1, 'sumPendingStockKg pending+failed, skip syncing');
+  assert(countActionablePending(rows) === 2, 'countActionablePending');
+  const sellable = sellableStockAfterReservation({ live: 10, dead: 0 }, { live: 6, dead: 0 });
+  assert(sellable.live === 4, 'sellableStockAfterReservation live');
+} catch (e) {
+  fail('offlineQueueUtils', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

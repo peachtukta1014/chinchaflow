@@ -31,19 +31,30 @@ function withTimeout(promise, ms = 10000) {
 
 export { sumCartStockKg } from '../lib/cartStock';
 
-export function validateStockForSale(cartItems, stock, stockBatches = []) {
+export function validateStockForSale(
+  cartItems,
+  stock,
+  stockBatches = [],
+  pendingDeduction = { live: 0, dead: 0 },
+) {
   const avail = getEffectiveStock(stock, stockBatches);
+  const reservedLive = Math.max(0, parseFloat(pendingDeduction.live) || 0);
+  const reservedDead = Math.max(0, parseFloat(pendingDeduction.dead) || 0);
+  const sellableLive = Math.max(0, avail.live - reservedLive);
+  const sellableDead = Math.max(0, avail.dead - reservedDead);
   const { liveKg, deadKg } = sumCartStockKg(cartItems);
-  if (liveKg > avail.live) {
+  if (liveKg > sellableLive) {
+    const hint = reservedLive > 0 ? `\n(มี ${reservedLive.toFixed(1)} กก. จองในคิว offline)` : '';
     return {
       ok: false,
-      message: `⚠️ ${STOCK_LINE.live.full} ในสต๊อกมีแค่ ${avail.live} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ ${STOCK_LINE.live.full} ในสต๊อกมีแค่ ${sellableLive} กก.${hint}\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
-  if (deadKg > avail.dead) {
+  if (deadKg > sellableDead) {
+    const hint = reservedDead > 0 ? `\n(มี ${reservedDead.toFixed(1)} กก. จองในคิว offline)` : '';
     return {
       ok: false,
-      message: `⚠️ ${STOCK_LINE.dead.full} ในสต๊อกมีแค่ ${avail.dead} กก.\nขายเกินสต๊อกไม่ได้ครับ`,
+      message: `⚠️ ${STOCK_LINE.dead.full} ในสต๊อกมีแค่ ${sellableDead} กก.${hint}\nขายเกินสต๊อกไม่ได้ครับ`,
     };
   }
   return { ok: true, liveKg, deadKg };
@@ -119,21 +130,39 @@ export async function saveBillWithCart({
   recordedBy,
   photoUrl,
   updateMainStock,
+  pendingStockDeduction = { live: 0, dead: 0 },
+  skipPendingDeduction = false,
+  queuedBillData = null,
+  queuedDateKey = null,
 }) {
   const avail = getEffectiveStock(stock, stockBatches);
-  const stockCheck = validateStockForSale(cartItems, stock, stockBatches);
+  const stockCheck = skipPendingDeduction
+    ? validateStockForSale(cartItems, stock, stockBatches)
+    : validateStockForSale(cartItems, stock, stockBatches, pendingStockDeduction);
   if (!stockCheck.ok) return { ok: false, message: stockCheck.message };
   const { liveKg, deadKg } = stockCheck;
-  const { billData, total, remain, dateKey } = buildBillData({
-    cartItems,
-    customer,
-    selectedCustomer,
-    paymentType,
-    paidAmount,
-    billNo,
-    recordedBy,
-    photoUrl,
-  });
+
+  let billData;
+  let total;
+  let remain;
+  let dateKey;
+  if (queuedBillData) {
+    billData = queuedBillData;
+    total = parseFloat(billData.total) || 0;
+    remain = parseFloat(billData.remainingAmount) || 0;
+    dateKey = queuedDateKey || billData.dateKey || dateKeyBangkok();
+  } else {
+    ({ billData, total, remain, dateKey } = buildBillData({
+      cartItems,
+      customer,
+      selectedCustomer,
+      paymentType,
+      paidAmount,
+      billNo,
+      recordedBy,
+      photoUrl,
+    }));
+  }
 
   // Step 1: ตัด FIFO batch (atomic commit) — ต้องเสร็จก่อนเขียนบิล
   let newLive, newDead;
