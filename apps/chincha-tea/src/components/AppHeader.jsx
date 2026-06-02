@@ -2,8 +2,9 @@ import { hardReloadApp } from '../lib/reloadApp';
 import { getAppBuildLabel } from '../lib/appBuildInfo';
 
 export default function AppHeader({ member, lang, setLang, onLogout, t }) {
+  const staffNeedsMy = member?.role === 'staff' && lang !== 'my';
   const handleReload = () => {
-    if (!window.confirm('รีเฟรชแอปเพื่อโหลดเวอร์ชันล่าสุด?\n(ข้อมูลบนเซิร์ฟเวอร์ยังอยู่ครบ)')) return;
+    if (!window.confirm(t('reloadConfirm'))) return;
     hardReloadApp();
   };
   return (
@@ -14,7 +15,7 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
           <p className="font-black text-amber-300 leading-none">{t('appName')}</p>
           <p className="text-amber-700 text-[10px] truncate">{member.name}</p>
           {getAppBuildLabel() && (
-            <p className="text-[9px] text-cyan-300/90 mt-0.5 truncate max-w-[200px]" title="เวอร์ชันที่โหลดอยู่ — กดปุ่มรีเฟรชถ้าไม่ตรง">
+            <p className="text-[9px] text-cyan-300/90 mt-0.5 truncate max-w-[200px]" title={t('buildVersionHint')}>
               {getAppBuildLabel()}
             </p>
           )}
@@ -27,7 +28,9 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
               key={l}
               type="button"
               onClick={() => setLang(l)}
-              className={`px-2 py-1.5 text-[10px] font-bold ${lang === l ? 'bg-amber-300 text-amber-900' : 'text-amber-500'}`}
+              className={`px-2 py-1.5 text-[10px] font-bold ${
+                lang === l ? 'bg-amber-300 text-amber-900' : 'text-amber-500'
+              } ${staffNeedsMy && l === 'my' ? 'ring-2 ring-red-400 animate-pulse' : ''}`}
             >
               {l === 'th' ? 'TH' : l === 'my' ? 'MY' : 'EN'}
             </button>
@@ -38,8 +41,8 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
           onClick={handleReload}
           className="w-9 h-9 rounded-full border border-amber-800 text-cyan-300 flex items-center justify-center"
           style={{ background: '#5a2d14' }}
-          aria-label="รีเฟรชแอป"
-          title="รีเฟรชแอป"
+          aria-label={t('reloadApp')}
+          title={t('reloadApp')}
         >
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0014-7M19 5a9 9 0 00-14 7" />

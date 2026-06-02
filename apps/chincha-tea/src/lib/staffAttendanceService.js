@@ -41,10 +41,22 @@ export async function listAttendanceStaff({ force = false } = {}) {
   });
 }
 
-/** พนักงานคนแรกในรายการ (มักเป็นพนักงานหลักร้าน) */
+/** พนักงานหลักร้าน (2004@chincha.pos) หรือคนแรกในรายการเวร */
 export async function getPrimaryAttendanceStaff(options) {
   const list = await listAttendanceStaff(options);
-  return list[0] || null;
+  const fromList = list.find((u) => isPrimaryStaffEmail(u.email)) || list[0];
+  if (fromList) return { staff: fromList, issue: null };
+  return resolvePrimaryStaffIssue();
+}
+
+/** บัญชีมีในระบบแต่ยังลงเวรไม่ได้ (role / อนุมัติ) */
+export async function resolvePrimaryStaffIssue() {
+  const users = await cachedFetch(STAFF_LIST_CACHE_KEY, fsQueryUsers, STAFF_LIST_TTL_MS);
+  const u = users.find((x) => isPrimaryStaffEmail(x.email));
+  if (!u) return { staff: null, issue: 'not_registered' };
+  if (u.approved !== true) return { staff: null, issue: 'not_approved', profile: u };
+  if (u.role !== 'staff') return { staff: null, issue: 'wrong_role', profile: u };
+  return { staff: null, issue: 'unknown', profile: u };
 }
 
 export function invalidateAttendanceStaffCache() {

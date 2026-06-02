@@ -20,6 +20,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
   const [period, setPeriod] = useState(() => getBiweeklyPeriodForDate(todayKey));
   const [markDateKey, setMarkDateKey] = useState(todayKey);
   const [staff, setStaff] = useState(null);
+  const [staffIssue, setStaffIssue] = useState(null);
   const [periodRow, setPeriodRow] = useState(null);
   const [dayPresent, setDayPresent] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,8 +48,10 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
 
   const refresh = useCallback(async ({ force = false } = {}) => {
     try {
-      const s = await getPrimaryAttendanceStaff({ force });
+      const resolved = await getPrimaryAttendanceStaff({ force });
+      const s = resolved?.staff ?? null;
       setStaff(s);
+      setStaffIssue(resolved?.issue ?? null);
       if (!s) {
         setPeriodRow(null);
         setDayPresent(false);
@@ -149,9 +152,16 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
       </div>
 
       {!staff && !loading && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 leading-relaxed">
-          <p className="font-bold mb-1">{t('payrollNoStaffTitle')}</p>
-          <p>{t('payrollNoStaffHint').replace('{email}', PRIMARY_STAFF.email)}</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 leading-relaxed space-y-2">
+          <p className="font-bold">{staffIssue === 'wrong_role' ? t('payrollWrongRoleTitle') : t('payrollNoStaffTitle')}</p>
+          <p>
+            {staffIssue === 'not_approved' && t('payrollNotApprovedHint')}
+            {staffIssue === 'wrong_role' && t('payrollWrongRoleHint')}
+            {(!staffIssue || staffIssue === 'not_registered' || staffIssue === 'unknown') && t('payrollNoStaffHint').replace('{email}', PRIMARY_STAFF.email)}
+          </p>
+          <p className="text-[10px] text-stone-500">
+            {PRIMARY_STAFF.displayName} · {PRIMARY_STAFF.email}
+          </p>
         </div>
       )}
 

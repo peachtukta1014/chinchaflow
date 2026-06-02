@@ -18,12 +18,14 @@ import { SummaryTab } from './screens/SummaryTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
+import StaffGuidePanel from './components/StaffGuidePanel';
+import StaffLangNudge from './components/StaffLangNudge';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 
 export default function App() {
-  const { lang, setLang, t, isMy } = useLang();
+  const { lang, setLang, t } = useLang();
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
   const [tab, setTab] = useState('order');
@@ -92,8 +94,8 @@ export default function App() {
     const prev = prevPendingRestocksRef.current;
     if (prev !== null && pendingRestocks > prev) {
       showWebNotify(
-        'มีรายการสั่งของใหม่',
-        `${pendingRestocks} ใบรอซื้อวันนี้`,
+        t('restockNotifyTitle'),
+        t('restockNotifyBody').replace('{n}', String(pendingRestocks)),
         { tag: 'restock', onClick: () => setTab('restock') },
       );
     }
@@ -165,10 +167,11 @@ export default function App() {
 
       <AppHeader member={member} lang={lang} setLang={setLang} onLogout={handleLogout} t={t} />
 
-      {isMy && (
-        <p className="z-10 shrink-0 mx-4 mt-1 px-3 py-2 rounded-xl text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 text-center leading-snug">
-          {t('staffBanner')}
-        </p>
+      {member?.role === 'staff' && (
+        <>
+          <StaffLangNudge lang={lang} setLang={setLang} t={t} />
+          <StaffGuidePanel t={t} lang={lang} />
+        </>
       )}
 
       <TabNav
@@ -214,6 +217,7 @@ export default function App() {
           <SummaryTab
             orders={orders}
             t={t}
+            lang={lang}
             viewDateKey={viewDateKey}
             setViewDateKey={setViewDateKey}
             member={member}
@@ -249,7 +253,7 @@ export default function App() {
             style={{ background: '#3d1f0f' }}
           >
             <span className="text-xl font-black">฿{cartTotal.toLocaleString()}</span>
-            <span className="text-sm font-bold bg-white/20 px-3 py-1 rounded-xl">ดูตะกร้า →</span>
+            <span className="text-sm font-bold bg-white/20 px-3 py-1 rounded-xl">{t('viewCart')} →</span>
           </button>
         </div>
       )}

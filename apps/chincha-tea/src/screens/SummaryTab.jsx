@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { dateKeyBangkok, shiftDateKey } from '../lib/constants';
+import { formatDateKeyLabel } from '../lib/localeFormat';
 import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestoreRest';
 import { pushTeaLineSummary } from '../lib/lineNotify';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from '../lib/restockService';
 
-export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
+export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
   const [expenses, setExpenses] = useState([]);
   const [expDesc, setExpDesc] = useState('');
   const [expAmount, setExpAmount] = useState('');
@@ -49,11 +50,11 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
     setLineFlash('');
     try {
       await pushTeaLineSummary(viewDateKey);
-      setLineFlash('✅ ส่งสรุป LINE แล้ว');
+      setLineFlash(t('lineSummarySent'));
       setTimeout(() => setLineFlash(''), 3000);
     } catch (e) {
       console.error(e);
-      setLineFlash(`⚠️ ${e.message || 'ส่งไม่สำเร็จ'}`);
+      setLineFlash(`⚠️ ${e.message || t('lineSummaryFailed')}`);
     }
     setLineSending(false);
   };
@@ -75,7 +76,7 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
       setExpenses(await fsQueryExpenses(viewDateKey));
       setExpDesc('');
       setExpAmount('');
-      setExpFlash('✅ บันทึกแล้ว');
+      setExpFlash(t('expenseSaved'));
       setTimeout(() => setExpFlash(''), 2000);
     } catch (e) {
       console.error(e);
@@ -84,21 +85,12 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
     setSavingExp(false);
   };
 
-  const formatDateLabel = (dk) => {
-    try {
-      const d = new Date(`${dk}T12:00:00+07:00`);
-      return d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-      return dk;
-    }
-  };
-
   return (
     <div className="px-4 pt-3 pb-6 space-y-3">
       <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 shadow-sm">
         <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-10 h-10 rounded-xl bg-stone-100 font-black text-stone-600">‹</button>
         <div className="flex-1 text-center min-w-0">
-          <p className="font-black text-sm text-stone-800 truncate">{formatDateLabel(viewDateKey)}</p>
+          <p className="font-black text-sm text-stone-800 truncate">{formatDateKeyLabel(viewDateKey, lang, { year: true })}</p>
           {isToday ? (
             <p className="text-[10px] text-emerald-600 font-bold">{t('todaySales')}</p>
           ) : (
@@ -139,11 +131,11 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
         <p className="text-amber-700 text-xs mt-2">{totalCups} {t('cupUnit')} · {orders.length} {t('orders')}</p>
         <div className="flex gap-3 pt-3 mt-3 border-t border-amber-900">
           <div className="flex-1 rounded-2xl p-3" style={{ background: 'rgba(16,185,129,0.15)' }}>
-            <p className="text-[10px] text-emerald-400 font-bold">💵 สด</p>
+            <p className="text-[10px] text-emerald-400 font-bold">💵 {t('cash')}</p>
             <p className="text-lg font-black text-emerald-300">฿{cashTotal.toLocaleString()}</p>
           </div>
           <div className="flex-1 rounded-2xl p-3" style={{ background: 'rgba(59,130,246,0.15)' }}>
-            <p className="text-[10px] text-blue-400 font-bold">📱 โอน</p>
+            <p className="text-[10px] text-blue-400 font-bold">📱 {t('transfer')}</p>
             <p className="text-lg font-black text-blue-300">฿{transferTotal.toLocaleString()}</p>
           </div>
         </div>
@@ -191,7 +183,7 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
         <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
           <div className="flex justify-between text-sm">
             <span className="font-bold text-stone-600">{t('netProfitLabel')}</span>
-            <span className="text-stone-400 text-xs">ขาย − ค่าใช้จ่าย − ซื้อของ</span>
+            <span className="text-stone-400 text-xs">{t('profitBreakdownHint')}</span>
           </div>
           <p className={`text-2xl font-black mt-1 ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
             ฿{net.toLocaleString()}
