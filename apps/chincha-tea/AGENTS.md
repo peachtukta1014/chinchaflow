@@ -25,5 +25,6 @@ https://chincha-tea.web.app
 
 ## Skills (เฉพาะแอปนี้)
 
+- `.cursor/skills/auto-tea/` — build อัตโนมัติ รายงานสุขภาพ (เรียก `/auto-tea`)
 - `.cursor/skills/deploy-tea/` — build และ deploy ชา (เรียก `/deploy-tea`)
 - Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)
