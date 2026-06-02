@@ -1,7 +1,10 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const appBuildIso = new Date().toISOString();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
@@ -11,6 +14,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        liffOrder: path.resolve(__dirname, 'liff-order.html'),
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/firebase')) return 'vendor-firebase';

@@ -2,8 +2,9 @@
 
 เอกสารรวมไอเดียจากทีม (Peach) + แนวทางเทคนิคที่แนะนำ — **โฟกัสแชทตรง LINE Official Account เท่านั้น** ไม่รวมกลุ่ม LINE ในรอบนี้ (คนในบ้านรู้ระบบพิมพ์/บอร์ดแอปอยู่แล้ว)
 
-**สถานะ:** สเปก / ออกแบบ — ยังไม่ implement · ยังไม่ deploy  
-**อัปเดตล่าสุด:** ตัดเรื่องสติกเกอร์ออกจากงานชุดนี้ (ตามนโยบายทีม)
+**สถานะ:** LIFF MVP ในโค้ดแล้ว — ต้องตั้ง `LINE_LIFF_ID` + `VITE_LIFF_ID` + Rich Menu แล้ว deploy  
+**ตั้งค่า:** `docs/LINE_LIFF_SETUP_TH.md`  
+**อัปเดตล่าสุด:** ฟอร์มสองภาษา · submit → `lineOrders` · กลุ่ม LINE ไม่เปลี่ยน
 
 ---
 
@@ -169,7 +170,7 @@ sequenceDiagram
   C->>RM: เห็น สั่งกุ้ง | แชท
   C->>RM: กด สั่งกุ้ง
   RM->>LIFF: เปิดฟอร์ม
-  LIFF->>Fn: submit
+  LIFF->>Fn: shrimpLiffOrder (id_token)
   Fn->>FS: lineOrders (+ customers ถ้าใหม่)
   Fn->>C: ยืนยันในแชท
   App->>FS: อ่าน lineOrders
@@ -195,9 +196,10 @@ sequenceDiagram
 
 ### เฟส 1 — MVP LINE OA
 
-- [ ] LIFF + Rich Menu (สั่งกุ้ง · แชท)
-- [ ] ฟอร์มสั้น / ฟอร์มเต็ม (ไม่มีสติก)
-- [ ] Submit → `lineOrders` + ยืนยันแชท
+- [x] LIFF ฟอร์ม (`liff-order.html`) + `shrimpLiffOrder` function
+- [ ] Rich Menu ใน LINE Console (สั่งกุ้ง · แชท) — ทีมตั้ง
+- [x] ฟอร์มสั้น / เลือกรายชื่อ / ลูกค้าใหม่ (ไม่มีสติก) · สองภาษา
+- [x] Submit → `lineOrders` (`source: liff`) + push ยืนยันแชท
 
 ### เฟส 2+
 

@@ -64,6 +64,22 @@ export const LIFF_COPY = {
   previewBanner: { th: 'ตัวอย่างออกแบบ', en: 'Design preview' },
   returningPreview: { th: 'ลูกค้าเดิม', en: 'Returning' },
   newPreview: { th: 'ลูกค้าใหม่', en: 'New customer' },
+  pickPreview: { th: 'เลือกรายชื่อ', en: 'Pick customer' },
+  pickTitle: { th: 'เลือกชื่อในรายชื่อเรา', en: 'Select your name' },
+  pickHint: {
+    th: 'ลูกค้าเก่าที่ยังไม่ผูก LINE — เลือกชื่อที่ตรงกับร้านคุณ',
+    en: 'Existing customer — pick the name we know',
+  },
+  pickSearch: { th: 'ค้นหาชื่อหรือโซน', en: 'Search name or zone' },
+  pickEmpty: { th: 'ไม่พบชื่อ', en: 'No match' },
+  loading: { th: 'กำลังเปิด…', en: 'Loading…' },
+  loadError: { th: 'เปิดฟอร์มไม่สำเร็จ', en: 'Could not open form' },
+  submitSuccess: { th: 'ส่งออเดอร์แล้ว', en: 'Order sent' },
+  submitFail: { th: 'ส่งไม่สำเร็จ', en: 'Send failed' },
+  chatOthersHint: {
+    th: 'คนอื่นในร้านสั่งได้โดยพิมพ์ในแชท เช่น จ๊ะขียด 2 โล',
+    en: 'Others at your shop can still order by chat',
+  },
   todayLabel: { th: 'วันนี้', en: 'Today' },
   kg: { th: 'กก.', en: 'kg' },
   sizes: {

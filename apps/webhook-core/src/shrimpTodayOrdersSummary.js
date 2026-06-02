@@ -5,7 +5,7 @@
 const { todayBKK, formatDateThai } = require('./parseDeliveryDate');
 const {
   buildCustomerNameByLineUidMap,
-  linkedCustomerNameForOrder,
+  normalizeLineUserId,
 } = require('./shrimpLinePush');
 
 const ORDER_WORD_RE = /(?:ออ[ร์]*เดอร?์?|ออเดอร์|order)/i;
@@ -139,9 +139,14 @@ function aggregateByProduct(orders) {
  */
 function enrichOrdersWithLinkedCustomers(orders, uidMap) {
   return orders.map((o) => {
-    const linked = linkedCustomerNameForOrder(o, uidMap);
-    if (linked && !o.customerName) return { ...o, customerName: linked };
-    return o;
+    const uid = normalizeLineUserId(o?.lineUserId);
+    const synced = uid && uidMap?.get(uid);
+    if (!synced) return o;
+    const items = (o.items || []).map((it) => ({
+      ...it,
+      customerName: synced,
+    }));
+    return { ...o, customerName: synced, items };
   });
 }
 

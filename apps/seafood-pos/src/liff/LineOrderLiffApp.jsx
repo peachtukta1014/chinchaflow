@@ -1,17 +1,15 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Bilingual, BilingualHeading, BilingualHint, BilingualInline } from './Bilingual.jsx';
+import { CustomerPicker } from './CustomerPicker.jsx';
+import { submitLiffOrder } from './liffOrderApi.js';
 import { LIFF_COPY as T } from './liffCopy.js';
+import { closeLiffWindow, useLiffSession } from './useLiffSession.js';
 
 const SIZES = [
   { id: 'small', labelTh: T.sizes.small.th, labelEn: T.sizes.small.en, sub: '850/กก.', product: T.products.small },
   { id: 'medium', labelTh: T.sizes.medium.th, labelEn: T.sizes.medium.en, sub: '1,100/กก.', product: T.products.medium },
   { id: 'large', labelTh: T.sizes.large.th, labelEn: T.sizes.large.en, sub: '1,450/กก.', product: T.products.large },
 ];
-
-function parseMode() {
-  const q = new URLSearchParams(window.location.search);
-  return q.get('mode') === 'new' ? 'new' : 'returning';
-}
 
 function todayKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
@@ -184,7 +182,22 @@ function OrderSummary({ lines, deliveryLabel }) {
   );
 }
 
-function ReturningForm({ shopName, onClose }) {
+function buildRiverPayload(sizes, activeSizes, deadOn, deadKg) {
+  const river = {};
+  for (const s of SIZES) {
+    if (activeSizes[s.id] && parseFloat(sizes[s.id]) > 0) river[s.id] = sizes[s.id];
+  }
+  if (deadOn && parseFloat(deadKg) > 0) river.dead = deadKg;
+  return river;
+}
+
+function ReturningForm({
+  customer,
+  idToken,
+  isPreview,
+  onClose,
+  submitExtra = {},
+}) {
   const [sizes, setSizes] = useState({ small: '', medium: '', large: '' });
   const [activeSizes, setActiveSizes] = useState({});
   const [deadOn, setDeadOn] = useState(false);
@@ -192,7 +205,10 @@ function ReturningForm({ shopName, onClose }) {
   const [delivery, setDelivery] = useState('today');
   const [otherDate, setOtherDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
+  const shopName = customer?.name || '—';
+  const deliveryKey = delivery === 'today' ? todayKey() : otherDate;
   const deliveryLabel =
     delivery === 'today' ? `วันนี้ (${formatThaiDate(todayKey())})` : formatThaiDate(otherDate || todayKey());
 
@@ -219,15 +235,34 @@ function ReturningForm({ shopName, onClose }) {
     summaryLines.length > 0 &&
     (delivery !== 'other' || /^\d{4}-\d{2}-\d{2}$/.test(otherDate));
 
-  const submit = () => {
-    if (!canSubmit) return;
+  const submit = async () => {
+    if (!canSubmit || submitting) return;
+    setSubmitError('');
     setSubmitting(true);
-    setTimeout(() => {
+    try {
+      const river = buildRiverPayload(sizes, activeSizes, deadOn, deadKg);
+      if (isPreview) {
+        alert(
+          `[ตัวอย่าง] ส่งออเดอร์แล้ว\n${summaryLines.join('\n')}\nส่ง: ${deliveryLabel}`,
+        );
+        return;
+      }
+      const result = await submitLiffOrder({
+        idToken,
+        river,
+        deliveryDate: deliveryKey,
+        customerId: customer?.id,
+        customerName: customer?.name,
+        linkUid: true,
+        ...submitExtra,
+      });
+      alert(result.message || `${T.submitSuccess.th}\n${T.submitSuccess.en}`);
+      closeLiffWindow();
+    } catch (e) {
+      setSubmitError(e?.message || T.submitFail.th);
+    } finally {
       setSubmitting(false);
-      alert(
-        `[ตัวอย่าง] ส่งออเดอร์แล้ว\n${summaryLines.join('\n')}\nส่ง: ${deliveryLabel}`,
-      );
-    }, 600);
+    }
   };
 
   return (
@@ -357,6 +392,14 @@ function ReturningForm({ shopName, onClose }) {
         <p className="text-[11px] text-center text-slate-400 px-2 leading-relaxed">
           <BilingualHint th={T.privacy.th} en={T.privacy.en} />
         </p>
+        <p className="text-[11px] text-center text-slate-400 px-2 mt-2 leading-relaxed">
+          <BilingualHint th={T.chatOthersHint.th} en={T.chatOthersHint.en} />
+        </p>
+        {submitError && (
+          <p className="text-sm text-red-600 text-center mt-3" role="alert">
+            {submitError}
+          </p>
+        )}
       </main>
 
       <footer
@@ -374,7 +417,7 @@ function ReturningForm({ shopName, onClose }) {
           <button
             type="button"
             disabled={!canSubmit || submitting}
-            onClick={submit}
+            onClick={() => { submit(); }}
             className="flex-1 min-h-[52px] rounded-2xl bg-sky-600 text-white font-extrabold text-base shadow-lg shadow-sky-600/25 disabled:opacity-40 disabled:shadow-none active:scale-[0.99] transition-transform"
           >
             {submitting ? (
@@ -389,7 +432,7 @@ function ReturningForm({ shopName, onClose }) {
   );
 }
 
-function NewCustomerForm({ onClose }) {
+function NewCustomerForm({ idToken, isPreview, onClose }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
@@ -398,7 +441,21 @@ function NewCustomerForm({ onClose }) {
   const profileOk = name.trim().length >= 2 && phone.trim().length >= 9 && notes.trim().length >= 3;
 
   if (step === 2) {
-    return <ReturningForm shopName={name.trim() || '—'} onClose={onClose} />;
+    return (
+      <ReturningForm
+        customer={{ id: null, name: name.trim() }}
+        idToken={idToken}
+        isPreview={isPreview}
+        onClose={onClose}
+        submitExtra={{
+          registerNew: true,
+          customerName: name.trim(),
+          phone: phone.trim(),
+          notes: notes.trim(),
+          linkUid: true,
+        }}
+      />
+    );
   }
 
   return (
@@ -486,49 +543,133 @@ function NewCustomerForm({ onClose }) {
   );
 }
 
-/** ตัวอย่าง UI LIFF — ยังไม่เชื่อม LINE / Firestore */
-export default function LineOrderLiffApp() {
-  const [mode, setMode] = useState(parseMode);
-  const isPreview = !window.liff;
+function PreviewBanner({ mode, onMode }) {
+  return (
+    <div className="sticky top-0 z-30 bg-amber-50 border-b border-amber-200 px-3 py-2 flex flex-wrap gap-2 items-center justify-center text-xs">
+      <span className="font-bold text-amber-900">
+        <BilingualInline th={T.previewBanner.th} en={T.previewBanner.en} />
+      </span>
+      <button
+        type="button"
+        onClick={() => onMode('short')}
+        className={`px-2.5 py-1 rounded-lg font-bold ${
+          mode === 'short' ? 'bg-slate-900 text-white' : 'bg-white border border-amber-200'
+        }`}
+      >
+        <BilingualInline th={T.returningPreview.th} en={T.returningPreview.en} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onMode('pick')}
+        className={`px-2.5 py-1 rounded-lg font-bold ${
+          mode === 'pick' ? 'bg-slate-900 text-white' : 'bg-white border border-amber-200'
+        }`}
+      >
+        <BilingualInline th={T.pickPreview.th} en={T.pickPreview.en} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onMode('new')}
+        className={`px-2.5 py-1 rounded-lg font-bold ${
+          mode === 'new' ? 'bg-slate-900 text-white' : 'bg-white border border-amber-200'
+        }`}
+      >
+        <BilingualInline th={T.newPreview.th} en={T.newPreview.en} />
+      </button>
+    </div>
+  );
+}
 
-  const close = useCallback(() => {
-    if (window.liff?.closeWindow) window.liff.closeWindow();
-    else alert('ปิดหน้าต่าง (ตัวอย่าง)');
-  }, []);
+/** LIFF สั่งกุ้ง — OA เท่านั้น (กลุ่ม LINE ยังพิมพ์สั่งเหมือนเดิม) */
+function initialPreviewMode() {
+  if ((import.meta.env.VITE_LIFF_ID || '').trim()) return null;
+  const q = new URLSearchParams(window.location.search);
+  if (q.get('mode') === 'new') return 'new';
+  if (q.get('mode') === 'pick') return 'pick';
+  return 'short';
+}
+
+export default function LineOrderLiffApp() {
+  const session = useLiffSession();
+  const [previewMode, setPreviewMode] = useState(initialPreviewMode);
+  const [pickedCustomer, setPickedCustomer] = useState(null);
+
+  const close = () => closeLiffWindow();
+
+  if (session.status === 'loading') {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50 font-['Sarabun',system-ui,sans-serif]">
+        <p className="text-slate-600 font-semibold">
+          <Bilingual th={T.loading.th} en={T.loading.en} />
+        </p>
+      </div>
+    );
+  }
+
+  if (session.status === 'error') {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-3 p-6 bg-slate-50 font-['Sarabun',system-ui,sans-serif]">
+        <p className="text-red-600 font-bold text-center">
+          <Bilingual th={T.loadError.th} en={T.loadError.en} />
+        </p>
+        <p className="text-sm text-slate-600 text-center">{session.error}</p>
+        <button
+          type="button"
+          onClick={close}
+          className="min-h-[48px] px-6 rounded-xl border border-slate-200 font-bold"
+        >
+          <BilingualInline th={T.close.th} en={T.close.en} />
+        </button>
+      </div>
+    );
+  }
+
+  const isPreview = session.isPreview;
+  const ctx = isPreview && previewMode
+    ? { mode: previewMode, customer: previewMode === 'short' ? { id: 'c1', name: 'จ๊ะขียด', zone: 'ป่าตอง' } : null }
+    : session.context;
+
+  const flowMode = ctx?.mode || 'short';
+  const linkedCustomer = pickedCustomer || ctx?.customer;
+
+  if (flowMode === 'pick' && !linkedCustomer) {
+    return (
+      <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
+        {isPreview && <PreviewBanner mode="pick" onMode={setPreviewMode} />}
+        <CustomerPicker
+          onSelect={(c) => setPickedCustomer({ id: c.id, name: c.name, zone: c.zone })}
+          onClose={close}
+        />
+      </div>
+    );
+  }
+
+  if (flowMode === 'new') {
+    return (
+      <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
+        {isPreview && <PreviewBanner mode="new" onMode={setPreviewMode} />}
+        <NewCustomerForm idToken={session.idToken} isPreview={isPreview} onClose={close} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
       {isPreview && (
-        <div className="sticky top-0 z-30 bg-amber-50 border-b border-amber-200 px-3 py-2 flex flex-wrap gap-2 items-center justify-center text-xs">
-          <span className="font-bold text-amber-900">
-            <BilingualInline th={T.previewBanner.th} en={T.previewBanner.en} />
-          </span>
-          <button
-            type="button"
-            onClick={() => setMode('returning')}
-            className={`px-2.5 py-1 rounded-lg font-bold ${
-              mode === 'returning' ? 'bg-slate-900 text-white' : 'bg-white border border-amber-200'
-            }`}
-          >
-            <BilingualInline th={T.returningPreview.th} en={T.returningPreview.en} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('new')}
-            className={`px-2.5 py-1 rounded-lg font-bold ${
-              mode === 'new' ? 'bg-slate-900 text-white' : 'bg-white border border-amber-200'
-            }`}
-          >
-            <BilingualInline th={T.newPreview.th} en={T.newPreview.en} />
-          </button>
-        </div>
+        <PreviewBanner
+          mode={previewMode || 'short'}
+          onMode={(m) => {
+            setPreviewMode(m);
+            setPickedCustomer(null);
+          }}
+        />
       )}
-
-      {mode === 'new' ? (
-        <NewCustomerForm onClose={close} />
-      ) : (
-        <ReturningForm shopName="จ๊ะขียด" onClose={close} />
-      )}
+      <ReturningForm
+        customer={linkedCustomer}
+        idToken={session.idToken}
+        isPreview={isPreview}
+        onClose={close}
+      />
     </div>
   );
 }

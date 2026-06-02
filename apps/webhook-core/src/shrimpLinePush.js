@@ -94,10 +94,9 @@ async function buildCustomerNameByLineUidMap(db) {
 }
 
 function linkedCustomerNameForOrder(order, uidMap) {
-  if (order?.customerName) return order.customerName;
   const uid = normalizeLineUserId(order?.lineUserId);
-  if (!uid || !uidMap) return null;
-  return uidMap.get(uid) || null;
+  if (uid && uidMap?.get(uid)) return uidMap.get(uid);
+  return order?.customerName || null;
 }
 
 /** ผูก LINE UID กับลูกค้าใน Firestore เมื่อชื่อตรงจากออเดอร์ LINE */

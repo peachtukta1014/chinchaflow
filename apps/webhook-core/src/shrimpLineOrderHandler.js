@@ -22,6 +22,10 @@ const {
 } = require('./shrimpLineCustomerProfile');
 const { prepareOrderInput } = require('./prepareOrderInput');
 const {
+  applySyncedCustomerNameToItems,
+  resolveLineOrderCustomerName,
+} = require('./lineOrderCustomerName');
+const {
   replyOrderOk,
   replyParseFail,
   replyDeliverySet,
@@ -34,56 +38,7 @@ const {
   replyInvalidWeight,
 } = require('./shrimpLineReply');
 const { getOrderWeightIssue } = require('./orderWeight');
-
-async function saveLineOrders(db, admin, { items, text, userId, groupId, deliveryDate }) {
-  const groups = groupItemsByCustomer(items);
-  const batch = db.batch();
-  const ts = admin.firestore.FieldValue.serverTimestamp();
-
-  let linkedCustomerName = null;
-  if (userId && !groupId) {
-    linkedCustomerName = await findCustomerNameByLineUserId(db, userId);
-  }
-
-  for (const [key, groupItems] of groups) {
-    let customerName = key === '__none__' ? null : key;
-    if (!customerName && linkedCustomerName) customerName = linkedCustomerName;
-    const ref = db.collection('lineOrders').doc();
-    batch.set(ref, {
-      source: 'line',
-      lineUserId: userId,
-      lineGroupId: groupId,
-      rawText: text,
-      items: groupItems.map((i) => ({
-        product: i.product,
-        qty: i.qty,
-        unit: i.unit,
-        customerName: i.customerName || customerName,
-      })),
-      deliveryDate,
-      customerName,
-      status: 'pending',
-      createdAt: ts,
-    });
-  }
-  await batch.commit();
-
-  const names = [...groups.keys()]
-    .filter((k) => k !== '__none__')
-    .map((k) => k);
-  for (const it of items) {
-    if (it.customerName) names.push(it.customerName);
-  }
-  if (!groupId) {
-    try {
-      await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
-    } catch (err) {
-      console.warn('linkLineUserToCustomers', err.message);
-    }
-  }
-
-  return groups.size;
-}
+const { saveLineOrders } = require('./saveShrimpLineOrders');
 
 function primaryCustomerNameFromItems(items) {
   for (const it of items) {
@@ -99,7 +54,17 @@ async function shouldVerifyCustomerProfile(db, groupId) {
 
 async function tryCompleteOrder(db, admin, session, ts, ctx) {
   const { items, text, userId, groupId, deliveryDate, replyLang } = ctx;
-  const summary = formatItemsSummary(items, replyLang);
+
+  let linkedCustomerName = null;
+  if (userId && !groupId) {
+    linkedCustomerName = await findCustomerNameByLineUserId(db, userId);
+  }
+  const { items: replyItems } = applySyncedCustomerNameToItems({
+    items,
+    groupId,
+    linkedCustomerName,
+  });
+  const summary = formatItemsSummary(replyItems, replyLang);
 
   if (await shouldVerifyCustomerProfile(db, groupId)) {
     const customerName = primaryCustomerNameFromItems(items)
@@ -154,7 +119,7 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
 
   return {
     ok: true,
-    reply: replyOrderOk(replyLang, orderCount, deliveryDate, items),
+    reply: replyOrderOk(replyLang, orderCount, deliveryDate, replyItems),
   };
 }
 
