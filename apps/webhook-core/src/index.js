@@ -36,6 +36,8 @@ const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
 } = require('./shrimpLinePush');
+const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
+const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
 
 function db() {
@@ -68,7 +70,21 @@ exports.lineWebhook = functions
     const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     for (const event of events) {
-      if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.type !== 'message') continue;
+      if (event.message.type === 'image') {
+        if (event.deliveryContext?.isRedelivery) continue;
+        if (!(await claimLineEvent(db(), event))) continue;
+        try {
+          if (!admin.apps.length) admin.initializeApp();
+          await processShrimpPaymentSlipImage(db(), admin, { event, token });
+          await completeLineEvent(db(), event);
+        } catch (err) {
+          await releaseLineEvent(db(), event);
+          console.error('shrimp payment slip image', err);
+        }
+        continue;
+      }
+      if (event.message.type !== 'text') continue;
       if (event.deliveryContext?.isRedelivery) continue;
       if (!(await claimLineEvent(db(), event))) continue;
 
@@ -283,6 +299,50 @@ exports.shrimpPushBill = functions
         return;
       }
       console.error('shrimpPushBill', err);
+      res.status(500).json({ error: err.message || 'failed' });
+    }
+  });
+
+// ── LIFF สั่งกุ้ง (LINE id_token) → lineOrders ───────────────────────────────
+exports.shrimpLiffOrder = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 30, memory: '256MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'GET') {
+      res.status(200).json({
+        ok: true,
+        hint: 'POST { action: "context"|"submit", idToken, river?, deliveryDate?, customerId? }',
+      });
+      return;
+    }
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const result = await handleShrimpLiffOrderRequest(db(), admin, req.body || {});
+      res.json(result);
+    } catch (err) {
+      const code = err.code || 'failed';
+      if (code === 'missing_id_token' || code === 'invalid_id_token') {
+        res.status(401).json({ error: code, hint: 'เปิดฟอร์มจาก LINE OA อีกครั้ง' });
+        return;
+      }
+      if (code === 'liff_not_configured') {
+        res.status(500).json({ error: code, hint: 'ตั้ง LINE_LIFF_ID ใน Cloud Functions' });
+        return;
+      }
+      if (code === 'empty_order' || code === 'invalid_weight' || code === 'invalid_delivery_date') {
+        res.status(400).json({ error: code, hint: err.message });
+        return;
+      }
+      if (code === 'customer_required' || code === 'customer_not_found') {
+        res.status(400).json({ error: code, hint: 'เลือกชื่อลูกค้าในรายชื่อ' });
+        return;
+      }
+      console.error('shrimpLiffOrder', err);
       res.status(500).json({ error: err.message || 'failed' });
     }
   });

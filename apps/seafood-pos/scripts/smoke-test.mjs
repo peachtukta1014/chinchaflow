@@ -591,6 +591,8 @@ try {
   }
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
+  assert(rules.includes('paymentSlipSubmissions'), 'firestore.rules มี paymentSlipSubmissions');
+  assert(rules.includes('lineBillPushes'), 'firestore.rules อ่าน lineBillPushes');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
   assert(
     rules.includes("role == 'staff'") && rules.includes('approved == true'),
@@ -639,6 +641,25 @@ try {
   assert(lotCloseSrc.includes('LotPortfolioPanel'), 'LotCloseScreen โหลด LotPortfolioPanel');
 } catch (e) {
   fail('lotPortfolioStats', e);
+}
+
+try {
+  const { saleRemainingAmount, isOpenSaleForSlip } = await import('../src/lib/paymentSlipOpenSale.js');
+  assert(saleRemainingAmount({ paymentType: 'credit', total: 500 }) === 500, 'saleRemainingAmount credit');
+  assert(!isOpenSaleForSlip({ paymentType: 'transfer', remainingAmount: 0 }), 'closed transfer not open');
+  const slipMod = requireWebhook('../../webhook-core/src/shrimpPaymentSlip.js');
+  assert(slipMod.isOpenSale({ remainingAmount: 100 }), 'webhook isOpenSale');
+} catch (e) {
+  fail('paymentSlip', e);
+}
+
+try {
+  const hub = fs.readFileSync(path.join(root, 'src/screens/SalesHubScreen.jsx'), 'utf8');
+  assert(hub.includes('PaymentSlipsScreen'), 'SalesHub มีแท็บสลิป');
+  const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
+  assert(wh.includes('processShrimpPaymentSlipImage'), 'lineWebhook รับรูปสลิป');
+} catch (e) {
+  fail('paymentSlip UI', e);
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');
