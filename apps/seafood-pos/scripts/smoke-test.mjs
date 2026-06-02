@@ -679,6 +679,7 @@ try {
   assert(liffSession.includes('ko-seafood'), 'LIFF prod host guard');
   const liffCopy = fs.readFileSync(path.join(root, 'src/liff/liffCopy.js'), 'utf8');
   assert(liffCopy.includes('identityTitle'), 'LIFF identity step copy');
+  assert(liffCopy.includes('9–13 ตัว/กก.'), 'LIFF size count per kg copy');
   const liffApp = fs.readFileSync(path.join(root, 'src/liff/LineOrderLiffApp.jsx'), 'utf8');
   assert(liffApp.includes('IdentityStep'), 'LIFF order-before-identity flow');
   assert(liffApp.includes("setStep('identity')"), 'LIFF identity routing');

@@ -6,9 +6,33 @@ import { LIFF_COPY as T } from './liffCopy.js';
 import { closeLiffWindow, useLiffSession } from './useLiffSession.js';
 
 const SIZES = [
-  { id: 'small', labelTh: T.sizes.small.th, labelEn: T.sizes.small.en, sub: '850/กก.', product: T.products.small },
-  { id: 'medium', labelTh: T.sizes.medium.th, labelEn: T.sizes.medium.en, sub: '1,100/กก.', product: T.products.medium },
-  { id: 'large', labelTh: T.sizes.large.th, labelEn: T.sizes.large.en, sub: '1,450/กก.', product: T.products.large },
+  {
+    id: 'small',
+    labelTh: T.sizes.small.th,
+    labelEn: T.sizes.small.en,
+    sub: '850/กก.',
+    countTh: T.sizeCountPerKg.small.th,
+    countEn: T.sizeCountPerKg.small.en,
+    product: T.products.small,
+  },
+  {
+    id: 'medium',
+    labelTh: T.sizes.medium.th,
+    labelEn: T.sizes.medium.en,
+    sub: '1,100/กก.',
+    countTh: T.sizeCountPerKg.medium.th,
+    countEn: T.sizeCountPerKg.medium.en,
+    product: T.products.medium,
+  },
+  {
+    id: 'large',
+    labelTh: T.sizes.large.th,
+    labelEn: T.sizes.large.en,
+    sub: '1,450/กก.',
+    countTh: T.sizeCountPerKg.large.th,
+    countEn: T.sizeCountPerKg.large.en,
+    product: T.products.large,
+  },
 ];
 
 function todayKey() {
@@ -137,6 +161,11 @@ function SizeChip({ item, active, weight, onToggle, onWeight }) {
             <Bilingual th={item.labelTh} en={item.labelEn} />
           </p>
           <p className="text-[11px] text-slate-500">{item.sub}</p>
+          {item.countTh && (
+            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+              <BilingualInline th={item.countTh} en={item.countEn} />
+            </p>
+          )}
         </div>
         <span
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
@@ -419,6 +448,9 @@ function OrderStep({
               />
             ))}
           </div>
+          <p className="text-[10px] text-slate-400 mt-2 px-0.5 leading-relaxed">
+            <BilingualHint th={T.sizeCountNote.th} en={T.sizeCountNote.en} />
+          </p>
         </Section>
 
         <Section

@@ -17,8 +17,18 @@ export const LIFF_COPY = {
   deliveryPrefix: { th: 'ส่ง', en: 'Delivery' },
   riverLive: { th: 'กุ้งแม่น้ำเป็น', en: 'Live river shrimp' },
   riverLiveHint: {
-    th: 'เลือกได้มากกว่าหนึ่งขนาด · แตะเพื่อกรอกน้ำหนัก',
-    en: 'Multiple sizes OK · tap to enter kg',
+    th: 'เลือกได้มากกว่าหนึ่งขนาด · แตะเพื่อกรอกน้ำหนัก · ดูจำนวนตัว/กก. ใต้ชื่อไซซ์',
+    en: 'Multiple sizes OK · tap for kg · pcs/kg under each size',
+  },
+  /** จำนวนตัวโดยประมาณต่อ 1 กก. — ช่วยลูกค้าใหม่เลือกไซซ์ */
+  sizeCountPerKg: {
+    small: { th: '9–13 ตัว/กก.', en: '9–13 pcs/kg' },
+    medium: { th: '6–8 ตัว/กก.', en: '6–8 pcs/kg' },
+    large: { th: '4–5 ตัว/กก.', en: '4–5 pcs/kg' },
+  },
+  sizeCountNote: {
+    th: 'จำนวนตัวเป็นแนวทาง — กุ้งธรรมชาติอาจต่างเล็กน้อยตามรอบ',
+    en: 'Counts are approximate — natural shrimp may vary by batch',
   },
   deadShrimp: { th: 'กุ้งตาย', en: 'Dead shrimp' },
   deadShrimpHint: { th: 'ไม่บังคับ — เปิดเมื่อต้องการสั่ง', en: 'Optional' },
