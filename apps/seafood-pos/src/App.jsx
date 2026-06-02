@@ -466,6 +466,7 @@ export default function App() {
               refreshKey={salesRefresh}
               active={activeTab === 'sales'}
               isAdmin={isAdmin}
+              member={member}
               stock={stock}
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}

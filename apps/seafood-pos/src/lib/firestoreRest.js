@@ -584,3 +584,41 @@ export async function fsAtomicStockBatchCommit(patches) {
     );
   }
 }
+
+/** สลิปโอนจาก LINE ที่รอตรวจ */
+export async function fsQueryPendingPaymentSlips(limit = 50) {
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'paymentSlipSubmissions' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'status' },
+        op: 'EQUAL',
+        value: { stringValue: 'pending' },
+      },
+    },
+    orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+    limit,
+  });
+  if (docs.length > 0) return docs;
+  const all = await fsListCollection('paymentSlipSubmissions', 80);
+  return all
+    .filter((d) => d.status === 'pending')
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
+export async function fsQuerySaleByBillNo(billNo) {
+  const key = String(billNo || '').trim();
+  if (!key) return null;
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'billNo' },
+        op: 'EQUAL',
+        value: { stringValue: key },
+      },
+    },
+    limit: 5,
+  });
+  return docs[0] || null;
+}
