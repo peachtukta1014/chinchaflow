@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { VoiceCommandBar } from '../components/VoiceCommandBar';
+import { hasLineSummaryCommand } from '../lib/voiceTabCommands';
 import { dateKeyBangkok, shiftDateKey } from '../lib/constants';
 import { formatDateKeyLabel } from '../lib/localeFormat';
 import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestoreRest';
@@ -45,7 +47,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
     return m?.nameTh || t(key) || key;
   };
 
-  const sendLineSummary = async () => {
+  const sendLineSummary = useCallback(async () => {
     setLineSending(true);
     setLineFlash('');
     try {
@@ -57,7 +59,16 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
       setLineFlash(`⚠️ ${e.message || t('lineSummaryFailed')}`);
     }
     setLineSending(false);
-  };
+  }, [viewDateKey, t]);
+
+  const onVoiceFinal = useCallback((text) => {
+    if (!isAdmin) return { log: text };
+    if (hasLineSummaryCommand(text)) {
+      sendLineSummary();
+      return { log: `${text} · 📲 ${t('sendLineSummary')}` };
+    }
+    return { log: `${text} · ${t('voiceSummaryHint')}` };
+  }, [isAdmin, sendLineSummary, t]);
 
   const addExpense = async () => {
     if (!isToday) return;
@@ -106,6 +117,15 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
           ›
         </button>
       </div>
+
+      {isAdmin && (
+        <VoiceCommandBar
+          lang={lang}
+          t={t}
+          hint={t('voiceSummaryHint')}
+          onFinalText={onVoiceFinal}
+        />
+      )}
 
       {lineFlash && (
         <p className={`text-center text-xs font-bold py-2 rounded-xl ${lineFlash.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>

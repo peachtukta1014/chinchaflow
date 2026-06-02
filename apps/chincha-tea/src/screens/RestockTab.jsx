@@ -25,6 +25,8 @@ import {
   upsertRestockCatalogItems,
 } from '../lib/restockCatalogService';
 import { restockDisplayName } from '../lib/restockDisplay';
+import { VoiceCommandBar } from '../components/VoiceCommandBar';
+import { parseRestockVoice } from '../lib/voiceRestock';
 
 function RestockItemName({ name, lang, catalogItem }) {
   const overrides = catalogItem
@@ -62,7 +64,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [manageCatalog, setManageCatalog] = useState(false);
   const [catalogSaving, setCatalogSaving] = useState(false);
   const [nameEditId, setNameEditId] = useState(null);
-  const [nameDraft, setNameDraft] = useState({ nameEn: '', nameMy: '' });
+  const [nameDraft, setNameDraft] = useState({ nameEn: '', nameMy: '', voiceAliases: '' });
   const fileRef = useRef(null);
   const dateKey = dateKeyBangkok();
   const isAdmin = member?.role === 'admin';
@@ -189,13 +191,18 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
 
   const openNameEdit = (catItem) => {
     setNameEditId(catItem.id);
-    setNameDraft({ nameEn: catItem.nameEn || '', nameMy: catItem.nameMy || '' });
+    setNameDraft({
+      nameEn: catItem.nameEn || '',
+      nameMy: catItem.nameMy || '',
+      voiceAliases: catItem.voiceAliases || '',
+    });
   };
 
   const handleSaveCatalogNames = async (catItem) => {
     const patch = {
       nameEn: nameDraft.nameEn.trim(),
       nameMy: nameDraft.nameMy.trim(),
+      voiceAliases: nameDraft.voiceAliases.trim(),
     };
     setCatalog((prev) => prev.map((c) => (c.id === catItem.id ? { ...c, ...patch } : c)));
     setCatalogSaving(true);
@@ -226,16 +233,36 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     setUploading(false);
   };
 
-  const handleSubmit = async () => {
-    if (!items.length) return;
+  const mergeParsedIntoList = (prev, parsed) => {
+    const next = [...prev];
+    for (const vi of parsed) {
+      const key = restockNameKey(vi.name);
+      const existing = next.find((i) => restockNameKey(i.name) === key);
+      if (existing) {
+        existing.qty += vi.qty;
+        existing.status = vi.status;
+      } else {
+        next.push({
+          cid: Date.now() + Math.random(),
+          name: vi.name,
+          qty: vi.qty,
+          status: vi.status,
+        });
+      }
+    }
+    return next;
+  };
+
+  const submitRestockList = useCallback(async (listToSubmit) => {
+    if (!listToSubmit?.length) return;
     setSaving(true);
     try {
-      const names = items.map((i) => i.name);
+      const names = listToSubmit.map((i) => i.name);
       await fsPost('restocks', {
         dateKey,
         uid: member?.uid || 'unknown',
         createdBy: member?.name || 'ชินชา',
-        items: items.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
+        items: listToSubmit.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
         purchaseStatus: 'pending',
         createdAt: new Date().toISOString(),
       });
@@ -250,7 +277,32 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       alert(t('saveFailed'));
     }
     setSaving(false);
-  };
+  }, [dateKey, member, notifyRestockChange, refreshCatalog, refreshRecent, t]);
+
+  const handleSubmit = () => submitRestockList(items);
+
+  const onVoiceFinal = useCallback((text) => {
+    const { items: parsed, submit } = parseRestockVoice(text, catalog);
+    if (parsed.length) {
+      const names = parsed.map((i) => i.name).join(', ');
+      setItems((prev) => {
+        const next = mergeParsedIntoList(prev, parsed);
+        if (submit && next.length) {
+          setTimeout(() => submitRestockList(next), 200);
+        }
+        return next;
+      });
+      if (submit) {
+        return { log: `${text} · ✅ ${names} · ${t('submitRestock')}` };
+      }
+      return { log: `${text} · ✅ ${names}` };
+    }
+    if (submit && items.length) {
+      submitRestockList(items);
+      return { log: `${text} · ${t('submitRestock')}` };
+    }
+    return { log: `${text} · ${t('voiceRestockNoMatch')}` };
+  }, [catalog, items, submitRestockList, t]);
 
   const handleDeleteRestock = async (req) => {
     if (!canManageRestock(req, member) || deletingId) return;
@@ -317,6 +369,13 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-4">
+      <VoiceCommandBar
+        lang={lang}
+        t={t}
+        hint={t('voiceRestockHint')}
+        onFinalText={onVoiceFinal}
+      />
+
       {flash && (
         <div className="py-3 rounded-2xl text-center font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 text-sm">{flash}</div>
       )}
@@ -439,6 +498,13 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                               onChange={(e) => setNameDraft((d) => ({ ...d, nameMy: e.target.value }))}
                               placeholder={t('nameMyLabel')}
                               className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-xs"
+                            />
+                            <input
+                              type="text"
+                              value={nameDraft.voiceAliases}
+                              onChange={(e) => setNameDraft((d) => ({ ...d, voiceAliases: e.target.value }))}
+                              placeholder={t('voiceAliasesPlaceholder')}
+                              className="w-full px-2 py-1.5 rounded-lg border border-amber-200 text-xs"
                             />
                             <button
                               type="button"

@@ -13,6 +13,7 @@ export function normalizeProductForm(form) {
     emoji: form.emoji || '☕',
     star: !!form.star,
     active: form.active !== false,
+    voiceAliases: (form.voiceAliases || '').trim(),
   };
 }
 

@@ -3,6 +3,11 @@ import { ICE_OPTIONS, SIZES, SWEET_OPTIONS } from './constants';
 import { MENU_KEY_MY } from './burmeseLexicon';
 import { burmeseToThai } from './burmeseToThai';
 import { speechRecognitionLang } from './burmeseToThai';
+import { voiceAliasNames } from './voiceAliases';
+import { needsIOSVoiceMode, warmUpMicrophone } from './speechSupport';
+
+/** iOS (Safari / Chrome) ใช้ instance เดียว — ลดเสียงแจ้งเตือนและค้าง */
+let iosSharedRecognition = null;
 
 const THAI_NUM = {
   ศูนย์: '0', หนึ่ง: '1', สอง: '2', สาม: '3', สี่: '4', ห้า: '5',
@@ -85,14 +90,14 @@ function buildMenuPatterns(menuItems) {
   return menuItems
     .filter((m) => m.active !== false)
     .map((item) => {
-      const names = [
+      const names = voiceAliasNames(item, [
         item.nameTh,
         item.nameEn,
         item.nameMy,
         MENU_KEY_MY[item.key],
         item.id?.replace(/-/g, ' '),
         item.key,
-      ].filter(Boolean);
+      ].filter(Boolean));
       const reParts = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
       const compactNames = names.map(compact).filter((n) => n.length >= 2);
       return { item, re: new RegExp(reParts.join('|'), 'i'), compactNames };
@@ -243,21 +248,28 @@ export function useVoice(onFinalText, appLang = 'th', { enabled = true } = {}) {
     flushTranscript();
   }, [flushTranscript]);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (!enabled) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       alert(appLang === 'my'
-        ? 'Chrome သို့မဟုတ် Edge သုံးပြီး အသံဖြင့် မှာယူနိုင်ပါသည်'
-        : 'ใช้ Chrome หรือ Edge เพื่อสั่งงานด้วยเสียง');
+        ? 'Safari သို့မဟုတ် Chrome မှ ဖွင့်ပြီး အသံဖြင့် မှာယူနိုင်ပါသည်'
+        : 'เปิดแอปผ่าน Safari หรือ Chrome เพื่อสั่งงานด้วยเสียง');
       return;
     }
+
+    const iosMode = needsIOSVoiceMode();
+    if (iosMode) await warmUpMicrophone();
+
     wantListenRef.current = true;
     committedRef.current = '';
     displayRef.current = '';
-    const rec = new SR();
+
+    const rec = iosMode
+      ? (iosSharedRecognition || (iosSharedRecognition = new SR()))
+      : new SR();
     rec.lang = speechRecognitionLang(appLang);
-    rec.continuous = true;
+    rec.continuous = !iosMode;
     rec.interimResults = true;
     recRef.current = rec;
 
@@ -277,23 +289,41 @@ export function useVoice(onFinalText, appLang = 'th', { enabled = true } = {}) {
       displayRef.current = display;
       setLiveText(display);
     };
-    rec.onerror = () => {
+    rec.onerror = (ev) => {
+      if (ev?.error === 'not-allowed' && appLang === 'my') {
+        alert('မိုက်ခရိုဖုန်း ခွင့်ပြုပါ');
+      } else if (ev?.error === 'not-allowed') {
+        alert('กรุณาอนุญาตไมโครโฟนใน Safari หรือ Chrome');
+      }
       if (!wantListenRef.current) setListening(false);
     };
     rec.onend = () => {
       if (wantListenRef.current) {
-        try { rec.start(); } catch {
-          wantListenRef.current = false;
-          setListening(false);
-          flushTranscript();
-        }
+        const delay = iosMode ? 250 : 0;
+        const restart = () => {
+          try { rec.start(); } catch {
+            wantListenRef.current = false;
+            setListening(false);
+            flushTranscript();
+          }
+        };
+        if (delay) setTimeout(restart, delay);
+        else restart();
       } else {
         setListening(false);
         flushTranscript();
       }
     };
-    rec.start();
-    setListening(true);
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      wantListenRef.current = false;
+      setListening(false);
+      alert(appLang === 'my'
+        ? 'အသံမစနိုင် — Safari/Chrome မှ ဖွင့်ပြီး မိုက်ခရိုဖုန်း ခွင့်ပြုပါ'
+        : 'เปิดไมค์ไม่ได้ — เปิดผ่าน Safari หรือ Chrome แล้วอนุญาตไมโครโฟน');
+    }
   }, [appLang, enabled, flushTranscript]);
 
   const toggle = useCallback(() => {
