@@ -14,8 +14,7 @@ export {
   ADMIN_EMAIL,
   ADMIN_EMAILS,
   isBootstrapAdminEmail,
-  isStaffAutoApproveEmail,
-  STAFF_AUTO_APPROVE_EMAILS,
+  getShrimpSignupRole,
   SESSION_KEY,
   SESSION_DAYS,
 } from './config';

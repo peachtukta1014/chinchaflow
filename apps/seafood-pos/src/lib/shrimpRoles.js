@@ -1,14 +1,13 @@
-import { isStaffAutoApproveEmail } from '../constants/config.js';
+import { OPERATIONAL_STAFF_EMAIL } from '../constants/config.js';
 
-export { OPERATIONAL_STAFF_EMAIL } from '../constants/config.js';
-export { isStaffAutoApproveEmail };
+export { OPERATIONAL_STAFF_EMAIL };
 
 export function normalizeShrimpEmail(email) {
   return (email || '').trim().toLowerCase();
 }
 
 export function isOperationalStaffEmail(email) {
-  return isStaffAutoApproveEmail(email);
+  return normalizeShrimpEmail(email) === OPERATIONAL_STAFF_EMAIL.toLowerCase();
 }
 
 /** ป้ายใน UI / หน้าสมาชิกแอป */
@@ -54,4 +53,11 @@ export function canAccessShrimpOverlay(member, tabId) {
 export function getDefaultMainTabForMember(member) {
   if (isShrimpStaff(member)) return 'orders';
   return 'pos';
+}
+
+/** ลำดับเปลี่ยน role ในหน้าจัดการสมาชิก (แอดมินเท่านั้น) */
+export function getNextShrimpRole(currentRole) {
+  if (currentRole === 'admin') return 'manager';
+  if (currentRole === 'manager') return 'staff';
+  return 'admin';
 }

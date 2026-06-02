@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
-import { isBootstrapAdminEmail, isStaffAutoApproveEmail } from '../constants';
+import { getShrimpSignupRole, isBootstrapAdminEmail } from '../constants';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
@@ -22,18 +22,14 @@ export default function LoginScreen({ onLogin }) {
       if (mode === 'register') {
         const em = email.trim().toLowerCase();
         const { user } = await createUserWithEmailAndPassword(auth, em, password);
-        const grantAdmin = isBootstrapAdminEmail(em);
-        const grantStaff = !grantAdmin && isStaffAutoApproveEmail(em);
-        const role = grantAdmin ? 'admin' : grantStaff ? 'staff' : 'manager';
-        const approved = grantAdmin || grantStaff;
+        const role = getShrimpSignupRole(em);
         await fsSetShrimpUser(user.uid, {
           name: name.trim(),
           email: em,
           role,
-          approved,
+          approved: true,
           createdAt: new Date().toISOString(),
         });
-        if (!approved) { await signOut(auth); setMode('pending'); return; }
         onLogin({ uid: user.uid, name: name.trim(), email: em, role });
       } else {
         const em = email.trim().toLowerCase();
@@ -74,7 +70,7 @@ export default function LoginScreen({ onLogin }) {
         <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-2xl p-6 text-center w-full">
           <p className="text-4xl mb-3">⏳</p>
           <p className="text-yellow-300 font-bold text-lg">รอการอนุมัติ</p>
-          <p className="text-slate-400 text-sm mt-2">แอดมินจะอนุมัติสิทธิ์ให้เร็วๆ นี้ครับ</p>
+          <p className="text-slate-400 text-sm mt-2">แอดมินจะอนุมัติและกำหนดตำแหน่งให้เร็วๆ นี้ครับ</p>
           <p className="text-slate-500 text-xs mt-1">{email}</p>
         </div>
         <button onClick={() => { setMode('login'); setEmail(''); setPassword(''); setName(''); }}
@@ -115,10 +111,16 @@ export default function LoginScreen({ onLogin }) {
           {loading ? 'กำลังตรวจสอบ...' : mode === 'register' ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}
         </button>
 
-        <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
-          className="w-full text-slate-400 text-sm py-2">
-          {mode === 'login' ? 'ยังไม่มีบัญชี? → สมัครสมาชิก' : 'มีบัญชีแล้ว? → เข้าสู่ระบบ'}
-        </button>
+        <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+          className="w-full text-slate-400 text-sm py-2">
+          {mode === 'login' ? 'ยังไม่มีบัญชี? → สมัครสมาชิก' : 'มีบัญชีแล้ว? → เข้าสู่ระบบ'}
+        </button>
+
+        {mode === 'register' && (
+          <p className="text-slate-500 text-[11px] text-center leading-relaxed px-2">
+            สมัครแล้วเข้าใช้ได้ทันที (สตาฟ) · แอดมินปรับตำแหน่งเป็น แมนเนเจอร์ / แอดมิน ได้ภายหลัง
+          </p>
+        )}
 
         {!isFirebaseReady && <p className="text-yellow-400 text-xs text-center">⚠️ Firebase config ยังไม่ครบ</p>}
       </div>

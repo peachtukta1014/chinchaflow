@@ -558,10 +558,12 @@ try {
     canAccessShrimpMainTab,
     canAccessShrimpOverlay,
     getDefaultMainTabForMember,
+    getNextShrimpRole,
   } = await import('../src/lib/shrimpRoles.js');
-  const { isStaffAutoApproveEmail } = await import('../src/constants/config.js');
+  const { getShrimpSignupRole } = await import('../src/constants/config.js');
   assert(isOperationalStaffEmail('techitudom2000@gmail.com'), 'โก๊ะ = operational staff email');
-  assert(isStaffAutoApproveEmail('techitudom2000@gmail.com'), 'staff auto-approve email');
+  assert(getShrimpSignupRole('new@example.com') === 'staff', 'สมัครใหม่ = staff');
+  assert(getShrimpSignupRole('peachtukta1014@gmail.com') === 'admin', 'bootstrap = admin');
   assert(getShrimpRoleLabel('manager', 'a@b.com') === 'แมนเนเจอร์', 'label manager');
   assert(getShrimpRoleLabel('staff', 'techitudom2000@gmail.com') === 'สตาฟ (ลูกมือ)', 'label โก๊ะ');
   const staffMember = { role: 'staff', email: 'techitudom2000@gmail.com' };
@@ -571,6 +573,9 @@ try {
   assert(canAccessShrimpOverlay(staffMember, 'members'), 'staff ดูลูกค้า');
   assert(!canAccessShrimpOverlay(staffMember, 'stock'), 'staff ไม่เข้าคลัง');
   assert(getDefaultMainTabForMember(staffMember) === 'orders', 'staff default tab = LINE');
+  assert(getNextShrimpRole('admin') === 'manager', 'cycle role admin→manager');
+  assert(getNextShrimpRole('manager') === 'staff', 'cycle role manager→staff');
+  assert(getNextShrimpRole('staff') === 'admin', 'cycle role staff→admin');
   const appSrc = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   assert(
     appSrc.includes('isAdmin && (\n        <LiveStockStickyBar'),
@@ -587,7 +592,10 @@ try {
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
-  assert(rules.includes('isShrimpOperationalStaffSignup'), 'firestore staff signup อนุมัติทันที');
+  assert(
+    rules.includes("role == 'staff'") && rules.includes('approved == true'),
+    'firestore สมัคร staff อนุมัติทันที',
+  );
 } catch (e) {
   fail('shrimpRoles', e);
 }
