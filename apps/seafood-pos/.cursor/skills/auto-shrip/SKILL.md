@@ -28,7 +28,9 @@ Post a short summary to the Slack thread:
 
 - Stay in `apps/seafood-pos` unless fixing a failure requires webhook code in `apps/webhook-core`
 - Do not edit `apps/chincha-tea/`
-- For deploy/merge workflow use `/deploy-shrimp` or `/land-it`
+- For merge + deploy after feature work use `/ship-shrimp` (not this skill — `auto-shrip` is verify-only)
+- For deploy reference use `/deploy-shrimp` or merge to `main` (`deploy-hosting.yml` → `deploy_shrimp`)
+- For PR workflow use `/land-it`
 
 ## Notes
 

@@ -28,7 +28,8 @@ https://ko-seafood.top
 
 - `.cursor/skills/auto-shrip/` — smoke + build อัตโนมัติ รายงาน Slack (เรียก `/auto-shrip`)
 - `.cursor/skills/deploy-shrimp/` — build, smoke test, deploy กุ้ง (เรียก `/deploy-shrimp`)
-- Repo-wide: `.cursor/skills/land-it/` — ปิดงาน PR (`/land-it`)
+- `.cursor/skills/ship-shrimp/` — **ปิดงานกุ้ง:** smoke + build ผ่าน → merge PR เข้า `main` → รอ deploy (เรียก `/ship-shrimp`)
+- Repo-wide: `.cursor/skills/land-it/` — เปิด/อัปเดต PR (`/land-it`)
 
 ## ก่อนเพิ่ม CI / automation ใหม่
 

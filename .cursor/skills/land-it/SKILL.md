@@ -11,8 +11,8 @@ Close out a coding task with a clean git state and a reviewable PR.
 
 | Paths touched | App | Verify before PR |
 |---------------|-----|------------------|
-| `apps/seafood-pos/**` | กุ้ง (shrimp) | `node apps/seafood-pos/scripts/smoke-test.mjs` then `npm run build --workspace=seafood-pos` |
-| `apps/chincha-tea/**` | ชา (tea) | `npm run build --workspace=chincha-tea` |
+| `apps/seafood-pos/**` | กุ้ง (shrimp) | `node apps/seafood-pos/scripts/smoke-test.mjs` then `npm run build --workspace=seafood-pos` — ถ้าต้องการ merge + deploy หลังงานเสร็จ ใช้ `/ship-shrimp` ต่อ |
+| `apps/chincha-tea/**` | ชา (tea) | `npm run build --workspace=chincha-tea` — ถ้าผู้ใช้/Peach ต้องการ merge + deploy หลังงานเสร็จ ใช้ `/ship-tea` ต่อ |
 | `apps/webhook-core/**` | LINE functions | Deploy-only; no local HTTP server — note deploy region `asia-southeast1` in PR |
 | Root shared (`package.json`, `firebase.json`, …) | Both PWAs | Run builds for every app whose workspace deps changed |
 
