@@ -7,7 +7,12 @@ const {
   parseSimpleOrderLine,
 } = require('../src/parseLineOrder');
 const { classifyShrimpLineMessage } = require('../src/shrimpLineIntent');
-const { replyRiverPrompt, replyOrderOk } = require('../src/shrimpLineReply');
+const {
+  replyRiverPrompt,
+  replyOrderOk,
+  replyHelpCustomerThai,
+  replyHelpCustomerEnglish,
+} = require('../src/shrimpLineReply');
 
 function assert(cond, msg) {
   if (!cond) {
@@ -41,5 +46,18 @@ const thReply = replyOrderOk('th', 1, '2026-05-31', [
   { product: 'กุ้งกลาง', qty: 2, unit: 'กก', customerName: 'ปุ้ย' },
 ]);
 assert(/รับออเดอร์/.test(thReply), 'order ok thai');
+
+assert(classifyShrimpLineMessage('ช่วยเหลือ', null) === 'help', 'help intent thai');
+assert(classifyShrimpLineMessage('EN', null) === 'help_en', 'help_en intent');
+assert(classifyShrimpLineMessage('2', null) === 'help_en', 'help_en digit 2');
+
+const helpTh = replyHelpCustomerThai();
+assert(/คู่มือการสั่งซื้อ/.test(helpTh), 'help th formal header');
+assert(/094-669-3628/.test(helpTh), 'help th contact phone');
+assert(!/မြန်မာ|အော်ဒါ/.test(helpTh), 'help th no burmese block');
+
+const helpEn = replyHelpCustomerEnglish();
+assert(/Ordering & contact guide/.test(helpEn), 'help en formal header');
+assert(/ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
 
 console.log('\nall shrimp i18n order tests passed\n');
