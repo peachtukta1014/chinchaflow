@@ -316,7 +316,7 @@ function ProductsSection({
   const [priceDraft, setPriceDraft] = useState('');
 
   const emptyProduct = () => ({
-    nameTh: '', nameEn: '', nameMy: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true,
+    nameTh: '', nameEn: '', nameMy: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true, voiceAliases: '',
   });
   const emptyTopping = () => ({ label: '', price: 10, active: true });
 
@@ -484,6 +484,13 @@ function ProductFormModal({ form, isNew, t, onClose, onSave }) {
         <input className="field" value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} />
         <label className="text-[10px] font-bold text-stone-500">{t('nameMyLabel')}</label>
         <input className="field" value={f.nameMy || ''} onChange={(e) => setF({ ...f, nameMy: e.target.value })} />
+        <label className="text-[10px] font-bold text-stone-500">{t('voiceAliasesLabel')}</label>
+        <input
+          className="field"
+          value={f.voiceAliases || ''}
+          onChange={(e) => setF({ ...f, voiceAliases: e.target.value })}
+          placeholder={t('voiceAliasesPlaceholder')}
+        />
         <label className="text-[10px] font-bold text-stone-500">{t('priceLabel')}</label>
         <input className="field" type="tel" inputMode="numeric" value={f.basePrice} onChange={(e) => setF({ ...f, basePrice: e.target.value.replace(/\D/g, '') })} />
         <label className="text-[10px] font-bold text-stone-500">{t('categoryLabel')}</label>

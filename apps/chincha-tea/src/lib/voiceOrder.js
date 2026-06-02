@@ -3,6 +3,7 @@ import { ICE_OPTIONS, SIZES, SWEET_OPTIONS } from './constants';
 import { MENU_KEY_MY } from './burmeseLexicon';
 import { burmeseToThai } from './burmeseToThai';
 import { speechRecognitionLang } from './burmeseToThai';
+import { voiceAliasNames } from './voiceAliases';
 
 const THAI_NUM = {
   ศูนย์: '0', หนึ่ง: '1', สอง: '2', สาม: '3', สี่: '4', ห้า: '5',
@@ -85,14 +86,14 @@ function buildMenuPatterns(menuItems) {
   return menuItems
     .filter((m) => m.active !== false)
     .map((item) => {
-      const names = [
+      const names = voiceAliasNames(item, [
         item.nameTh,
         item.nameEn,
         item.nameMy,
         MENU_KEY_MY[item.key],
         item.id?.replace(/-/g, ' '),
         item.key,
-      ].filter(Boolean);
+      ].filter(Boolean));
       const reParts = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
       const compactNames = names.map(compact).filter((n) => n.length >= 2);
       return { item, re: new RegExp(reParts.join('|'), 'i'), compactNames };

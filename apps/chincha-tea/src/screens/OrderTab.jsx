@@ -2,14 +2,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { DRINK_CATEGORIES, menuItemToCard } from '../lib/constants';
 import { burmeseToThai } from '../lib/burmeseToThai';
 import { categoryDisplayLabel, categoryDisplaySub } from '../lib/displayNames';
-import { canUseVoiceOrder } from '../lib/speechSupport';
-import { parseTeaVoice, useVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
+import { parseTeaVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
+import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { MenuCard } from '../components/MenuCard';
 import { CustomizeModal } from '../components/CustomizeModal';
 
 export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoiceCommit, canVoiceCommit, setModalItem, modalItem }) {
   const [search, setSearch] = useState('');
-  const [voiceLog, setVoiceLog] = useState('');
 
   const onVoiceFinal = useCallback((text) => {
     const lines = parseTeaVoice(text, menuItems, toppingsList);
@@ -18,25 +17,20 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
     if (cartLines.length > 0) {
       cartLines.forEach((line) => onAddToCart(line));
       const summary = cartLines.map((c) => `${c.qty}×${c.nameSnapshot}`).join(', ');
-      setVoiceLog(`${text} · ✅ ${summary}`);
-    } else if (!hasVoiceCommitCommand(text)) {
-      setVoiceLog(`${text} · ${t('voiceNoMenu')}`);
-    } else {
-      setVoiceLog(text);
+      return { log: `${text} · ✅ ${summary}` };
     }
 
     if (hasVoiceCommitCommand(text)) {
       const hasItemsToCommit = canVoiceCommit || cartLines.length > 0;
       if (!hasItemsToCommit) {
-        setVoiceLog(`${text} · ${t('voiceCartEmpty')}`);
-        return;
+        return { log: `${text} · ${t('voiceCartEmpty')}` };
       }
       onVoiceCommit?.({ pendingLines: cartLines, rawText: text });
+      return { log: `${text} · ✅` };
     }
-  }, [menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit]);
 
-  const voiceAvailable = canUseVoiceOrder();
-  const { listening, toggle, liveText } = useVoice(onVoiceFinal, lang, { enabled: voiceAvailable });
+    return { log: `${text} · ${t('voiceNoMenu')}` };
+  }, [menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit]);
 
   const grouped = useMemo(() => {
     const kw = burmeseToThai(search.trim()).toLowerCase();
@@ -66,28 +60,7 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
             className="w-full pl-4 pr-4 py-2.5 rounded-2xl bg-stone-100 text-sm outline-none focus:border-amber-300 border-2 border-transparent"
           />
         </div>
-        {!voiceAvailable && (
-          <p className="text-xs px-3 py-2.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 leading-relaxed">
-            {t('voiceIosHint')}
-          </p>
-        )}
-        {voiceAvailable && (
-        <button
-          type="button"
-          onClick={toggle}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2 transition-all ${
-            listening ? 'bg-red-500 border-red-400 text-white' : 'bg-white border-stone-200 text-stone-600'
-          }`}
-        >
-          <span>{listening ? '🎙️' : '🎤'}</span>
-          {listening ? t('voiceStop') : t('voiceListen')}
-        </button>
-        )}
-        {(listening || liveText || voiceLog) && (
-          <p className={`text-xs px-2 py-2 rounded-xl ${listening ? 'bg-red-50 text-red-600' : 'bg-stone-100 text-stone-500'}`}>
-            {liveText || voiceLog || t('voiceHint')}
-          </p>
-        )}
+        <VoiceCommandBar lang={lang} t={t} onFinalText={onVoiceFinal} />
       </div>
       {grouped.map(({ cat, items }) => (
         <div key={cat.id} className="px-4 mt-4">
