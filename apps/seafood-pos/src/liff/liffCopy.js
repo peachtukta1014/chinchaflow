@@ -17,12 +17,25 @@ export const LIFF_COPY = {
   deliveryPrefix: { th: 'ส่ง', en: 'Delivery' },
   riverLive: { th: 'กุ้งแม่น้ำเป็น', en: 'Live river shrimp' },
   riverLiveHint: {
-    th: 'เลือกได้มากกว่าหนึ่งขนาด · แตะเพื่อกรอกน้ำหนัก',
-    en: 'Multiple sizes OK · tap to enter kg',
+    th: 'เลือกได้มากกว่าหนึ่งขนาด · แตะเพื่อกรอกน้ำหนัก · ดูจำนวนตัว/กก. ใต้ชื่อไซซ์',
+    en: 'Multiple sizes OK · tap for kg · pcs/kg under each size',
+  },
+  /** จำนวนตัวโดยประมาณต่อ 1 กก. — ช่วยลูกค้าใหม่เลือกไซซ์ */
+  sizeCountPerKg: {
+    small: { th: '9–13 ตัว/กก.', en: '9–13 pcs/kg' },
+    medium: { th: '6–8 ตัว/กก.', en: '6–8 pcs/kg' },
+    large: { th: '4–5 ตัว/กก.', en: '4–5 pcs/kg' },
+  },
+  sizeCountNote: {
+    th: 'จำนวนตัวเป็นแนวทาง — กุ้งธรรมชาติอาจต่างเล็กน้อยตามรอบ',
+    en: 'Counts are approximate — natural shrimp may vary by batch',
   },
   deadShrimp: { th: 'กุ้งตาย', en: 'Dead shrimp' },
-  deadShrimpHint: { th: 'ไม่บังคับ — เปิดเมื่อต้องการสั่ง', en: 'Optional' },
-  orderDead: { th: 'สั่งกุ้งตาย', en: 'Add dead shrimp' },
+  deadShrimpHint: {
+    th: 'เลือกไซซ์ (เล็ก/กลาง/ใหญ่) แล้วกรอกน้ำหนัก — แยกจากกุ้งเป็น',
+    en: 'Pick size (S/M/L) and kg — separate from live shrimp',
+  },
+  orderDead: { th: 'เลือกไซซ์กุ้ง', en: 'Choose shrimp size' },
   on: { th: 'เปิด', en: 'On' },
   off: { th: 'ปิด', en: 'Off' },
   weightKg: { th: 'น้ำหนัก (กก.)', en: 'Weight (kg)' },
@@ -110,10 +123,20 @@ export const LIFF_COPY = {
     medium: { th: 'กลาง', en: 'Medium' },
     large: { th: 'ใหญ่', en: 'Large' },
   },
+  /** ป้ายในฟอร์ม (ส่วนหัวยังเป็น「กุ้งตาย」— ไม่ซ้ำคำว่าตายทุกแถว) */
+  deadSizeLabels: {
+    small: { th: 'กุ้งไซซ์เล็ก', en: 'Shrimp · size S' },
+    medium: { th: 'กุ้งไซซ์กลาง', en: 'Shrimp · size M' },
+    large: { th: 'กุ้งไซซ์ใหญ่', en: 'Shrimp · size L' },
+  },
   products: {
     small: 'กุ้งเล็ก',
     medium: 'กุ้งกลาง',
     large: 'กุ้งใหญ่',
     dead: 'กุ้งตาย',
+    /** ส่งเข้าระบบร้าน — มีคำว่าตายเพื่อแยกจากกุ้งเป็น */
+    dead_small: 'กุ้งตาย ไซซ์เล็ก',
+    dead_medium: 'กุ้งตาย ไซซ์กลาง',
+    dead_large: 'กุ้งตาย ไซซ์ใหญ่',
   },
 };
