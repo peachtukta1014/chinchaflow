@@ -36,6 +36,7 @@ const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
 } = require('./shrimpLinePush');
+const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
 
 function db() {
@@ -68,7 +69,21 @@ exports.lineWebhook = functions
     const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     for (const event of events) {
-      if (event.type !== 'message' || event.message.type !== 'text') continue;
+      if (event.type !== 'message') continue;
+      if (event.message.type === 'image') {
+        if (event.deliveryContext?.isRedelivery) continue;
+        if (!(await claimLineEvent(db(), event))) continue;
+        try {
+          if (!admin.apps.length) admin.initializeApp();
+          await processShrimpPaymentSlipImage(db(), admin, { event, token });
+          await completeLineEvent(db(), event);
+        } catch (err) {
+          await releaseLineEvent(db(), event);
+          console.error('shrimp payment slip image', err);
+        }
+        continue;
+      }
+      if (event.message.type !== 'text') continue;
       if (event.deliveryContext?.isRedelivery) continue;
       if (!(await claimLineEvent(db(), event))) continue;
 

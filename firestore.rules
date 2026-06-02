@@ -276,6 +276,26 @@ service cloud.firestore {
       allow delete: if isAdmin() || isAdminShrimp();
     }
 
+    // สลิปโอนจากลูกค้า LINE — สร้างจาก webhook เท่านั้น · ยืนยัน/ปฏิเสธจากแอป
+    match /paymentSlipSubmissions/{docId} {
+      allow read: if isApprovedShrimp();
+      allow create: if false;
+      allow update: if canMutateShrimpOps()
+        && request.resource.data.status in ['pending', 'confirmed', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'billNo', 'saleId', 'remainingAmount', 'total',
+          'confirmedAt', 'confirmedByUid', 'confirmedByName',
+          'rejectedAt', 'rejectedByUid', 'rejectedByName', 'rejectReason',
+          'paidBillPushedAt',
+        ]);
+      allow delete: if isAdminShrimp();
+    }
+
+    match /lineBillPushes/{docId} {
+      allow read: if isApprovedShrimp();
+      allow create, update, delete: if false;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
