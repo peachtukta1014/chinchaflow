@@ -600,6 +600,47 @@ try {
   fail('shrimpRoles', e);
 }
 
+try {
+  const {
+    aggregateClosedLots,
+    bucketSummariesByMonth,
+    computePortfolioOverview,
+    computeRemainingInventoryBaht,
+    filterSummariesByPeriod,
+  } = await import('../src/lib/lotPortfolioStats.js');
+  const summaries = [
+    { lotDateKey: '2026-05-10', totalCost: 100000, revenue: 120000, grossProfit: 20000, netLotProfit: 15000 },
+    { lotDateKey: '2026-05-28', totalCost: 80000, revenue: 70000, grossProfit: -5000, netLotProfit: -8000 },
+    { lotDateKey: '2025-12-01', totalCost: 50000, revenue: 60000, grossProfit: 8000, netLotProfit: 6000 },
+  ];
+  const agg = aggregateClosedLots(summaries);
+  assert(agg.count === 3, 'portfolio aggregate count');
+  assert(agg.netProfit === 13000, 'portfolio net profit sum');
+  const may = filterSummariesByPeriod(summaries, 'month', '2026-05-15');
+  assert(may.length === 2, 'portfolio filter month');
+  const months = bucketSummariesByMonth(summaries);
+  assert(months.length === 2, 'portfolio bucket months');
+  const batches = [
+    { liveKg: 10, deadKg: 0, remainingLiveKg: 5, remainingDeadKg: 0, totalCost: 1000 },
+  ];
+  const inv = computeRemainingInventoryBaht(batches);
+  assert(inv.totalKg === 5, 'portfolio inventory kg');
+  assert(inv.baht > 0, 'portfolio inventory baht');
+  const overview = computePortfolioOverview({
+    closedSummaries: summaries,
+    stockBatches: batches,
+    closedLotKeys: new Set(),
+    period: 'all',
+  });
+  assert(overview.closed.count === 3, 'portfolio overview');
+  assert(overview.byYear.length >= 1, 'portfolio by year');
+  const lotCloseSrc = fs.readFileSync(path.join(root, 'src/screens/LotCloseScreen.jsx'), 'utf8');
+  assert(lotCloseSrc.includes("setSection('overview')"), 'LotCloseScreen มีแท็บภาพรวม');
+  assert(lotCloseSrc.includes('LotPortfolioPanel'), 'LotCloseScreen โหลด LotPortfolioPanel');
+} catch (e) {
+  fail('lotPortfolioStats', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
