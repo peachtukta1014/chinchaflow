@@ -18,6 +18,7 @@ import { SummaryTab } from './screens/SummaryTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
+import { ProfitTab } from './screens/ProfitTab';
 import StaffGuidePanel from './components/StaffGuidePanel';
 import StaffLangNudge from './components/StaffLangNudge';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
@@ -58,7 +59,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed) return;
-    if (tab === 'history' || tab === 'summary') refreshOrders();
+    if (tab === 'history' || tab === 'summary' || tab === 'profit') refreshOrders();
   }, [isAuthed, tab, refreshOrders]);
 
   const refreshPendingRestocks = useCallback(async (force = false) => {
@@ -181,7 +182,7 @@ export default function App() {
         onSelect={(id) => {
           setTab(id);
           if (id === 'admin' || id === 'catalog') refreshCatalog();
-          if (id === 'history' || id === 'summary') refreshOrders();
+          if (id === 'history' || id === 'summary' || id === 'profit') refreshOrders();
           if (id === 'restock' && isAdmin) refreshPendingRestocks();
         }}
       />
@@ -233,6 +234,15 @@ export default function App() {
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
+        {tab === 'profit' && isAdmin && (
+          <ProfitTab
+            t={t}
+            lang={lang}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+            todayKey={todayKey}
+          />
+        )}
         {tab === 'payroll' && isAdmin && (
           <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
         )}
@@ -244,7 +254,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && (
+      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"
