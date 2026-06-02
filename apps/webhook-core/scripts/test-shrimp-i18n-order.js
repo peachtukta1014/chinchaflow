@@ -53,7 +53,7 @@ assert(classifyShrimpLineMessage('2', null) === 'help_en', 'help_en digit 2');
 
 const helpTh = replyHelpCustomerThai();
 assert(/คู่มือการสั่งซื้อ/.test(helpTh), 'help th formal header');
-assert(/094-669-3628/.test(helpTh), 'help th contact phone');
+assert(/094-940-8665/.test(helpTh), 'help th contact phone peach');
 assert(!/မြန်မာ|အော်ဒါ/.test(helpTh), 'help th no burmese block');
 
 const helpEn = replyHelpCustomerEnglish();
