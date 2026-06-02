@@ -679,6 +679,19 @@ try {
   assert(liffSession.includes('ko-seafood'), 'LIFF prod host guard');
   const prov = requireWebhook('../../webhook-core/src/provisionShrimpLiff.js');
   assert(typeof prov.ensureShrimpLiffApp === 'function', 'provisionShrimpLiff');
+  const verifyMod = requireWebhook('../../webhook-core/src/verifyLineLiffToken.js');
+  const prevLiff = process.env.LINE_LIFF_ID;
+  const prevLoginCh = process.env.LINE_LOGIN_CHANNEL_ID;
+  try {
+    process.env.LINE_LIFF_ID = '2010271574-YmykKoCc';
+    delete process.env.LINE_LOGIN_CHANNEL_ID;
+    assert(verifyMod.resolveIdTokenClientId() === '2010271574', 'id_token verify uses channel id not full liff id');
+  } finally {
+    if (prevLiff !== undefined) process.env.LINE_LIFF_ID = prevLiff;
+    else delete process.env.LINE_LIFF_ID;
+    if (prevLoginCh !== undefined) process.env.LINE_LOGIN_CHANNEL_ID = prevLoginCh;
+    else delete process.env.LINE_LOGIN_CHANNEL_ID;
+  }
 } catch (e) {
   fail('LIFF OA', e);
 }

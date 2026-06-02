@@ -23,8 +23,9 @@
 
 | Secret | ใช้ที่ |
 |--------|--------|
-| `LINE_LIFF_ID` | Cloud Functions (`verify` id_token) |
-| `VITE_LIFF_ID` | Build แอปกุ้ง (ค่าเดียวกับ LIFF ID) |
+| `LINE_LIFF_ID` | Cloud Functions — ตรวจ `id_token` (ใช้เลข Channel ก่อนขีดจาก LIFF ID อัตโนมัติ) |
+| `VITE_LIFF_ID` | Build แอปกุ้ง (ค่าเดียวกับ LIFF ID ทั้งก้อน เช่น `2010271574-YmykKoCc`) |
+| `LINE_LOGIN_CHANNEL_ID` | ทางเลือก — Channel ID ตัวเลขถ้า verify ไม่ผ่าน |
 
 ถ้า **ยังไม่ตั้ง** ทั้งสองตัว — CI จะรัน `provision-shrimp-liff.mjs --ensure` ด้วย `LINE_CHANNEL_ACCESS_TOKEN` สร้าง LIFF ให้อัตโนมัติ (endpoint `https://ko-seafood.top/liff-order.html`)
 
