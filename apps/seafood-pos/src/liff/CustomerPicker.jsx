@@ -5,7 +5,7 @@ import { LIFF_COPY as T } from './liffCopy.js';
 
 const CATALOG = CUSTOMERS.filter((c) => c.id !== 'general');
 
-export function CustomerPicker({ onSelect, onClose }) {
+export function CustomerPicker({ onSelect, onClose, onBack }) {
   const [q, setQ] = useState('');
 
   const filtered = useMemo(() => {
@@ -68,13 +68,24 @@ export function CustomerPicker({ onSelect, onClose }) {
         className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-4 pt-3"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full max-w-md mx-auto block min-h-[52px] rounded-2xl border border-slate-200 font-bold text-slate-600"
-        >
-          <BilingualInline th={T.close.th} en={T.close.en} />
-        </button>
+        <div className="max-w-md mx-auto flex gap-2">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="min-h-[52px] px-4 rounded-2xl border border-slate-200 font-bold text-slate-600 text-sm shrink-0"
+            >
+              <BilingualInline th={T.back.th} en={T.back.en} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 min-h-[52px] rounded-2xl border border-slate-200 font-bold text-slate-600"
+          >
+            <BilingualInline th={T.close.th} en={T.close.en} />
+          </button>
+        </div>
       </footer>
     </>
   );

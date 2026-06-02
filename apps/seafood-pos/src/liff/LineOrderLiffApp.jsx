@@ -191,23 +191,14 @@ function buildRiverPayload(sizes, activeSizes, deadOn, deadKg) {
   return river;
 }
 
-function ReturningForm({
-  customer,
-  idToken,
-  isPreview,
-  onClose,
-  submitExtra = {},
-}) {
+function useOrderDraft() {
   const [sizes, setSizes] = useState({ small: '', medium: '', large: '' });
   const [activeSizes, setActiveSizes] = useState({});
   const [deadOn, setDeadOn] = useState(false);
   const [deadKg, setDeadKg] = useState('');
   const [delivery, setDelivery] = useState('today');
   const [otherDate, setOtherDate] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
 
-  const shopName = customer?.name || '—';
   const deliveryKey = delivery === 'today' ? todayKey() : otherDate;
   const deliveryLabel =
     delivery === 'today' ? `วันนี้ (${formatThaiDate(todayKey())})` : formatThaiDate(otherDate || todayKey());
@@ -231,39 +222,157 @@ function ReturningForm({
     });
   };
 
-  const canSubmit =
+  const canProceed =
     summaryLines.length > 0 &&
     (delivery !== 'other' || /^\d{4}-\d{2}-\d{2}$/.test(otherDate));
 
-  const submit = async () => {
-    if (!canSubmit || submitting) return;
-    setSubmitError('');
-    setSubmitting(true);
-    try {
-      const river = buildRiverPayload(sizes, activeSizes, deadOn, deadKg);
-      if (isPreview) {
-        alert(
-          `[ตัวอย่าง] ส่งออเดอร์แล้ว\n${summaryLines.join('\n')}\nส่ง: ${deliveryLabel}`,
-        );
-        return;
-      }
-      const result = await submitLiffOrder({
-        idToken,
-        river,
-        deliveryDate: deliveryKey,
-        customerId: customer?.id,
-        customerName: customer?.name,
-        linkUid: true,
-        ...submitExtra,
-      });
-      alert(result.message || `${T.submitSuccess.th}\n${T.submitSuccess.en}`);
-      closeLiffWindow();
-    } catch (e) {
-      setSubmitError(e?.message || T.submitFail.th);
-    } finally {
-      setSubmitting(false);
-    }
+  const riverPayload = () => buildRiverPayload(sizes, activeSizes, deadOn, deadKg);
+
+  return {
+    sizes,
+    setSizes,
+    activeSizes,
+    deadOn,
+    setDeadOn,
+    deadKg,
+    setDeadKg,
+    delivery,
+    setDelivery,
+    otherDate,
+    setOtherDate,
+    deliveryKey,
+    deliveryLabel,
+    summaryLines,
+    toggleSize,
+    canProceed,
+    riverPayload,
   };
+}
+
+function LiffFooter({ onClose, onPrimary, primaryDisabled, primarySubmitting, primaryTh, primaryEn, onBack }) {
+  return (
+    <footer
+      className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)]"
+      style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+    >
+      <div className="max-w-md mx-auto flex gap-2">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-[52px] px-4 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm shrink-0"
+          >
+            <BilingualInline th={T.back.th} en={T.back.en} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[52px] px-4 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm shrink-0"
+          >
+            <BilingualInline th={T.close.th} en={T.close.en} />
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={primaryDisabled || primarySubmitting}
+          onClick={onPrimary}
+          className="flex-1 min-h-[52px] rounded-2xl bg-sky-600 text-white font-extrabold text-base shadow-lg shadow-sky-600/25 disabled:opacity-40 disabled:shadow-none active:scale-[0.99] transition-transform"
+        >
+          {primarySubmitting ? (
+            <BilingualInline th={T.submitting.th} en={T.submitting.en} className="!text-white" />
+          ) : (
+            <BilingualInline th={primaryTh} en={primaryEn} className="!text-white" />
+          )}
+        </button>
+      </div>
+    </footer>
+  );
+}
+
+function IdentityStep({ onReturning, onNew, onBack }) {
+  return (
+    <>
+      <header className="px-5 pt-5 pb-4 bg-gradient-to-b from-slate-900 to-slate-800 text-white rounded-b-[1.75rem] shadow-md">
+        <p className="text-[11px] font-semibold text-sky-300/90 tracking-wide">
+          <Bilingual th={T.brand.th} en={T.brand.en} className="!text-sky-300/90" />
+        </p>
+        <h1 className="text-xl font-extrabold mt-1 tracking-tight">
+          <Bilingual th={T.identityTitle.th} en={T.identityTitle.en} className="!text-white" />
+        </h1>
+        <div className="text-xs text-slate-400 mt-3 leading-relaxed">
+          <BilingualHint th={T.identityHint.th} en={T.identityHint.en} />
+        </div>
+      </header>
+      <main className="px-4 pt-6 pb-32 max-w-md mx-auto space-y-3">
+        <button
+          type="button"
+          onClick={onReturning}
+          className="w-full text-left min-h-[72px] px-4 py-4 rounded-2xl border-2 border-sky-500 bg-sky-50 active:bg-sky-100"
+        >
+          <p className="font-extrabold text-slate-900 text-base">
+            <Bilingual th={T.orderedBefore.th} en={T.orderedBefore.en} />
+          </p>
+          <p className="text-xs text-slate-600 mt-1">
+            <BilingualHint th={T.orderedBeforeSub.th} en={T.orderedBeforeSub.en} />
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={onNew}
+          className="w-full text-left min-h-[72px] px-4 py-4 rounded-2xl border border-slate-200 bg-white active:bg-slate-50"
+        >
+          <p className="font-extrabold text-slate-900 text-base">
+            <Bilingual th={T.notYetOrdered.th} en={T.notYetOrdered.en} />
+          </p>
+          <p className="text-xs text-slate-600 mt-1">
+            <BilingualHint th={T.notYetOrderedSub.th} en={T.notYetOrderedSub.en} />
+          </p>
+        </button>
+      </main>
+      <footer
+        className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-4 pt-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full max-w-md mx-auto block min-h-[52px] rounded-2xl border border-slate-200 font-bold text-slate-600"
+        >
+          <BilingualInline th={T.back.th} en={T.back.en} />
+        </button>
+      </footer>
+    </>
+  );
+}
+
+function OrderStep({
+  customer,
+  draft,
+  onClose,
+  onPrimary,
+  primaryTh,
+  primaryEn,
+  primarySubmitting,
+  submitError,
+}) {
+  const {
+    sizes,
+    setSizes,
+    activeSizes,
+    deadOn,
+    setDeadOn,
+    deadKg,
+    setDeadKg,
+    delivery,
+    setDelivery,
+    otherDate,
+    setOtherDate,
+    deliveryLabel,
+    summaryLines,
+    toggleSize,
+    canProceed,
+  } = draft;
 
   return (
     <>
@@ -274,11 +383,17 @@ function ReturningForm({
         <h1 className="text-xl font-extrabold mt-1 tracking-tight">
           <Bilingual th={T.orderTitle.th} en={T.orderTitle.en} className="!text-white" />
         </h1>
-        <div className="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden />
-          <span className="text-sm font-semibold">{shopName}</span>
-        </div>
-        <div className="text-xs text-slate-400 mt-3 leading-relaxed">
+        {customer?.name ? (
+          <div className="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-3 py-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden />
+            <span className="text-sm font-semibold">{customer.name}</span>
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400 mt-3 leading-relaxed">
+            <BilingualHint th={T.orderFirstHint.th} en={T.orderFirstHint.en} />
+          </div>
+        )}
+        <div className="text-xs text-slate-400 mt-2 leading-relaxed">
           <BilingualHint th={T.headerHint.th} en={T.headerHint.en} />
         </div>
       </header>
@@ -402,61 +517,24 @@ function ReturningForm({
         )}
       </main>
 
-      <footer
-        className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 pt-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)]"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-      >
-        <div className="max-w-md mx-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[52px] px-4 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm shrink-0"
-          >
-            <BilingualInline th={T.close.th} en={T.close.en} />
-          </button>
-          <button
-            type="button"
-            disabled={!canSubmit || submitting}
-            onClick={() => { submit(); }}
-            className="flex-1 min-h-[52px] rounded-2xl bg-sky-600 text-white font-extrabold text-base shadow-lg shadow-sky-600/25 disabled:opacity-40 disabled:shadow-none active:scale-[0.99] transition-transform"
-          >
-            {submitting ? (
-              <BilingualInline th={T.submitting.th} en={T.submitting.en} className="!text-white" />
-            ) : (
-              <BilingualInline th={T.submit.th} en={T.submit.en} className="!text-white" />
-            )}
-          </button>
-        </div>
-      </footer>
+      <LiffFooter
+        onClose={onClose}
+        onPrimary={onPrimary}
+        primaryDisabled={!canProceed}
+        primarySubmitting={primarySubmitting}
+        primaryTh={primaryTh}
+        primaryEn={primaryEn}
+      />
     </>
   );
 }
 
-function NewCustomerForm({ idToken, isPreview, onClose }) {
+function ProfileStep({ onClose, onBack, onSubmit, submitting, submitError }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [step, setStep] = useState(1);
 
   const profileOk = name.trim().length >= 2 && phone.trim().length >= 9 && notes.trim().length >= 3;
-
-  if (step === 2) {
-    return (
-      <ReturningForm
-        customer={{ id: null, name: name.trim() }}
-        idToken={idToken}
-        isPreview={isPreview}
-        onClose={onClose}
-        submitExtra={{
-          registerNew: true,
-          customerName: name.trim(),
-          phone: phone.trim(),
-          notes: notes.trim(),
-          linkUid: true,
-        }}
-      />
-    );
-  }
 
   return (
     <>
@@ -470,13 +548,17 @@ function NewCustomerForm({ idToken, isPreview, onClose }) {
         <div className="text-xs text-slate-400 mt-2 leading-relaxed">
           <BilingualHint th={T.registerHint.th} en={T.registerHint.en} />
         </div>
-        <div className="flex gap-2 mt-4">
-          <span className="flex-1 h-1 rounded-full bg-sky-400" />
-          <span className="flex-1 h-1 rounded-full bg-white/20" />
-        </div>
+        <p className="text-[11px] text-sky-300/80 mt-3">
+          <BilingualInline th={T.stepShop.th} en={T.stepShop.en} className="!text-sky-300/80" />
+        </p>
       </header>
 
       <main className="px-4 pt-5 pb-32 max-w-md mx-auto">
+        {submitError && (
+          <p className="text-sm text-red-600 text-center mb-3" role="alert">
+            {submitError}
+          </p>
+        )}
         <Section
           titleTh={T.profileSection.th}
           titleEn={T.profileSection.en}
@@ -517,28 +599,15 @@ function NewCustomerForm({ idToken, isPreview, onClose }) {
         </p>
       </main>
 
-      <footer
-        className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 px-4 pt-3"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-      >
-        <div className="max-w-md mx-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[52px] px-4 rounded-2xl border border-slate-200 font-bold text-slate-600 text-sm"
-          >
-            <BilingualInline th={T.close.th} en={T.close.en} />
-          </button>
-          <button
-            type="button"
-            disabled={!profileOk}
-            onClick={() => setStep(2)}
-            className="flex-1 min-h-[52px] rounded-2xl bg-sky-600 text-white font-extrabold disabled:opacity-40"
-          >
-            <BilingualInline th={T.nextPickShrimp.th} en={T.nextPickShrimp.en} className="!text-white" />
-          </button>
-        </div>
-      </footer>
+      <LiffFooter
+        onBack={onBack}
+        onClose={onClose}
+        onPrimary={() => onSubmit({ name: name.trim(), phone: phone.trim(), notes: notes.trim() })}
+        primaryDisabled={!profileOk}
+        primarySubmitting={submitting}
+        primaryTh={T.submit.th}
+        primaryEn={T.submit.en}
+      />
     </>
   );
 }
@@ -593,6 +662,10 @@ export default function LineOrderLiffApp() {
   const session = useLiffSession();
   const [previewMode, setPreviewMode] = useState(initialPreviewMode);
   const [pickedCustomer, setPickedCustomer] = useState(null);
+  const [step, setStep] = useState('order');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const draft = useOrderDraft();
 
   const close = () => closeLiffWindow();
 
@@ -629,31 +702,47 @@ export default function LineOrderLiffApp() {
     ? { mode: previewMode, customer: previewMode === 'short' ? { id: 'c1', name: 'จ๊ะขียด', zone: 'ป่าตอง' } : null }
     : session.context;
 
-  const flowMode = ctx?.mode || 'short';
-  const linkedCustomer = pickedCustomer || ctx?.customer;
+  const linkedCustomer =
+    pickedCustomer
+    || (ctx?.mode === 'short' && ctx?.customer ? ctx.customer : null);
 
-  if (flowMode === 'pick' && !linkedCustomer) {
-    return (
-      <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
-        {isPreview && <PreviewBanner mode="pick" onMode={setPreviewMode} />}
-        <CustomerPicker
-          onSelect={(c) => setPickedCustomer({ id: c.id, name: c.name, zone: c.zone })}
-          onClose={close}
-        />
-      </div>
-    );
-  }
+  const submitOrder = async ({ customer, registerProfile }) => {
+    if (!draft.canProceed || submitting) return;
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      const river = draft.riverPayload();
+      if (isPreview) {
+        alert(
+          `[ตัวอย่าง] ส่งออเดอร์แล้ว\n${draft.summaryLines.join('\n')}\nส่ง: ${draft.deliveryLabel}`,
+        );
+        return;
+      }
+      const result = await submitLiffOrder({
+        idToken: session.idToken,
+        river,
+        deliveryDate: draft.deliveryKey,
+        customerId: customer?.id,
+        customerName: customer?.name || registerProfile?.name,
+        linkUid: true,
+        ...(registerProfile
+          ? {
+              registerNew: true,
+              phone: registerProfile.phone,
+              notes: registerProfile.notes,
+            }
+          : {}),
+      });
+      alert(result.message || `${T.submitSuccess.th}\n${T.submitSuccess.en}`);
+      closeLiffWindow();
+    } catch (e) {
+      setSubmitError(e?.message || T.submitFail.th);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  if (flowMode === 'new') {
-    return (
-      <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
-        {isPreview && <PreviewBanner mode="new" onMode={setPreviewMode} />}
-        <NewCustomerForm idToken={session.idToken} isPreview={isPreview} onClose={close} />
-      </div>
-    );
-  }
-
-  return (
+  const shell = (content) => (
     <div className="min-h-[100dvh] bg-slate-50 font-['Sarabun',system-ui,sans-serif] antialiased">
       {isPreview && (
         <PreviewBanner
@@ -661,15 +750,69 @@ export default function LineOrderLiffApp() {
           onMode={(m) => {
             setPreviewMode(m);
             setPickedCustomer(null);
+            setStep('order');
           }}
         />
       )}
-      <ReturningForm
-        customer={linkedCustomer}
-        idToken={session.idToken}
-        isPreview={isPreview}
-        onClose={close}
-      />
+      {content}
     </div>
+  );
+
+  if (step === 'pick') {
+    return shell(
+      <CustomerPicker
+        onSelect={(c) => {
+          const cust = { id: c.id, name: c.name, zone: c.zone };
+          setPickedCustomer(cust);
+          submitOrder({ customer: cust });
+        }}
+        onBack={() => setStep('identity')}
+        onClose={close}
+      />,
+    );
+  }
+
+  if (step === 'identity') {
+    return shell(
+      <IdentityStep
+        onReturning={() => setStep('pick')}
+        onNew={() => setStep('profile')}
+        onBack={() => setStep('order')}
+      />,
+    );
+  }
+
+  if (step === 'profile') {
+    return shell(
+      <ProfileStep
+        onClose={close}
+        onBack={() => setStep('identity')}
+        onSubmit={(profile) => submitOrder({ registerProfile: profile })}
+        submitting={submitting}
+        submitError={submitError}
+      />,
+    );
+  }
+
+  const onOrderPrimary = () => {
+    if (linkedCustomer) {
+      submitOrder({ customer: linkedCustomer });
+    } else {
+      setSubmitError('');
+      setStep('identity');
+    }
+  };
+
+  return shell(
+    <OrderStep
+      customer={linkedCustomer}
+      draft={draft}
+      onClose={close}
+      onPrimary={onOrderPrimary}
+      primaryTh={linkedCustomer ? T.submit.th : T.next.th}
+      primaryEn={linkedCustomer ? T.submit.en : T.next.en}
+      primarySubmitting={submitting}
+      submitError={submitError}
+    />,
   );
 }

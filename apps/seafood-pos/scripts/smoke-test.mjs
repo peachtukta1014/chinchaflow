@@ -677,6 +677,11 @@ try {
   assert(wh2.includes("event.type === 'follow'"), 'webhook follow welcome');
   const liffSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSession.js'), 'utf8');
   assert(liffSession.includes('ko-seafood'), 'LIFF prod host guard');
+  const liffCopy = fs.readFileSync(path.join(root, 'src/liff/liffCopy.js'), 'utf8');
+  assert(liffCopy.includes('identityTitle'), 'LIFF identity step copy');
+  const liffApp = fs.readFileSync(path.join(root, 'src/liff/LineOrderLiffApp.jsx'), 'utf8');
+  assert(liffApp.includes('IdentityStep'), 'LIFF order-before-identity flow');
+  assert(liffApp.includes("setStep('identity')"), 'LIFF identity routing');
   const prov = requireWebhook('../../webhook-core/src/provisionShrimpLiff.js');
   assert(typeof prov.ensureShrimpLiffApp === 'function', 'provisionShrimpLiff');
   const verifyMod = requireWebhook('../../webhook-core/src/verifyLineLiffToken.js');
