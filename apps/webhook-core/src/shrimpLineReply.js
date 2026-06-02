@@ -141,6 +141,7 @@ const M = {
       '• ปุ้ย กลาง 6 กก · กุ้งแม่น้ำ 6.6 กก',
       '• Peach 6.6 kg m · River prawn 4 kg → pick size',
       '• 5 b 4 (รหัสร้าน · กลาง · 4 กก)',
+      '• พิมพ์ ฟอร์ม — เปิดฟอร์มสั่ง (แชต OA 1:1)',
       '• help · ยกเลิก',
       '',
       `น้ำหนัก ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} กก. · ในแอปบันทึกเป็นภาษาไทย — ตอบตามภาษาที่พิมพ์`,
@@ -151,6 +152,7 @@ const M = {
       'အော်ဒါ (မြန်မာ / English / ไทย):',
       '• ဖောက်သည်အမည် + ကိုယ်အလေးချိန် + သေး/လယ်/ကြီး',
       `• မြစ်ပုစွန် 6.6 kg · ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
+      '• form — ဖောင် (OA 1:1)',
       '• help · cancel',
     ].join('\n'),
     en: () => [
@@ -159,6 +161,7 @@ const M = {
       'Order (English / Myanmar / Thai):',
       '• Customer name + weight + s/m/l — e.g. Peach 6.6 kg m',
       `• River prawn 6.6 kg → then size (${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg)`,
+      '• form — open order form (OA direct chat)',
       '• help · cancel',
       '',
       'Saved in Thai in the app — replies match your language',

@@ -32,6 +32,25 @@ jobs:
         run: npm install
         working-directory: apps/webhook-core
 
+      - name: Resolve LIFF ID (secret or auto-provision)
+        id: liff
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_LIFF_ID: ${{ secrets.LINE_LIFF_ID }}
+          VITE_LIFF_ID: ${{ secrets.VITE_LIFF_ID }}
+        run: |
+          set -euo pipefail
+          ID="${LINE_LIFF_ID:-${VITE_LIFF_ID:-}}"
+          if [ -z "$ID" ]; then
+            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure | tail -1)
+          fi
+          if [ -z "$ID" ]; then
+            echo "LIFF ID missing — set LINE_LIFF_ID or ensure LINE_CHANNEL_ACCESS_TOKEN can create LIFF"
+            exit 1
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "Resolved LIFF ID (${#ID} chars)"
+
       - name: Write env vars for functions
         run: |
           {
@@ -39,7 +58,7 @@ jobs:
             echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}"
             echo "LINE_TEA_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_TEA_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
-            echo "LINE_LIFF_ID=${{ secrets.LINE_LIFF_ID }}"
+            echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions

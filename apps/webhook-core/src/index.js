@@ -39,6 +39,19 @@ const {
 const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
 const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
+const {
+  getShrimpLiffId,
+  buildLiffOrderFlex,
+  buildLiffWelcomeFlex,
+  replyLiffNotReadyText,
+  lineReplyMessages,
+} = require('./shrimpLiffMessaging');
+
+function isShrimpDirectChat(event) {
+  return event.source?.type === 'user'
+    && !event.source?.groupId
+    && !event.source?.roomId;
+}
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -70,6 +83,29 @@ exports.lineWebhook = functions
     const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     for (const event of events) {
+      if (event.type === 'follow' && isShrimpDirectChat(event)) {
+        if (event.deliveryContext?.isRedelivery) continue;
+        if (!(await claimLineEvent(db(), event))) continue;
+        try {
+          const liffId = getShrimpLiffId();
+          const replyToken = event.replyToken;
+          if (liffId && replyToken) {
+            await lineReplyMessages(replyToken, buildLiffWelcomeFlex(liffId), token);
+          } else if (replyToken) {
+            await lineReply(
+              replyToken,
+              'สวัสดีครับ 🦐 โกอ้วน คลังซีฟู้ด\nพิมพ์สั่งในแชทได้เลย หรือพิมพ์ ฟอร์ม เมื่อเปิดใช้ฟอร์มสั่งแล้ว',
+              token,
+            );
+          }
+          await completeLineEvent(db(), event);
+        } catch (err) {
+          await releaseLineEvent(db(), event);
+          console.error('shrimp follow', err);
+        }
+        continue;
+      }
+
       if (event.type !== 'message') continue;
       if (event.message.type === 'image') {
         if (event.deliveryContext?.isRedelivery) continue;
@@ -103,6 +139,28 @@ exports.lineWebhook = functions
 
         if (intent === 'help') {
           await lineReply(replyToken, replyHelp(detectMessageLang(text)), token);
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'open_liff') {
+          const lang = detectMessageLang(text);
+          if (!isShrimpDirectChat(event)) {
+            await lineReply(
+              replyToken,
+              lang === 'en'
+                ? 'Order form works in direct chat with our LINE OA only.'
+                : 'ฟอร์มสั่งใช้ในแชตตรงกับร้าน (LINE OA) เท่านั้นครับ — ในกลุ่มพิมพ์สั่งได้ตามปกติ',
+              token,
+            );
+          } else {
+            const liffId = getShrimpLiffId();
+            if (liffId) {
+              await lineReplyMessages(replyToken, [buildLiffOrderFlex(liffId)], token);
+            } else {
+              await lineReply(replyToken, replyLiffNotReadyText(lang), token);
+            }
+          }
           await completeLineEvent(db(), event);
           continue;
         }

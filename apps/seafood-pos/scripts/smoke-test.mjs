@@ -662,6 +662,27 @@ try {
   fail('paymentSlip UI', e);
 }
 
+try {
+  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  assert(intent.isShrimpLiffOpenCommand('ฟอร์ม'), 'LIFF intent ฟอร์ม');
+  assert(intent.isShrimpLiffOpenCommand('form'), 'LIFF intent form');
+  assert(intent.classifyShrimpLineMessage('liff', null) === 'open_liff', 'classify open_liff');
+  const msg = requireWebhook('../../webhook-core/src/shrimpLiffMessaging.js');
+  assert(typeof msg.buildLiffOrderFlex === 'function', 'buildLiffOrderFlex');
+  const flex = msg.buildLiffOrderFlex('1234567890-AbcdEfgh');
+  assert(flex.type === 'flex', 'flex message type');
+  assert(flex.contents.footer.contents[0].action.uri.includes('liff.line.me'), 'flex LIFF uri');
+  const wh2 = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
+  assert(wh2.includes("intent === 'open_liff'"), 'webhook open_liff handler');
+  assert(wh2.includes("event.type === 'follow'"), 'webhook follow welcome');
+  const liffSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSession.js'), 'utf8');
+  assert(liffSession.includes('ko-seafood'), 'LIFF prod host guard');
+  const prov = requireWebhook('../../webhook-core/src/provisionShrimpLiff.js');
+  assert(typeof prov.ensureShrimpLiffApp === 'function', 'provisionShrimpLiff');
+} catch (e) {
+  fail('LIFF OA', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

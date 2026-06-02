@@ -13,14 +13,22 @@
 2. Add → **Full** · Endpoint URL = `https://ko-seafood.top/liff-order.html`
 3. คัดลอก **LIFF ID** (ตัวเลข)
 
-## 2) GitHub Secrets
+## 2) GitHub Secrets (ทางเลือก)
 
 | Secret | ใช้ที่ |
 |--------|--------|
 | `LINE_LIFF_ID` | Cloud Functions (`verify` id_token) |
 | `VITE_LIFF_ID` | Build แอปกุ้ง (ค่าเดียวกับ LIFF ID) |
 
+ถ้า **ยังไม่ตั้ง** ทั้งสองตัว — CI จะรัน `provision-shrimp-liff.mjs --ensure` ด้วย `LINE_CHANNEL_ACCESS_TOKEN` สร้าง LIFF ให้อัตโนมัติ (endpoint `https://ko-seafood.top/liff-order.html`)
+
 มีอยู่แล้ว: `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`
+
+## 2b) เปิดฟอร์มจากแชต OA 1:1
+
+- พิมพ์ **`ฟอร์ม`** หรือ **`form`** → บอทส่งปุ่ม Flex เปิด LIFF
+- แอดเพื่อน OA ครั้งแรก → ข้อความต้อนรับ + ปุ่มสั่ง
+- กลุ่ม LINE ยังพิมพ์สั่งแบบเดิม (ฟอร์มใช้แชตตรงเท่านั้น)
 
 ## 3) Deploy
 

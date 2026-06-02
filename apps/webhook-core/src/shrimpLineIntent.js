@@ -15,6 +15,9 @@ const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
 
 const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order|ပယ်ဖျက်)(\s|$)/i;
 
+/** เปิดฟอร์ม LIFF — ใช้ในแชต OA 1:1 เท่านั้น */
+const LIFF_OPEN_CMD = /^(ฟอร์ม|form|liff|เปิดฟอร์ม|เมนูสั่ง|order\s*form|open\s*form)(\s|$)/i;
+
 const UNIT_RE = /(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)/i;
 const ORDER_VERB_RE = /^(สั่ง|จอง|ใส่|บันทึก|ออเดอร์|order)\b/i;
 
@@ -78,9 +81,15 @@ function isShrimpCancelCommand(text) {
   return CANCEL_ORDER_CMD.test(String(text || '').trim());
 }
 
+function isShrimpLiffOpenCommand(text) {
+  return LIFF_OPEN_CMD.test(String(text || '').trim());
+}
+
 function classifyShrimpLineMessage(text, session) {
   const raw = String(text || '').trim();
   if (!raw) return 'ignore';
+
+  if (isShrimpLiffOpenCommand(raw)) return 'open_liff';
 
   if (SHRIMP_HELP_CMD.test(raw)) return 'help';
   if (isShrimpCancelCommand(raw)) return 'cancel_order';
@@ -98,6 +107,7 @@ module.exports = {
   classifyShrimpLineMessage,
   isShrimpOrderCommand,
   isShrimpCancelCommand,
+  isShrimpLiffOpenCommand,
   hasOrderBody,
   isShrimpSessionContinuation,
 };

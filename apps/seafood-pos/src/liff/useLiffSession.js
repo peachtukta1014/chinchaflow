@@ -25,7 +25,17 @@ export function useLiffSession() {
 
   useEffect(() => {
     const liffId = (import.meta.env.VITE_LIFF_ID || '').trim();
-    const preview = !liffId;
+    const isProdHost = /(^|\.)ko-seafood\.top$/i.test(window.location.hostname);
+    const preview = !liffId && !isProdHost;
+
+    if (!liffId && isProdHost) {
+      setState({
+        status: 'error',
+        isPreview: false,
+        error: 'ระบบกำลังเปิดใช้ฟอร์มสั่ง — ลองใหม่ในอีกสักครู่ หรือพิมพ์สั่งในแชต LINE',
+      });
+      return;
+    }
 
     if (preview) {
       const { forceNew, forcePick } = parsePreviewMode();

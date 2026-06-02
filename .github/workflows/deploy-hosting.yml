@@ -68,6 +68,24 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Resolve LIFF ID (secret or auto-provision)
+        id: liff
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_LIFF_ID: ${{ secrets.LINE_LIFF_ID }}
+          VITE_LIFF_ID: ${{ secrets.VITE_LIFF_ID }}
+        run: |
+          set -euo pipefail
+          ID="${LINE_LIFF_ID:-${VITE_LIFF_ID:-}}"
+          if [ -z "$ID" ]; then
+            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure | tail -1)
+          fi
+          if [ -z "$ID" ]; then
+            echo "LIFF ID missing — set VITE_LIFF_ID or LINE_CHANNEL_ACCESS_TOKEN for auto-provision"
+            exit 1
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
       - name: Build seafood-pos
         run: npm run build --workspace=apps/seafood-pos
         env:
@@ -78,7 +96,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET:      ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID:              ${{ secrets.VITE_FIREBASE_APP_ID_SHRIMP }}
-          VITE_LIFF_ID:                      ${{ secrets.VITE_LIFF_ID }}
+          VITE_LIFF_ID:                      ${{ steps.liff.outputs.id || secrets.VITE_LIFF_ID }}
 
       - name: Deploy to Firebase Hosting (shrimp)
         uses: FirebaseExtended/action-hosting-deploy@v0
