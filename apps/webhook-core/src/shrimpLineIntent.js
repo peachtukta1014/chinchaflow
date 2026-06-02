@@ -11,6 +11,9 @@ const { parseDeliveryDateFromText } = require('./parseDeliveryDate');
 const { translateOrderTextToThai } = require('./translateOrderText');
 const { hasMyanmarScript } = require('./orderMessageLang');
 const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummary');
+
+/** หลังข้อความช่วยเหลือภาษาไทย — ลูกค้าขอเมนูภาษาอังกฤษ */
+const SHRIMP_HELP_EN_CMD = /^(2|en|english|eng)(\s|$)/i;
 const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
 
 const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order|ပယ်ဖျက်)(\s|$)/i;
@@ -91,6 +94,10 @@ function classifyShrimpLineMessage(text, session) {
 
   if (isShrimpLiffOpenCommand(raw)) return 'open_liff';
 
+  if (SHRIMP_HELP_EN_CMD.test(raw) && !isShrimpSessionContinuation(session) && !isShrimpOrderCommand(raw)) {
+    return 'help_en';
+  }
+
   if (SHRIMP_HELP_CMD.test(raw)) return 'help';
   if (isShrimpCancelCommand(raw)) return 'cancel_order';
 
@@ -110,4 +117,5 @@ module.exports = {
   isShrimpLiffOpenCommand,
   hasOrderBody,
   isShrimpSessionContinuation,
+  SHRIMP_HELP_EN_CMD,
 };

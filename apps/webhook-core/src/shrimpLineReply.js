@@ -133,46 +133,68 @@ const M = {
     my: (lines) => ['📋 အော်ဒါမတိုင်မီ ဖောက်သည်အချက်အလက်', ...lines].join('\n'),
     en: (lines) => ['📋 Before confirming, need customer info:', ...lines].join('\n'),
   },
+  /** ข้อความช่วยเหลือลูกค้า OA — ไทยเป็นหลัก (ไม่รวมพม่าในเมนูนี้; สั่งพม่าในแชตยังรับตามเดิม) */
+  helpCustomerTh: () => [
+    'โกอ้วน คลังซีฟู้ด',
+    'Ko Ao Seafood',
+    '',
+    'คู่มือการสั่งซื้อและติดต่อร้าน',
+    '',
+    '【วิธีสั่ง】',
+    '1. เมนูด้านล่าง 「สั่งกุ้ง」— เปิดแบบฟอร์มสั่ง',
+    '2. เมนู 「แชท」— สั่งด้วยข้อความในแชตนี้',
+    '',
+    '【รูปแบบข้อความ (ตัวอย่าง)】',
+    '• [ชื่อร้าน] [ขนาด] [น้ำหนัก] — เช่น ปุ้ย กลาง 6 กก.',
+    '• กุ้งแม่น้ำ [น้ำหนัก] กก. จากนั้นระบุ เล็ก / กลาง / ใหญ่',
+    '• พิมพ์ ฟอร์ม — เปิดแบบฟอร์ม (เฉพาะแชตตรงกับร้าน)',
+    '',
+    '【แนวทาง】',
+    `• น้ำหนักที่รับต่อรายการ: ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} กก.`,
+    '• ยกเลิกออเดอร์: พิมพ์「ยกเลิก」ก่อนร้านจัดส่ง',
+    '• ชำระเงินแล้ว: ส่งรูปสลิปโอนในแชตนี้',
+    '• ข้อมูลไม่ครบ: ระบบจะขอชื่อร้าน / เบอร์ / จุดส่งก่อนยืนยัน',
+    '',
+    '【ติดต่อ】',
+    '• แชต LINE นี้ หรือโทร 094-940-8665 (พีช)',
+    '• นอกเวลาทำการอาจตอบช้า — ขอบคุณที่รอครับ',
+    '',
+    '—',
+    'For English, reply: 2 or EN',
+  ].join('\n'),
+  helpCustomerEn: () => [
+    'Ko Ao Seafood',
+    'โกอ้วน คลังซีฟู้ด',
+    '',
+    'Ordering & contact guide',
+    '',
+    '[How to order]',
+    '1. Bottom menu 「Order shrimp」— order form',
+    '2. Bottom menu 「Chat」— place your order in this chat',
+    '',
+    '[Message format — examples]',
+    '• [Shop name] [size] [weight] — e.g. Peach medium 6 kg',
+    '• River prawn [weight] kg, then reply small / medium / large',
+    '• Type form — order form (direct chat with our LINE only)',
+    '',
+    '[Guidelines]',
+    `• Weight per line: ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
+    '• Cancel: type cancel before we dispatch your order',
+    '• After payment: send your transfer slip image here',
+    '• Missing details: we will ask for shop name, phone, and delivery notes',
+    '',
+    '[Contact]',
+    '• This LINE chat or call 094-940-8665 (Peach)',
+    '• Off-hours replies may be delayed — thank you for your patience',
+    '',
+    '—',
+    'For Thai, reply: Help or ช่วยเหลือ',
+  ].join('\n'),
+  /** ใช้กับ parse fail / ข้อความอื่นที่ยังอิงภาษาตามข้อความลูกค้า */
   help: {
-    th: () => [
-      '🤖 โกอ้วน คลังซีฟู้ด · Ko Ao Seafood',
-      '',
-      'แถบล่างแชต (Rich Menu):',
-      '• สั่งกุ้ง — เปิดฟอร์ม (ไทย + English)',
-      '• แชท — พิมพ์สั่งในแชตได้',
-      '• ช่วยเหลือ — ข้อความนี้',
-      '',
-      'สั่งในแชต (ไทย / พม่า / English):',
-      '• ปุ้ย กลาง 6 กก · กุ้งแม่น้ำ 6.6 กก',
-      '• พิมพ์ ฟอร์ม / form — เปิดฟอร์ม (แชตตรง OA)',
-      '• help / ช่วยเหลือ · ยกเลิก',
-      '',
-      `น้ำหนัก ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} กก.`,
-    ].join('\n'),
-    my: () => [
-      '🤖 ကုန်ကြမ်း ဂဏန်း',
-      '',
-      'အော်ဒါ (မြန်မာ / English / ไทย):',
-      '• ဖောက်သည်အမည် + ကိုယ်အလေးချိန် + သေး/လယ်/ကြီး',
-      `• မြစ်ပုစွန် 6.6 kg · ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
-      '• form — ဖောင် (OA 1:1)',
-      '• help · cancel',
-    ].join('\n'),
-    en: () => [
-      '🤖 Ko Ao Seafood',
-      '',
-      'Rich menu (bottom bar):',
-      '• Order shrimp — LIFF form (Thai + English)',
-      '• Chat — type your order here',
-      '• Help — this message',
-      '',
-      'In chat:',
-      '• Name + weight + size — e.g. Peach 6.6 kg medium',
-      '• form — open order form (OA direct chat only)',
-      '• help · cancel',
-      '',
-      `Weight ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg`,
-    ].join('\n'),
+    th: () => M.helpCustomerTh(),
+    my: () => M.helpCustomerTh(),
+    en: () => M.helpCustomerEn(),
   },
   cancelFail: {
     th: () => '⚠️ ยกเลิกออเดอร์ไม่สำเร็จ ลองใหม่หรือแจ้งพนักงานโดยตรงครับ',
@@ -253,6 +275,15 @@ function replyMissingProfile(lang, missing, { itemsSummary, deliveryDateLabel })
   return M.missingProfile[key](lines);
 }
 
+function replyHelpCustomerThai() {
+  return M.helpCustomerTh();
+}
+
+function replyHelpCustomerEnglish() {
+  return M.helpCustomerEn();
+}
+
+/** @deprecated ใช้ replyHelpCustomerThai / replyHelpCustomerEnglish สำหรับเมนูช่วยเหลือ */
 function replyHelp(lang) {
   return M.help[L(lang)]();
 }
@@ -274,6 +305,8 @@ module.exports = {
   replyRiverPrompt,
   replyMissingProfile,
   replyHelp,
+  replyHelpCustomerThai,
+  replyHelpCustomerEnglish,
   replyCancelFail,
   replyInvalidWeight,
   formatItemsSummary,

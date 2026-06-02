@@ -27,7 +27,7 @@ const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
 const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
 const { detectMessageLang } = require('./orderMessageLang');
-const { replyHelp, replyCancelFail } = require('./shrimpLineReply');
+const { replyHelpCustomerThai, replyHelpCustomerEnglish, replyCancelFail } = require('./shrimpLineReply');
 const {
   buildShrimpTodayOrdersSummary,
   cancelLatestPendingOrderForUser,
@@ -138,7 +138,13 @@ exports.lineWebhook = functions
         }
 
         if (intent === 'help') {
-          await lineReply(replyToken, replyHelp(detectMessageLang(text)), token);
+          await lineReply(replyToken, replyHelpCustomerThai(), token);
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'help_en') {
+          await lineReply(replyToken, replyHelpCustomerEnglish(), token);
           await completeLineEvent(db(), event);
           continue;
         }
