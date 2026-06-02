@@ -43,6 +43,10 @@ Automatic on push to `main` when `apps/seafood-pos/**` (or shared root deps) cha
 
 Manual dispatch: GitHub Actions → **Deploy Firebase Hosting** → enable **Deploy Shrimp POS**.
 
+## Agent close-out
+
+For Peach / `#chincha-shrimp-agent` work that should go live after a PR: use **`/ship-shrimp`** (smoke + build → merge PR to `main` → monitor `deploy-hosting.yml`). This skill documents deploy mechanics; `ship-shrimp` runs the full pipeline.
+
 ## Scope
 
 Stay in `apps/seafood-pos` unless the task is shrimp LINE webhook code in `apps/webhook-core`. Do not edit `apps/chincha-tea/` unless the user asks.
