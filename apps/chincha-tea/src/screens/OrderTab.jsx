@@ -28,7 +28,7 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
     if (hasVoiceCommitCommand(text)) {
       const hasItemsToCommit = canVoiceCommit || cartLines.length > 0;
       if (!hasItemsToCommit) {
-        setVoiceLog(`${text} · ยังไม่มีรายการในตะกร้า`);
+        setVoiceLog(`${text} · ${t('voiceCartEmpty')}`);
         return;
       }
       onVoiceCommit?.({ pendingLines: cartLines, rawText: text });

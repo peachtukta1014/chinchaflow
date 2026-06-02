@@ -1,4 +1,5 @@
-import { STAFF_DAILY_WAGE } from './constants';
+import { isPrimaryStaffEmail, STAFF_DAILY_WAGE } from './constants';
+import { listDateKeysInRange } from './payrollPeriod';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import {
   fsDelete,
@@ -31,9 +32,31 @@ export async function listAttendanceStaff({ force = false } = {}) {
     fsQueryUsers,
     STAFF_LIST_TTL_MS,
   );
-  return users
-    .filter((u) => u.approved === true && u.role === 'staff')
-    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
+  const staff = users.filter((u) => u.approved === true && u.role === 'staff');
+  return staff.sort((a, b) => {
+    const aPrimary = isPrimaryStaffEmail(a.email) ? 0 : 1;
+    const bPrimary = isPrimaryStaffEmail(b.email) ? 0 : 1;
+    if (aPrimary !== bPrimary) return aPrimary - bPrimary;
+    return (a.name || '').localeCompare(b.name || '', 'th');
+  });
+}
+
+/** พนักงานหลักร้าน (2004@chincha.pos) หรือคนแรกในรายการเวร */
+export async function getPrimaryAttendanceStaff(options) {
+  const list = await listAttendanceStaff(options);
+  const fromList = list.find((u) => isPrimaryStaffEmail(u.email)) || list[0];
+  if (fromList) return { staff: fromList, issue: null };
+  return resolvePrimaryStaffIssue();
+}
+
+/** บัญชีมีในระบบแต่ยังลงเวรไม่ได้ (role / อนุมัติ) */
+export async function resolvePrimaryStaffIssue() {
+  const users = await cachedFetch(STAFF_LIST_CACHE_KEY, fsQueryUsers, STAFF_LIST_TTL_MS);
+  const u = users.find((x) => isPrimaryStaffEmail(x.email));
+  if (!u) return { staff: null, issue: 'not_registered' };
+  if (u.approved !== true) return { staff: null, issue: 'not_approved', profile: u };
+  if (u.role !== 'staff') return { staff: null, issue: 'wrong_role', profile: u };
+  return { staff: null, issue: 'unknown', profile: u };
 }
 
 export function invalidateAttendanceStaffCache() {
@@ -63,7 +86,7 @@ export async function setStaffPresent({
     return null;
   }
   const now = new Date().toISOString();
-  return fsUpsertDoc('dailyStaffAttendance', docId, {
+  const saved = await fsUpsertDoc('dailyStaffAttendance', docId, {
     dateKey,
     staffUid,
     staffName: staffName || 'พนักงาน',
@@ -74,6 +97,48 @@ export async function setStaffPresent({
     createdAt: now,
   });
   invalidateCache(MONTH_CACHE_PREFIX);
+  return saved;
+}
+
+/** สรุปเวรในรอบ 15 วัน — รวมรายการวันที่มาทำงานต่อคน */
+export async function getPeriodAttendanceSummary(startKey, endKey, { force = false } = {}) {
+  const yearMonth = startKey.slice(0, 7);
+  const cacheKey = `${MONTH_CACHE_PREFIX}${yearMonth}`;
+  if (force) invalidateCache(cacheKey);
+  const rows = await cachedFetch(
+    cacheKey,
+    () => fsQueryStaffAttendanceForMonth(yearMonth),
+    MONTH_TTL_MS,
+  );
+  const inRange = rows.filter(
+    (r) => r.present && r.staffUid && r.dateKey >= startKey && r.dateKey <= endKey,
+  );
+  const byStaff = new Map();
+  for (const r of inRange) {
+    const cur = byStaff.get(r.staffUid) || {
+      staffUid: r.staffUid,
+      staffName: r.staffName || 'พนักงาน',
+      workDays: [],
+    };
+    if (!cur.workDays.includes(r.dateKey)) cur.workDays.push(r.dateKey);
+    if (r.staffName) cur.staffName = r.staffName;
+    byStaff.set(r.staffUid, cur);
+  }
+  const periodDays = listDateKeysInRange(startKey, endKey).length;
+  return [...byStaff.values()]
+    .map((s) => {
+      const workDays = [...s.workDays].sort();
+      const days = workDays.length;
+      return {
+        staffUid: s.staffUid,
+        staffName: s.staffName,
+        workDays,
+        days,
+        wage: days * STAFF_DAILY_WAGE,
+      };
+    })
+    .sort((a, b) => a.staffName.localeCompare(b.staffName, 'th'))
+    .map((s) => ({ ...s, periodDays }));
 }
 
 /** สรุปจำนวนวันทำงานต่อคนในเดือน YYYY-MM */

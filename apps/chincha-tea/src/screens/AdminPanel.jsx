@@ -31,6 +31,7 @@ import {
 } from '../lib/productService';
 import { invalidateAttendanceStaffCache } from '../lib/staffAttendanceService';
 import { FIREBASE_PROJECT_ID } from '../lib/viteEnv.js';
+import { SegmentedTabBar } from '../components/TabNav';
 
 const PROJECT_ID = FIREBASE_PROJECT_ID;
 const DEFAULT_LINE_CONFIG = {
@@ -194,19 +195,16 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
         <div className="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">{flash}</div>
       )}
       {!catalogOnly && (
-        <div className="flex gap-1.5 flex-wrap">
-          {[['members', t('members')], ['products', t('products')], ['orders', t('orderHistory')], ['settings', t('lineSettings')]].map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setSection(id)}
-              className={`shrink-0 px-3 py-2 rounded-2xl font-bold text-[10px] ${section === id ? 'text-white' : 'bg-stone-200 text-stone-500'}`}
-              style={section === id ? { background: '#3d1f0f' } : {}}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabBar
+          tabs={[
+            ['members', t('members')],
+            ['products', t('products')],
+            ['orders', t('orderHistory')],
+            ['settings', t('lineSettings')],
+          ]}
+          activeId={section}
+          onSelect={setSection}
+        />
       )}
       {loading && (!catalogOnly && section === 'members' || section === 'products') ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
