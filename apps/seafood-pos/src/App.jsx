@@ -12,7 +12,14 @@ import {
   syncMainStockFromBatches,
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
-import { getShrimpRoleLabel, isShrimpAdmin } from './lib/shrimpRoles';
+import {
+  canAccessShrimpMainTab,
+  canAccessShrimpOverlay,
+  getDefaultMainTabForMember,
+  getShrimpRoleLabel,
+  isShrimpAdmin,
+  isShrimpStaff,
+} from './lib/shrimpRoles';
 import { getAppBuildLabel } from './lib/appBuildInfo';
 import { FIREBASE_PROJECT_ID } from './lib/viteEnv.js';
 import { useIntervalWhen } from './lib/useIntervalWhen';
@@ -81,22 +88,38 @@ export default function App() {
   const isOverlayTab = !isMainTab;
 
   const isAdmin = isShrimpAdmin(member);
+  const isStaff = isShrimpStaff(member);
 
   const goMainTab = useCallback((tab) => {
+    if (member && !canAccessShrimpMainTab(member, tab)) return;
     setActiveTab(tab);
     setLastMainTab(tab);
-  }, []);
+  }, [member]);
 
   const openOverlay = useCallback((tab) => {
+    if (member && !canAccessShrimpOverlay(member, tab)) return;
     setLastMainTab((prev) => (MAIN_TABS.has(activeTab) ? activeTab : prev));
     setActiveTab(tab);
-  }, [activeTab]);
+  }, [activeTab, member]);
 
   const goBackFromOverlay = useCallback(() => {
     setActiveTab(lastMainTab);
   }, [lastMainTab]);
 
   useEffect(() => subscribeShrimpMember(setMember), []);
+
+  useEffect(() => {
+    if (!member) return;
+    const onMain = MAIN_TABS.has(activeTab);
+    const allowed = onMain
+      ? canAccessShrimpMainTab(member, activeTab)
+      : canAccessShrimpOverlay(member, activeTab);
+    if (!allowed) {
+      const tab = getDefaultMainTabForMember(member);
+      setActiveTab(tab);
+      setLastMainTab(tab);
+    }
+  }, [member, activeTab]);
 
   const loadStockFromRest = useCallback(async () => {
     if (!FIREBASE_PROJECT_ID || !member) return;
@@ -189,7 +212,12 @@ export default function App() {
     prevPendingOrdersRef.current = pendingOrders;
   }, [member, pendingOrders, goMainTab]);
 
-  const handleLogin = (m) => setMember(m);
+  const handleLogin = (m) => {
+    setMember(m);
+    const tab = getDefaultMainTabForMember(m);
+    setActiveTab(tab);
+    setLastMainTab(tab);
+  };
   const handleLogout = async () => {
     if (!window.confirm('ออกจากระบบ?')) return;
     if (auth) await signOut(auth).catch(() => {});
@@ -397,7 +425,8 @@ export default function App() {
 
       {isMainTab && (
         <HeaderQuickLinks
-          isAdmin={isAdmin}
+          showCustomers={canAccessShrimpOverlay(member, 'members')}
+          showAppMembers={isAdmin}
           onOpenCustomers={() => openOverlay('members')}
           onOpenAppMembers={() => openOverlay('admin-users')}
         />
@@ -410,14 +439,14 @@ export default function App() {
             stock={stock}
             stockBatches={stockBatches}
             updateMainStock={updateMainStock}
-            onOpenReceiveLive={() => {
+            onOpenReceiveLive={!isStaff ? () => {
               setStockOverlayLine('live');
               openOverlay('stock');
-            }}
-            onOpenReceiveDead={() => {
+            } : undefined}
+            onOpenReceiveDead={!isStaff ? () => {
               setStockOverlayLine('dead');
               openOverlay('stock');
-            }}
+            } : undefined}
             onSaveBill={(b) => {
               setTransactions((prev) => [b, ...prev]);
               bumpSalesAndStock();
@@ -430,7 +459,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'sales' && (
+        {activeTab === 'sales' && canAccessShrimpMainTab(member, 'sales') && (
           <Suspense fallback={<TabLoading />}>
             <SalesHubScreen
               localBills={transactions}
@@ -460,13 +489,13 @@ export default function App() {
           </Suspense>
         )}
 
-        {activeTab === 'members' && (
+        {activeTab === 'members' && canAccessShrimpOverlay(member, 'members') && (
           <Suspense fallback={<TabLoading />}>
-            <MembersScreen isAdmin={isAdmin} />
+            <MembersScreen isAdmin={isAdmin} readOnly={isStaff} />
           </Suspense>
         )}
 
-        {activeTab === 'stock' && (
+        {activeTab === 'stock' && canAccessShrimpOverlay(member, 'stock') && (
           <Suspense fallback={<TabLoading />}>
             <InventoryScreen
               stock={effectiveStock}
@@ -504,7 +533,7 @@ export default function App() {
           </Suspense>
         )}
 
-        {activeTab === 'expenses' && (
+        {activeTab === 'expenses' && canAccessShrimpMainTab(member, 'expenses') && (
           <Suspense fallback={<TabLoading />}>
             <ExpensesScreen stockBatches={stockBatches} />
           </Suspense>
@@ -516,34 +545,42 @@ export default function App() {
           className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
-          <NavButton
-            icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
-            label="บันทึกการขาย"
-            compactLabel
-            isActive={activeTab === 'pos'}
-            onClick={() => goMainTab('pos')}
-          />
-          <NavButton
-            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
-            label="รายจ่าย"
-            compactLabel
-            isActive={activeTab === 'expenses'}
-            onClick={() => goMainTab('expenses')}
-          />
-          <NavButton
-            icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
-            label="ยอดขาย/ยอดค้าง"
-            compactLabel
-            isActive={activeTab === 'sales'}
-            onClick={() => goMainTab('sales')}
-          />
-          <NavButton
-            icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
-            label="LINE"
-            isActive={activeTab === 'orders'}
-            onClick={() => goMainTab('orders')}
-            badge={pendingOrders}
-          />
+          {canAccessShrimpMainTab(member, 'pos') && (
+            <NavButton
+              icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
+              label="บันทึกการขาย"
+              compactLabel
+              isActive={activeTab === 'pos'}
+              onClick={() => goMainTab('pos')}
+            />
+          )}
+          {canAccessShrimpMainTab(member, 'expenses') && (
+            <NavButton
+              icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
+              label="รายจ่าย"
+              compactLabel
+              isActive={activeTab === 'expenses'}
+              onClick={() => goMainTab('expenses')}
+            />
+          )}
+          {canAccessShrimpMainTab(member, 'sales') && (
+            <NavButton
+              icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
+              label="ยอดขาย/ยอดค้าง"
+              compactLabel
+              isActive={activeTab === 'sales'}
+              onClick={() => goMainTab('sales')}
+            />
+          )}
+          {canAccessShrimpMainTab(member, 'orders') && (
+            <NavButton
+              icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
+              label="LINE"
+              isActive={activeTab === 'orders'}
+              onClick={() => goMainTab('orders')}
+              badge={pendingOrders}
+            />
+          )}
         </div>
       )}
     </div>

@@ -45,7 +45,7 @@ function RiverDefaultSelect({ value, onChange }) {
   );
 }
 
-export default function MembersScreen({ isAdmin = false }) {
+export default function MembersScreen({ isAdmin = false, readOnly = false }) {
   const [subTab, setSubTab] = useState('list');
   const [fsCustomers, setFsCustomers] = useState({});
   const [cusLoading, setCusLoading] = useState(true);
@@ -61,6 +61,10 @@ export default function MembersScreen({ isAdmin = false }) {
     (map) => { setFsCustomers(map); setCusLoading(false); },
     () => setCusLoading(false),
   ), []);
+
+  useEffect(() => {
+    if (readOnly && subTab === 'lineOa') setSubTab('list');
+  }, [readOnly, subTab]);
 
   const allCustomers = mergeCustomerLists(fsCustomers);
 
@@ -171,55 +175,64 @@ export default function MembersScreen({ isAdmin = false }) {
         </div>
       )}
       <>
-        <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
-          <button
-            type="button"
-            onClick={() => setSubTab('list')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
-              subTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            <Users size={15} />
-            รายชื่อหลัก
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('lineOa')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
-              subTab === 'lineOa' ? 'bg-white text-[#06C755] shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            <MessageCircle size={15} />
-            LINE รอผูก
-            {lineOaPending > 0 && (
-              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
-                {lineOaPending > 99 ? '99+' : lineOaPending}
-              </span>
-            )}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
+            <button
+              type="button"
+              onClick={() => setSubTab('list')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
+                subTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              <Users size={15} />
+              รายชื่อหลัก
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab('lineOa')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 ${
+                subTab === 'lineOa' ? 'bg-white text-[#06C755] shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              <MessageCircle size={15} />
+              LINE รอผูก
+              {lineOaPending > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {lineOaPending > 99 ? '99+' : lineOaPending}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
 
         {subTab === 'lineOa' ? (
           <LineOaCustomersPanel showFlash={showFlash} onPendingCountChange={setLineOaPending} />
         ) : (
           <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย
-          ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」
-          <br />
-          ชื่อบนบิล = ช่องแรก · ชื่อเรียกอื่น = ช่องที่สอง (บอท LINE จับคู่เท่านั้น ไม่ขึ้นบิล)
+          {readOnly
+            ? 'ดูเบอร์ / โซน / ที่อยู่ส่งของ — แก้ไขได้เฉพาะแอดมินและแมนเนเจอร์'
+            : 'รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」'}
+          {!readOnly && (
+            <>
+              <br />
+              ชื่อบนบิล = ช่องแรก · ชื่อเรียกอื่น = ช่องที่สอง (บอท LINE จับคู่เท่านั้น ไม่ขึ้นบิล)
+            </>
+          )}
         </p>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-slate-800">รายชื่อลูกค้า</h2>
-          <button
-            type="button"
-            onClick={() => setShowAdd((v) => !v)}
-            className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95"
-          >
-            <PlusCircle size={14} /> เพิ่มลูกค้า
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setShowAdd((v) => !v)}
+              className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95"
+            >
+              <PlusCircle size={14} /> เพิ่มลูกค้า
+            </button>
+          )}
         </div>
-        {showAdd && (
+        {!readOnly && showAdd && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
             <p className="text-xs font-bold text-blue-600">เพิ่มลูกค้าใหม่</p>
             <input
@@ -299,7 +312,7 @@ export default function MembersScreen({ isAdmin = false }) {
                   c.duplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-100'
                 }`}
               >
-                {cusEditId === c.id ? (
+                {!readOnly && cusEditId === c.id ? (
                   <div className="space-y-3">
                     <input
                       value={cusEditData.name}
@@ -430,40 +443,42 @@ export default function MembersScreen({ isAdmin = false }) {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCusEditId(c.id);
-                          setCusEditData(customerToFormFields(c));
-                        }}
-                        className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg"
-                      >
-                        แก้ไข
-                      </button>
-                      {isDeletableCustomer(c) && (
+                    {!readOnly && (
+                      <div className="flex gap-1.5 shrink-0">
                         <button
                           type="button"
-                          disabled={saveBusy}
-                          onClick={() => removeCustomer(c)}
-                          className="text-xs font-bold text-white bg-red-500 border border-red-600 px-2.5 py-1.5 rounded-lg flex items-center gap-1"
-                          title="ลบถาวร"
+                          onClick={() => {
+                            setCusEditId(c.id);
+                            setCusEditData(customerToFormFields(c));
+                          }}
+                          className="text-xs text-blue-500 border border-blue-200 px-3 py-1.5 rounded-lg"
                         >
-                          <Trash2 size={14} />
-                          ลบ
+                          แก้ไข
                         </button>
-                      )}
-                      {isBuiltinCustomer(c) && c.duplicate && (
-                        <button
-                          type="button"
-                          disabled={saveBusy}
-                          onClick={() => hideCustomer(c)}
-                          className="text-[10px] text-slate-500 border border-slate-200 px-2 py-1 rounded-lg"
-                        >
-                          ซ่อน
-                        </button>
-                      )}
-                    </div>
+                        {isDeletableCustomer(c) && (
+                          <button
+                            type="button"
+                            disabled={saveBusy}
+                            onClick={() => removeCustomer(c)}
+                            className="text-xs font-bold text-white bg-red-500 border border-red-600 px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                            title="ลบถาวร"
+                          >
+                            <Trash2 size={14} />
+                            ลบ
+                          </button>
+                        )}
+                        {isBuiltinCustomer(c) && c.duplicate && (
+                          <button
+                            type="button"
+                            disabled={saveBusy}
+                            onClick={() => hideCustomer(c)}
+                            className="text-[10px] text-slate-500 border border-slate-200 px-2 py-1 rounded-lg"
+                          >
+                            ซ่อน
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

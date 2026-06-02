@@ -169,6 +169,7 @@ service cloud.firestore {
         && (
           (request.resource.data.role == 'manager' && request.resource.data.approved == false)
           || (request.resource.data.role == 'staff' && request.resource.data.approved == false)
+          || (request.resource.data.role == 'staff' && request.resource.data.approved == true)
           || (isShrimpBootstrapAdmin()
             && request.resource.data.role == 'admin'
             && request.resource.data.approved == true)

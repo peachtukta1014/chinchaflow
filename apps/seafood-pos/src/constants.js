@@ -1,6 +1,7 @@
 export {
   ADMIN_EMAIL,
   isBootstrapAdminEmail,
+  getShrimpSignupRole,
   SESSION_KEY,
   SESSION_DAYS,
   CUSTOMERS,

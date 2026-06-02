@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
-import {
-  getShrimpRoleLabel,
-  isOperationalStaffEmail,
-} from '../lib/shrimpRoles';
+import { getNextShrimpRole, getShrimpRoleLabel } from '../lib/shrimpRoles';
 
 function memberDeleteConfirmMessage(u) {
   const name = u.name || '—';
@@ -46,20 +43,11 @@ export default function AdminUsersScreen() {
   };
 
   const setRole = async (uid, nextRole) => {
-    const u = users.find((x) => x.id === uid);
-    if (nextRole === 'staff' && u && !isOperationalStaffEmail(u.email)) {
-      alert('ตำแหน่งสตาฟ (ลูกมือ) ใช้ได้เฉพาะบัญชีโก๊ะ (techitudom2000@gmail.com)');
-      return;
-    }
     await fsPatch(`shrimp_users/${uid}`, { role: nextRole });
     setUsers((prev) => prev.map((x) => (x.id === uid ? { ...x, role: nextRole } : x)));
   };
 
-  const cycleRole = (u) => {
-    if (u.role === 'admin') return 'manager';
-    if (u.role === 'manager') return isOperationalStaffEmail(u.email) ? 'staff' : 'admin';
-    return 'admin';
-  };
+  const cycleRole = (u) => getNextShrimpRole(u.role);
 
   const cycleRoleLabel = (u) => {
     const next = cycleRole(u);
@@ -102,6 +90,9 @@ export default function AdminUsersScreen() {
       <ShrimpLineNotifySettings />
       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-2">
         จัดการสมาชิก ({users.length} คน)
+      </p>
+      <p className="text-[10px] text-slate-500 leading-relaxed">
+        สมาชิกเดิมในตารางไม่เปลี่ยนเอง — คนสมัครอีเมลใหม่ได้สตาฟอัตโนมัติ · กดเปลี่ยนตำแหน่ง (แอดมิน / แมนเนเจอร์ / สตาฟ) ได้ที่นี่เท่านั้น
       </p>
       {users.length === 0 && <p className="text-slate-300 text-center py-12">ยังไม่มีสมาชิก</p>}
       {users.map((u) => {

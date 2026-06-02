@@ -15,5 +15,10 @@ export function isBootstrapAdminEmail(email) {
 export const SESSION_KEY = 'koseafood-session';
 export const SESSION_DAYS = 30;
 
-/** ลูกมือช่วยส่งของ (โก๊ะ) — คนเดียวที่ใช้ role staff ใน Firestore */
+/** อีเมลลูกมือหลัก (โก๊ะ) — ใช้แสดงป้าย「สตาฟ (ลูกมือ)」ใน UI */
 export const OPERATIONAL_STAFF_EMAIL = 'techitudom2000@gmail.com';
+
+/** role ตอนสมัครครั้งแรก — แอดมิน bootstrap เท่านั้นที่ได้ admin ทันที */
+export function getShrimpSignupRole(email) {
+  return isBootstrapAdminEmail(email) ? 'admin' : 'staff';
+}
