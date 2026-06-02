@@ -15,4 +15,9 @@ try {
 }
 assert(threw, 'zero weight rejected');
 
+const deadSized = buildItemsFromPayload({ dead_small: '3', dead_large: '1' });
+assert.equal(deadSized.length, 2);
+assert.equal(deadSized[0].product, 'กุ้งตาย ไซซ์เล็ก');
+assert.equal(deadSized[1].product, 'กุ้งตาย ไซซ์ใหญ่');
+
 console.log('test-liff-order-items: ok');

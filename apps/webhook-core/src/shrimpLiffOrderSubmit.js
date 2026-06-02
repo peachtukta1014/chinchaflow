@@ -17,6 +17,9 @@ const PRODUCT_BY_SIZE = {
   small: 'กุ้งเล็ก',
   medium: 'กุ้งกลาง',
   large: 'กุ้งใหญ่',
+  dead_small: 'กุ้งตาย ไซซ์เล็ก',
+  dead_medium: 'กุ้งตาย ไซซ์กลาง',
+  dead_large: 'กุ้งตาย ไซซ์ใหญ่',
   dead: 'กุ้งตาย',
 };
 

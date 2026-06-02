@@ -35,6 +35,33 @@ const SIZES = [
   },
 ];
 
+const DEAD_SIZES = [
+  {
+    id: 'dead_small',
+    labelTh: T.deadSizeLabels.small.th,
+    labelEn: T.deadSizeLabels.small.en,
+    countTh: T.sizeCountPerKg.small.th,
+    countEn: T.sizeCountPerKg.small.en,
+    product: T.products.dead_small,
+  },
+  {
+    id: 'dead_medium',
+    labelTh: T.deadSizeLabels.medium.th,
+    labelEn: T.deadSizeLabels.medium.en,
+    countTh: T.sizeCountPerKg.medium.th,
+    countEn: T.sizeCountPerKg.medium.en,
+    product: T.products.dead_medium,
+  },
+  {
+    id: 'dead_large',
+    labelTh: T.deadSizeLabels.large.th,
+    labelEn: T.deadSizeLabels.large.en,
+    countTh: T.sizeCountPerKg.large.th,
+    countEn: T.sizeCountPerKg.large.en,
+    product: T.products.dead_large,
+  },
+];
+
 function todayKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
 }
@@ -143,11 +170,17 @@ function Numpad({ value, onChange, onDone }) {
   );
 }
 
-function SizeChip({ item, active, weight, onToggle, onWeight }) {
+function SizeChip({ item, active, weight, onToggle, onWeight, variant = 'sky' }) {
+  const activeClass =
+    variant === 'amber'
+      ? 'border-amber-500 bg-amber-50/60 shadow-sm'
+      : 'border-sky-500 bg-sky-50/60 shadow-sm';
+  const checkClass = variant === 'amber' ? 'border-amber-600 bg-amber-600' : 'border-sky-600 bg-sky-600';
+
   return (
     <div
       className={`rounded-2xl border p-3 transition-colors ${
-        active ? 'border-sky-500 bg-sky-50/60 shadow-sm' : 'border-slate-200 bg-white'
+        active ? activeClass : 'border-slate-200 bg-white'
       }`}
     >
       <button
@@ -160,7 +193,7 @@ function SizeChip({ item, active, weight, onToggle, onWeight }) {
           <p className="font-bold text-slate-900">
             <Bilingual th={item.labelTh} en={item.labelEn} />
           </p>
-          <p className="text-[11px] text-slate-500">{item.sub}</p>
+          {item.sub && <p className="text-[11px] text-slate-500">{item.sub}</p>}
           {item.countTh && (
             <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
               <BilingualInline th={item.countTh} en={item.countEn} />
@@ -169,7 +202,7 @@ function SizeChip({ item, active, weight, onToggle, onWeight }) {
         </div>
         <span
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
-            active ? 'border-sky-600 bg-sky-600' : 'border-slate-300'
+            active ? checkClass : 'border-slate-300'
           }`}
           aria-hidden
         >
@@ -211,12 +244,14 @@ function OrderSummary({ lines, deliveryLabel }) {
   );
 }
 
-function buildRiverPayload(sizes, activeSizes, deadOn, deadKg) {
+function buildRiverPayload(sizes, activeSizes, deadSizes, activeDeadSizes) {
   const river = {};
   for (const s of SIZES) {
     if (activeSizes[s.id] && parseFloat(sizes[s.id]) > 0) river[s.id] = sizes[s.id];
   }
-  if (deadOn && parseFloat(deadKg) > 0) river.dead = deadKg;
+  for (const s of DEAD_SIZES) {
+    if (activeDeadSizes[s.id] && parseFloat(deadSizes[s.id]) > 0) river[s.id] = deadSizes[s.id];
+  }
   return river;
 }
 
@@ -224,7 +259,12 @@ function useOrderDraft() {
   const [sizes, setSizes] = useState({ small: '', medium: '', large: '' });
   const [activeSizes, setActiveSizes] = useState({});
   const [deadOn, setDeadOn] = useState(false);
-  const [deadKg, setDeadKg] = useState('');
+  const [deadSizes, setDeadSizes] = useState({
+    dead_small: '',
+    dead_medium: '',
+    dead_large: '',
+  });
+  const [activeDeadSizes, setActiveDeadSizes] = useState({});
   const [delivery, setDelivery] = useState('today');
   const [otherDate, setOtherDate] = useState('');
 
@@ -239,9 +279,13 @@ function useOrderDraft() {
         lines.push(`${s.product} · ${sizes[s.id]} ${T.kg.th}`);
       }
     }
-    if (deadOn && parseFloat(deadKg) > 0) lines.push(`${T.products.dead} · ${deadKg} ${T.kg.th}`);
+    for (const s of DEAD_SIZES) {
+      if (activeDeadSizes[s.id] && parseFloat(deadSizes[s.id]) > 0) {
+        lines.push(`${s.labelTh} · ${deadSizes[s.id]} ${T.kg.th}`);
+      }
+    }
     return lines;
-  }, [activeSizes, sizes, deadOn, deadKg]);
+  }, [activeSizes, sizes, activeDeadSizes, deadSizes]);
 
   const toggleSize = (id) => {
     setActiveSizes((prev) => {
@@ -251,20 +295,38 @@ function useOrderDraft() {
     });
   };
 
+  const toggleDeadSize = (id) => {
+    setActiveDeadSizes((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      if (!next[id]) setDeadSizes((w) => ({ ...w, [id]: '' }));
+      return next;
+    });
+  };
+
+  const setDeadSectionOn = (on) => {
+    setDeadOn(on);
+    if (!on) {
+      setActiveDeadSizes({});
+      setDeadSizes({ dead_small: '', dead_medium: '', dead_large: '' });
+    }
+  };
+
   const canProceed =
     summaryLines.length > 0 &&
     (delivery !== 'other' || /^\d{4}-\d{2}-\d{2}$/.test(otherDate));
 
-  const riverPayload = () => buildRiverPayload(sizes, activeSizes, deadOn, deadKg);
+  const riverPayload = () => buildRiverPayload(sizes, activeSizes, deadSizes, activeDeadSizes);
 
   return {
     sizes,
     setSizes,
     activeSizes,
     deadOn,
-    setDeadOn,
-    deadKg,
-    setDeadKg,
+    setDeadSectionOn,
+    deadSizes,
+    setDeadSizes,
+    activeDeadSizes,
+    toggleDeadSize,
     delivery,
     setDelivery,
     otherDate,
@@ -390,9 +452,11 @@ function OrderStep({
     setSizes,
     activeSizes,
     deadOn,
-    setDeadOn,
-    deadKg,
-    setDeadKg,
+    setDeadSectionOn,
+    deadSizes,
+    setDeadSizes,
+    activeDeadSizes,
+    toggleDeadSize,
     delivery,
     setDelivery,
     otherDate,
@@ -466,7 +530,7 @@ function OrderStep({
           >
             <button
               type="button"
-              onClick={() => setDeadOn((v) => !v)}
+              onClick={() => setDeadSectionOn(!deadOn)}
               className="w-full flex items-center justify-between min-h-[44px]"
               aria-pressed={deadOn}
             >
@@ -486,8 +550,18 @@ function OrderStep({
               </span>
             </button>
             {deadOn && (
-              <div className="mt-3 pt-3 border-t border-amber-200/80">
-                <Numpad value={deadKg} onChange={setDeadKg} />
+              <div className="mt-3 pt-3 border-t border-amber-200/80 space-y-2">
+                {DEAD_SIZES.map((s) => (
+                  <SizeChip
+                    key={s.id}
+                    item={s}
+                    variant="amber"
+                    active={!!activeDeadSizes[s.id]}
+                    weight={deadSizes[s.id]}
+                    onToggle={() => toggleDeadSize(s.id)}
+                    onWeight={(v) => setDeadSizes((prev) => ({ ...prev, [s.id]: v }))}
+                  />
+                ))}
               </div>
             )}
           </div>
