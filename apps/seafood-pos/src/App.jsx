@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'lucide-react';
 import { auth } from './firebase';
@@ -12,12 +12,7 @@ import {
   syncMainStockFromBatches,
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
-import {
-  getShrimpAccessTier,
-  getShrimpRoleLabel,
-  isShrimpAdmin,
-  isShrimpOperationalStaff,
-} from './lib/shrimpRoles';
+import { getShrimpRoleLabel, isShrimpAdmin } from './lib/shrimpRoles';
 import { getAppBuildLabel } from './lib/appBuildInfo';
 import { FIREBASE_PROJECT_ID } from './lib/viteEnv.js';
 import { useIntervalWhen } from './lib/useIntervalWhen';
@@ -85,17 +80,7 @@ export default function App() {
   const isMainTab = MAIN_TABS.has(activeTab);
   const isOverlayTab = !isMainTab;
 
-  const accessTier = member ? getShrimpAccessTier(member) : null;
   const isAdmin = isShrimpAdmin(member);
-  const isManager = accessTier === 'manager';
-  const isOperational = isShrimpOperationalStaff(member);
-
-  const allowedMainTabs = useMemo(() => {
-    if (isAdmin) return MAIN_TABS;
-    if (isManager) return new Set(['sales']);
-    if (isOperational) return new Set(['orders']);
-    return new Set(['sales']);
-  }, [isAdmin, isManager, isOperational]);
 
   const goMainTab = useCallback((tab) => {
     setActiveTab(tab);
@@ -103,27 +88,15 @@ export default function App() {
   }, []);
 
   const openOverlay = useCallback((tab) => {
-    if (!isShrimpAdmin(member)) return;
     setLastMainTab((prev) => (MAIN_TABS.has(activeTab) ? activeTab : prev));
     setActiveTab(tab);
-  }, [activeTab, member]);
+  }, [activeTab]);
 
   const goBackFromOverlay = useCallback(() => {
     setActiveTab(lastMainTab);
   }, [lastMainTab]);
 
   useEffect(() => subscribeShrimpMember(setMember), []);
-
-  useEffect(() => {
-    if (!member) return;
-    if (isMainTab && !allowedMainTabs.has(activeTab)) {
-      goMainTab(isManager ? 'sales' : 'orders');
-      return;
-    }
-    if (isOverlayTab && !isAdmin) {
-      goMainTab(isManager ? 'sales' : 'orders');
-    }
-  }, [member, activeTab, isMainTab, isOverlayTab, isAdmin, isManager, allowedMainTabs, goMainTab]);
 
   const loadStockFromRest = useCallback(async () => {
     if (!FIREBASE_PROJECT_ID || !member) return;
@@ -167,7 +140,7 @@ export default function App() {
     [stock, stockBatches],
   );
 
-  const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID && (isAdmin || isOperational));
+  const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID);
 
   const refreshPendingOrderBadge = useCallback(() => {
     if (!canPollOrders) return;
@@ -364,9 +337,10 @@ export default function App() {
                 <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
                   {member.name}
-                  <span className={`ml-1.5 ${isAdmin ? 'text-purple-400' : isOperational ? 'text-cyan-400' : 'text-amber-400'}`}>
-                    · {roleBadge}
-                  </span>
+                  {!isAdmin && (
+                    <span className="ml-1.5 text-amber-400">· {roleBadge}</span>
+                  )}
+                  {isAdmin && <span className="ml-1.5 text-purple-400">· แอดมิน</span>}
                 </p>
                 {getAppBuildLabel() && (
                   <p className="text-[9px] text-cyan-400/90 mt-0.5 truncate max-w-[180px]" title="เวอร์ชันที่โหลดอยู่">
@@ -411,15 +385,17 @@ export default function App() {
         onRetrySync={runOfflineSync}
       />
 
-      <LiveStockStickyBar
-        live={effectiveStock.live}
-        dead={effectiveStock.dead}
-        loadError={stockLoadError}
-        pendingLive={pendingStockDeduction.live}
-        pendingDead={pendingStockDeduction.dead}
-      />
+      {isAdmin && (
+        <LiveStockStickyBar
+          live={effectiveStock.live}
+          dead={effectiveStock.dead}
+          loadError={stockLoadError}
+          pendingLive={pendingStockDeduction.live}
+          pendingDead={pendingStockDeduction.dead}
+        />
+      )}
 
-      {isAdmin && isMainTab && (
+      {isMainTab && (
         <HeaderQuickLinks
           isAdmin={isAdmin}
           onOpenCustomers={() => openOverlay('members')}
@@ -461,7 +437,6 @@ export default function App() {
               refreshKey={salesRefresh}
               active={activeTab === 'sales'}
               isAdmin={isAdmin}
-              managerView={isManager}
               stock={stock}
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
@@ -541,42 +516,34 @@ export default function App() {
           className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
-          {allowedMainTabs.has('pos') && (
-            <NavButton
-              icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
-              label="บันทึกการขาย"
-              compactLabel
-              isActive={activeTab === 'pos'}
-              onClick={() => goMainTab('pos')}
-            />
-          )}
-          {allowedMainTabs.has('expenses') && (
-            <NavButton
-              icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
-              label="รายจ่าย"
-              compactLabel
-              isActive={activeTab === 'expenses'}
-              onClick={() => goMainTab('expenses')}
-            />
-          )}
-          {allowedMainTabs.has('sales') && (
-            <NavButton
-              icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
-              label={isManager ? 'สรุปยอดวัน' : 'ยอดขาย/ยอดค้าง'}
-              compactLabel
-              isActive={activeTab === 'sales'}
-              onClick={() => goMainTab('sales')}
-            />
-          )}
-          {allowedMainTabs.has('orders') && (
-            <NavButton
-              icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
-              label="LINE"
-              isActive={activeTab === 'orders'}
-              onClick={() => goMainTab('orders')}
-              badge={pendingOrders}
-            />
-          )}
+          <NavButton
+            icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
+            label="บันทึกการขาย"
+            compactLabel
+            isActive={activeTab === 'pos'}
+            onClick={() => goMainTab('pos')}
+          />
+          <NavButton
+            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
+            label="รายจ่าย"
+            compactLabel
+            isActive={activeTab === 'expenses'}
+            onClick={() => goMainTab('expenses')}
+          />
+          <NavButton
+            icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
+            label="ยอดขาย/ยอดค้าง"
+            compactLabel
+            isActive={activeTab === 'sales'}
+            onClick={() => goMainTab('sales')}
+          />
+          <NavButton
+            icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
+            label="LINE"
+            isActive={activeTab === 'orders'}
+            onClick={() => goMainTab('orders')}
+            badge={pendingOrders}
+          />
         </div>
       )}
     </div>

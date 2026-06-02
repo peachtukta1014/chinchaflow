@@ -552,19 +552,17 @@ try {
 
 try {
   const {
-    getShrimpAccessTier,
     getShrimpRoleLabel,
-    shouldMigrateStaffToManager,
     isOperationalStaffEmail,
   } = await import('../src/lib/shrimpRoles.js');
-  const koi = { role: 'staff', email: 'techitudom2000@gmail.com' };
-  const home = { role: 'staff', email: 'family@example.com' };
-  assert(isOperationalStaffEmail(koi.email), 'โก๊ะ = operational staff email');
-  assert(getShrimpAccessTier(koi) === 'operational', 'โก๊ะ access = operational');
-  assert(getShrimpAccessTier(home) === 'manager', 'staff อื่น = manager (UI)');
-  assert(shouldMigrateStaffToManager('staff', home.email), 'migrate staff ในบ้าน → manager');
-  assert(!shouldMigrateStaffToManager('staff', koi.email), 'ไม่ migrate โก๊ะ');
-  assert(getShrimpRoleLabel('manager', home.email) === 'แมนเนเจอร์', 'label manager');
+  assert(isOperationalStaffEmail('techitudom2000@gmail.com'), 'โก๊ะ = operational staff email');
+  assert(getShrimpRoleLabel('manager', 'a@b.com') === 'แมนเนเจอร์', 'label manager');
+  assert(getShrimpRoleLabel('staff', 'techitudom2000@gmail.com') === 'สตาฟ (ลูกมือ)', 'label โก๊ะ');
+  const appSrc = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
+  assert(
+    appSrc.includes('isAdmin && (\n        <LiveStockStickyBar'),
+    'แถบสต๊อกด้านบนแสดงเฉพาะแอดมิน',
+  );
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');

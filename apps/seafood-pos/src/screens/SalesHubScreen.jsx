@@ -15,22 +15,18 @@ export default function SalesHubScreen({
   refreshKey = 0,
   active = true,
   isAdmin = false,
-  managerView = false,
   stock = null,
   stockBatches = [],
   updateMainStock,
   onSaleDeleted,
 }) {
   const [subTab, setSubTab] = useState('summary');
-  const visibleSubTabs = managerView
-    ? SUB_TABS.filter((t) => t.id === 'summary')
-    : SUB_TABS;
 
   return (
     <div className="flex flex-col min-h-full">
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm px-4 pt-2 pb-2 border-b border-slate-200">
         <div className="flex gap-1 p-1 bg-slate-200/80 rounded-xl">
-          {visibleSubTabs.map(({ id, label }) => (
+          {SUB_TABS.map(({ id, label }) => (
             <button
               key={id}
               type="button"

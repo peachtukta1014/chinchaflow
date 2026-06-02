@@ -52,7 +52,7 @@ service cloud.firestore {
     }
 
     function canMutateShrimpOps() {
-      return isAdminShrimp() || isOperationalStaffShrimp();
+      return isApprovedShrimp();
     }
 
     function isChinchaBootstrapAdmin() {
