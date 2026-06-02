@@ -8,7 +8,7 @@
  * แท็บ "ตัดวัน" (payroll) — เตรียมไว้ในกลุ่ม daily สำหรับแอดมิน (ยังไม่เปิดใช้)
  */
 
-/** @typedef {'order'|'history'|'summary'|'restock'|'admin'|'catalog'|'payroll'} AppTabId */
+/** @typedef {'order'|'history'|'summary'|'restock'|'admin'|'catalog'|'payroll'|'profit'} AppTabId */
 
 /** @type {Record<string, { d: string }>} */
 export const TAB_ICONS = {
@@ -33,6 +33,9 @@ export const TAB_ICONS = {
   payroll: {
     d: 'M12 3v18M7 8h10M7 12h7M7 16h10',
   },
+  profit: {
+    d: 'M4 20V10m6 10V4m6 16v-6m4 6V8',
+  },
 };
 
 const PAYROLL_TAB_ENABLED = true;
@@ -53,6 +56,7 @@ export function getAppNavGroups(isAdmin, t) {
   ];
 
   if (isAdmin && PAYROLL_TAB_ENABLED) {
+    dailyTabs.push({ id: 'profit', label: t('profitTabShort'), icon: 'profit' });
     dailyTabs.push({ id: 'payroll', label: t('payrollTabShort'), icon: 'payroll' });
   }
 
