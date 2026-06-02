@@ -27,9 +27,9 @@
 | ตรวจ logic กุ้ง (ไม่ต้อง Firebase) | `node apps/seafood-pos/scripts/smoke-test.mjs` | ใช้ก่อน merge / ในแชท agent |
 | ตรวจกุ้ง + รายงาน Slack | skill `auto-shrip` (`/auto-shrip`) | ไม่แก้โค้ดถ้าแค่เช็กสุขภาพ |
 | build / deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` · skill `deploy-shrimp` | **ไม่มี** PR CI smoke ตามนโยบายทีม (ไม่จำเป็น — smoke มือ/skill พอ) |
-| ปิดงานกุ้ง (smoke → build → merge main → deploy) | skill `ship-shrimp` (`/ship-shrimp`) | หลัง PR พร้อม |
+| ปิดงานกุ้ง (smoke → build → merge main → deploy) | skill `ship-shrimp` (`/ship-shrimp` หรือพูด **โอเค/แอปกุ้ง**) | หลัง PR พร้อม |
 | deploy ชา | `deploy-hosting.yml` (target tea) · skill `deploy-tea` | |
-| ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`/ship-tea`) | หลัง PR พร้อม; build = smoke ชา |
+| ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`/ship-tea` หรือพูด **โอเค/ชินชา**) | หลัง PR พร้อม; build = smoke ชา |
 | deploy rules / functions | `deploy-rules.yml`, `deploy-functions.yml` | |
 | ปิดงาน PR | skill `land-it` | |
 
