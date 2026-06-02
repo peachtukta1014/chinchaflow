@@ -5,6 +5,7 @@ import { groupBatchesByReceiveDay } from '../lib/stockBatchUtils';
 const LotReportPanel = lazy(() => import('../components/LotReportPanel'));
 const StockCountPanel = lazy(() => import('../components/StockCountPanel'));
 const LotHistoryPanel = lazy(() => import('../components/LotHistoryPanel'));
+const LotPortfolioPanel = lazy(() => import('../components/LotPortfolioPanel'));
 
 function PanelLoading() {
   return (
@@ -16,8 +17,9 @@ function PanelLoading() {
  * สรุปล็อต + ชั่งปิด + ประวัติล็อต — แอดมินเท่านั้น
  *
  * แท็บย่อย:
- *  1. สรุป+ชั่งปิด  — LotReportPanel (สรุป P&L + ปิดล็อต) + StockCountPanel (ชั่งปิดทั้งบ่อ)
- *  2. ประวัติล็อต   — LotHistoryPanel (รายการล็อตที่ปิดแล้ว)
+ *  1. ภาพรวม      — LotPortfolioPanel (สะสมกำไร/ทุน · รายเดือน/ปี)
+ *  2. สรุป+ชั่งปิด — LotReportPanel + StockCountPanel
+ *  3. ประวัติล็อต  — LotHistoryPanel
  */
 export default function LotCloseScreen({
   stock,
@@ -26,7 +28,7 @@ export default function LotCloseScreen({
   member,
   onStockMoved,
 }) {
-  const [section, setSection] = useState('report');
+  const [section, setSection] = useState('overview');
   const [closedLotKeys, setClosedLotKeys] = useState(new Set());
 
   // pre-load which lots are already closed (check against existing batches)
@@ -52,8 +54,17 @@ export default function LotCloseScreen({
       <div className="flex bg-slate-200 p-1 rounded-2xl gap-1">
         <button
           type="button"
+          onClick={() => setSection('overview')}
+          className={`flex-1 py-2.5 font-bold text-[11px] rounded-xl ${
+            section === 'overview' ? 'bg-white text-purple-700' : 'text-slate-500'
+          }`}
+        >
+          ภาพรวม
+        </button>
+        <button
+          type="button"
           onClick={() => setSection('report')}
-          className={`flex-1 py-2.5 font-bold text-xs rounded-xl ${
+          className={`flex-1 py-2.5 font-bold text-[11px] rounded-xl ${
             section === 'report' ? 'bg-white text-purple-700' : 'text-slate-500'
           }`}
         >
@@ -62,13 +73,19 @@ export default function LotCloseScreen({
         <button
           type="button"
           onClick={() => setSection('history')}
-          className={`flex-1 py-2.5 font-bold text-xs rounded-xl ${
+          className={`flex-1 py-2.5 font-bold text-[11px] rounded-xl ${
             section === 'history' ? 'bg-white text-purple-700' : 'text-slate-500'
           }`}
         >
           ประวัติล็อต
         </button>
       </div>
+
+      {section === 'overview' && (
+        <Suspense fallback={<PanelLoading />}>
+          <LotPortfolioPanel stockBatches={stockBatches} closedLotKeys={closedLotKeys} />
+        </Suspense>
+      )}
 
       {/* ── สรุป + ชั่งปิด ──────────────────────────────────────────────── */}
       {section === 'report' && (
