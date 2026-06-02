@@ -169,7 +169,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       return {
         ...o,
         effectiveDeliveryDate: orderDeliveryDateKey(o),
-        displayCustomerName: o.customerName || linked?.name || null,
+        displayCustomerName: linked?.name || o.customerName || null,
       };
     }),
     [orders, allCustomers],
