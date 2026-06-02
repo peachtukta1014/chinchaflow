@@ -1,6 +1,6 @@
 ---
 name: ship-tea
-description: Close out tea agent work — verify build, merge PR to main, wait for production deploy. Use after finishing a task, post-PR fixes, or when Peach says ship, merge, deploy, or ขึ้น prod for chincha-tea.
+description: Close out tea agent work — verify build, merge PR to main, wait for production deploy. Use when Peach says ship/ชิป/โอเค/ชินชา/โอเค ชา, merge, deploy, or ขึ้น prod for chincha-tea (including voice-to-text phrasing).
 ---
 
 # Ship tea (verify → merge `main` → deploy)
@@ -16,6 +16,21 @@ Default **ปิดงาน** สำหรับ `#chincha-tea-agent` เมื
 - คำสั่งประมาณ: ship, merge, deploy, ขึ้น main, ขึ้นโปรดักชัน, ดีพลอย
 - **ไม่รัน** ถ้ารอบนั้นเป็นแค่ถาม/ออกแบบ ไม่มี diff โค้ด
 - **หยุด** ถ้าผู้ใช้บอกชัดว่า «แค่ PR», «อย่า merge», «รอ review ก่อน»
+
+## คำสั่งเสียง / ไมค์ (Peach) — เท่ากับ `/ship-tea`
+
+Peach มักพูดผ่านไมค์ ไม่ต้องพิมพ์ `/ship-tea` — ถ้าข้อความ **ตั้งใจปิดงานชาขึ้น prod** และอยู่บริบท `#chincha-tea-agent` / งานชา ให้ **รัน skill นี้ทันที** (ครบ build → merge → deploy):
+
+| พูด / STT มักได้ | ทำ |
+|------------------|-----|
+| **โอเค/ชินชา** · โอเค ชินชา · โอเคชินชา | ใช่ → ship ชา |
+| โอเค/ชา · โอเค ชา · โอเคชา | ใช่ |
+| ชิปชา · ship ชา · ship tea · ชิป tea | ใช่ |
+| ขึ้น prod ชา · ดีพลอยชา · merge ชา | ใช่ (ถ้าไม่ได้บอก «อย่า merge») |
+
+**ไม่ใช่คำสั่ง ship:** แค่ «โอเค» ไม่มีคำว่าชา/ชินชา/tea · คุยเรื่องอื่น · ถามอย่างเดียว
+
+**สับสนกับกุ้ง:** ถ้ามีคำ **กุ้ง / แอปกุ้ง / shrimp / seafood** → ใช้ `/ship-shrimp` ไม่ใช่ skill นี้
 
 ## ลำดับขั้น (ทำครบทุกครั้ง)
 
@@ -102,5 +117,5 @@ gh run watch <run-id> --exit-status
 
 ## คำสั่งย่อ (Peach / agent)
 
-> งานชาเสร็จแล้ว → `/ship-tea`  
+> งานชาเสร็จแล้ว → `/ship-tea` หรือพูด **「โอเค/ชินชา」**  
 > (= build ผ่าน → merge PR → รอ deploy ชา)
