@@ -110,7 +110,38 @@ chincha/
 2. สร้าง environment สำหรับ repo นี้ → รัน setup → **Save snapshot**
 3. ใส่ `snapshot` ใน `environment.json` ตาม [เอกสาร Cursor](https://cursor.com/docs/cloud-agent/setup)
 
-สำหรับ **login Firebase จริง** ใน cloud: ใส่ `VITE_FIREBASE_*` ใน **Dashboard → Secrets** (อย่า commit `.env.local`)
+สำหรับ **login Firebase จริง** ใน cloud: ใส่ใน **[cursor.com/dashboard](https://cursor.com/dashboard) → Cloud Agents → Secrets** (อย่า commit `.env.local` หรือรหัสผ่านลง git)
+
+โปรเจกต์นี้ **ไม่มีไฟล์ `.login`** — ใช้ Secrets แทน
+
+### Secrets สำหรับแอปกุ้ง (`apps/seafood-pos`)
+
+| Secret (ชื่อใน Dashboard) | ใช้ทำอะไร |
+|---------------------------|-----------|
+| `VITE_FIREBASE_API_KEY` | config Firebase (build + runtime) |
+| `VITE_FIREBASE_AUTH_DOMAIN` | เช่น `chincha-eeed6.firebaseapp.com` |
+| `VITE_FIREBASE_DATABASE_URL` | Realtime DB (ถ้ามี) |
+| `VITE_FIREBASE_PROJECT_ID` | `chincha-eeed6` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | bucket โปรเจกต์ |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | จาก Firebase Console |
+| `VITE_FIREBASE_APP_ID` | **ของกุ้ง** (คนละตัวกับชา — ดู GitHub `VITE_FIREBASE_APP_ID_SHRIMP`) |
+
+ค่าตัวอย่างชื่อตัวแปรอยู่ที่ `apps/seafood-pos/.env.example` (ไม่มีค่าจริง)
+
+### ล็อกอินแอดมินให้ agent อ่าน Firestore (ทางเลือก)
+
+ถ้าต้องการให้ Cloud Agent **ล็อกอินเป็นแอดมิน** (เช่น ดูรายชื่อ `shrimp_users`) เพิ่มใน Secrets **บน Dashboard เท่านั้น**:
+
+| Secret | ตัวอย่าง |
+|--------|----------|
+| `SHRIMP_AGENT_EMAIL` | `peachtukta1014@gmail.com` |
+| `SHRIMP_AGENT_PASSWORD` | รหัสผ่าน Firebase Auth ของบัญชีนั้น |
+
+- อีเมล `peachtukta1014@gmail.com` เป็น **bootstrap admin** ในแอปกุ้ง (อนุมัติทันทีเมื่อสมัคร/ล็อกอินครั้งแรก)
+- หลังเพิ่ม Secrets แล้ว **เริ่ม agent session ใหม่** (secret ไม่ติด session เก่า)
+- อย่าใส่รหัสผ่านใน Slack / ใน PR / ใน repo
+
+บนเครื่องตัวเอง: คัดลอก `.env.example` → `apps/seafood-pos/.env.local` แล้วเติมค่าจาก Firebase Console → Project settings → Your apps (Web app กุ้ง)
 
 ---
 
