@@ -554,15 +554,30 @@ try {
   const {
     getShrimpRoleLabel,
     isOperationalStaffEmail,
+    isShrimpStaff,
+    canAccessShrimpMainTab,
+    canAccessShrimpOverlay,
+    getDefaultMainTabForMember,
   } = await import('../src/lib/shrimpRoles.js');
+  const { isStaffAutoApproveEmail } = await import('../src/constants/config.js');
   assert(isOperationalStaffEmail('techitudom2000@gmail.com'), 'โก๊ะ = operational staff email');
+  assert(isStaffAutoApproveEmail('techitudom2000@gmail.com'), 'staff auto-approve email');
   assert(getShrimpRoleLabel('manager', 'a@b.com') === 'แมนเนเจอร์', 'label manager');
   assert(getShrimpRoleLabel('staff', 'techitudom2000@gmail.com') === 'สตาฟ (ลูกมือ)', 'label โก๊ะ');
+  const staffMember = { role: 'staff', email: 'techitudom2000@gmail.com' };
+  assert(isShrimpStaff(staffMember), 'isShrimpStaff');
+  assert(canAccessShrimpMainTab(staffMember, 'orders'), 'staff เข้า LINE');
+  assert(!canAccessShrimpMainTab(staffMember, 'sales'), 'staff ไม่เข้ายอดขาย');
+  assert(canAccessShrimpOverlay(staffMember, 'members'), 'staff ดูลูกค้า');
+  assert(!canAccessShrimpOverlay(staffMember, 'stock'), 'staff ไม่เข้าคลัง');
+  assert(getDefaultMainTabForMember(staffMember) === 'orders', 'staff default tab = LINE');
   const appSrc = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   assert(
     appSrc.includes('isAdmin && (\n        <LiveStockStickyBar'),
     'แถบสต๊อกด้านบนแสดงเฉพาะแอดมิน',
   );
+  assert(appSrc.includes('canAccessShrimpMainTab(member'), 'App จำกัดแท็บตาม role');
+  assert(appSrc.includes('readOnly={isStaff}'), 'ลูกค้า read-only สำหรับสตาฟ');
   if (/\buseMemo\s*\(/.test(appSrc)) {
     assert(
       /import\s+React,\s*\{[^}]*\buseMemo\b/.test(appSrc),
@@ -572,6 +587,7 @@ try {
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
+  assert(rules.includes('isShrimpOperationalStaffSignup'), 'firestore staff signup อนุมัติทันที');
 } catch (e) {
   fail('shrimpRoles', e);
 }

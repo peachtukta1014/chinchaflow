@@ -17,3 +17,11 @@ export const SESSION_DAYS = 30;
 
 /** ลูกมือช่วยส่งของ (โก๊ะ) — คนเดียวที่ใช้ role staff ใน Firestore */
 export const OPERATIONAL_STAFF_EMAIL = 'techitudom2000@gmail.com';
+
+/** สมัครด้วยอีเมลนี้ → role staff + อนุมัติทันที (ไม่รอแอดมิน) */
+export const STAFF_AUTO_APPROVE_EMAILS = [OPERATIONAL_STAFF_EMAIL];
+
+export function isStaffAutoApproveEmail(email) {
+  const em = (email || '').trim().toLowerCase();
+  return STAFF_AUTO_APPROVE_EMAILS.some((e) => e.toLowerCase() === em);
+}

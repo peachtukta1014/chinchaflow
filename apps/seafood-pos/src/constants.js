@@ -1,6 +1,7 @@
 export {
   ADMIN_EMAIL,
   isBootstrapAdminEmail,
+  isStaffAutoApproveEmail,
   SESSION_KEY,
   SESSION_DAYS,
   CUSTOMERS,

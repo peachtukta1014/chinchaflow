@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
-import { isBootstrapAdminEmail } from '../constants';
+import { isBootstrapAdminEmail, isStaffAutoApproveEmail } from '../constants';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
@@ -23,15 +23,18 @@ export default function LoginScreen({ onLogin }) {
         const em = email.trim().toLowerCase();
         const { user } = await createUserWithEmailAndPassword(auth, em, password);
         const grantAdmin = isBootstrapAdminEmail(em);
-        await fsSetShrimpUser(user.uid, {
-          name: name.trim(),
-          email: em,
-          role: grantAdmin ? 'admin' : 'manager',
-          approved: grantAdmin,
-          createdAt: new Date().toISOString(),
+        const grantStaff = !grantAdmin && isStaffAutoApproveEmail(em);
+        const role = grantAdmin ? 'admin' : grantStaff ? 'staff' : 'manager';
+        const approved = grantAdmin || grantStaff;
+        await fsSetShrimpUser(user.uid, {
+          name: name.trim(),
+          email: em,
+          role,
+          approved,
+          createdAt: new Date().toISOString(),
         });
-        if (!grantAdmin) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: name.trim(), email: em, role: grantAdmin ? 'admin' : 'manager' });
+        if (!approved) { await signOut(auth); setMode('pending'); return; }
+        onLogin({ uid: user.uid, name: name.trim(), email: em, role });
       } else {
         const em = email.trim().toLowerCase();
         const { user } = await signInWithEmailAndPassword(auth, em, password);
