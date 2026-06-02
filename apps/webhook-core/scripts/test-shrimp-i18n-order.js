@@ -58,6 +58,7 @@ assert(!/မြန်မာ|အော်ဒါ/.test(helpTh), 'help th no burmes
 
 const helpEn = replyHelpCustomerEnglish();
 assert(/Ordering & contact guide/.test(helpEn), 'help en formal header');
-assert(/ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
+assert(/For Thai, reply: Help or ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
+assert(/For English, reply: 2 or EN/.test(helpTh), 'help th english switch all-english');
 
 console.log('\nall shrimp i18n order tests passed\n');

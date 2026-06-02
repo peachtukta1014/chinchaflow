@@ -160,7 +160,7 @@ const M = {
     '• นอกเวลาทำการอาจตอบช้า — ขอบคุณที่รอครับ',
     '',
     '—',
-    'English: พิมพ์ 2 หรือ EN',
+    'For English, reply: 2 or EN',
   ].join('\n'),
   helpCustomerEn: () => [
     'Ko Ao Seafood',
@@ -188,7 +188,7 @@ const M = {
     '• Off-hours replies may be delayed — thank you for your patience',
     '',
     '—',
-    'ภาษาไทย: พิมพ์ ช่วยเหลือ',
+    'For Thai, reply: Help or ช่วยเหลือ',
   ].join('\n'),
   /** ใช้กับ parse fail / ข้อความอื่นที่ยังอิงภาษาตามข้อความลูกค้า */
   help: {
