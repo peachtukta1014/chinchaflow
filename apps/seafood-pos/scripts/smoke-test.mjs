@@ -563,6 +563,12 @@ try {
     appSrc.includes('isAdmin && (\n        <LiveStockStickyBar'),
     'แถบสต๊อกด้านบนแสดงเฉพาะแอดมิน',
   );
+  if (/\buseMemo\s*\(/.test(appSrc)) {
+    assert(
+      /import\s+React,\s*\{[^}]*\buseMemo\b/.test(appSrc),
+      'App.jsx ใช้ useMemo ต้อง import จาก react (กัน ReferenceError จอขาว)',
+    );
+  }
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');

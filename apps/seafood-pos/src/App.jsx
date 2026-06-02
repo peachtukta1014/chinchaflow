@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'lucide-react';
 import { auth } from './firebase';
