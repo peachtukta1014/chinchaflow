@@ -17,6 +17,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
+import { PayrollTab } from './screens/PayrollTab';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
@@ -228,6 +229,9 @@ export default function App() {
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
+        {tab === 'payroll' && isAdmin && (
+          <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
+        )}
         {tab === 'admin' && isAdmin && (
           <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
         )}
@@ -236,7 +240,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && (
+      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"

@@ -35,7 +35,7 @@ export const TAB_ICONS = {
   },
 };
 
-const PAYROLL_TAB_ENABLED = false;
+const PAYROLL_TAB_ENABLED = true;
 
 /**
  * @param {boolean} isAdmin

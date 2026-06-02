@@ -3,7 +3,6 @@ import { dateKeyBangkok, shiftDateKey } from '../lib/constants';
 import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestoreRest';
 import { pushTeaLineSummary } from '../lib/lineNotify';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from '../lib/restockService';
-import { StaffAttendancePanel } from '../components/StaffAttendancePanel';
 
 export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
   const [expenses, setExpenses] = useState([]);
@@ -200,10 +199,6 @@ export function SummaryTab({ orders, t, viewDateKey, setViewDateKey, member, men
           <p className="text-[10px] text-stone-500 mt-1">{t('profitAfterRestock')}</p>
         </div>
       )}
-      {isAdmin && (
-        <StaffAttendancePanel viewDateKey={viewDateKey} member={member} t={t} isAdmin={isAdmin} />
-      )}
-
       <div className="bg-white rounded-3xl p-4 border border-stone-200">
         <p className="font-bold text-stone-500 text-[10px] uppercase mb-3">{t('topItems')}</p>
         {topItems.length === 0 ? (
