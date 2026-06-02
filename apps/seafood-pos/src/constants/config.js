@@ -14,3 +14,6 @@ export function isBootstrapAdminEmail(email) {
 
 export const SESSION_KEY = 'koseafood-session';
 export const SESSION_DAYS = 30;
+
+/** ลูกมือช่วยส่งของ (โก๊ะ) — คนเดียวที่ใช้ role staff ใน Firestore */
+export const OPERATIONAL_STAFF_EMAIL = 'techitudom2000@gmail.com';

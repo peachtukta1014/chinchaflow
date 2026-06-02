@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
+import { migrateLegacyStaffToManager } from '../lib/migrateShrimpRoles';
+import {
+  getShrimpRoleLabel,
+  isOperationalStaffEmail,
+} from '../lib/shrimpRoles';
 
 function memberDeleteConfirmMessage(u) {
   const name = u.name || '—';
@@ -22,11 +27,19 @@ export default function AdminUsersScreen() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const rows = await fsRunQuery({
+      let rows = await fsRunQuery({
         from: [{ collectionId: 'shrimp_users' }],
         orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
         limit: 100,
       });
+      const migrated = await migrateLegacyStaffToManager(rows);
+      if (migrated > 0) {
+        rows = await fsRunQuery({
+          from: [{ collectionId: 'shrimp_users' }],
+          orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
+          limit: 100,
+        });
+      }
       setUsers(rows);
     } catch (e) {
       console.warn('loadUsers', e);
@@ -41,9 +54,27 @@ export default function AdminUsersScreen() {
     setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, approved: val } : u)));
   };
 
-  const setRole = async (uid, role) => {
-    await fsPatch(`shrimp_users/${uid}`, { role });
-    setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role } : u)));
+  const setRole = async (uid, nextRole) => {
+    const u = users.find((x) => x.id === uid);
+    if (nextRole === 'staff' && u && !isOperationalStaffEmail(u.email)) {
+      alert('ตำแหน่งสตาฟ (ลูกมือ) ใช้ได้เฉพาะบัญชีโก๊ะ (techitudom2000@gmail.com)');
+      return;
+    }
+    await fsPatch(`shrimp_users/${uid}`, { role: nextRole });
+    setUsers((prev) => prev.map((x) => (x.id === uid ? { ...x, role: nextRole } : x)));
+  };
+
+  const cycleRole = (u) => {
+    if (u.role === 'admin') return 'manager';
+    if (u.role === 'manager') return isOperationalStaffEmail(u.email) ? 'staff' : 'admin';
+    return 'admin';
+  };
+
+  const cycleRoleLabel = (u) => {
+    const next = cycleRole(u);
+    if (next === 'admin') return '→ แอดมิน';
+    if (next === 'manager') return '→ แมนเนเจอร์';
+    return '→ สตาฟ (ลูกมือ)';
   };
 
   const deleteMember = async (u) => {
@@ -96,8 +127,14 @@ export default function AdminUsersScreen() {
                 )}
               </div>
               <div className="flex items-center gap-1 ml-2 shrink-0">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {u.role === 'admin' ? 'แอดมิน' : 'สตาฟ'}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  u.role === 'admin'
+                    ? 'bg-purple-100 text-purple-700'
+                    : u.role === 'staff'
+                      ? 'bg-cyan-100 text-cyan-800'
+                      : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {getShrimpRoleLabel(u.role, u.email)}
                 </span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-600'}`}>
                   {u.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
@@ -124,10 +161,10 @@ export default function AdminUsersScreen() {
               )}
               <button
                 type="button"
-                onClick={() => setRole(u.id, u.role === 'admin' ? 'staff' : 'admin')}
+                onClick={() => setRole(u.id, cycleRole(u))}
                 className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold active:scale-95"
               >
-                {u.role === 'admin' ? '→ สตาฟ' : '→ แอดมิน'}
+                {cycleRoleLabel(u)}
               </button>
             </div>
             <button

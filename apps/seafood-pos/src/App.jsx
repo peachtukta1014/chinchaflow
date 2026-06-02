@@ -12,6 +12,12 @@ import {
   syncMainStockFromBatches,
 } from './services/stockService';
 import { hardReloadApp } from './lib/reloadApp';
+import {
+  getShrimpAccessTier,
+  getShrimpRoleLabel,
+  isShrimpAdmin,
+  isShrimpOperationalStaff,
+} from './lib/shrimpRoles';
 import { getAppBuildLabel } from './lib/appBuildInfo';
 import { FIREBASE_PROJECT_ID } from './lib/viteEnv.js';
 import { useIntervalWhen } from './lib/useIntervalWhen';
@@ -79,21 +85,45 @@ export default function App() {
   const isMainTab = MAIN_TABS.has(activeTab);
   const isOverlayTab = !isMainTab;
 
+  const accessTier = member ? getShrimpAccessTier(member) : null;
+  const isAdmin = isShrimpAdmin(member);
+  const isManager = accessTier === 'manager';
+  const isOperational = isShrimpOperationalStaff(member);
+
+  const allowedMainTabs = useMemo(() => {
+    if (isAdmin) return MAIN_TABS;
+    if (isManager) return new Set(['sales']);
+    if (isOperational) return new Set(['orders']);
+    return new Set(['sales']);
+  }, [isAdmin, isManager, isOperational]);
+
   const goMainTab = useCallback((tab) => {
     setActiveTab(tab);
     setLastMainTab(tab);
   }, []);
 
   const openOverlay = useCallback((tab) => {
+    if (!isShrimpAdmin(member)) return;
     setLastMainTab((prev) => (MAIN_TABS.has(activeTab) ? activeTab : prev));
     setActiveTab(tab);
-  }, [activeTab]);
+  }, [activeTab, member]);
 
   const goBackFromOverlay = useCallback(() => {
     setActiveTab(lastMainTab);
   }, [lastMainTab]);
 
   useEffect(() => subscribeShrimpMember(setMember), []);
+
+  useEffect(() => {
+    if (!member) return;
+    if (isMainTab && !allowedMainTabs.has(activeTab)) {
+      goMainTab(isManager ? 'sales' : 'orders');
+      return;
+    }
+    if (isOverlayTab && !isAdmin) {
+      goMainTab(isManager ? 'sales' : 'orders');
+    }
+  }, [member, activeTab, isMainTab, isOverlayTab, isAdmin, isManager, allowedMainTabs, goMainTab]);
 
   const loadStockFromRest = useCallback(async () => {
     if (!FIREBASE_PROJECT_ID || !member) return;
@@ -137,7 +167,7 @@ export default function App() {
     [stock, stockBatches],
   );
 
-  const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID);
+  const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID && (isAdmin || isOperational));
 
   const refreshPendingOrderBadge = useCallback(() => {
     if (!canPollOrders) return;
@@ -298,7 +328,7 @@ export default function App() {
 
   if (!member) return <LoginScreen onLogin={handleLogin} />;
 
-  const isAdmin = member.role === 'admin';
+  const roleBadge = getShrimpRoleLabel(member.role, member.email);
 
   return (
     <div className="bg-slate-50 h-screen font-sans max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
@@ -334,7 +364,9 @@ export default function App() {
                 <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
                   {member.name}
-                  {isAdmin && <span className="ml-1.5 text-purple-400">· แอดมิน</span>}
+                  <span className={`ml-1.5 ${isAdmin ? 'text-purple-400' : isOperational ? 'text-cyan-400' : 'text-amber-400'}`}>
+                    · {roleBadge}
+                  </span>
                 </p>
                 {getAppBuildLabel() && (
                   <p className="text-[9px] text-cyan-400/90 mt-0.5 truncate max-w-[180px]" title="เวอร์ชันที่โหลดอยู่">
@@ -387,7 +419,7 @@ export default function App() {
         pendingDead={pendingStockDeduction.dead}
       />
 
-      {isMainTab && (
+      {isAdmin && isMainTab && (
         <HeaderQuickLinks
           isAdmin={isAdmin}
           onOpenCustomers={() => openOverlay('members')}
@@ -429,6 +461,7 @@ export default function App() {
               refreshKey={salesRefresh}
               active={activeTab === 'sales'}
               isAdmin={isAdmin}
+              managerView={isManager}
               stock={stock}
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
@@ -508,34 +541,42 @@ export default function App() {
           className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-50 rounded-t-2xl"
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
-          <NavButton
-            icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
-            label="บันทึกการขาย"
-            compactLabel
-            isActive={activeTab === 'pos'}
-            onClick={() => goMainTab('pos')}
-          />
-          <NavButton
-            icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
-            label="รายจ่าย"
-            compactLabel
-            isActive={activeTab === 'expenses'}
-            onClick={() => goMainTab('expenses')}
-          />
-          <NavButton
-            icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
-            label="ยอดขาย/ยอดค้าง"
-            compactLabel
-            isActive={activeTab === 'sales'}
-            onClick={() => goMainTab('sales')}
-          />
-          <NavButton
-            icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
-            label="LINE"
-            isActive={activeTab === 'orders'}
-            onClick={() => goMainTab('orders')}
-            badge={pendingOrders}
-          />
+          {allowedMainTabs.has('pos') && (
+            <NavButton
+              icon={<ShoppingCart size={22} strokeWidth={activeTab === 'pos' ? 2.5 : 2} />}
+              label="บันทึกการขาย"
+              compactLabel
+              isActive={activeTab === 'pos'}
+              onClick={() => goMainTab('pos')}
+            />
+          )}
+          {allowedMainTabs.has('expenses') && (
+            <NavButton
+              icon={<Wallet size={22} strokeWidth={activeTab === 'expenses' ? 2.5 : 2} />}
+              label="รายจ่าย"
+              compactLabel
+              isActive={activeTab === 'expenses'}
+              onClick={() => goMainTab('expenses')}
+            />
+          )}
+          {allowedMainTabs.has('sales') && (
+            <NavButton
+              icon={<BarChart2 size={22} strokeWidth={activeTab === 'sales' ? 2.5 : 2} />}
+              label={isManager ? 'สรุปยอดวัน' : 'ยอดขาย/ยอดค้าง'}
+              compactLabel
+              isActive={activeTab === 'sales'}
+              onClick={() => goMainTab('sales')}
+            />
+          )}
+          {allowedMainTabs.has('orders') && (
+            <NavButton
+              icon={<LineTabIcon size={22} active={activeTab === 'orders'} />}
+              label="LINE"
+              isActive={activeTab === 'orders'}
+              onClick={() => goMainTab('orders')}
+              badge={pendingOrders}
+            />
+          )}
         </div>
       )}
     </div>

@@ -550,6 +550,28 @@ try {
   fail('offlineQueueUtils', e);
 }
 
+try {
+  const {
+    getShrimpAccessTier,
+    getShrimpRoleLabel,
+    shouldMigrateStaffToManager,
+    isOperationalStaffEmail,
+  } = await import('../src/lib/shrimpRoles.js');
+  const koi = { role: 'staff', email: 'techitudom2000@gmail.com' };
+  const home = { role: 'staff', email: 'family@example.com' };
+  assert(isOperationalStaffEmail(koi.email), 'โก๊ะ = operational staff email');
+  assert(getShrimpAccessTier(koi) === 'operational', 'โก๊ะ access = operational');
+  assert(getShrimpAccessTier(home) === 'manager', 'staff อื่น = manager (UI)');
+  assert(shouldMigrateStaffToManager('staff', home.email), 'migrate staff ในบ้าน → manager');
+  assert(!shouldMigrateStaffToManager('staff', koi.email), 'ไม่ migrate โก๊ะ');
+  assert(getShrimpRoleLabel('manager', home.email) === 'แมนเนเจอร์', 'label manager');
+  const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
+  assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
+  assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
+} catch (e) {
+  fail('shrimpRoles', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
