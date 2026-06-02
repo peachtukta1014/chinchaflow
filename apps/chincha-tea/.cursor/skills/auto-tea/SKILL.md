@@ -30,7 +30,8 @@ Post a short summary to the Slack thread:
 
 - Stay in `apps/chincha-tea` unless fixing a failure requires webhook code in `apps/webhook-core`
 - Do not edit `apps/seafood-pos/`
-- For deploy after merge use `/deploy-tea` or merge to `main` (`.github/workflows/deploy-hosting.yml` → `deploy_tea`)
+- For merge + deploy after feature work use `/ship-tea` (not this skill — `auto-tea` is verify-only)
+- For deploy reference use `/deploy-tea` or merge to `main` (`.github/workflows/deploy-hosting.yml` → `deploy_tea`)
 - For PR workflow use `/land-it`
 
 ## Notes

@@ -7,7 +7,7 @@
 - **กุ้ง:** `apps/seafood-pos` · **ชา:** `apps/chincha-tea` · **LINE functions:** `apps/webhook-core`
 - Slack default model: **Claude 4.6 Sonnet** (Dashboard → Cloud Agents → My Settings). Composer in Slack: `@cursor with composer, …`
 - Dependencies on boot: `npm install` (see `.cursor/environment.json`)
-- **Agent Skills (monorepo):** repo-wide `.cursor/skills/` (e.g. `land-it`) · app-scoped `apps/seafood-pos/.cursor/skills/` (`auto-shrip`, `deploy-shrimp`) · `apps/chincha-tea/.cursor/skills/` (`deploy-tea`). Nested skills auto-apply only when working under that app directory.
+- **Agent Skills (monorepo):** repo-wide `.cursor/skills/` (e.g. `land-it`) · app-scoped `apps/seafood-pos/.cursor/skills/` (`auto-shrip`, `deploy-shrimp`) · `apps/chincha-tea/.cursor/skills/` (`auto-tea`, `deploy-tea`, `ship-tea`). Nested skills auto-apply only when working under that app directory.
 
 ## ก่อนเพิ่มของใหม่ — แจ้งเตือนถ้าไม่จำเป็น (บังคับสำหรับเอเจนต์)
 
@@ -28,6 +28,7 @@
 | ตรวจกุ้ง + รายงาน Slack | skill `auto-shrip` (`/auto-shrip`) | ไม่แก้โค้ดถ้าแค่เช็กสุขภาพ |
 | build / deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` · skill `deploy-shrimp` | **ไม่มี** PR CI smoke ตามนโยบายทีม (ไม่จำเป็น — smoke มือ/skill พอ) |
 | deploy ชา | `deploy-hosting.yml` (target tea) · skill `deploy-tea` | |
+| ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`/ship-tea`) | หลัง PR พร้อม; build = smoke ชา |
 | deploy rules / functions | `deploy-rules.yml`, `deploy-functions.yml` | |
 | ปิดงาน PR | skill `land-it` | |
 

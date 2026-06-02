@@ -42,6 +42,10 @@ Automatic on push to `main` when `apps/chincha-tea/**` (or shared root deps) cha
 
 Manual dispatch: GitHub Actions → **Deploy Firebase Hosting** → enable **Deploy Chincha Tea**.
 
+## Agent close-out
+
+For Peach / `#chincha-tea-agent` work that should go live after a PR: use **`/ship-tea`** (verify build → merge PR to `main` → monitor `deploy-hosting.yml`). This skill documents deploy mechanics; `ship-tea` runs the full pipeline.
+
 ## Scope
 
 Stay in `apps/chincha-tea` unless the task is tea LINE webhook code in `apps/webhook-core`. Do not edit `apps/seafood-pos/` unless the user asks.
