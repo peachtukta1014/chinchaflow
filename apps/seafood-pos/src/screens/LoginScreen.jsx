@@ -3,7 +3,6 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } f
 import { auth, isFirebaseReady } from '../firebase';
 import { isBootstrapAdminEmail } from '../constants';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
-import { shouldMigrateStaffToManager } from '../lib/shrimpRoles';
 
 export default function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('');
@@ -41,7 +40,7 @@ export default function LoginScreen({ onLogin }) {
         const resp = await fetch(`${FS_BASE}/shrimp_users/${user.uid}`, { headers: authH });
         if (!resp.ok) throw new Error('ไม่พบข้อมูลสมาชิก กรุณาสมัครสมาชิกก่อน');
         const f = (await resp.json()).fields || {};
-        let role = f.role?.stringValue || 'manager';
+        const role = f.role?.stringValue || 'staff';
         const approved = f.approved?.booleanValue === true;
         // Bootstrap elevation applies only on first login (profile not yet approved).
         // Re-elevation after admin-initiated demotion/block is intentionally disabled
@@ -53,10 +52,6 @@ export default function LoginScreen({ onLogin }) {
           return;
         }
         if (!approved) { await signOut(auth); setMode('pending'); return; }
-        if (shouldMigrateStaffToManager(role, em)) {
-          await fsPatch(`shrimp_users/${user.uid}`, { role: 'manager' });
-          role = 'manager';
-        }
         onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role });
       }
     } catch (e) {

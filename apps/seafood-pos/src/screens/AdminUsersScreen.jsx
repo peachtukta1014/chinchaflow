@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
-import { migrateLegacyStaffToManager } from '../lib/migrateShrimpRoles';
 import {
   getShrimpRoleLabel,
   isOperationalStaffEmail,
@@ -27,19 +26,11 @@ export default function AdminUsersScreen() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      let rows = await fsRunQuery({
+      const rows = await fsRunQuery({
         from: [{ collectionId: 'shrimp_users' }],
         orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
         limit: 100,
       });
-      const migrated = await migrateLegacyStaffToManager(rows);
-      if (migrated > 0) {
-        rows = await fsRunQuery({
-          from: [{ collectionId: 'shrimp_users' }],
-          orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
-          limit: 100,
-        });
-      }
       setUsers(rows);
     } catch (e) {
       console.warn('loadUsers', e);
