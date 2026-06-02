@@ -1,10 +1,21 @@
 /**
- * ตรวจ LINE LIFF id_token — https://developers.line.biz/en/docs/liff/development/
- * ใช้ LINE_LIFF_ID (ตัวเลข LIFF app) เป็น client_id
+ * ตรวจ LINE LIFF id_token — https://developers.line.biz/en/reference/line-login/#verify-id-token
+ * client_id ต้องเป็น Channel ID (ตัวเลข) ไม่ใช่ LIFF ID ทั้งก้อน (เช่น 2010271574 ไม่ใช่ 2010271574-xxx)
  */
+function resolveIdTokenClientId() {
+  const explicit = String(process.env.LINE_LOGIN_CHANNEL_ID || '').trim();
+  if (explicit) return explicit;
+
+  const liffId = String(process.env.LINE_LIFF_ID || '').trim();
+  const fromLiff = liffId.match(/^(\d+)-/);
+  if (fromLiff) return fromLiff[1];
+
+  return liffId;
+}
+
 async function verifyLineLiffIdToken(idToken) {
   const token = String(idToken || '').trim();
-  const clientId = String(process.env.LINE_LIFF_ID || '').trim();
+  const clientId = resolveIdTokenClientId();
   if (!token) {
     const err = new Error('missing_id_token');
     err.code = 'missing_id_token';
@@ -40,4 +51,4 @@ async function verifyLineLiffIdToken(idToken) {
   };
 }
 
-module.exports = { verifyLineLiffIdToken };
+module.exports = { verifyLineLiffIdToken, resolveIdTokenClientId };
