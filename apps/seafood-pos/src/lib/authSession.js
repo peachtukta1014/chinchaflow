@@ -2,6 +2,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { isBootstrapAdminEmail } from '../constants';
 import { fsGetDoc, fsPatch } from './firestoreRest';
+import { shouldMigrateStaffToManager } from './shrimpRoles';
 
 /**
  * Restore an approved shrimp_users session from Firebase Auth.
@@ -28,11 +29,16 @@ export function subscribeShrimpMember(onMember) {
       }
 
       if (profile?.approved === true) {
+        let role = profile.role || 'manager';
+        if (shouldMigrateStaffToManager(role, em)) {
+          await fsPatch(`shrimp_users/${user.uid}`, { role: 'manager' });
+          role = 'manager';
+        }
         onMember({
           uid: user.uid,
           name: profile.name || 'สมาชิก',
-          email: user.email || profile.email || '',
-          role: profile.role || 'staff',
+          email: em,
+          role,
         });
       }
     } catch {

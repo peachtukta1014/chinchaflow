@@ -11,3 +11,4 @@ export {
 } from './stockLines';
 export { PAY, DEFAULT_PAYMENT_TYPE } from './payments';
 export { ADMIN_EMAIL, ADMIN_EMAILS, isBootstrapAdminEmail, SESSION_KEY, SESSION_DAYS } from './config';
+export { OPERATIONAL_STAFF_EMAIL } from './config';
