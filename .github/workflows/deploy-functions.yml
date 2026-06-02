@@ -41,15 +41,18 @@ jobs:
         run: |
           set -euo pipefail
           ID="${LINE_LIFF_ID:-${VITE_LIFF_ID:-}}"
-          if [ -z "$ID" ]; then
-            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure | tail -1)
+          if [ -z "$ID" ] && [ -f apps/webhook-core/shrimp-liff-id.json ]; then
+            ID=$(node -p "require('./apps/webhook-core/shrimp-liff-id.json').liffId")
           fi
           if [ -z "$ID" ]; then
-            echo "LIFF ID missing — set LINE_LIFF_ID or ensure LINE_CHANNEL_ACCESS_TOKEN can create LIFF"
-            exit 1
+            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure 2>/dev/null | tail -1 || true)
+          fi
+          if [ -z "$ID" ]; then
+            echo "::warning::LIFF ID not set — พิมพ์ ฟอร์มใน OA ยังไม่เปิดจนกว่าจะตั้ง shrimp-liff-id.json หรือ Secrets"
+          else
+            echo "Resolved LIFF ID (${#ID} chars)"
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
-          echo "Resolved LIFF ID (${#ID} chars)"
 
       - name: Write env vars for functions
         run: |

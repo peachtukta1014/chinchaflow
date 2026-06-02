@@ -7,11 +7,17 @@
 - หน้า LIFF: `https://ko-seafood.top/liff-order.html`
 - Cloud Function: `https://asia-southeast1-chincha-eeed6.cloudfunctions.net/shrimpLiffOrder`
 
-## 1) LINE Developers — สร้าง LIFF
+## 1) LINE Developers — สร้าง LIFF (ครั้งเดียว)
 
-1. เปิด Channel กุ้ง (Messaging API) → แท็บ **LIFF**
-2. Add → **Full** · Endpoint URL = `https://ko-seafood.top/liff-order.html`
-3. คัดลอก **LIFF ID** (ตัวเลข)
+1. เปิด [LINE Developers Console](https://developers.line.biz/console/) → Channel กุ้ง (Messaging API) → แท็บ **LIFF**
+2. **Add** → Size **Full** · Endpoint URL = `https://ko-seafood.top/liff-order.html`
+3. Scopes: **profile** (และ **openid** ถ้ามีตัวเลือก)
+4. คัดลอก **LIFF ID** (รูปแบบ `1234567890-AbcdEfgh`)
+5. ใส่ค่าใดอย่างหนึ่ง:
+   - GitHub Secrets: `LINE_LIFF_ID` + `VITE_LIFF_ID` (ค่าเดียวกัน)
+   - หรือคัดลอก `apps/webhook-core/shrimp-liff-id.json.example` → `shrimp-liff-id.json` แล้วใส่ `liffId`
+
+> CI พยายามสร้าง LIFF อัตโนมัติด้วย channel token — บาง channel ต้องสร้างมือใน Console ตามขั้นตอนด้านบน
 
 ## 2) GitHub Secrets (ทางเลือก)
 

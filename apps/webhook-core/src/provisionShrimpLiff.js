@@ -68,8 +68,6 @@ async function ensureShrimpLiffApp({
     body: JSON.stringify({
       view: { type: 'full', url: target },
       description,
-      scope: ['profile', 'openid'],
-      botPrompt: 'normal',
     }),
   });
 
