@@ -5,23 +5,24 @@ import {
   shiftDateKey,
   tomorrowDateKeyBangkok,
 } from './date.js';
+import { getLineDeliveryWindow, LINE_DELIVERY_WINDOW_DEFAULTS } from './lineDeliveryWindow.js';
 
-/** 18:00 เมื่อวาน → 15:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
-export const LINE_DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 15 };
+/** @deprecated use getLineDeliveryWindow() */
+export const LINE_DEFAULT_TODAY_WINDOW = LINE_DELIVERY_WINDOW_DEFAULTS;
 
 /**
- * วันส่งเริ่มต้นเมื่อไม่พิมพ์วันที่ — ตรงกับบอท LINE
- * ช่วง 18:00 เมื่อวาน – 15:00 วันนี้ → วันนี้ · หลัง 15:00 → พรุ่งนี้
+ * วันส่งเริ่มต้นเมื่อไม่พิมพ์วันที่ — ตรงกับบอท LINE (อ่านช่วงจาก config/shrimpLine)
  */
 export function defaultDeliveryDateKeyBangkok(now = new Date()) {
+  const window = getLineDeliveryWindow();
   const todayKey = dateKeyBangkok(now);
   const yesterdayKey = shiftDateKey(todayKey, -1);
   const pad = (n) => String(n).padStart(2, '0');
   const startMs = new Date(
-    `${yesterdayKey}T${pad(LINE_DEFAULT_TODAY_WINDOW.startHour)}:00:00+07:00`,
+    `${yesterdayKey}T${pad(window.startHour)}:00:00+07:00`,
   ).getTime();
   const endMs = new Date(
-    `${todayKey}T${pad(LINE_DEFAULT_TODAY_WINDOW.endHour)}:00:00+07:00`,
+    `${todayKey}T${pad(window.endHour)}:00:00+07:00`,
   ).getTime();
 
   if (now.getTime() >= startMs && now.getTime() < endMs) return todayKey;

@@ -37,6 +37,7 @@ import OfflineBanner from './components/OfflineBanner';
 import { stockLineFull } from './constants/stockLines';
 import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
 import { refreshPendingSummary, syncPendingSales } from './lib/offlineSaleQueue';
+import { syncLineDeliveryWindowFromFirestore } from './lib/syncLineDeliveryWindow';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -142,6 +143,7 @@ export default function App() {
   useEffect(() => {
     if (!member) return;
     loadStockFromRest();
+    syncLineDeliveryWindowFromFirestore();
   }, [member, loadStockFromRest]);
 
   useEffect(() => {

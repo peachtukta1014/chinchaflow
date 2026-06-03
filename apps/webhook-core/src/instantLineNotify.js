@@ -1,5 +1,6 @@
 const { linePush } = require('./teaDailySummary');
 const { formatDateThai } = require('./parseDeliveryDate');
+const { getShrimpLineConfig } = require('./shrimpLineConfig');
 
 function collectNotifyTargets(config) {
   const targets = new Set();
@@ -56,11 +57,6 @@ function formatTeaRestockMessage(data) {
   if (items) lines.push(items);
   lines.push('', '— เปิดแอปชินชา → แท็บสั่งของ');
   return lines.join('\n');
-}
-
-async function getShrimpLineConfig(db) {
-  const snap = await db.collection('config').doc('shrimpLine').get();
-  return snap.exists ? snap.data() : {};
 }
 
 async function getTeaLineConfig(db) {
