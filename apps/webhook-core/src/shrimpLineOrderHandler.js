@@ -10,6 +10,7 @@ const {
   formatDateThai,
   resolveLineOrderDeliveryDate,
 } = require('./parseDeliveryDate');
+const { getShrimpLineDeliveryWindow } = require('./shrimpLineConfig');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
 const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
 const { resolveRiverDefaultProduct } = require('./customerRiverDefault');
@@ -214,6 +215,7 @@ async function handleProfileCollect(db, admin, session, ts, { text, userId, grou
  */
 async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const ts = admin.firestore.FieldValue.serverTimestamp();
+  const deliveryWindow = await getShrimpLineDeliveryWindow(db);
   const session = await getLineOrderSession(db, groupId, userId);
   const prep = prepareOrderInput(text, session);
   const replyLang = prep.replyLang;
@@ -235,6 +237,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     parsedDate,
     sessionDate: session.deliveryDate,
     lockSessionDate,
+    window: deliveryWindow,
   });
 
   if (parsedDate) {

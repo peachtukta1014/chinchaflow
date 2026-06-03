@@ -18,12 +18,14 @@ function tomorrowBKK() {
   return dateKeyBangkok(d);
 }
 
-/** 18:00 เมื่อวาน → 15:00 วันนี้ (ไม่ระบุวันส่ง) = ส่งวันนี้ · นอกช่วง = พรุ่งนี้ */
-const DEFAULT_TODAY_WINDOW = { startHour: 18, endHour: 15 };
+const { DEFAULT_DELIVERY_WINDOW } = require('./shrimpLineConfig');
+
+/** @deprecated use DEFAULT_DELIVERY_WINDOW */
+const DEFAULT_TODAY_WINDOW = DEFAULT_DELIVERY_WINDOW;
 
 /**
  * วันส่งเริ่มต้นเมื่อลูกค้าไม่พิมพ์ วันนี้/พรุ่งนี้/วันที่
- * ช่วง 18:00 เมื่อวาน – 15:00 วันนี้ → วันนี้ · หลัง 15:00 → พรุ่งนี้
+ * ช่วง startHour เมื่อวาน – endHour วันนี้ → วันนี้ · นอกช่วง → พรุ่งนี้
  */
 function tomorrowFromDate(date = new Date()) {
   const d = new Date(`${dateKeyBangkok(date)}T12:00:00+07:00`);
@@ -31,15 +33,16 @@ function tomorrowFromDate(date = new Date()) {
   return dateKeyBangkok(d);
 }
 
-function defaultDeliveryDateKeyBangkok(now = new Date()) {
+function defaultDeliveryDateKeyBangkok(now = new Date(), window = DEFAULT_DELIVERY_WINDOW) {
   const todayKey = dateKeyBangkok(now);
   const yesterdayKey = shiftDateKeyByDays(todayKey, -1);
+  const w = window || DEFAULT_DELIVERY_WINDOW;
 
   const startMs = new Date(
-    `${yesterdayKey}T${pad2(DEFAULT_TODAY_WINDOW.startHour)}:00:00+07:00`,
+    `${yesterdayKey}T${pad2(w.startHour)}:00:00+07:00`,
   ).getTime();
   const endMs = new Date(
-    `${todayKey}T${pad2(DEFAULT_TODAY_WINDOW.endHour)}:00:00+07:00`,
+    `${todayKey}T${pad2(w.endHour)}:00:00+07:00`,
   ).getTime();
 
   if (now.getTime() >= startMs && now.getTime() < endMs) return todayKey;
@@ -172,10 +175,11 @@ function resolveLineOrderDeliveryDate({
   sessionDate,
   now = new Date(),
   lockSessionDate = false,
+  window = DEFAULT_DELIVERY_WINDOW,
 }) {
   if (parsedDate) return parsedDate;
-  const defaultDate = defaultDeliveryDateKeyBangkok(now);
-  const fromSession = coalesceSessionDeliveryDate(sessionDate);
+  const defaultDate = defaultDeliveryDateKeyBangkok(now, window);
+  const fromSession = coalesceSessionDeliveryDate(sessionDate, dateKeyBangkok(now));
   if (fromSession) {
     if (lockSessionDate) return fromSession;
     // ออเดอร์ใหม่หลังเลย cutoff: session วันนี้จากเช้าไม่ดึงกลับมาเป็น「ส่งวันนี้」

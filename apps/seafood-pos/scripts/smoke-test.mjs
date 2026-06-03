@@ -192,6 +192,21 @@ try {
 
 try {
   const {
+    normalizeLineDeliveryWindow,
+    setLineDeliveryWindow,
+    LINE_DELIVERY_WINDOW_DEFAULTS,
+  } = await import('../src/lib/lineDeliveryWindow.js');
+  assert(
+    normalizeLineDeliveryWindow({ lineDefaultStartHour: 17, lineDefaultEndHour: 14 }).startHour === 17,
+    'normalize delivery window start',
+  );
+  setLineDeliveryWindow(LINE_DELIVERY_WINDOW_DEFAULTS);
+} catch (e) {
+  fail('lineDeliveryWindow', e);
+}
+
+try {
+  const {
     formatLineOrderWeightSummary,
     summarizeLineOrderItemWeights,
     summarizeLineOrdersWeights,

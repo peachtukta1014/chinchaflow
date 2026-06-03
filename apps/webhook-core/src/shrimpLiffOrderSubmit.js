@@ -1,4 +1,5 @@
-const { todayBKK } = require('./teaDailySummary');
+const { defaultDeliveryDateKeyBangkok } = require('./parseDeliveryDate');
+const { getShrimpLineDeliveryWindow } = require('./shrimpLineConfig');
 const { saveLineOrders } = require('./saveShrimpLineOrders');
 const { verifyLineLiffIdToken } = require('./verifyLineLiffToken');
 const { normalizeLineUserId } = require('./shrimpLinePush');
@@ -173,7 +174,12 @@ async function getLiffContext(db, lineUserId) {
 
 async function submitLiffOrder(db, admin, body, verified) {
   const lineUserId = verified.lineUserId;
-  const deliveryDate = String(body.deliveryDate || '').trim() || todayBKK();
+  const rawDelivery = String(body.deliveryDate || '').trim();
+  let deliveryDate = rawDelivery;
+  if (!deliveryDate) {
+    const window = await getShrimpLineDeliveryWindow(db);
+    deliveryDate = defaultDeliveryDateKeyBangkok(new Date(), window);
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
     const err = new Error('invalid_delivery_date');
     err.code = 'invalid_delivery_date';
