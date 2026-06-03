@@ -235,8 +235,33 @@ try {
   assert(hit?.name === 'ร้านทดสอบ', 'หาร้านจาก order uid');
   const legacy = { lineUserId: billing };
   assert(normalizeLineContacts(legacy).length === 1, 'legacy lineUserId = billing');
+  const { resolveLineOaLinkRole } = await import('../src/lib/lineCustomerContacts.js');
+  assert(
+    resolveLineOaLinkRole(billing, order) === 'order',
+    'มี billing แล้ว uid ใหม่ = order',
+  );
+  assert(
+    resolveLineOaLinkRole('', billing) === 'billing',
+    'ยังไม่มี billing = billing',
+  );
 } catch (e) {
   fail('lineCustomerContacts', e);
+}
+
+try {
+  const { normalizeLineUserId, isValidLineUserId } = await import('../src/lib/lineUserId.js');
+  const uidA = 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
+  const uidB = 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';
+  const uidC = 'Uccccccccccccccccccccccccccccccc3';
+  const skip = new Set([
+    ...[uidA].map(normalizeLineUserId).filter(isValidLineUserId),
+    uidC,
+  ]);
+  const contacts = [{ lineUserId: uidA }, { lineUserId: uidB }, { lineUserId: uidC }];
+  const pending = contacts.filter((c) => !skip.has(c.lineUserId));
+  assert(pending.length === 1 && pending[0].lineUserId === uidB, 'ซ่อน UID จากรอผูก + สมาชิกแอป');
+} catch (e) {
+  fail('lineOaDismissed', e);
 }
 
 try {

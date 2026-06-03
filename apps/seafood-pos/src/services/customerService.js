@@ -8,11 +8,15 @@ import {
 } from '../lib/customerAliases';
 import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
 import {
+  appendLineContact,
   getBillingLineUserId,
   getOrderLineUserIds,
   legacyLineUserIdFromContacts,
   lineContactsFromForm,
+  LINE_CONTACT_ROLE_BILLING,
+  LINE_CONTACT_ROLE_ORDER,
   normalizeLineContacts,
+  resolveLineOaLinkRole,
 } from '../lib/lineCustomerContacts';
 
 function compactName(s) {
@@ -293,6 +297,35 @@ export async function updateCustomer(id, data, { merge = false } = {}) {
   }
   const doc = await withTimeout(fsGetDoc(`customers/${id}`));
   return assertSaved(doc, want, id);
+}
+
+/**
+ * ผูก UID จากแท็บ LINE รอผูก — role: billing | order | auto
+ */
+export async function linkLineOaUidToCustomer(customerId, lineUserId, role = 'auto') {
+  if (!customerId) throw new Error('ไม่พบรหัสลูกค้า');
+  const uid = normalizeLineUserId(lineUserId);
+  if (!isValidLineUserId(uid)) throw new Error('LINE UID ไม่ถูกต้อง');
+
+  const base = await loadCustomerBase(customerId);
+  const existingBilling = getBillingLineUserId(base);
+  const linkRole = resolveLineOaLinkRole(existingBilling, uid, role);
+
+  if (linkRole === LINE_CONTACT_ROLE_BILLING) {
+    const contacts = normalizeLineContacts(base).filter((c) => c.uid !== uid);
+    const orderIds = getOrderLineUserIds({ lineContacts: contacts });
+    return saveCustomerVerified(customerId, {
+      lineUserId: uid,
+      lineOrderUserIds: orderIds.join(', '),
+    }, { merge: true });
+  }
+
+  const contacts = appendLineContact(normalizeLineContacts(base), uid, LINE_CONTACT_ROLE_ORDER);
+  const billing = existingBilling || legacyLineUserIdFromContacts(contacts);
+  return saveCustomerVerified(customerId, {
+    lineUserId: billing,
+    lineOrderUserIds: getOrderLineUserIds({ lineContacts: contacts }).join(', '),
+  }, { merge: true });
 }
 
 /** บันทึก + ยืนยันจาก Firestore + คืน map ล่าสุด */

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
+import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
+import { saveMemberLineUserId } from '../services/shrimpMemberLineService';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
 import { getNextShrimpRole, getShrimpRoleLabel } from '../lib/shrimpRoles';
 
@@ -19,6 +21,7 @@ export default function AdminUsersScreen() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [lineDraft, setLineDraft] = useState({});
 
   const loadUsers = async () => {
     setLoading(true);
@@ -54,6 +57,34 @@ export default function AdminUsersScreen() {
     if (next === 'admin') return '→ แอดมิน';
     if (next === 'manager') return '→ แมนเนเจอร์';
     return '→ สตาฟ (ลูกมือ)';
+  };
+
+  const saveMemberLine = async (u) => {
+    const raw = lineDraft[u.id] !== undefined ? lineDraft[u.id] : (u.lineUserId || '');
+    const trimmed = String(raw || '').trim();
+    if (trimmed && !isValidLineUserId(normalizeLineUserId(trimmed))) {
+      alert('LINE UID ต้องขึ้นต้น U ยาว 33 ตัว');
+      return;
+    }
+    setBusyId(u.id);
+    try {
+      if (!trimmed) {
+        await fsPatch(`shrimp_users/${u.id}`, { lineUserId: '', lineUserIdUpdatedAt: new Date().toISOString() });
+        setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, lineUserId: '' } : x)));
+      } else {
+        const uid = await saveMemberLineUserId(u.id, trimmed);
+        setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, lineUserId: uid } : x)));
+      }
+      setLineDraft((d) => {
+        const next = { ...d };
+        delete next[u.id];
+        return next;
+      });
+    } catch (e) {
+      alert(e?.message || 'บันทึก LINE UID ไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const deleteMember = async (u) => {
@@ -93,6 +124,7 @@ export default function AdminUsersScreen() {
       </p>
       <p className="text-[10px] text-slate-500 leading-relaxed">
         สมาชิกเดิมในตารางไม่เปลี่ยนเอง — คนสมัครอีเมลใหม่ได้สตาฟอัตโนมัติ · กดเปลี่ยนตำแหน่ง (แอดมิน / แมนเนเจอร์ / สตาฟ) ได้ที่นี่เท่านั้น
+        · ใส่ LINE UID (U…) ของแต่ละคน — ทดสอบบอทจะไม่ขึ้น「รอผูก」
       </p>
       {users.length === 0 && <p className="text-slate-300 text-center py-12">ยังไม่มีสมาชิก</p>}
       {users.map((u) => {
@@ -123,7 +155,26 @@ export default function AdminUsersScreen() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="mt-2 space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-500 block">
+                LINE UID (ทดสอบบอท — ไม่ขึ้นรอผูก)
+                <input
+                  value={lineDraft[u.id] !== undefined ? lineDraft[u.id] : (u.lineUserId || '')}
+                  onChange={(e) => setLineDraft((d) => ({ ...d, [u.id]: e.target.value }))}
+                  placeholder="Uxxxxxxxx..."
+                  className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono outline-none"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busyId === u.id}
+                onClick={() => saveMemberLine(u)}
+                className="w-full py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-800 text-[11px] font-bold disabled:opacity-50"
+              >
+                {busyId === u.id ? 'กำลังบันทึก...' : 'บันทึก LINE UID'}
+              </button>
+            </div>
+            <div className="flex gap-2 mt-3">
               {!u.approved ? (
                 <button
                   type="button"
