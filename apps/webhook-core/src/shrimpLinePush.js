@@ -175,10 +175,9 @@ function lineBillUnpaidHint(paymentType, remainingAmount, total) {
   ].join('\n');
 }
 
-/** ขอบคุณในแชท LINE เมื่อชำระครบ (สด/โอน) — แยกจากภาพบิล */
+/** ขอบคุณในแชท LINE — ตรง BILL_PAID_THANK_YOU_MESSAGE ใน apps/seafood-pos/src/lib/billPaymentDisplay.js */
 const LINE_BILL_PAID_THANK_YOU =
-  'ขอบคุณที่ไว้วางใจและอุดหนุน โกอ้วน คลังซีฟู้ดครับ\n'
-  + 'ยินดีดูแลทุกออเดอร์ — มีอะไรให้ช่วยทักมาได้เลยนะครับ';
+  'ขอบคุณที่ไว้วางใจและอุดหนุน โกอ้วน คลังซีฟู้ด — ยินดีให้บริการท่านเสมอ';
 
 function lineBillPaidThankYouCaption(paymentType, remainingAmount, total) {
   if (!lineBillPaymentNote(paymentType)) return '';
