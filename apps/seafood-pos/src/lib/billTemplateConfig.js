@@ -1,5 +1,7 @@
+const billAssetBase = `${import.meta.env?.BASE_URL || '/'}bill-assets/`;
+
 /** QR LINE OA บนฟอร์มบิลดิจิทัล */
-export const BILL_QR_URL = `${import.meta.env?.BASE_URL || '/'}bill-assets/line-oa-qr.png`;
+export const BILL_QR_URL = `${billAssetBase}line-oa-qr.png`;
 
 /**
  * บัญชีรับโอนเมื่อบิล「ค้างชำระ」— แสดงบนภาพบิลเท่านั้น

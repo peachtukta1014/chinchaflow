@@ -2,24 +2,16 @@ import React from 'react';
 import { BILL_PAID_THANK_YOU_MESSAGE } from '../lib/billPaymentDisplay';
 import { BILL_QR_URL } from '../lib/billTemplateConfig';
 
+/** โลโก้แบรนด์เดียวกับแอป — ใช้แทนไอคอนโน้ตบรรทัดภูเก็ต */
+const BILL_BRAND_LOGO_URL = '/logo.jpg';
+import { FIXED_TEMPLATE_ROWS } from '../lib/billTemplateRows';
+
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
 /** @typedef {{ label?: string; holder: string; bank: string; accountNo: string }} TransferAccount */
 /** @typedef {{ unpaidAmount: number; accounts: TransferAccount[] }} CreditTransferInfo */
-/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; date: string; deliveryDate?: string; address?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; paymentNote?: string; creditTransfer?: CreditTransferInfo | null }} BillData */
+/** @typedef {{ bookNo?: string; billNo?: string; customerName: string; customerPhone?: string; deliveryAddress?: string; address?: string; date: string; deliveryDate?: string; items: BillItem[]; extraLines?: BillItem[]; totalAmount: number; senderName?: string; moneyReceiverName?: string; paymentNote?: string; creditTransfer?: CreditTransferInfo | null }} BillData */
 
-export const FIXED_TEMPLATE_ROWS = [
-  { key: 'shrimp-a', defaultName: 'กุ้งแม่น้ำ A' },
-  { key: 'shrimp-b', defaultName: 'กุ้งแม่น้ำ B' },
-  { key: 'shrimp-c', defaultName: 'กุ้งแม่น้ำ C' },
-  { key: 'empty-1', defaultName: '' },
-  { key: 'dead-shrimp-big', defaultName: 'กุ้งแม่น้ำตาย ใหญ่' },
-  { key: 'dead-shrimp-small', defaultName: 'กุ้งแม่น้ำตาย เล็ก' },
-  { key: 'empty-2', defaultName: '' },
-  { key: 'empty-3', defaultName: '' },
-  { key: 'empty-4', defaultName: '' },
-  { key: 'empty-5', defaultName: '' },
-  { key: 'empty-6', defaultName: '' },
-];
+export { FIXED_TEMPLATE_ROWS };
 
 function formatCellMoney(n) {
   const v = parseFloat(n);
@@ -33,7 +25,16 @@ function formatCellPrice(n) {
   return String(v);
 }
 
-/** ตัวเลขในตาราง — ขยับขึ้นเล็กน้อยให้อ่านชัด (ไม่ชิดขอบล่างเซลล์) */
+/** น้ำหนักในคอลัมน์แรก — มีหน่วย Kg */
+function formatBillQuantityKg(quantity) {
+  const raw = String(quantity ?? '').trim();
+  if (!raw) return '';
+  const v = parseFloat(raw.replace(/,/g, ''));
+  if (!Number.isFinite(v) || v <= 0) return '';
+  const num = v % 1 === 0 ? String(v) : v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  return `${num} Kg`;
+}
+
 function TableNum({ children, align = 'center' }) {
   if (children === '' || children == null) return null;
   const alignCls =
@@ -51,8 +52,8 @@ function TableNum({ children, align = 'center' }) {
 function FieldLine({ label, value, valueClassName = '', variant = 'default' }) {
   const valueCls =
     variant === 'customer'
-      ? 'text-[#2563eb] font-extrabold text-[22px] leading-snug tracking-tight'
-      : 'text-black font-semibold text-sm leading-tight';
+      ? 'text-[#2563eb] font-extrabold text-[22px] leading-snug tracking-tight break-words'
+      : 'text-black font-semibold text-sm leading-snug break-words';
 
   return (
     <div className="flex items-end gap-2 min-w-0">
@@ -68,33 +69,62 @@ function FieldLine({ label, value, valueClassName = '', variant = 'default' }) {
 
 /**
  * @param {BillData} data
+ * @param {string} matchName
  */
-function getRowData(data, defaultName, extraQueue) {
-  if (!defaultName) {
-    const extra = extraQueue.length > 0 ? extraQueue.shift() : null;
-    if (!extra) return { label: '', quantity: '', pricePerUnit: '', amount: '' };
+function findTemplateItem(data, matchName) {
+  return data.items.find((item) => item.name.trim() === matchName.trim());
+}
+
+/**
+ * @param {BillData} data
+ * @param {import('../lib/billTemplateRows').BillTemplateRow} row
+ * @param {BillItem[]} extraQueue
+ */
+function getItemRowData(data, row, extraQueue) {
+  const matched = row.matchName ? findTemplateItem(data, row.matchName) : null;
+  const hasValues =
+    matched &&
+    (matched.quantity || matched.pricePerUnit || matched.amount);
+
+  if (!hasValues) {
     return {
-      label: extra.name,
-      quantity: extra.quantity ?? '',
-      pricePerUnit: formatCellPrice(extra.pricePerUnit),
-      amount: formatCellMoney(extra.amount),
+      label: row.emptyLabel || row.matchName || '',
+      quantity: '',
+      pricePerUnit: '',
+      amount: '',
+      isPlaceholder: Boolean(row.emptyLabel),
+      isFilled: false,
     };
   }
 
-  const matched = data.items.find((item) => item.name.trim() === defaultName.trim());
-  if (!matched) {
-    return { label: defaultName, quantity: '', pricePerUnit: '', amount: '' };
-  }
   return {
-    label: defaultName,
-    quantity: matched.quantity ?? '',
+    label: row.matchName || '',
+    quantity: formatBillQuantityKg(matched.quantity),
     pricePerUnit: formatCellPrice(matched.pricePerUnit),
     amount: formatCellMoney(matched.amount),
+    isPlaceholder: false,
+    isFilled: true,
   };
 }
 
 /**
- * ฟอร์มใบส่งของดิจิทัล — ไม่ใช้ภาพสแกนบิล
+ * @param {BillItem[]} extraQueue
+ */
+function getExtraRowData(extraQueue) {
+  const extra = extraQueue.length > 0 ? extraQueue.shift() : null;
+  if (!extra) {
+    return { label: '', quantity: '', pricePerUnit: '', amount: '', isExtra: false };
+  }
+  return {
+    label: extra.name,
+    quantity: formatBillQuantityKg(extra.quantity),
+    pricePerUnit: formatCellPrice(extra.pricePerUnit),
+    amount: formatCellMoney(extra.amount),
+    isExtra: true,
+  };
+}
+
+/**
  * @param {{ data: BillData }} props
  */
 export default function BillTemplate({ data }) {
@@ -110,18 +140,26 @@ export default function BillTemplate({ data }) {
         <div className="flex items-start gap-3">
           <img
             src="/logo.jpg"
-            alt="โกอ้วน คลังซีฟู้ด"
+            alt="โกอ้วนคลังซีฟู๊ดภูเก็ต"
             className="w-14 h-14 rounded-full object-cover border-2 border-[#1e3a8a] shrink-0"
             crossOrigin="anonymous"
           />
           <div>
-            <h1 className="text-3xl font-extrabold tracking-wide text-[#1a365d] leading-tight">
-              โกอ้วน คลังซีฟู้ด
+            <h1 className="text-2xl font-extrabold tracking-wide text-[#1a365d] leading-tight">
+              โกอ้วนคลังซีฟู๊ดภูเก็ต
             </h1>
             <div className="text-xs mt-1 space-y-0.5 font-medium text-[#1e3a8a]">
               <p>📞 094-6693628 (โกอ้วน)</p>
               <p>📞 094-9408665 (พีช)</p>
-              <p>🎵 โกอ้วน คลังซีฟู้ด ภูเก็ต</p>
+              <p className="flex items-center gap-1.5 leading-snug">
+                <img
+                  src={BILL_BRAND_LOGO_URL}
+                  alt="โกอ้วนคลังซีฟู๊ดภูเก็ต"
+                  className="w-5 h-5 shrink-0 rounded-full object-cover border border-[#1e3a8a]/40"
+                  crossOrigin="anonymous"
+                />
+                <span>โกอ้วนคลังซีฟู๊ด ภูเก็ต · Ko Ao Seafood Phuket</span>
+              </p>
             </div>
           </div>
         </div>
@@ -153,7 +191,7 @@ export default function BillTemplate({ data }) {
         </div>
       </div>
 
-      <p className="text-[11px] text-center font-semibold border-b border-gray-300 pb-2 mb-3 text-[#1e3a8a]">
+      <p className="text-[11px] text-center font-semibold border-b border-gray-300 pb-2 mb-3 text-[#1e3a8a] leading-snug">
         จำหน่าย : ซีฟู้ดของสดของเป็น เน้นกุ้งแม่น้ำธรรมชาติเป็นๆ พร้อมส่ง
       </p>
 
@@ -164,13 +202,14 @@ export default function BillTemplate({ data }) {
       <div className="text-sm space-y-3 mb-4 font-medium">
         <div className="flex w-full gap-4">
           <div className="flex-grow min-w-0">
-            <FieldLine label="นามลูกค้า" value={data.customerName} variant="customer" />
+            <FieldLine label="ชื่อลูกค้า" value={data.customerName} variant="customer" />
           </div>
           <div className="w-[9.5rem] shrink-0">
             <FieldLine label="วันที่ส่ง" value={data.date} valueClassName="whitespace-nowrap" />
           </div>
         </div>
-        <FieldLine label="ที่อยู่" value={data.address} />
+        <FieldLine label="เบอร์โทร" value={data.customerPhone || ''} />
+        <FieldLine label="ที่อยู่จัดส่ง" value={data.deliveryAddress || data.address || ''} />
       </div>
 
       <table className="w-full border-collapse border-2 border-[#1e3a8a] bg-white text-sm shadow-sm">
@@ -184,26 +223,55 @@ export default function BillTemplate({ data }) {
         </thead>
         <tbody>
           {FIXED_TEMPLATE_ROWS.map((row) => {
-            const rowValue = getRowData(data, row.defaultName, extraQueue);
-            const isExtraLine = !row.defaultName && rowValue.label;
+            if (row.kind === 'section') {
+              return (
+                <tr key={row.key} className="align-middle bg-slate-50/80">
+                  <td
+                    colSpan={4}
+                    className="border-b border-[#1e3a8a] text-left px-2 py-1.5 text-[11px] font-bold text-[#1e3a8a] leading-snug whitespace-normal break-words"
+                  >
+                    {row.label}
+                  </td>
+                </tr>
+              );
+            }
+
+            if (row.kind === 'spacer') {
+              return (
+                <tr key={row.key} className="h-2">
+                  <td colSpan={4} className="border-b border-[#1e3a8a]/30 p-0" />
+                </tr>
+              );
+            }
+
+            const rowValue =
+              row.kind === 'extra'
+                ? getExtraRowData(extraQueue)
+                : getItemRowData(data, row, extraQueue);
+
+            const isExtraLine = row.kind === 'extra' && rowValue.isExtra;
+            const labelCls = rowValue.isPlaceholder
+              ? 'text-gray-400 text-xs font-medium italic leading-snug break-words'
+              : isExtraLine
+                ? 'text-[#2563eb] text-base font-bold leading-snug break-words'
+                : rowValue.isFilled
+                  ? 'text-sm font-semibold text-gray-900 leading-snug break-words'
+                  : 'text-sm font-semibold text-gray-800 leading-snug break-words';
+
             return (
-              <tr key={row.key} className="h-9 text-center align-middle">
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-xl font-black bg-slate-50/50 align-middle py-0.5">
+              <tr key={row.key} className="min-h-[2.25rem] text-center align-middle">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle py-0.5 px-0.5">
                   <TableNum>{rowValue.quantity}</TableNum>
                 </td>
                 <td
-                  className={`border-r border-b border-[#1e3a8a] text-left px-3 align-middle ${
-                    isExtraLine
-                      ? 'text-[#2563eb] text-base font-bold'
-                      : 'text-sm font-semibold text-gray-800'
-                  }`}
+                  className={`border-r border-b border-[#1e3a8a] text-left px-2 py-1 align-middle ${labelCls}`}
                 >
                   {rowValue.label}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-xl font-black bg-slate-50/50 align-middle py-0.5">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle py-0.5">
                   <TableNum>{rowValue.pricePerUnit}</TableNum>
                 </td>
-                <td className="border-b border-[#1e3a8a] text-red-600 text-xl font-black align-middle py-0.5 px-2">
+                <td className="border-b border-[#1e3a8a] text-red-600 text-lg font-black align-middle py-0.5 px-2">
                   <TableNum align="right">{rowValue.amount}</TableNum>
                 </td>
               </tr>
@@ -246,7 +314,7 @@ export default function BillTemplate({ data }) {
                 {acc.label && (
                   <p className="text-red-800 font-black text-xs leading-tight">{acc.label}</p>
                 )}
-                <p className="text-red-700 font-bold text-[10px] leading-tight mt-0.5">
+                <p className="text-red-700 font-bold text-[10px] leading-tight mt-0.5 break-words">
                   {acc.holder}
                   {' · '}
                   {acc.bank}
@@ -266,12 +334,14 @@ export default function BillTemplate({ data }) {
           <p className="flex-1 border-b-2 border-dotted border-[#1e3a8a]/50 text-[#1e3a8a] font-extrabold text-lg leading-tight pb-[7px] min-h-[26px] truncate">
             {data.senderName || '\u00a0'}
           </p>
-          <span className="shrink-0 pb-[7px] text-xs font-bold">ผู้บันทึก/ส่งของ</span>
+          <span className="shrink-0 pb-[7px] text-xs font-bold leading-snug">ผู้บันทึก/ส่งของ</span>
         </div>
         <div className="flex items-end flex-1 min-w-0 gap-1.5">
           <span className="shrink-0 pb-[7px] text-xs font-bold">ลงชื่อ</span>
-          <p className="flex-1 border-b border-dotted border-gray-500 min-h-[26px] pb-[7px]" />
-          <span className="shrink-0 pb-[7px] text-xs font-bold">ผู้รับของ</span>
+          <p className="flex-1 border-b-2 border-dotted border-[#1e3a8a]/50 text-[#1e3a8a] font-extrabold text-lg leading-tight pb-[7px] min-h-[26px] truncate break-words">
+            {data.moneyReceiverName || '\u00a0'}
+          </p>
+          <span className="shrink-0 pb-[7px] text-xs font-bold leading-snug">ผู้รับเงิน</span>
         </div>
       </div>
     </div>

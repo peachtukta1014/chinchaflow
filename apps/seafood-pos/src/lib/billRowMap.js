@@ -15,15 +15,15 @@ export function normalizeLineItem(item) {
 }
 
 /**
- * แถวในตารางบิล (นับจากแถวแรกใต้หัวตาราง) — ตรงฟอร์มพิมพ์
- * กุ้งแม่น้ำ A / B / C และกุ้งตายใหญ่ / เล็ก
+ * แถวในตารางบิล (นับจากแถวแรกใต้หัวตาราง) — อ้างอิง billTemplateRows.js
  */
 export const BILL_PRINTED_ROWS = {
-  large: 1,
-  medium: 2,
-  small: 3,
-  dead_large: 5,
-  dead_small: 6,
+  large: 2,
+  medium: 3,
+  small: 4,
+  dead_large: 7,
+  dead_medium: 8,
+  dead_small: 9,
 };
 
 /** แถวที่มีชื่อสินค้าพิมพ์ไว้แล้ว — วาดแค่ จำนวน / หน่วยละ / จำนวนเงิน */
@@ -44,6 +44,7 @@ export function resolveBillRowIndex(item) {
   if (productId === 'dead' || row.type === 'dead') {
     const n = `${row.productName} ${row.note}`.toLowerCase();
     if (/เล็ก|\bsmall\b|\bc\b|,c/.test(n)) return BILL_PRINTED_ROWS.dead_small;
+    if (/กลาง|\bmedium\b|\bb\b|,b/.test(n)) return BILL_PRINTED_ROWS.dead_medium;
     if (/ใหญ่|\blarge\b|\ba\b|,a/.test(n)) return BILL_PRINTED_ROWS.dead_large;
     return BILL_PRINTED_ROWS.dead_large;
   }
@@ -53,6 +54,7 @@ export function resolveBillRowIndex(item) {
   if (/กลาง|,?\s*B\b|กุ้งแม่น้ำ\s*B/i.test(name)) return BILL_PRINTED_ROWS.medium;
   if (/เล็ก|,?\s*C\b|กุ้งแม่น้ำ\s*C/i.test(name)) return BILL_PRINTED_ROWS.small;
   if (/ตาย.*เล็ก/i.test(name)) return BILL_PRINTED_ROWS.dead_small;
+  if (/ตาย.*กลาง/i.test(name)) return BILL_PRINTED_ROWS.dead_medium;
   if (/ตาย.*ใหญ่/i.test(name)) return BILL_PRINTED_ROWS.dead_large;
   if (/ตาย/i.test(name)) return BILL_PRINTED_ROWS.dead_large;
 

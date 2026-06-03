@@ -1,14 +1,9 @@
 import { dateKeyBangkok, formatDateThaiShort } from './date.js';
 import { normalizeLineItem } from './billRowMap.js';
 import { billCreditTransferBlock, lineBillPaymentNote } from './lineBillPaymentNote.js';
+import { TEMPLATE_ROW_NAMES } from './billTemplateRows.js';
 
-export const TEMPLATE_ROW_NAMES = {
-  large: 'กุ้งแม่น้ำ A',
-  medium: 'กุ้งแม่น้ำ B',
-  small: 'กุ้งแม่น้ำ C',
-  dead_large: 'กุ้งแม่น้ำตาย ใหญ่',
-  dead_small: 'กุ้งแม่น้ำตาย เล็ก',
-};
+export { TEMPLATE_ROW_NAMES };
 
 /** แปลงรายการขาย → ชื่อแถวบนฟอร์มใบส่งของ */
 export function resolveTemplateRowName(item) {
@@ -24,6 +19,7 @@ export function resolveTemplateRowName(item) {
   if (productId === 'dead' || row.type === 'dead') {
     const n = `${row.productName} ${row.note}`.toLowerCase();
     if (/เล็ก|small|\bc\b|,c/.test(n)) return TEMPLATE_ROW_NAMES.dead_small;
+    if (/กลาง|medium|\bb\b|,b/.test(n)) return TEMPLATE_ROW_NAMES.dead_medium;
     if (/ใหญ่|large|\ba\b|,a/.test(n)) return TEMPLATE_ROW_NAMES.dead_large;
     return TEMPLATE_ROW_NAMES.dead_large;
   }
@@ -33,6 +29,7 @@ export function resolveTemplateRowName(item) {
   if (/กลาง|,?\s*B\b|กุ้งแม่น้ำ\s*B/i.test(name)) return TEMPLATE_ROW_NAMES.medium;
   if (/เล็ก|,?\s*C\b|กุ้งแม่น้ำ\s*C/i.test(name)) return TEMPLATE_ROW_NAMES.small;
   if (/ตาย.*เล็ก/i.test(name)) return TEMPLATE_ROW_NAMES.dead_small;
+  if (/ตาย.*กลาง/i.test(name)) return TEMPLATE_ROW_NAMES.dead_medium;
   if (/ตาย.*ใหญ่/i.test(name)) return TEMPLATE_ROW_NAMES.dead_large;
   if (/ตาย/i.test(name)) return TEMPLATE_ROW_NAMES.dead_large;
 
@@ -61,7 +58,7 @@ function lineToBillItem(raw) {
   return {
     templateName,
     lineLabel: row.productName || '',
-    quantity: isDead ? '' : (row.weight > 0 ? String(row.weight) : ''),
+    quantity: row.weight > 0 ? String(row.weight) : '',
     pricePerUnit: isDead ? 0 : (row.pricePerKg > 0 ? row.pricePerKg : 0),
     amount: row.total,
   };
@@ -112,19 +109,27 @@ export function saleToBillData(bill, customer = {}) {
     parseFloat(bill.total) ||
     items.map(normalizeLineItem).reduce((s, i) => s + i.total, 0);
 
-  const addressParts = [customer.zone || bill.zone, customer.phone || bill.phone].filter(Boolean);
+  const customerPhone = String(customer.phone || bill.phone || '').trim();
+  const deliveryAddress = String(
+    customer.zone || bill.zone || customer.address || bill.deliveryAddress || '',
+  ).trim();
 
   return {
     bookNo: bill.bookNo || '',
     billNo: bill.billNo || '',
     customerName: bill.customerName || customer.name || '',
+    customerPhone,
+    deliveryAddress,
+    /** @deprecated ใช้ deliveryAddress + customerPhone แทน */
+    address: [deliveryAddress, customerPhone].filter(Boolean).join(' · '),
     /** วันที่บนบิล = วันจัดส่งเท่านั้น (ไม่แสดงวันสั่งซื้อ) */
     date: deliveryKey ? formatDateThaiShort(deliveryKey) : formatDateThaiShort(dateKey),
-    address: addressParts.join(' · '),
     items: Array.from(byTemplate.values()),
     extraLines,
     totalAmount: subtotal,
     senderName: bill.recordedBy || bill.senderName || customer.recordedBy || '',
+    moneyReceiverName:
+      bill.moneyReceiverName || bill.confirmedByName || bill.paymentConfirmedByName || '',
     paymentNote: lineBillPaymentNote(bill.paymentType),
     creditTransfer: billCreditTransferBlock(bill),
     paymentType: bill.paymentType || '',
