@@ -38,6 +38,17 @@
 
 - **GitHub Actions CI** รัน smoke + build กุ้งบนทุก PR — **ไม่จำเป็น**: มี smoke script + `auto-shrip` + deploy บน `main` อยู่แล้ว; PR #127 ปิดโดยไม่ merge.
 
+## เอกสารให้เอเจนต์ (อ่านทุกรอบ)
+
+| เอกสาร | หน้าที่ |
+|--------|---------|
+| `docs/AGENT_HANDBOOK_TH.md` | แผนที่ repo + กฎอัปเดต docs หลังเปลี่ยนโครงสร้าง |
+| `docs/PEACH_WORKING_STYLE_TH.md` | Peach สั่งงานภาษาพูด — พี่เซอทบทวนก่อนลงมือ |
+| `docs/ARCHITECTURE_TH.md` | สถาปัตยกรรม, Firestore, deploy |
+| `docs/PROJECT_STRUCTURE.md` | โฟลเดอร์/ไฟล์สำคัญ |
+
+เมื่อ PR เปลี่ยน collection, โมดูล LINE, หรือ config สำคัญ — แก้ section ที่เกี่ยวในเอกสารด้านบนใน PR เดียวกัน (ไม่ copy ทั้ง repo ลงไฟล์ใหม่)
+
 ## Cursor Cloud specific instructions
 
 ### Product overview

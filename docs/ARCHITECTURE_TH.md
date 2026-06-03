@@ -88,7 +88,8 @@ flowchart TB
 | `config/stock` | ยอดกุ้งเป็น/ตาย (อัปเดตแบบ real-time) |
 | `stockBatches` | ล็อตรับเข้าแบบ FIFO |
 | `customerDebts` | ลูกหนี้จากเครดิต/ผ่อน |
-| `customers`, `productSettings/shrimp` | ลูกค้าและราคาสินค้า |
+| `customers`, `productSettings/shrimp` | ลูกค้าและราคาสินค้า · `lineUserId` (billing) + `lineContacts[]` (billing/order หลาย UID ต่อร้าน) |
+| `config/shrimpLine` | แจ้งเตือนออเดอร์ LINE + ช่วงเวลา「ไม่ระบุวันส่ง」(เริ่ม/สิ้นสุดรอบ ชม.) |
 | `lineOrders` | ออเดอร์จาก LINE (วันส่ง, สถานะ) |
 
 นอกจากนี้มีฐานข้อมูลชื่อ **`chincha`** (กฎใน `firestore-chincha.rules`) สำหรับข้อมูลรูปแบบเก่า — สคริปต์ `tea:db-reset` สามารถล้างฐานนี้ได้เมื่อข้อมูลค้าง
