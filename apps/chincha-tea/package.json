@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chincha/app-credits": "*",
     "firebase": "^10.0.0",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",

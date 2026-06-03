@@ -38,6 +38,7 @@ import { stockLineFull } from './constants/stockLines';
 import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
 import { refreshPendingSummary, syncPendingSales } from './lib/offlineSaleQueue';
 import { syncLineDeliveryWindowFromFirestore } from './lib/syncLineDeliveryWindow';
+import { AppCredits } from '@chincha/app-credits';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -434,7 +435,10 @@ export default function App() {
         />
       )}
 
-      <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
+      <div
+        className={`flex-1 overflow-y-auto ${isMainTab ? 'pb-40' : 'pb-24'}`}
+        style={{ scrollbarWidth: 'none' }}
+      >
         {activeTab === 'pos' && (
           <POSMobile
             user={member}
@@ -541,6 +545,14 @@ export default function App() {
             <ExpensesScreen stockBatches={stockBatches} />
           </Suspense>
         )}
+      </div>
+
+      <div
+        className={`absolute left-0 right-0 z-40 px-2 pointer-events-none ${
+          isMainTab ? 'bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))]' : 'bottom-[env(safe-area-inset-bottom,0px)] pb-2'
+        }`}
+      >
+        <AppCredits theme="shrimp" placement="bar" />
       </div>
 
       {isMainTab && (
