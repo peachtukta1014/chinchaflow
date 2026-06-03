@@ -1,7 +1,41 @@
 import { CUSTOMERS } from '../constants/customers.js';
-import { fsListCollection } from '../lib/firestoreRest';
+import { fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
 import { customerHasLineUserId } from '../lib/lineCustomerContacts';
+
+const SHRIMP_LINE_CONFIG = 'config/shrimpLine';
+
+export function normalizeDismissedLineOaSet(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  return new Set(
+    list.map((u) => normalizeLineUserId(u)).filter((u) => isValidLineUserId(u)),
+  );
+}
+
+export async function fetchDismissedLineOaUids() {
+  try {
+    const doc = await fsGetDoc(SHRIMP_LINE_CONFIG);
+    return normalizeDismissedLineOaSet(doc?.dismissedLineOaUids);
+  } catch {
+    return new Set();
+  }
+}
+
+/** ซ่อน UID จากแท็บ「LINE รอผูก」(ทดสอบ / ไม่ใช่ร้านจริง) — เก็บใน config/shrimpLine */
+export async function dismissLineOaPendingUid(lineUserId) {
+  const uid = normalizeLineUserId(lineUserId);
+  if (!isValidLineUserId(uid)) throw new Error('LINE UID ไม่ถูกต้อง');
+
+  const doc = (await fsGetDoc(SHRIMP_LINE_CONFIG)) || {};
+  const prev = normalizeDismissedLineOaSet(doc.dismissedLineOaUids);
+  prev.add(uid);
+
+  await fsSetDoc(SHRIMP_LINE_CONFIG, {
+    dismissedLineOaUids: [...prev],
+    updatedAt: new Date().toISOString(),
+  });
+  return prev;
+}
 import { customerMatchesLabel } from '../lib/customerAliases';
 import { compactNameMatch } from '../lib/customerNameMatch';
 
@@ -109,13 +143,17 @@ export function findCustomerByExactName(allCustomers, name) {
 }
 
 /** แยกราย LINE OA ตามว่าผูกรายชื่อหลักแล้วหรือยัง */
-export function partitionLineOaContacts(contacts, allCustomers) {
+export function partitionLineOaContacts(contacts, allCustomers, dismissedUids = null) {
+  const dismissed = dismissedUids instanceof Set
+    ? dismissedUids
+    : normalizeDismissedLineOaSet(dismissedUids);
+
   const pending = [];
   const linked = [];
   for (const contact of contacts) {
     const match = findCustomerByLineUserId(allCustomers, contact.lineUserId);
     if (match) linked.push({ contact, customer: match });
-    else pending.push(contact);
+    else if (!dismissed.has(contact.lineUserId)) pending.push(contact);
   }
   return { pending, linked };
 }

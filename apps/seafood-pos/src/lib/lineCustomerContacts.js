@@ -121,6 +121,17 @@ export function appendLineContact(contacts, uid, role = LINE_CONTACT_ROLE_ORDER)
   return [...merged, { uid: u, role, label: '' }];
 }
 
+/** ผูกจากแท็บ LINE รอผูก — auto = มีเจ้าของแล้ว → order, ไม่มี → billing */
+export function resolveLineOaLinkRole(existingBilling, lineUserId, requestedRole = 'auto') {
+  const uid = normalizeLineUserId(lineUserId);
+  if (requestedRole === LINE_CONTACT_ROLE_BILLING || requestedRole === LINE_CONTACT_ROLE_ORDER) {
+    return requestedRole;
+  }
+  const billing = normalizeLineUserId(existingBilling);
+  if (billing && billing !== uid) return LINE_CONTACT_ROLE_ORDER;
+  return LINE_CONTACT_ROLE_BILLING;
+}
+
 export function formatLineContactsSummary(customer) {
   const contacts = normalizeLineContacts(customer);
   if (!contacts.length) return '';
