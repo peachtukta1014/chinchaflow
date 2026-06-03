@@ -21,7 +21,7 @@ export async function saveTeaOrder({
     createdAt: new Date().toISOString(),
   });
   try {
-    await ensurePrimaryStaffPresentOnSale({ dateKey, member });
+    await ensurePrimaryStaffPresentOnSale({ dateKey });
   } catch (e) {
     console.warn('ensurePrimaryStaffPresentOnSale failed', e);
   }

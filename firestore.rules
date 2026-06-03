@@ -109,7 +109,7 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ลงเวรพนักงานรายวัน — แอดมินบันทึก · พนักงาน/แอดมินติ๊กอัตโนมัติจากยอดขายได้
+    // ลงเวรพนักงานรายวัน — แอดมินติ๊กมือ · ติ๊กอัตโนมัติจากยอดขาย (markedSource sale) เท่านั้น — พนักงานติ๊กมือไม่ได้
     match /dailyStaffAttendance/{docId} {
       allow read: if isApproved();
       allow create, update: if isApproved()

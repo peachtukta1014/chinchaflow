@@ -79,7 +79,13 @@ export async function setStaffPresent({
   markedBy,
   markedByUid,
   markedSource,
+  actingMember,
 }) {
+  const autoFromSale = markedSource === 'sale';
+  if (!autoFromSale && actingMember?.role !== 'admin') {
+    throw new Error('attendanceAdminOnly');
+  }
+
   const docId = attendanceDocId(dateKey, staffUid);
   if (!present) {
     await fsDelete(`dailyStaffAttendance/${docId}`);
@@ -103,10 +109,7 @@ export async function setStaffPresent({
 }
 
 /** บันทึกเวรพนักงานหลักอัตโนมัติเมื่อมีการขายวันนั้น (ครั้งแรกของวัน) */
-export async function ensurePrimaryStaffPresentOnSale({
-  dateKey,
-  member,
-}) {
+export async function ensurePrimaryStaffPresentOnSale({ dateKey }) {
   if (!dateKey) return { ok: false, reason: 'no_date' };
   const { staff } = await getPrimaryAttendanceStaff();
   if (!staff?.id) return { ok: false, reason: 'no_staff' };
@@ -116,14 +119,13 @@ export async function ensurePrimaryStaffPresentOnSale({
     return { ok: true, skipped: true, reason: 'already_present' };
   }
 
-  const markedByName = member?.name || member?.email || 'ระบบ';
   await setStaffPresent({
     dateKey,
     staffUid: staff.id,
     staffName: staff.name || PRIMARY_STAFF.displayName,
     present: true,
-    markedBy: markedByName,
-    markedByUid: member?.uid || member?.id || '',
+    markedBy: 'ระบบ (ยอดขายแรกของวัน)',
+    markedByUid: '',
     markedSource: 'sale',
   });
   return { ok: true, skipped: false };

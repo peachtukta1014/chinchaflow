@@ -86,7 +86,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
   }, [refresh]);
 
   const toggleDay = async (checked) => {
-    if (!staff) return;
+    if (!staff || member?.role !== 'admin') return;
     setBusy(true);
     setFlash('');
     try {
@@ -97,6 +97,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
         present: checked,
         markedBy: member?.name || member?.email,
         markedByUid: member?.uid || member?.id,
+        actingMember: member,
       });
       await refresh({ force: true });
       setFlash(checked ? t('staffAttendanceSaved') : t('staffAttendanceRemoved'));
@@ -141,6 +142,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
             {formatBiweeklyPeriodLabel(period, lang)}
           </p>
           <p className="text-[10px] text-stone-400">{t('payrollPeriodHint')}</p>
+          <p className="text-[10px] text-violet-600/80 mt-0.5">{t('payrollAdminOnlyHint')}</p>
         </div>
         <button
           type="button"
