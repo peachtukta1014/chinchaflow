@@ -846,10 +846,9 @@ try {
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');
-for (const f of ['line-oa-qr.png', 'shrimp-sticker.svg']) {
+for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
-  const minSize = f.endsWith('.svg') ? 100 : 1000;
-  if (fs.existsSync(p) && fs.statSync(p).size > minSize) ok(`asset ${f}`);
+  if (fs.existsSync(p) && fs.statSync(p).size > 1000) ok(`asset ${f}`);
   else fail(`asset ${f}`, new Error('missing or too small'));
 }
 console.log(failed ? `\nFAILED: ${failed}\n` : '\nAll smoke tests passed.\n');

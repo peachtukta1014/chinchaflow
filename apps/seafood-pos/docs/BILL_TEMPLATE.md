@@ -13,7 +13,7 @@
 
 - `src/components/BillTemplate.jsx` — หน้าตาบิล
 - `src/lib/billTemplateRows.js` — แถวคงที่ + ชื่อแมป
-- `public/bill-assets/shrimp-sticker.svg` — สติกเกอร์กุ้งหัวบิล
+- `/logo.jpg` — โลโก้แบรนด์ (หัวบิล + แทนไอคอนโน้ตบรรทัดภูเก็ต)
 - `src/lib/billDataFromSale.js` — แปลงบิลจาก POS → ข้อมูลฟอร์ม
 - `src/lib/generateBillImage.js` — render + ส่งออก JPEG
 - `public/bill-assets/line-oa-qr.png` — QR LINE

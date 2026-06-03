@@ -1,6 +1,9 @@
 import React from 'react';
 import { BILL_PAID_THANK_YOU_MESSAGE } from '../lib/billPaymentDisplay';
-import { BILL_QR_URL, BILL_SHRIMP_STICKER_URL } from '../lib/billTemplateConfig';
+import { BILL_QR_URL } from '../lib/billTemplateConfig';
+
+/** โลโก้แบรนด์เดียวกับแอป — ใช้แทนไอคอนโน้ตบรรทัดภูเก็ต */
+const BILL_BRAND_LOGO_URL = '/logo.jpg';
 import { FIXED_TEMPLATE_ROWS } from '../lib/billTemplateRows';
 
 /** @typedef {{ name: string; quantity: string; pricePerUnit: number; amount: number }} BillItem */
@@ -150,9 +153,9 @@ export default function BillTemplate({ data }) {
               <p>📞 094-9408665 (พีช)</p>
               <p className="flex items-center gap-1.5 leading-snug">
                 <img
-                  src={BILL_SHRIMP_STICKER_URL}
-                  alt=""
-                  className="w-4 h-4 shrink-0 object-contain"
+                  src={BILL_BRAND_LOGO_URL}
+                  alt="โกอ้วนคลังซีฟู๊ดภูเก็ต"
+                  className="w-5 h-5 shrink-0 rounded-full object-cover border border-[#1e3a8a]/40"
                   crossOrigin="anonymous"
                 />
                 <span>โกอ้วนคลังซีฟู๊ด ภูเก็ต · Ko Ao Seafood Phuket</span>
