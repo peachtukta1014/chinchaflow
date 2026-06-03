@@ -1,6 +1,7 @@
 import { CUSTOMERS } from '../constants/customers.js';
 import { fsListCollection } from '../lib/firestoreRest';
 import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
+import { customerHasLineUserId } from '../lib/lineCustomerContacts';
 import { customerMatchesLabel } from '../lib/customerAliases';
 import { compactNameMatch } from '../lib/customerNameMatch';
 
@@ -98,7 +99,7 @@ export async function findLineUserIdForCustomerName(name, { directOnly = true } 
 export function findCustomerByLineUserId(allCustomers, lineUserId) {
   const uid = normalizeLineUserId(lineUserId);
   if (!uid) return null;
-  return allCustomers.find((c) => normalizeLineUserId(c.lineUserId) === uid) || null;
+  return allCustomers.find((c) => customerHasLineUserId(c, uid)) || null;
 }
 
 export function findCustomerByExactName(allCustomers, name) {

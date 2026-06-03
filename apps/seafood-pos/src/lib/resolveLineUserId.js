@@ -9,6 +9,7 @@ import {
   suggestCustomersForLineName,
 } from './lineCustomerResolve';
 import { normalizeLineUserId, isValidLineUserId } from './lineUserId';
+import { getBillingLineUserId } from './lineCustomerContacts.js';
 import { pickLineUidForBillPush } from './resolveLineUserIdPick';
 
 function isMarketGeneralDisplayName(name) {
@@ -19,7 +20,7 @@ function isMarketGeneralDisplayName(name) {
 
 /** UID ที่ฝังในบิล/พร็อพที่ส่งเข้ามา (อาจเก่ากว่ารายชื่อลูกค้า) */
 export function lineUidFromBillProps(customer, bill) {
-  const fromCustomer = normalizeLineUserId(customer?.lineUserId);
+  const fromCustomer = getBillingLineUserId(customer);
   if (isValidLineUserId(fromCustomer)) return fromCustomer;
   const fromBill = normalizeLineUserId(bill?.customerLineUserId);
   if (isValidLineUserId(fromBill)) return fromBill;
@@ -48,17 +49,18 @@ function findUidInCustomerList(allCustomers, name) {
 
   const suggestions = suggestCustomersForLineName(name, allCustomers);
   if (suggestions.length === 1) {
-    const uid = normalizeLineUserId(suggestions[0].customer?.lineUserId);
+    const uid = getBillingLineUserId(suggestions[0].customer);
     if (isValidLineUserId(uid)) return uid;
   }
   if (suggestions.length > 0 && suggestions[0].score >= 3) {
-    const uid = normalizeLineUserId(suggestions[0].customer?.lineUserId);
+    const uid = getBillingLineUserId(suggestions[0].customer);
     if (isValidLineUserId(uid)) return uid;
   }
 
   const hits = [];
   for (const c of allCustomers) {
-    if (!c?.id || c.id === 'general' || !isValidLineUserId(c.lineUserId)) continue;
+    const billingUid = getBillingLineUserId(c);
+    if (!c?.id || c.id === 'general' || !isValidLineUserId(billingUid)) continue;
     for (const label of collectCustomerSearchNames(c)) {
       if (uidCustomerNameMatch(label, n)) {
         hits.push(c);
@@ -66,7 +68,7 @@ function findUidInCustomerList(allCustomers, name) {
       }
     }
   }
-  if (hits.length === 1) return normalizeLineUserId(hits[0].lineUserId);
+  if (hits.length === 1) return getBillingLineUserId(hits[0]);
   return '';
 }
 
@@ -134,11 +136,11 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
 
   const profileRow = resolveCustomerProfileForBill(customer, bill, allCustomers);
   const generalRow = allCustomers.find((c) => c.id === 'general');
-  const generalUid = normalizeLineUserId(generalRow?.lineUserId);
+  const generalUid = getBillingLineUserId(generalRow);
   const billIsNamedShop = Boolean(name && !isMarketGeneralDisplayName(name));
   const billUsesGeneralBucket = (bill?.customerId || customer?.id) === 'general';
 
-  let profileUid = normalizeLineUserId(profileRow?.lineUserId);
+  let profileUid = getBillingLineUserId(profileRow);
   let profileName = profileRow?.name || '';
 
   if (profileRow?.id === 'general' && billIsNamedShop) {
@@ -191,9 +193,7 @@ export async function resolveLineUserIdDetails(customer, bill, options = {}) {
   });
 
   if (!profileName && picked.profileUid) {
-    const row = allCustomers.find(
-      (c) => normalizeLineUserId(c.lineUserId) === picked.profileUid,
-    );
+    const row = allCustomers.find((c) => getBillingLineUserId(c) === picked.profileUid);
     profileName = row?.name || '';
   }
 

@@ -14,6 +14,8 @@ import {
 import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import LineOaCustomersPanel from '../components/LineOaCustomersPanel';
 import { customerToFormFields, formatAliasesForEdit } from '../lib/customerAliases';
+import { formatLineContactsSummary } from '../lib/lineCustomerContacts';
+import LineUidFields from '../components/LineUidFields';
 
 const RIVER_DEFAULT_OPTIONS = [
   { value: '', label: 'กุ้งแม่น้ำ — ถามขนาดทุกครั้ง' },
@@ -29,6 +31,7 @@ const EMPTY_CUSTOMER_FORM = {
   zone: '',
   phone: '',
   lineUserId: '',
+  lineOrderUserIds: '',
 };
 
 function RiverDefaultSelect({ value, onChange }) {
@@ -268,20 +271,15 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
               type="tel"
               className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm outline-none"
             />
-            <input
-              value={newCus.lineUserId}
-              onChange={(e) => setNewCus((p) => ({ ...p, lineUserId: e.target.value }))}
-              placeholder="LINE User ID (U...)"
-              className="w-full bg-white border border-green-200 rounded-xl px-3 py-2.5 text-sm font-mono outline-none"
+            <LineUidFields
+              lineUserId={newCus.lineUserId}
+              lineOrderUserIds={newCus.lineOrderUserIds}
+              onLineUserId={(v) => setNewCus((p) => ({ ...p, lineUserId: v }))}
+              onLineOrderUserIds={(v) => setNewCus((p) => ({ ...p, lineOrderUserIds: v }))}
+              suggestBusy={suggestBusy === 'add'}
+              nameFilled={Boolean(newCus.name.trim())}
+              onSuggest={() => fillLineFromOrders('add', setNewCus, newCus, newCus.lineUserId)}
             />
-            <button
-              type="button"
-              disabled={suggestBusy === 'add' || !newCus.name.trim()}
-              onClick={() => fillLineFromOrders('add', setNewCus, newCus, newCus.lineUserId)}
-              className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
-            >
-              {suggestBusy === 'add' ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
-            </button>
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
@@ -347,20 +345,15 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
                       type="tel"
                       className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"
                     />
-                    <input
-                      value={cusEditData.lineUserId}
-                      onChange={(e) => setCusEditData((p) => ({ ...p, lineUserId: e.target.value }))}
-                      placeholder="LINE User ID (U...)"
-                      className="w-full border border-green-200 rounded-xl px-3 py-2.5 text-sm font-mono outline-none"
+                    <LineUidFields
+                      lineUserId={cusEditData.lineUserId}
+                      lineOrderUserIds={cusEditData.lineOrderUserIds}
+                      onLineUserId={(v) => setCusEditData((p) => ({ ...p, lineUserId: v }))}
+                      onLineOrderUserIds={(v) => setCusEditData((p) => ({ ...p, lineOrderUserIds: v }))}
+                      suggestBusy={suggestBusy === c.id}
+                      nameFilled={Boolean(cusEditData.name.trim())}
+                      onSuggest={() => fillLineFromOrders(c.id, setCusEditData, cusEditData, cusEditData.lineUserId)}
                     />
-                    <button
-                      type="button"
-                      disabled={suggestBusy === c.id || !cusEditData.name.trim()}
-                      onClick={() => fillLineFromOrders(c.id, setCusEditData, cusEditData, cusEditData.lineUserId)}
-                      className="w-full text-xs font-bold text-green-700 border border-green-300 py-2.5 rounded-xl disabled:opacity-40"
-                    >
-                      {suggestBusy === c.id ? 'กำลังค้นหา...' : 'ดึง LINE ID จากออเดอร์ล่าสุด'}
-                    </button>
                     <div className="flex gap-2 flex-wrap">
                       <button
                         type="button"
@@ -430,15 +423,9 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
                           <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{c.zone}</span>
                         )}
                         {c.phone && <span className="text-[10px] text-slate-400">{c.phone}</span>}
-                        {c.lineUserId && (
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                              isValidLineUserId(c.lineUserId)
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-amber-100 text-amber-700'
-                            }`}
-                          >
-                            LINE …{c.lineUserId.slice(-6)}
+                        {formatLineContactsSummary(c) && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-green-100 text-green-700">
+                            {formatLineContactsSummary(c)}
                           </span>
                         )}
                       </div>

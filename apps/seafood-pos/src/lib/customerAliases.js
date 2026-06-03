@@ -1,4 +1,5 @@
 import { canonicalCustomerNameKey, exactCustomerNameMatch, uidCustomerNameMatch } from './customerNameMatch.js';
+import { formatOrderLineUserIdsForEdit } from './lineCustomerContacts.js';
 
 const ALIAS_SPLIT_RE = /[,，、]/;
 
@@ -85,6 +86,7 @@ export function customerToFormFields(customer) {
     zone: customer?.zone || '',
     phone: customer?.phone || '',
     lineUserId: customer?.lineUserId || '',
+    lineOrderUserIds: formatOrderLineUserIdsForEdit(customer),
   };
 }
 
