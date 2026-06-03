@@ -36,7 +36,8 @@ Peach มักไม่ใช้ศัพท์ dev — อ่าน `docs/PEAC
 ## โครงสร้าง repo ให้เอเจนต์รอบถัดไป
 
 - จุดเริ่ม: `docs/AGENT_HANDBOOK_TH.md` + `docs/ARCHITECTURE_TH.md` + `docs/PROJECT_STRUCTURE.md`
-- หลังเปลี่ยนโครงสร้าง/collection/พฤติกรรม LINE — **อัปเดตเอกสารใน PR เดียวกัน** (ดูตารางใน handbook) ไม่สร้าง snapshot ไฟล์ใหม่ซ้ำ
+- **มีปัญหา/บั๊ก:** อ่าน `docs/AGENT_CHANGELOG_TH.md` ก่อน — เริ่มจากจุดที่รอบก่อนแก้
+- หลัง merge งานที่เปลี่ยนพฤติกรรม — **เพิ่ม entry** ใน `AGENT_CHANGELOG_TH.md` + อัปเดต ARCHITECTURE/handbook ตามความจำเป็น (PR เดียวกัน)
 
 ## ขอบเขตงาน
 

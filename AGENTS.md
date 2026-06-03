@@ -44,6 +44,7 @@
 |--------|---------|
 | `docs/AGENT_HANDBOOK_TH.md` | แผนที่ repo + กฎอัปเดต docs หลังเปลี่ยนโครงสร้าง |
 | `docs/PEACH_WORKING_STYLE_TH.md` | Peach สั่งงานภาษาพูด — พี่เซอทบทวนก่อนลงมือ |
+| `docs/AGENT_CHANGELOG_TH.md` | รอบก่อนแก้อะไร — **อ่านก่อนไล่บั๊ก** · เพิ่มหลัง merge |
 | `docs/ARCHITECTURE_TH.md` | สถาปัตยกรรม, Firestore, deploy |
 | `docs/PROJECT_STRUCTURE.md` | โฟลเดอร์/ไฟล์สำคัญ |
 
