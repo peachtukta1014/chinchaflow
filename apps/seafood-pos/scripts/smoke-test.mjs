@@ -252,10 +252,14 @@ try {
   const { normalizeLineUserId, isValidLineUserId } = await import('../src/lib/lineUserId.js');
   const uidA = 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
   const uidB = 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';
-  const dismissed = new Set([uidA].map(normalizeLineUserId).filter(isValidLineUserId));
-  const contacts = [{ lineUserId: uidA }, { lineUserId: uidB }];
-  const pending = contacts.filter((c) => !dismissed.has(c.lineUserId));
-  assert(pending.length === 1 && pending[0].lineUserId === uidB, 'ซ่อน UID จากรอผูก');
+  const uidC = 'Uccccccccccccccccccccccccccccccc3';
+  const skip = new Set([
+    ...[uidA].map(normalizeLineUserId).filter(isValidLineUserId),
+    uidC,
+  ]);
+  const contacts = [{ lineUserId: uidA }, { lineUserId: uidB }, { lineUserId: uidC }];
+  const pending = contacts.filter((c) => !skip.has(c.lineUserId));
+  assert(pending.length === 1 && pending[0].lineUserId === uidB, 'ซ่อน UID จากรอผูก + สมาชิกแอป');
 } catch (e) {
   fail('lineOaDismissed', e);
 }

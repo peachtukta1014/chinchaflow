@@ -1,5 +1,6 @@
 const { groupItemsByCustomer } = require('./parseLineOrder');
 const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
+const { isStaffLineUserId } = require('./shrimpStaffLineUids');
 const {
   applySyncedCustomerNameToItems,
   resolveLineOrderCustomerName,
@@ -81,7 +82,10 @@ async function saveLineOrders(db, admin, {
   }
   if (autoLinkLineUid && !groupId && userId) {
     try {
-      await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
+      const staffUid = await isStaffLineUserId(db, userId);
+      if (!staffUid) {
+        await linkLineUserToCustomers(db, admin, { lineUserId: userId, customerNames: names });
+      }
     } catch (err) {
       console.warn('linkLineUserToCustomers', err.message);
     }

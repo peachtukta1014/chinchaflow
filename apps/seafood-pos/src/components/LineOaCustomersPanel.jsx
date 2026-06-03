@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { EyeOff, Link2, RefreshCw, UserPlus } from 'lucide-react';
+import { EyeOff, Link2, RefreshCw, UserPlus, UserRound } from 'lucide-react';
+import { getShrimpRoleLabel } from '../lib/shrimpRoles';
 import { getBillingLineUserId } from '../lib/lineCustomerContacts';
 import {
   createCustomerVerified,
@@ -17,23 +18,31 @@ import {
   partitionLineOaContacts,
   suggestMainCatalogLinks,
 } from '../services/lineOaCustomerService';
+import {
+  assignPendingLineUidToMember,
+  fetchShrimpMembersForLineAssign,
+  fetchStaffLineUserIdSet,
+  mergeSkipLineOaUidSets,
+} from '../services/shrimpMemberLineService';
 import { isValidLineUserId } from '../lib/lineUserId';
 
 export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }) {
   const [fsCustomers, setFsCustomers] = useState({});
   const [contacts, setContacts] = useState([]);
-  const [dismissedUids, setDismissedUids] = useState(() => new Set());
+  const [skipUids, setSkipUids] = useState(() => new Set());
+  const [appMembers, setAppMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyUid, setBusyUid] = useState(null);
   const [linkPick, setLinkPick] = useState(null);
   const [linkConfirm, setLinkConfirm] = useState(null);
+  const [staffAssign, setStaffAssign] = useState(null);
   const [view, setView] = useState('pending');
 
   const allCustomers = mergeCustomerLists(fsCustomers);
   const mainCatalog = useMemo(() => getMainCatalogCustomers(fsCustomers), [fsCustomers]);
   const { pending, linked } = useMemo(
-    () => partitionLineOaContacts(contacts, allCustomers, dismissedUids),
-    [contacts, allCustomers, dismissedUids],
+    () => partitionLineOaContacts(contacts, allCustomers, skipUids),
+    [contacts, allCustomers, skipUids],
   );
 
   useEffect(() => {
@@ -49,13 +58,16 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [rows, dismissed] = await Promise.all([
+      const [rows, dismissed, staffUids, members] = await Promise.all([
         fetchLineOaContacts(),
         fetchDismissedLineOaUids(),
+        fetchStaffLineUserIdSet(),
+        fetchShrimpMembersForLineAssign(),
         refreshCustomers(),
       ]);
       setContacts(rows);
-      setDismissedUids(dismissed);
+      setSkipUids(mergeSkipLineOaUidSets(dismissed, staffUids));
+      setAppMembers(members);
     } catch (e) {
       console.error(e);
       showFlash?.('❌ โหลดรายชื่อ LINE ไม่สำเร็จ');
@@ -114,6 +126,28 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     }
   };
 
+  const assignToAppMember = async (contact, memberId) => {
+    if (!memberId) return;
+    const member = appMembers.find((m) => m.id === memberId);
+    setBusyUid(contact.lineUserId);
+    try {
+      const { staffSet } = await assignPendingLineUidToMember(memberId, contact.lineUserId);
+      const dismissed = await fetchDismissedLineOaUids();
+      setSkipUids(mergeSkipLineOaUidSets(dismissed, staffSet));
+      setAppMembers((prev) => prev.map((m) => (
+        m.id === memberId ? { ...m, lineUserId: contact.lineUserId } : m
+      )));
+      showFlash?.(`✅ บันทึก LINE UID ให้ ${member?.name || 'สมาชิก'} แล้ว — ไม่ขึ้นรอผูก`);
+      setStaffAssign(null);
+      setLinkPick(null);
+      setLinkConfirm(null);
+    } catch (e) {
+      showFlash?.('❌ ' + (e?.message || 'บันทึกไม่สำเร็จ'));
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
   const dismissContact = async (contact) => {
     if (!window.confirm(
       'ซ่อนรายการนี้จาก「รอผูก」?\n\nใช้กับการทดสอบบอท / UID ที่ไม่ใช่ร้านจริง\n(ออเดอร์ LINE ยังอยู่ในระบบ)',
@@ -121,7 +155,7 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     setBusyUid(contact.lineUserId);
     try {
       const next = await dismissLineOaPendingUid(contact.lineUserId);
-      setDismissedUids(next);
+      setSkipUids(mergeSkipLineOaUidSets(next, await fetchStaffLineUserIdSet()));
       showFlash?.('✅ ซ่อนรายการแล้ว');
       setLinkPick(null);
       setLinkConfirm(null);
@@ -209,6 +243,7 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     const busy = busyUid === contact.lineUserId;
     const picking = linkPick === contact.lineUserId;
     const confirming = linkConfirm?.contact?.lineUserId === contact.lineUserId;
+    const assigningStaff = staffAssign === contact.lineUserId;
     const suggestions = suggestMainCatalogLinks(contact, fsCustomers);
 
     return (
@@ -242,7 +277,39 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
           linkConfirm.customerName,
         )}
 
-        {suggestions.length > 0 && !picking && !confirming && (
+        {assigningStaff && (
+          <div className="mt-3 space-y-2 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+            <p className="text-[10px] font-bold text-violet-900">
+              เลือกสมาชิกแอป (ทดสอบบอท / ครอบครัว)
+            </p>
+            <select
+              className="w-full border border-violet-200 rounded-xl px-3 py-2 text-sm font-bold bg-white"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) assignToAppMember(contact, e.target.value);
+              }}
+            >
+              <option value="">— เลือกชื่อในแอป —</option>
+              {appMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name || m.email || m.id}
+                  {m.lineUserId ? ` · มี UID แล้ว` : ''}
+                  {' · '}
+                  {getShrimpRoleLabel(m.role, m.email)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setStaffAssign(null)}
+              className="w-full text-xs text-slate-400 py-1"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        )}
+
+        {suggestions.length > 0 && !picking && !confirming && !assigningStaff && (
           <div className="mt-2 space-y-1">
             <p className="text-[10px] text-slate-500 font-bold">อาจเป็นร้านในระบบ:</p>
             {suggestions.slice(0, 3).map((c) => (
@@ -260,7 +327,7 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
           </div>
         )}
 
-        {!picking && !confirming && (
+        {!picking && !confirming && !assigningStaff && (
           <div className="flex gap-2 mt-3">
             <button
               type="button"
@@ -283,19 +350,34 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
           </div>
         )}
 
-        {!confirming && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => dismissContact(contact)}
-            className="w-full mt-2 py-2 rounded-xl border border-slate-200 text-slate-500 text-[11px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
-          >
-            <EyeOff size={13} />
-            ซ่อนรายการนี้ (ทดสอบ / ไม่ใช่ร้าน)
-          </button>
+        {!confirming && !assigningStaff && (
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setStaffAssign(contact.lineUserId);
+                setLinkPick(null);
+                setLinkConfirm(null);
+              }}
+              className="flex-1 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-800 text-[11px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              <UserRound size={13} />
+              สมาชิกแอป
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => dismissContact(contact)}
+              className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-500 text-[11px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              <EyeOff size={13} />
+              ซ่อนรายการ
+            </button>
+          </div>
         )}
 
-        {picking && !confirming && (
+        {picking && !confirming && !assigningStaff && (
           <div className="mt-3 space-y-2">
             <p className="text-[10px] text-slate-500 font-bold">
               เลือกจากรายชื่อหลัก ({mainCatalog.length} ร้าน)
@@ -360,7 +442,7 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
         <p className="text-xs text-[#047857] leading-relaxed font-medium">
           แท็บนี้เฉพาะคนทัก <strong>LINE OA ตรงๆ</strong> ที่ยังไม่ผูกร้าน
           · ร้านเดิมกด「ผูกลูกค้าเดิม」 — มีเจ้าของแล้วจะถามว่าเป็นคนสั่งหรือเจ้าของใหม่
-          · ทดสอบบอทกด「ซ่อนรายการนี้」
+          · ทดสอบบอท →「สมาชิกแอป」เลือกชื่อน้อง/พี่ · หรือ「ซ่อนรายการ」
         </p>
       </div>
 
