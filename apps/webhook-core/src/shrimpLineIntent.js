@@ -15,6 +15,7 @@ const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummar
 /** หลังข้อความช่วยเหลือภาษาไทย — ลูกค้าขอเมนูภาษาอังกฤษ */
 const SHRIMP_HELP_EN_CMD = /^(2|en|english|eng)(\s|$)/i;
 const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
+const { isLinkCustomerCommand } = require('./shrimpLineCustomerLink');
 
 const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order|ပယ်ဖျက်)(\s|$)/i;
 
@@ -41,6 +42,7 @@ function isShrimpSessionContinuation(session) {
   if (!session) return false;
   if (session.pending) return true;
   if (session.profileCollect && session.orderDraft) return true;
+  if (session.customerLink?.step) return true;
   return false;
 }
 
@@ -100,6 +102,9 @@ function classifyShrimpLineMessage(text, session) {
 
   if (SHRIMP_HELP_CMD.test(raw)) return 'help';
   if (isShrimpCancelCommand(raw)) return 'cancel_order';
+
+  if (session?.customerLink?.step === 'shop_name') return 'link_customer';
+  if (isLinkCustomerCommand(raw)) return 'link_customer';
 
   if (isShrimpSessionContinuation(session)) return 'order';
 

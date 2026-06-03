@@ -353,6 +353,14 @@ export async function fsQueryStockBatches() {
   return sortStockBatchesDesc(rows);
 }
 
+/** ข้อความจาก LINE webhook — ใช้ดึง Group / User ID ล่าสุด */
+export async function fsQueryLineMessages(limit = 80) {
+  const docs = await fsListCollection('line_messages', Math.min(limit * 2, 200));
+  return docs
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, limit);
+}
+
 export async function fsListCollection(col, pageSize = 200) {
   const allDocs = [];
   let pageToken = null;

@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { fsGetDoc, fsSetDoc } from '../lib/firestoreRest';
+import { fsGetDoc, fsQueryLineMessages, fsSetDoc } from '../lib/firestoreRest';
+import {
+  mergeNotifyUserIds,
+  pickLatestLineIds,
+} from '../lib/lineIds';
 import {
   formatLineDeliveryWindowLabel,
   LINE_DELIVERY_WINDOW_DEFAULTS,
@@ -19,6 +23,7 @@ export default function ShrimpLineNotifySettings() {
   const [form, setForm] = useState({ ...DEFAULT });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fetchBusy, setFetchBusy] = useState(null);
   const [flash, setFlash] = useState('');
 
   useEffect(() => {
@@ -36,6 +41,35 @@ export default function ShrimpLineNotifySettings() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const fetchLineIds = async (kind) => {
+    setFetchBusy(kind);
+    try {
+      const messages = await fsQueryLineMessages(80);
+      const { groupId, userId } = pickLatestLineIds(messages);
+      if (kind === 'group') {
+        if (!groupId) {
+          setFlash('⚠️ ยังไม่เจอ Group ID — ให้มีคนพิมพ์ในกลุ่มที่มีบอทกุ้งก่อน');
+          return;
+        }
+        setForm((p) => ({ ...p, notifyGroupId: groupId }));
+        setFlash('✅ ดึง Group ID แล้ว');
+      } else {
+        if (!userId) {
+          setFlash('⚠️ ยังไม่เจอ User ID — ทักบอท OA ตรงๆ หรือพิมพ์ในกลุ่มก่อน');
+          return;
+        }
+        setForm((p) => ({ ...p, notifyUserIds: mergeNotifyUserIds(p.notifyUserIds, userId) }));
+        setFlash('✅ ดึง User ID แล้ว');
+      }
+      setTimeout(() => setFlash(''), 2500);
+    } catch (e) {
+      console.error(e);
+      setFlash('❌ ดึง ID ไม่สำเร็จ');
+    } finally {
+      setFetchBusy(null);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -72,13 +106,21 @@ export default function ShrimpLineNotifySettings() {
       {flash && (
         <p className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-2 rounded-xl">{flash}</p>
       )}
-      <label className="text-[10px] font-bold text-slate-500 block">LINE Group ID (กลุ่มพนักงาน)</label>
+      <label className="text-[10px] font-bold text-slate-500 block">LINE Group ID (กลุ่มพนักงาน / ครอบครัว)</label>
       <input
         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-mono outline-none"
         placeholder="Cxxxxxxxx... (33 ตัว)"
         value={form.notifyGroupId || ''}
         onChange={(e) => setForm((p) => ({ ...p, notifyGroupId: e.target.value.trim() }))}
       />
+      <button
+        type="button"
+        disabled={!!fetchBusy || saving}
+        onClick={() => fetchLineIds('group')}
+        className="w-full py-2 rounded-xl text-xs font-bold border border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
+      >
+        {fetchBusy === 'group' ? 'กำลังดึง...' : 'ดึง Group ID จากข้อความล่าสุด'}
+      </button>
       <label className="text-[10px] font-bold text-slate-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
       <input
         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-mono outline-none"
@@ -86,6 +128,14 @@ export default function ShrimpLineNotifySettings() {
         value={form.notifyUserIds || ''}
         onChange={(e) => setForm((p) => ({ ...p, notifyUserIds: e.target.value }))}
       />
+      <button
+        type="button"
+        disabled={!!fetchBusy || saving}
+        onClick={() => fetchLineIds('user')}
+        className="w-full py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-700 disabled:opacity-50"
+      >
+        {fetchBusy === 'user' ? 'กำลังดึง...' : 'ดึง User ID จากข้อความล่าสุด'}
+      </button>
       <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
         <input
           type="checkbox"
@@ -142,8 +192,9 @@ export default function ShrimpLineNotifySettings() {
         </p>
       </div>
 
-      <p className="text-[10px] text-slate-400">
-        เชิญบอทกุ้ง (LINE OA) เข้ากลุ่มพนักงาน แล้ว copy Group ID จาก LINE Official Account Manager
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        เชิญบอทกุ้งเข้ากลุ่ม (ครอบครัว/พนักงาน) แล้วให้มีคนพิมพ์ในกลุ่ม 1 ครั้ง → กดดึง Group ID
+        หรือ copy จาก LINE Official Account Manager
       </p>
       <button
         type="button"

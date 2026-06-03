@@ -21,6 +21,7 @@ async function getLineOrderSession(db, groupId, userId) {
       pending: null,
       orderDraft: null,
       profileCollect: null,
+      customerLink: null,
       replyLang: null,
     };
   }
@@ -33,6 +34,7 @@ async function getLineOrderSession(db, groupId, userId) {
       pending: null,
       orderDraft: null,
       profileCollect: null,
+      customerLink: null,
       replyLang: null,
       stale: true,
     };
@@ -43,6 +45,7 @@ async function getLineOrderSession(db, groupId, userId) {
     pending: data.pending || null,
     orderDraft: data.orderDraft || null,
     profileCollect: data.profileCollect || null,
+    customerLink: data.customerLink || null,
     replyLang: data.replyLang || null,
   };
 }
@@ -70,6 +73,7 @@ async function clearSessionForCancel(db, sessionId, serverTimestamp) {
       pending: null,
       orderDraft: null,
       profileCollect: null,
+      customerLink: null,
       updatedAt: serverTimestamp,
     },
     { merge: true },

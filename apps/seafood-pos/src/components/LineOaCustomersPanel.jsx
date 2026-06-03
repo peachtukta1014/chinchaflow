@@ -7,10 +7,13 @@ import {
   fetchCustomersMap,
   getMainCatalogCustomers,
   linkLineOaUidToCustomer,
+  linkLineOaUidToCustomerIds,
   mergeCustomerLists,
   subscribeCustomers,
 } from '../services/customerService';
+import { multiLinkGroupsPending } from '../lib/lineOaLinkGroups';
 import {
+  clearPendingLinkRequest,
   dismissLineOaPendingUid,
   fetchDismissedLineOaUids,
   fetchLineOaContacts,
@@ -106,6 +109,17 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     linkToCustomer(contact, customerId, 'auto');
   };
 
+  const maybeClearLinkRequest = async (contact, customerIds) => {
+    if (!contact.linkRequested) return;
+    const groups = multiLinkGroupsPending(
+      contact.lineUserId,
+      (id) => findCustomer(id),
+    );
+    const pendingGroup = groups.find((g) => g.customerIds.join() === customerIds.join());
+    if (pendingGroup) return;
+    await clearPendingLinkRequest(contact.lineUserId);
+  };
+
   const linkToCustomer = async (contact, customerId, role) => {
     const c = findCustomer(customerId);
     if (!c) return;
@@ -114,8 +128,26 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
       const { map } = await linkLineOaUidToCustomer(c.id, contact.lineUserId, role);
       confirmLinked(map, contact.lineUserId, c.name);
       setFsCustomers(map);
+      await maybeClearLinkRequest(contact, [customerId]);
       const roleLabel = role === 'billing' ? 'เจ้าของ/โอน' : 'คนสั่งใน LINE';
       showFlash?.(`✅ ผูก LINE กับ "${c.name}" (${role === 'auto' ? 'เรียบร้อย' : roleLabel}) แล้ว`);
+      setLinkPick(null);
+      setLinkConfirm(null);
+      await load();
+    } catch (e) {
+      showFlash?.('❌ ' + (e?.message || 'ผูกไม่สำเร็จ'));
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
+  const linkToCustomerGroup = async (contact, group) => {
+    setBusyUid(contact.lineUserId);
+    try {
+      const { map } = await linkLineOaUidToCustomerIds(group.customerIds, contact.lineUserId);
+      setFsCustomers(map);
+      await clearPendingLinkRequest(contact.lineUserId);
+      showFlash?.(`✅ ผูก LINE กับ ${group.label} แล้ว`);
       setLinkPick(null);
       setLinkConfirm(null);
       await load();
@@ -245,6 +277,8 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     const confirming = linkConfirm?.contact?.lineUserId === contact.lineUserId;
     const assigningStaff = staffAssign === contact.lineUserId;
     const suggestions = suggestMainCatalogLinks(contact, fsCustomers);
+    const multiGroups = multiLinkGroupsPending(contact.lineUserId, (id) => findCustomer(id));
+    const linkedNames = (contact.linkedCustomers || []).map((c) => c.name).filter(Boolean);
 
     return (
       <div
@@ -258,18 +292,53 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
           UID …{contact.lineUserId.slice(-8)}
         </p>
         <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {contact.linkRequested && (
+            <span className="text-[10px] bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full font-bold">
+              ขอผูกจาก LINE
+            </span>
+          )}
           <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
-            ยังไม่ผูกรายชื่อหลัก
+            {linkedNames.length ? 'ผูกบางร้านแล้ว' : 'ยังไม่ผูกรายชื่อหลัก'}
           </span>
-          <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-            ออเดอร์ {contact.orderCount} ครั้ง
-          </span>
+          {contact.orderCount > 0 && (
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              ออเดอร์ {contact.orderCount} ครั้ง
+            </span>
+          )}
           {contact.lastDeliveryDate && (
             <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
               ส่งล่าสุด {contact.lastDeliveryDate}
             </span>
           )}
         </div>
+
+        {linkedNames.length > 0 && (
+          <p className="text-[10px] text-green-700 font-bold mt-1.5">
+            ผูกแล้ว: {linkedNames.join(' · ')}
+          </p>
+        )}
+
+        {multiGroups.length > 0 && !picking && !confirming && !assigningStaff && (
+          <div className="mt-2 space-y-1">
+            {multiGroups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                disabled={busy}
+                onClick={() => linkToCustomerGroup(contact, group)}
+                className="w-full text-left text-xs font-bold text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-2 disabled:opacity-50"
+              >
+                ผูกทั้ง {group.label}
+                <span className="block text-[10px] font-normal text-indigo-600 mt-0.5">
+                  {group.hint}
+                  {group.missing?.length < group.shops.length
+                    ? ` · เหลือ ${group.missing.map((s) => s.name).join(', ')}`
+                    : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {confirming && renderLinkRoleChoice(
           contact,
@@ -440,9 +509,10 @@ export default function LineOaCustomersPanel({ showFlash, onPendingCountChange }
     <div className="space-y-3">
       <div className="bg-[#06C755]/10 border border-[#06C755]/30 rounded-2xl p-3">
         <p className="text-xs text-[#047857] leading-relaxed font-medium">
-          แท็บนี้เฉพาะคนทัก <strong>LINE OA ตรงๆ</strong> ที่ยังไม่ผูกร้าน
-          · ร้านเดิมกด「ผูกลูกค้าเดิม」 — มีเจ้าของแล้วจะถามว่าเป็นคนสั่งหรือเจ้าของใหม่
-          · ทดสอบบอท →「สมาชิกแอป」เลือกชื่อน้อง/พี่ · หรือ「ซ่อนรายการ」
+          แท็บนี้เฉพาะคนทัก <strong>LINE OA ตรงๆ</strong>
+          · ลูกค้าพิมพ์「ผูกไอดีลูกค้า」จะขึ้นที่นี่ (ไม่ต้องสั่งอาหาร) — แอดมินจับคู่ร้านเอง
+          · ตาจุ้ยสองร้าน → กด「ผูกทั้งตาจุ้ยหนึ่ง + ตาจุ้ยสอง」ได้
+          · ทดสอบบอท →「สมาชิกแอป」· เสร็จแล้ว →「ซ่อนรายการ」
         </p>
       </div>
 
