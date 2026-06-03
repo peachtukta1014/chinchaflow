@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@chincha/app-credits": "*",
     "@line/liff": "^2.29.0",
     "firebase": "^10.14.1",
     "html2canvas": "^1.4.1",

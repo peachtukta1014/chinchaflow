@@ -11,6 +11,11 @@ export default defineConfig({
   define: {
     __APP_BUILD_ISO__: JSON.stringify(appBuildIso),
   },
+  resolve: {
+    alias: {
+      '@chincha/app-credits': path.resolve(__dirname, '../../packages/app-credits/src/index.js'),
+    },
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {

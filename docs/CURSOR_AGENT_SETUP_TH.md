@@ -13,7 +13,7 @@
 | **IDE — แท็บ Ask** | Composer 2.5 | ถามเร็ว ๆ / ประหยัด quota |
 | **Slack อยากใช้ Composer** | พิมพ์ `with composer` | ไม่มีปุ่ม default แยกใน Slack |
 
-Repo นี้ = monorepo **ชา + กุ้ง** (โปรเจกต์ทำคนเดียว) ชื่อ GitHub ประมาณ `chincha-tea-Privately-` — งานกุ้งอยู่ที่ `apps/seafood-pos`
+ระบบรวมชื่อ **CHINCHA FLOW** · repo เทคนิค **chincha-business-os** (GitHub ~`chincha-tea-Privately-`) — ชา + กุ้ง + LINE · ดู [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md)
 
 ---
 
@@ -50,7 +50,7 @@ Repo นี้ = monorepo **ชา + กุ้ง** (โปรเจกต์ท
 
 หลังนี้สั่งงานใน channel นั้น — agent จะอ่าน `AGENTS.md` ในแอปนั้น และ thread ไม่ปนกันระหว่างชากับกุ้ง
 
-ช่อง `#chincha-flow` ใช้คุยทั่วไป / ประสานงานได้ตามเดิม
+ช่อง `#chincha-flow` = ประสานงานภาพรวม **CHINCHA FLOW** (ชื่อระบบรวม)
 
 **งานกุ้งชัด ๆ** (ถ้า agent ไป repo ผิด):
 

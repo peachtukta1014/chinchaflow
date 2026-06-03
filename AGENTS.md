@@ -54,7 +54,11 @@
 
 ### Product overview
 
-Firebase monorepo (`chincha-eeed6`) with two Vite/React PWAs:
+**CHINCHA FLOW** — business operations platform (POS + inventory + CRM + LINE), not POS-only.  
+Brand name: **CHINCHA FLOW** · Repo: **chincha-business-os** · Cloud: Firebase `chincha-eeed6`.  
+Naming reference: `docs/CHINCHA_FLOW_NAMING_TH.md`
+
+Firebase monorepo with two Vite/React PWAs:
 
 - **Tea POS** — `apps/chincha-tea` (`npm run dev:tea`, default http://localhost:5173)
 - **Shrimp POS** — `apps/seafood-pos` (`npm run dev:seafood`, Vite `--host 0.0.0.0`)

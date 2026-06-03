@@ -24,6 +24,7 @@ import StaffLangNudge from './components/StaffLangNudge';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
+import { AppCredits } from '@chincha/app-credits';
 
 export default function App() {
   const { lang, setLang, t } = useLang();
@@ -186,6 +187,8 @@ export default function App() {
           if (id === 'restock' && isAdmin) refreshPendingRestocks();
         }}
       />
+
+      <AppCredits theme="tea" placement="bar" className="z-10 shrink-0 px-3 pb-1" />
 
       <main className="flex-1 overflow-y-auto z-10" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
