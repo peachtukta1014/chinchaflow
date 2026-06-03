@@ -133,6 +133,64 @@ try {
 }
 
 try {
+  const {
+    sizeLineCost,
+    calcBySizeShrimpCost,
+    buildBySizeBreakdown,
+    missingSizePriceLabel,
+    shrimpCostFromSizeBreakdown,
+  } = await import('../src/lib/stockReceiveCost.js');
+  assert(sizeLineCost(15, 850) === 12750, 'sizeLineCost A 15×850');
+  assert(sizeLineCost(20, 650) === 13000, 'sizeLineCost B 20×650');
+  const shrimpTotal = calcBySizeShrimpCost({
+    A: 15,
+    B: 20,
+    C: 0,
+    priceA: 850,
+    priceB: 650,
+    priceC: 0,
+  });
+  assert(shrimpTotal === 25750, 'calcBySizeShrimpCost bill example');
+  const bd = buildBySizeBreakdown({
+    A: 15,
+    B: 20,
+    C: 0,
+    priceA: 850,
+    priceB: 650,
+    priceC: 0,
+  });
+  assert(bd.mode === 'by_size' && bd.lineA === 12750 && bd.lineB === 13000, 'buildBySizeBreakdown lines');
+  assert(
+    missingSizePriceLabel({ A: 15, B: 0, C: 0, priceA: 0, priceB: 0, priceC: 0 }) === 'A ใหญ่',
+    'missingSizePriceLabel A',
+  );
+  assert(
+    shrimpCostFromSizeBreakdown(bd) === 25750,
+    'shrimpCostFromSizeBreakdown',
+  );
+  const grandWithTransport = shrimpTotal + 1000;
+  assert(grandWithTransport === 26750, 'by-size + transport (Peach bill + ค่ารถ)');
+  const { batchLineMetrics } = await import('../src/lib/lotCostSplit.js');
+  const bySizeBatch = {
+    liveKg: 35,
+    deadKg: 0,
+    remainingLiveKg: 35,
+    remainingDeadKg: 0,
+    totalCost: grandWithTransport,
+    transport: 1000,
+    costPerKg: shrimpTotal / 35,
+    effectiveCostPerKg: grandWithTransport / 35,
+    sizeBreakdown: bd,
+  };
+  const liveM = batchLineMetrics(bySizeBatch, 'live');
+  assert(Math.abs(liveM.costPerKg - grandWithTransport / 35) < 0.02, 'by-size batch → lot COGS/kg');
+  assert(Math.abs(liveM.purchaseCostPerKg - shrimpTotal / 35) < 0.02, 'by-size batch → purchase/kg');
+  assert(Math.abs(liveM.lineReceivedCostBaht - grandWithTransport) < 1, 'by-size batch totalCost');
+} catch (e) {
+  fail('stockReceiveCost', e);
+}
+
+try {
   assert(resolveTemplateRowName({ productId: 'medium' }) === TEMPLATE_ROW_NAMES.medium, 'กุ้งกลาง → แถว B');
   const data = saleToBillData({
     billNo: 'B001',
