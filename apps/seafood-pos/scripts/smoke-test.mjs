@@ -170,6 +170,22 @@ try {
   );
   const grandWithTransport = shrimpTotal + 1000;
   assert(grandWithTransport === 26750, 'by-size + transport (Peach bill + ค่ารถ)');
+  const { batchLineMetrics } = await import('../src/lib/lotCostSplit.js');
+  const bySizeBatch = {
+    liveKg: 35,
+    deadKg: 0,
+    remainingLiveKg: 35,
+    remainingDeadKg: 0,
+    totalCost: grandWithTransport,
+    transport: 1000,
+    costPerKg: shrimpTotal / 35,
+    effectiveCostPerKg: grandWithTransport / 35,
+    sizeBreakdown: bd,
+  };
+  const liveM = batchLineMetrics(bySizeBatch, 'live');
+  assert(Math.abs(liveM.costPerKg - grandWithTransport / 35) < 0.02, 'by-size batch → lot COGS/kg');
+  assert(Math.abs(liveM.purchaseCostPerKg - shrimpTotal / 35) < 0.02, 'by-size batch → purchase/kg');
+  assert(Math.abs(liveM.lineReceivedCostBaht - grandWithTransport) < 1, 'by-size batch totalCost');
 } catch (e) {
   fail('stockReceiveCost', e);
 }

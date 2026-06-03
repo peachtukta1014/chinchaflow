@@ -266,6 +266,16 @@ export default function InventoryScreen({
     loadDeadInboundHistory();
   }, [stockLine, tab, historyViewDate, loadDeadInboundHistory]);
 
+  /** โหมดแยกไซซ์ — ดึงน้ำหนักรวมจาก A+B+C ขึ้นช่องบนเมื่อว่างหรือตรงกันอยู่แล้ว */
+  useEffect(() => {
+    if (sizeMode !== 'by_size' || sizeTotalKg <= 0) return;
+    const cur = parseFloat(rcvLive) || 0;
+    if (!rcvLive || Math.abs(cur - sizeTotalKg) < 0.001) {
+      const next = sizeTotalKg.toFixed(3);
+      if (rcvLive !== next) setRcvLive(next);
+    }
+  }, [sizeMode, sizeA, sizeB, sizeC, sizeTotalKg, rcvLive]);
+
   const resetReceiveFields = () => {
     setRcvLive('');
     setRcvDead('');
