@@ -1,6 +1,6 @@
 # โครงสร้างโปรเจกต์ (Project Tree)
 
-Monorepo **chincha-business-os** — Firebase project `chincha-eeed6`
+**CHINCHA FLOW** (ระบบรวม) · monorepo **chincha-business-os** · Firebase `chincha-eeed6` — [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md)
 
 | แอป | URL Hosting | ผู้ใช้หลัก |
 |-----|-------------|-----------|

@@ -13,10 +13,10 @@
 ## แผนที่ repo (สรุป)
 
 ```
-chincha monorepo (Firebase chincha-eeed6)
-├── apps/chincha-tea/      # POS ชา · chincha-tea.web.app
-├── apps/seafood-pos/      # POS กุ้ง · ko-seafood.top
-├── apps/webhook-core/     # LINE Cloud Functions · asia-southeast1
+CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chincha-eeed6
+├── apps/chincha-tea/      # ชินชา Tea POS · chincha-tea.web.app
+├── apps/seafood-pos/      # โกอ้วน คลังซีฟู้ด · ko-seafood.top
+├── apps/webhook-core/     # LINE backend · asia-southeast1
 ├── firestore.rules        # กฎ Firestore ร่วม
 ├── .github/workflows/     # deploy hosting / functions / rules
 ├── docs/                  # เอกสารทีม + สถาปัตยกรรม
@@ -27,6 +27,7 @@ chincha monorepo (Firebase chincha-eeed6)
 
 | เอกสาร | ใช้เมื่อไหร่ |
 |--------|-------------|
+| [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md) | ชื่อระบบ CHINCHA FLOW vs repo, คำเรียกสากล (ไม่ใช่แค่ POS) |
 | [ARCHITECTURE_TH.md](./ARCHITECTURE_TH.md) | ภาพรวมระบบ, Firestore collections, deploy |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | โฟลเดอร์/ไฟล์สำคัญแต่ละแอป |
 | [LINE_OA_ORDER_SCOPE_TH.md](./LINE_OA_ORDER_SCOPE_TH.md) | ขอบเขต LINE OA กุ้ง, LIFF, Rich Menu |

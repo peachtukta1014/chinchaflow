@@ -1,6 +1,8 @@
-# สถาปัตยกรรมระบบ chincha-business-os
+# สถาปัตยกรรม CHINCHA FLOW (`chincha-business-os`)
 
-เอกสารนี้อธิบายภาพรวมสถาปัตยกรรมของ monorepo สำหรับธุรกิจ Chincha สองสายงาน: **POS กุ้ง (โกอ้วน คลังซีฟู้ด)** และ **แอปร้านชา (ชินชา)** ทั้งคู่ใช้ Firebase โปรเจกต์เดียว (`chincha-eeed6`) แต่ deploy แยกเป็น PWA คนละ Hosting target พร้อม Cloud Functions สำหรับ LINE
+**CHINCHA FLOW** = ชื่อระบบรวม (แบรนด์) · **chincha-business-os** = ชื่อ monorepo ใน Git/npm · รายละเอียดชื่อและคำเรียกสากล → [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md)
+
+เอกสารนี้อธิบายสถาปัตยกรรมของแพลตฟอร์มปฏิบัติการธุรกิจ (POS + สต๊อก + ลูกค้า + LINE) สองสายงาน: **โกอ้วน คลังซีฟู้ด** และ **ชินชา Tea POS** — ใช้ Firebase โปรเจกต์เดียว (`chincha-eeed6`) deploy แยก PWA คนละ Hosting target + Cloud Functions สำหรับ LINE
 
 ---
 
