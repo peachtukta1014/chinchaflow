@@ -16,6 +16,7 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
 import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
+import { FIXED_TEMPLATE_ROWS } from '../src/lib/billTemplateRows.js';
 import { customRowsToCartItems } from '../src/lib/customCartItem.js';
 import { sumCartStockKg } from '../src/lib/cartStock.js';
 import { SHRIMP_DAMAGE, STOCK_LINE } from '../src/constants/stockLines.js';
@@ -118,6 +119,9 @@ try {
   });
   assert(billCustom.extraLines?.[0]?.name === 'แอนตี้โฟม', 'custom → extraLines on bill');
   assert(billCustom.extraLines?.[0]?.quantity === '2', 'custom qty on bill');
+  const extraSlotIdx = FIXED_TEMPLATE_ROWS.findIndex((r) => r.key === 'extra-1');
+  const deadSmallIdx = FIXED_TEMPLATE_ROWS.findIndex((r) => r.key === 'dead-small');
+  assert(extraSlotIdx > deadSmallIdx, 'หมวดอื่นๆ อยู่ใต้แถวกุ้งตาย');
   assert(billCustom.extraLines?.[0]?.pricePerUnit === 240, 'custom ppk on bill');
 } catch (e) {
   fail('stockLines/customCart', e);
@@ -133,7 +137,8 @@ try {
     total: 2200,
   });
   assert(data.date === '26/5/69', 'วันที่บิล = วันจัดส่ง (ตรง dateKey ไม่บวกวัน)');
-  assert(data.items[0].name === 'กุ้งแม่น้ำ B', 'บิลดิจิทัลมีรายการแถว B');
+  assert(data.items[0].name === TEMPLATE_ROW_NAMES.medium, 'บิลดิจิทัลมีรายการแถวกลาง');
+  assert(data.items[0].quantity === '2', 'บิลเก็บน้ำหนักเป็น kg');
   assert(data.totalAmount === 2200, 'ยอดรวมไม่หักส่วนลด');
   assert(data.customerName === 'ปุ้ย', 'ชื่อลูกค้าถูกต้อง');
 } catch (e) {
@@ -841,9 +846,10 @@ try {
 }
 
 const assetsDir = path.join(root, 'public/bill-assets');
-for (const f of ['line-oa-qr.png']) {
+for (const f of ['line-oa-qr.png', 'shrimp-sticker.svg']) {
   const p = path.join(assetsDir, f);
-  if (fs.existsSync(p) && fs.statSync(p).size > 1000) ok(`asset ${f}`);
+  const minSize = f.endsWith('.svg') ? 100 : 1000;
+  if (fs.existsSync(p) && fs.statSync(p).size > minSize) ok(`asset ${f}`);
   else fail(`asset ${f}`, new Error('missing or too small'));
 }
 console.log(failed ? `\nFAILED: ${failed}\n` : '\nAll smoke tests passed.\n');

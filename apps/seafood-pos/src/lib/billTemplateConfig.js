@@ -1,5 +1,10 @@
+const billAssetBase = `${import.meta.env?.BASE_URL || '/'}bill-assets/`;
+
 /** QR LINE OA บนฟอร์มบิลดิจิทัล */
-export const BILL_QR_URL = `${import.meta.env?.BASE_URL || '/'}bill-assets/line-oa-qr.png`;
+export const BILL_QR_URL = `${billAssetBase}line-oa-qr.png`;
+
+/** สติกเกอร์กุ้งแทนไอคอนโน้ตในหัวบิล */
+export const BILL_SHRIMP_STICKER_URL = `${billAssetBase}shrimp-sticker.svg`;
 
 /**
  * บัญชีรับโอนเมื่อบิล「ค้างชำระ」— แสดงบนภาพบิลเท่านั้น

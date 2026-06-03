@@ -41,16 +41,23 @@ export async function loadOpenBillsForSlip(slip, sale) {
   return open.length ? open : (sale ? [sale] : []);
 }
 
-async function pushPaidBillToLine(sale, customer) {
+async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
   const lineUserId = await resolveLineUserId(customer || {}, sale);
   if (!isValidLineUserId(lineUserId)) {
     return { pushed: false, reason: 'no_line_uid' };
   }
+  const receiver =
+    moneyReceiverName ||
+    sale.moneyReceiverName ||
+    sale.confirmedByName ||
+    '';
   const paidSale = {
     ...sale,
     paymentType: 'transfer',
     remainingAmount: 0,
     paidAmount: parseFloat(sale.total) || 0,
+    moneyReceiverName: receiver,
+    confirmedByName: receiver,
   };
   let objectUrl = null;
   try {
@@ -100,7 +107,8 @@ export async function confirmPaymentSlip({
   let pushResult = { pushed: false };
   if (pushPaidBill) {
     try {
-      pushResult = await pushPaidBillToLine(refreshed || sale, customer);
+      const receiverName = staffMember?.displayName || staffMember?.email || '';
+      pushResult = await pushPaidBillToLine(refreshed || sale, customer, receiverName);
     } catch (e) {
       console.error('pushPaidBillToLine', e);
       pushResult = { pushed: false, reason: e.message || 'push_failed' };
