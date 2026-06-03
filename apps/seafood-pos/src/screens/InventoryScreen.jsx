@@ -72,7 +72,7 @@ export default function InventoryScreen({
   const [rcvCost, setRcvCost] = useState('');
   const [rcvTransport, setRcvTransport] = useState('');
   const [rcvNote, setRcvNote] = useState('');
-  const [sizeMode, setSizeMode] = useState('mixed');
+  const [sizeMode, setSizeMode] = useState('by_size');
   const [sizeA, setSizeA] = useState('');
   const [sizeB, setSizeB] = useState('');
   const [sizeC, setSizeC] = useState('');
@@ -99,10 +99,8 @@ export default function InventoryScreen({
   const sizeBKg = parseFloat(sizeB) || 0;
   const sizeCKg = parseFloat(sizeC) || 0;
   const sizeTotalKg = sizeAKg + sizeBKg + sizeCKg;
-  /** โหมดแยกไซซ์ — น้ำหนักรวม = A+B+C (ไม่ต้องพึ่งช่องบนแยก) */
+  /** โหมดแยกไซซ์ — น้ำหนักรวม = A+B+C (กรอกทีละไซซ์ ไม่ใช้ช่องรวมด้านบน) */
   const receiveLiveKg = sizeMode === 'by_size' ? sizeTotalKg : liveKg;
-  const sizeHintMismatch =
-    sizeMode === 'by_size' && liveKg > 0 && Math.abs(sizeTotalKg - liveKg) > 0.001;
 
   const bySizeShrimpCost =
     sizeMode === 'by_size'
@@ -269,15 +267,20 @@ export default function InventoryScreen({
     loadDeadInboundHistory();
   }, [stockLine, tab, historyViewDate, loadDeadInboundHistory]);
 
-  /** โหมดแยกไซซ์ — ดึงน้ำหนักรวมจาก A+B+C ขึ้นช่องบนเมื่อว่างหรือตรงกันอยู่แล้ว */
-  useEffect(() => {
-    if (sizeMode !== 'by_size' || sizeTotalKg <= 0) return;
-    const cur = parseFloat(rcvLive) || 0;
-    if (!rcvLive || Math.abs(cur - sizeTotalKg) < 0.001) {
-      const next = sizeTotalKg.toFixed(3);
-      if (rcvLive !== next) setRcvLive(next);
+  const switchSizeMode = (mode) => {
+    setSizeMode(mode);
+    if (mode === 'by_size') {
+      setRcvLive('');
+      setRcvCost('');
+    } else {
+      setSizeA('');
+      setSizeB('');
+      setSizeC('');
+      setPriceA('');
+      setPriceB('');
+      setPriceC('');
     }
-  }, [sizeMode, sizeA, sizeB, sizeC, sizeTotalKg, rcvLive]);
+  };
 
   const resetReceiveFields = () => {
     setRcvLive('');
@@ -285,7 +288,7 @@ export default function InventoryScreen({
     setRcvCost('');
     setRcvTransport('');
     setRcvNote('');
-    setSizeMode('mixed');
+    setSizeMode('by_size');
     setSizeA('');
     setSizeB('');
     setSizeC('');
@@ -498,30 +501,147 @@ export default function InventoryScreen({
               รายการ
             </p>
           )}
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">น้ำหนัก {STOCK_LINE.live.full} (กก.)</label>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={rcvLive}
-              onChange={(e) => setRcvLive(e.target.value)}
-              placeholder="0.000"
-              className="w-full p-4 bg-blue-50 rounded-2xl outline-none text-2xl font-black text-blue-800 text-center"
-            />
+
+          <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-bold text-slate-500">วิธีกรอกน้ำหนัก</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => switchSizeMode('by_size')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 ${
+                  sizeMode === 'by_size'
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                แยกไซซ์ A / B / C
+              </button>
+              <button
+                type="button"
+                onClick={() => switchSizeMode('mixed')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 ${
+                  sizeMode === 'mixed'
+                    ? 'border-blue-400 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 text-slate-500'
+                }`}
+              >
+                รวมไซซ์ (กก.เดียว)
+              </button>
+            </div>
+            {sizeMode === 'by_size' ? (
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                ใส่กก. ทีละไซซ์ที่รับมา — ระบบรวมน้ำหนักให้อัตโนมัติ (ไม่ต้องพิมพ์ยอดรวมเอง)
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                รับมารวมไซซ์ ไม่แยก A/B/C — ใส่น้ำหนักรวมและราคา/กก. เดียว
+              </p>
+            )}
           </div>
-          {sizeMode === 'mixed' && (
-            <div>
-              <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={rcvCost}
-                onChange={(e) => setRcvCost(e.target.value)}
-                placeholder="0"
-                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
-              />
+
+          {sizeMode === 'mixed' ? (
+            <>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">
+                  น้ำหนักรวม
+                  {' '}
+                  {STOCK_LINE.live.full}
+                  {' '}
+                  (กก.)
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={rcvLive}
+                  onChange={(e) => setRcvLive(e.target.value)}
+                  placeholder="0.000"
+                  className="w-full p-4 bg-blue-50 rounded-2xl outline-none text-2xl font-black text-blue-800 text-center"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={rcvCost}
+                  onChange={(e) => setRcvCost(e.target.value)}
+                  placeholder="0"
+                  className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3 border border-emerald-200 bg-emerald-50/40 rounded-2xl p-4">
+              <p className="text-xs font-bold text-emerald-800">น้ำหนักที่รับเข้า (กก.) — แยกไซซ์</p>
+              <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-slate-500 text-center">
+                <span>A ใหญ่</span>
+                <span>B กลาง</span>
+                <span>C เล็ก</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: sizeA, set: setSizeA },
+                  { val: sizeB, set: setSizeB },
+                  { val: sizeC, set: setSizeC },
+                ].map(({ val, set }, i) => (
+                  <input
+                    key={`kg-${i}`}
+                    type="number"
+                    inputMode="decimal"
+                    value={val}
+                    onChange={(e) => set(e.target.value)}
+                    placeholder="0.000"
+                    className="w-full p-3 bg-white border-2 border-emerald-200 rounded-xl outline-none text-lg font-black text-emerald-900 text-center"
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between items-center bg-white border border-emerald-200 rounded-xl px-4 py-3">
+                <span className="text-xs font-bold text-slate-600">น้ำหนักรวม (อัตโนมัติ)</span>
+                <span className="text-2xl font-black text-emerald-800 tabular-nums">
+                  {sizeTotalKg.toFixed(3)}
+                  {' '}
+                  <span className="text-sm font-bold">กก.</span>
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-slate-500 text-center">ราคาซื้อ/กก. (฿) ต่อไซซ์</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: priceA, set: setPriceA, line: lineCostA },
+                  { val: priceB, set: setPriceB, line: lineCostB },
+                  { val: priceC, set: setPriceC, line: lineCostC },
+                ].map(({ val, set, line }, i) => (
+                  <div key={`price-${i}`} className="space-y-1">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={val}
+                      onChange={(e) => set(e.target.value)}
+                      placeholder="฿/กก."
+                      className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl outline-none text-sm font-bold text-center"
+                    />
+                    {line > 0 && (
+                      <p className="text-[10px] font-bold text-amber-800 text-center tabular-nums">
+                        =
+                        {' '}
+                        ฿
+                        {line.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {bySizeShrimpCost > 0 && (
+                <div className="flex justify-between text-xs font-bold text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
+                  <span>รวมซื้อกุ้ง (A+B+C)</span>
+                  <span>
+                    ฿
+                    {bySizeShrimpCost.toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
+
           <div>
             <label className="text-xs font-bold text-slate-500 mb-1 block">ค่ารถ (฿)</label>
             <input
@@ -542,108 +662,6 @@ export default function InventoryScreen({
               placeholder="เช่น รถทะเบียน กข-1234"
               className="w-full p-3 bg-slate-50 rounded-2xl outline-none"
             />
-          </div>
-
-          <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
-            <p className="text-xs font-bold text-slate-500">ไซต์ {STOCK_LINE.live.label}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setSizeMode('mixed')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${
-                  sizeMode === 'mixed'
-                    ? 'border-blue-400 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 text-slate-500'
-                }`}
-              >
-                รวมไซต์
-              </button>
-              <button
-                type="button"
-                onClick={() => setSizeMode('by_size')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${
-                  sizeMode === 'by_size'
-                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 text-slate-500'
-                }`}
-              >
-                แยก A / B / C
-              </button>
-            </div>
-            {sizeMode === 'by_size' && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-slate-400 text-center">
-                  <span>A ใหญ่</span>
-                  <span>B กลาง</span>
-                  <span>C เล็ก</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { val: sizeA, set: setSizeA },
-                    { val: sizeB, set: setSizeB },
-                    { val: sizeC, set: setSizeC },
-                  ].map(({ val, set }, i) => (
-                    <input
-                      key={`kg-${i}`}
-                      type="number"
-                      inputMode="decimal"
-                      value={val}
-                      onChange={(e) => set(e.target.value)}
-                      placeholder="กก."
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-center"
-                    />
-                  ))}
-                </div>
-                <p className="text-[10px] font-bold text-slate-500 text-center">ราคา/กก. (฿)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { val: priceA, set: setPriceA, line: lineCostA },
-                    { val: priceB, set: setPriceB, line: lineCostB },
-                    { val: priceC, set: setPriceC, line: lineCostC },
-                  ].map(({ val, set, line }, i) => (
-                    <div key={`price-${i}`} className="space-y-1">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={val}
-                        onChange={(e) => set(e.target.value)}
-                        placeholder="฿/กก."
-                        className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl outline-none text-sm font-bold text-center"
-                      />
-                      {line > 0 && (
-                        <p className="text-[10px] font-bold text-amber-800 text-center tabular-nums">
-                          =
-                          {' '}
-                          ฿
-                          {line.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {bySizeShrimpCost > 0 && (
-                  <div className="flex justify-between text-xs font-bold text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
-                    <span>รวมซื้อกุ้ง (A+B+C)</span>
-                    <span>
-                      ฿
-                      {bySizeShrimpCost.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                <div className={`flex justify-between text-xs font-bold px-1 ${sizeHintMismatch ? 'text-amber-700' : 'text-emerald-600'}`}>
-                  <span>รวมน้ำหนัก A+B+C (ใช้บันทึก)</span>
-                  <span>{sizeTotalKg.toFixed(3)} กก.</span>
-                </div>
-                {sizeHintMismatch && (
-                  <p className="text-[10px] text-amber-700 px-1">
-                    ช่องน้ำหนักบน (
-                    {liveKg.toFixed(3)}
-                    {' '}
-                    กก.) ไม่ตรงผลรวมไซซ์ — ระบบบันทึกตาม A+B+C
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
