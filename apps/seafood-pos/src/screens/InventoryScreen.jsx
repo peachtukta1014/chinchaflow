@@ -19,6 +19,12 @@ import StockLotTimeline from '../components/StockLotTimeline';
 import StockLineSwitcher from '../components/StockLineSwitcher';
 import SubTabBar from '../components/SubTabBar';
 import { SHRIMP_DAMAGE, STOCK_LINE } from '../constants/stockLines';
+import {
+  buildBySizeBreakdown,
+  calcBySizeShrimpCost,
+  missingSizePriceLabel,
+  sizeLineCost,
+} from '../lib/stockReceiveCost';
 
 const ADJUST_LABELS = {
   pond_to_dead: { title: 'ส่งยอดจากบ่อ (ขายได้)', emoji: '🔄', cls: 'text-red-700 bg-red-50' },
@@ -70,6 +76,9 @@ export default function InventoryScreen({
   const [sizeA, setSizeA] = useState('');
   const [sizeB, setSizeB] = useState('');
   const [sizeC, setSizeC] = useState('');
+  const [priceA, setPriceA] = useState('');
+  const [priceB, setPriceB] = useState('');
+  const [priceC, setPriceC] = useState('');
   const [deadMode, setDeadMode] = useState('pond_to_dead');
   const [deadWeight, setDeadWeight] = useState('');
   const [deadNote, setDeadNote] = useState('');
@@ -92,7 +101,23 @@ export default function InventoryScreen({
   const sizeTotalKg = sizeAKg + sizeBKg + sizeCKg;
   const sizeWarning = sizeMode === 'by_size' && liveKg > 0 && Math.abs(sizeTotalKg - liveKg) > 0.001;
 
-  const liveReceiveCost = liveKg * costPerKg + transport;
+  const bySizeShrimpCost =
+    sizeMode === 'by_size'
+      ? calcBySizeShrimpCost({
+          A: sizeAKg,
+          B: sizeBKg,
+          C: sizeCKg,
+          priceA,
+          priceB,
+          priceC,
+        })
+      : 0;
+  const lineCostA = sizeLineCost(sizeAKg, priceA);
+  const lineCostB = sizeLineCost(sizeBKg, priceB);
+  const lineCostC = sizeLineCost(sizeCKg, priceC);
+
+  const liveReceiveCost =
+    sizeMode === 'by_size' ? bySizeShrimpCost + transport : liveKg * costPerKg + transport;
   const liveEffectiveCost = liveKg > 0 ? liveReceiveCost / liveKg : 0;
 
   const deadReceiveCost = deadKg * costPerKg + transport;
@@ -100,7 +125,14 @@ export default function InventoryScreen({
 
   function buildSizeBreakdown() {
     if (sizeMode === 'mixed') return { mode: 'mixed' };
-    return { mode: 'by_size', A: sizeAKg, B: sizeBKg, C: sizeCKg };
+    return buildBySizeBreakdown({
+      A: sizeAKg,
+      B: sizeBKg,
+      C: sizeCKg,
+      priceA,
+      priceB,
+      priceC,
+    });
   }
 
   const todayReceiveCount = useMemo(
@@ -244,11 +276,26 @@ export default function InventoryScreen({
     setSizeA('');
     setSizeB('');
     setSizeC('');
+    setPriceA('');
+    setPriceB('');
+    setPriceC('');
   };
 
   const handleReceiveLive = async () => {
     if (!rcvLive || liveKg <= 0) return alert(`ใส่น้ำหนัก${STOCK_LINE.live.full} (กก.) ครับ`);
-    if (!rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    if (sizeMode === 'mixed' && !rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
+    if (sizeMode === 'by_size') {
+      const missing = missingSizePriceLabel({
+        A: sizeA,
+        B: sizeB,
+        C: sizeC,
+        priceA,
+        priceB,
+        priceC,
+      });
+      if (missing) return alert(`ใส่ราคา/กก. ของไซซ์ ${missing} ด้วยครับ`);
+      if (bySizeShrimpCost <= 0) return alert('ใส่ราคาแต่ละไซซ์ที่มีน้ำหนักครับ');
+    }
     if (sizeWarning) {
       return alert(`ยอดรวมไซต์ (${sizeTotalKg.toFixed(3)} กก.) ไม่ตรงกับ ${STOCK_LINE.live.label} (${liveKg.toFixed(3)} กก.) ครับ`);
     }
@@ -257,10 +304,11 @@ export default function InventoryScreen({
       const { grandTotal: savedTotal, effectiveCost: savedCost } = await createStockBatchRecord({
         liveKg,
         deadKg: 0,
-        costPerKg,
+        costPerKg: sizeMode === 'by_size' && liveKg > 0 ? bySizeShrimpCost / liveKg : costPerKg,
         transport,
         note: rcvNote,
         sizeBreakdown: buildSizeBreakdown(),
+        shrimpCost: sizeMode === 'by_size' ? bySizeShrimpCost : null,
       });
       await updateMainStock(stock.live + liveKg, stock.dead);
       alert(
@@ -444,17 +492,19 @@ export default function InventoryScreen({
               className="w-full p-4 bg-blue-50 rounded-2xl outline-none text-2xl font-black text-blue-800 text-center"
             />
           </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={rcvCost}
-              onChange={(e) => setRcvCost(e.target.value)}
-              placeholder="0"
-              className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
-            />
-          </div>
+          {sizeMode === 'mixed' && (
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">ราคาซื้อ/กก. (฿/กก.)</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={rcvCost}
+                onChange={(e) => setRcvCost(e.target.value)}
+                placeholder="0"
+                className="w-full p-3 bg-slate-50 rounded-2xl outline-none text-lg font-bold"
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs font-bold text-slate-500 mb-1 block">ค่ารถ (฿)</label>
             <input
@@ -504,28 +554,67 @@ export default function InventoryScreen({
               </button>
             </div>
             {sizeMode === 'by_size' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-slate-400 text-center">
+                  <span>A ใหญ่</span>
+                  <span>B กลาง</span>
+                  <span>C เล็ก</span>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: 'A ใหญ่ (กก.)', val: sizeA, set: setSizeA },
-                    { label: 'B กลาง (กก.)', val: sizeB, set: setSizeB },
-                    { label: 'C เล็ก (กก.)', val: sizeC, set: setSizeC },
-                  ].map(({ label, val, set }) => (
-                    <div key={label}>
-                      <label className="text-[10px] font-bold text-slate-400 mb-1 block">{label}</label>
+                    { val: sizeA, set: setSizeA },
+                    { val: sizeB, set: setSizeB },
+                    { val: sizeC, set: setSizeC },
+                  ].map(({ val, set }, i) => (
+                    <input
+                      key={`kg-${i}`}
+                      type="number"
+                      inputMode="decimal"
+                      value={val}
+                      onChange={(e) => set(e.target.value)}
+                      placeholder="กก."
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-center"
+                    />
+                  ))}
+                </div>
+                <p className="text-[10px] font-bold text-slate-500 text-center">ราคา/กก. (฿)</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: priceA, set: setPriceA, line: lineCostA },
+                    { val: priceB, set: setPriceB, line: lineCostB },
+                    { val: priceC, set: setPriceC, line: lineCostC },
+                  ].map(({ val, set, line }, i) => (
+                    <div key={`price-${i}`} className="space-y-1">
                       <input
                         type="number"
                         inputMode="decimal"
                         value={val}
                         onChange={(e) => set(e.target.value)}
-                        placeholder="0.000"
-                        className="w-full p-2 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-center"
+                        placeholder="฿/กก."
+                        className="w-full p-2 bg-amber-50 border border-amber-200 rounded-xl outline-none text-sm font-bold text-center"
                       />
+                      {line > 0 && (
+                        <p className="text-[10px] font-bold text-amber-800 text-center tabular-nums">
+                          =
+                          {' '}
+                          ฿
+                          {line.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
+                {bySizeShrimpCost > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
+                    <span>รวมซื้อกุ้ง (A+B+C)</span>
+                    <span>
+                      ฿
+                      {bySizeShrimpCost.toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className={`flex justify-between text-xs font-bold px-1 ${sizeWarning ? 'text-red-600' : 'text-emerald-600'}`}>
-                  <span>รวม A+B+C</span>
+                  <span>รวมน้ำหนัก A+B+C</span>
                   <span>
                     {sizeTotalKg.toFixed(3)} กก.
                     {sizeWarning && ` ≠ ${liveKg.toFixed(3)} กก.`}
@@ -540,6 +629,18 @@ export default function InventoryScreen({
               <span>น้ำหนัก</span>
               <span className="font-bold">{liveKg.toFixed(3)} กก.</span>
             </div>
+            {sizeMode === 'by_size' && bySizeShrimpCost > 0 && (
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>ซื้อกุ้ง (แยกไซซ์)</span>
+                <span className="font-bold">฿{bySizeShrimpCost.toLocaleString()}</span>
+              </div>
+            )}
+            {transport > 0 && (
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>ค่ารถ</span>
+                <span className="font-bold">฿{transport.toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between font-black text-slate-800 text-base border-t border-slate-200 pt-2">
               <span>ต้นทุนทั้งหมด</span>
               <span className="text-blue-600">฿{liveReceiveCost.toLocaleString()}</span>

@@ -526,9 +526,9 @@ export async function persistStock(val) {
  * รับกุ้งเข้า — บันทึกล็อต FIFO (เรียกหลังอัปเดตสต๊อกแล้ว)
  *
  * sizeBreakdown ตัวเลือก (บันทึกแยก A/B/C หรือรวมไซซ์ — ใช้ดูประวัติเท่านั้น ไม่กระทบการตัด FIFO):
- *   { mode: 'mixed'|'by_size', A: kg, B: kg, C: kg }
+ *   { mode: 'mixed'|'by_size', A, B, C, priceA?, priceB?, priceC?, lineA?, ... }
  *   - mode='mixed'  → รวมไซต์ (ไม่ระบุขนาดย่อย)
- *   - mode='by_size' → แยก A/B/C โดยรวม A+B+C ต้องเท่ากับ liveKg
+ *   - mode='by_size' → แยก A/B/C + ราคา/กก. ต่อไซซ์ (ยอดซื้อ = Σ กก.×ราคา)
  *   ตัดสต๊อกตอนขาย/LINE ใช้เฉพาะ remainingLiveKg / remainingDeadKg รวมทั้งล็อต
  */
 export async function createStockBatchRecord({
@@ -538,10 +538,16 @@ export async function createStockBatchRecord({
   transport,
   note,
   sizeBreakdown = null,
+  shrimpCost: shrimpCostOverride = null,
 }) {
-  const shrimpCost = (liveKg + deadKg) * costPerKg;
+  const totalKg = liveKg + deadKg;
+  const shrimpCost =
+    shrimpCostOverride != null && Number.isFinite(shrimpCostOverride)
+      ? shrimpCostOverride
+      : totalKg * costPerKg;
   const grandTotal = shrimpCost + transport;
-  const effectiveCost = (liveKg + deadKg) > 0 ? grandTotal / (liveKg + deadKg) : 0;
+  const effectiveCost = totalKg > 0 ? grandTotal / totalKg : 0;
+  const storedCostPerKg = totalKg > 0 ? shrimpCost / totalKg : costPerKg;
   if (!isFirebaseReady) {
     throw new Error('Firebase config ไม่ครบ — บันทึกล็อต FIFO ไม่ได้');
   }
@@ -551,7 +557,7 @@ export async function createStockBatchRecord({
     purchaseDate: new Date().toISOString(),
     liveKg,
     deadKg,
-    costPerKg,
+    costPerKg: storedCostPerKg,
     transport,
     totalCost: grandTotal,
     effectiveCostPerKg: effectiveCost,

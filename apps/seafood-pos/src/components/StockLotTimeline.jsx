@@ -185,20 +185,30 @@ export default function StockLotTimeline({
                     <span className="text-slate-400">รับ {formatBatchPurchaseDate(b.purchaseDate)}</span>
                   </div>
                   {b.sizeBreakdown && b.sizeBreakdown.mode === 'by_size' && stockLine === 'live' && (
-                    <p className="text-[10px] text-indigo-500 mt-1">
-                      ไซต์: A
-                      {' '}
-                      {(b.sizeBreakdown.A || 0).toFixed(2)}
+                    <p className="text-[10px] text-indigo-500 mt-1 leading-relaxed">
+                      ไซต์ A {(b.sizeBreakdown.A || 0).toFixed(2)} กก.
+                      {b.sizeBreakdown.priceA > 0 && (
+                        <>
+                          {' '}
+                          @ ฿{Number(b.sizeBreakdown.priceA).toLocaleString()}/กก.
+                        </>
+                      )}
                       {' · '}
-                      B
-                      {' '}
-                      {(b.sizeBreakdown.B || 0).toFixed(2)}
+                      B {(b.sizeBreakdown.B || 0).toFixed(2)} กก.
+                      {b.sizeBreakdown.priceB > 0 && (
+                        <>
+                          {' '}
+                          @ ฿{Number(b.sizeBreakdown.priceB).toLocaleString()}/กก.
+                        </>
+                      )}
                       {' · '}
-                      C
-                      {' '}
-                      {(b.sizeBreakdown.C || 0).toFixed(2)}
-                      {' '}
-                      กก.
+                      C {(b.sizeBreakdown.C || 0).toFixed(2)} กก.
+                      {b.sizeBreakdown.priceC > 0 && (
+                        <>
+                          {' '}
+                          @ ฿{Number(b.sizeBreakdown.priceC).toLocaleString()}/กก.
+                        </>
+                      )}
                     </p>
                   )}
                   {b.sizeBreakdown && b.sizeBreakdown.mode === 'mixed' && stockLine === 'live' && (
