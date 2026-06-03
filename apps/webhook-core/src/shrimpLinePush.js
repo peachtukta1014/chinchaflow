@@ -156,12 +156,31 @@ function lineBillPaymentNote(paymentType) {
   return '';
 }
 
-/** ข้อความเลขบัญชีในแชท LINE (tel: = แตะคัดลอกได้) — สอดคล้อง billTemplateConfig กุ้ง */
-const LINE_BILL_TRANSFER_ACCOUNTS_TEXT =
-  'คุณลูกค้าสามารถโอนมาได้ที่ เลขที่บัญชี กสิกรไทย / KBank '
-  + '<tel:5382038136|538 203 8136> วิไลรัตน์ จินดาพล '
-  + '033 331 8237 อภินันท์ ชัยราบ (พีช) '
-  + 'พร้อมเพย์ / PromptPay <tel:0949408665|094 940 8665> อภินันท์ ชัยราบ (พีช)';
+/**
+ * เลขบัญชีในแชท LINE — จัดเป็นบรรทัด (สอดคล้อง billTemplateConfig กุ้ง)
+ * ไม่ใช้ <tel:…> เพื่อไม่ให้ข้อความกระจุก/อ่านยาก
+ */
+function buildLineBillTransferAccountsText() {
+  return [
+    'คุณลูกค้าสามารถโอนมาได้ที่',
+    '',
+    'บัญชีแม่',
+    'เลขที่บัญชี กสิกรไทย / KBank',
+    '538 203 8136',
+    'วิไลรัตน์ จินดาพล',
+    '',
+    'บัญชีพีช',
+    'เลขที่บัญชี กสิกรไทย / KBank',
+    '033 3318 237',
+    'อภินันท์ ชัยราบ (พีช)',
+    '',
+    'พร้อมเพย์ / PromptPay',
+    '094 940 8665',
+    'อภินันท์ ชัยราบ (พีช)',
+  ].join('\n');
+}
+
+const LINE_BILL_TRANSFER_ACCOUNTS_TEXT = buildLineBillTransferAccountsText();
 
 function lineBillUnpaidHint(paymentType, remainingAmount, total) {
   const remain = parseFloat(remainingAmount);
@@ -171,7 +190,7 @@ function lineBillUnpaidHint(paymentType, remainingAmount, total) {
   if (unpaid <= 0) return '';
   return [
     `ค้างชำระ ฿${unpaid.toLocaleString('th-TH')}`,
-    LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
+    buildLineBillTransferAccountsText(),
   ].join('\n');
 }
 
@@ -261,5 +280,6 @@ module.exports = {
   lineBillPaidThankYouCaption,
   LINE_BILL_PAID_THANK_YOU,
   LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
+  buildLineBillTransferAccountsText,
   pushShrimpBillToCustomer,
 };
