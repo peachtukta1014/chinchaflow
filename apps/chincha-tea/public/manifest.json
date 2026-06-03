@@ -1,7 +1,7 @@
 {
-  "name": "ร้านน้ำชินชา",
-  "short_name": "ร้านน้ำชินชา",
-  "description": "บันทึกยอดขายรายวัน ร้านน้ำชินชา",
+  "name": "ชินชา · CHINCHA FLOW",
+  "short_name": "ชินชา",
+  "description": "CHINCHA FLOW — ชินชา Tea POS · แพลตฟอร์มปฏิบัติการธุรกิจ",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#3d1f0f",

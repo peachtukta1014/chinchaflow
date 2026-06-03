@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "โกอ้วนคลังซีฟู๊ด",
-  "short_name": "โกอ้วนคลังซีฟู๊ด",
-  "description": "ระบบจัดการสต๊อกและจุดขาย โกอ้วนคลังซีฟู๊ด",
+  "name": "โกอ้วน · CHINCHA FLOW",
+  "short_name": "โกอ้วน",
+  "description": "CHINCHA FLOW — โกอ้วน คลังซีฟู้ด · แพลตฟอร์มปฏิบัติการธุรกิจ",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e293b",
