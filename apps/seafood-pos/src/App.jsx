@@ -38,7 +38,7 @@ import { stockLineFull } from './constants/stockLines';
 import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
 import { refreshPendingSummary, syncPendingSales } from './lib/offlineSaleQueue';
 import { syncLineDeliveryWindowFromFirestore } from './lib/syncLineDeliveryWindow';
-import { AppCredits, PlatformMark } from '@chincha/app-credits';
+import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -365,7 +365,6 @@ export default function App() {
             <div className="flex items-center gap-3 min-w-0">
               <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
               <div className="min-w-0">
-                <PlatformMark theme="shrimp" size="sm" className="text-left mb-0.5" />
                 <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
                   {member.name}
@@ -408,6 +407,11 @@ export default function App() {
             </div>
           </div>
         )}
+        {!isOverlayTab && (
+          <div className="px-4 pb-2 border-t border-slate-800/80">
+            <CreditsStrip theme="shrimp" onDark className="text-left" />
+          </div>
+        )}
       </div>
 
       <OfflineBanner
@@ -436,10 +440,7 @@ export default function App() {
         />
       )}
 
-      <div
-        className={`flex-1 overflow-y-auto ${isMainTab ? 'pb-40' : 'pb-24'}`}
-        style={{ scrollbarWidth: 'none' }}
-      >
+      <div className="flex-1 overflow-y-auto pb-24" style={{ scrollbarWidth: 'none' }}>
         {activeTab === 'pos' && (
           <POSMobile
             user={member}
@@ -546,14 +547,6 @@ export default function App() {
             <ExpensesScreen stockBatches={stockBatches} />
           </Suspense>
         )}
-      </div>
-
-      <div
-        className={`absolute left-0 right-0 z-40 px-2 pointer-events-none ${
-          isMainTab ? 'bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))]' : 'bottom-[env(safe-area-inset-bottom,0px)] pb-2'
-        }`}
-      >
-        <AppCredits theme="shrimp" placement="bar" />
       </div>
 
       {isMainTab && (
