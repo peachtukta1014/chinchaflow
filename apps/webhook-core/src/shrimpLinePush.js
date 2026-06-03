@@ -156,13 +156,23 @@ function lineBillPaymentNote(paymentType) {
   return '';
 }
 
+/** ข้อความเลขบัญชีในแชท LINE (tel: = แตะคัดลอกได้) — สอดคล้อง billTemplateConfig กุ้ง */
+const LINE_BILL_TRANSFER_ACCOUNTS_TEXT =
+  'คุณลูกค้าสามารถโอนมาได้ที่ เลขที่บัญชี กสิกรไทย / KBank '
+  + '<tel:5382038136|538 203 8136> วิไลรัตน์ จินดาพล '
+  + '033 331 8237 อภินันท์ ชัยราบ (พีช) '
+  + 'พร้อมเพย์ / PromptPay <tel:0949408665|094 940 8665> อภินันท์ ชัยราบ (พีช)';
+
 function lineBillUnpaidHint(paymentType, remainingAmount, total) {
   const remain = parseFloat(remainingAmount);
   const unpaid = Number.isFinite(remain) && remain > 0
     ? remain
     : (paymentType === 'credit' ? parseFloat(total) || 0 : 0);
   if (unpaid <= 0) return '';
-  return `ค้างชำระ ฿${unpaid.toLocaleString('th-TH')} — ดูเลขบัญชีในภาพบิล`;
+  return [
+    `ค้างชำระ ฿${unpaid.toLocaleString('th-TH')}`,
+    LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
+  ].join('\n');
 }
 
 async function pushShrimpBillToCustomer(db, admin, {
@@ -235,5 +245,7 @@ module.exports = {
   buildCustomerNameByLineUidMap,
   linkedCustomerNameForOrder,
   linkLineUserToCustomers,
+  lineBillUnpaidHint,
+  LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
   pushShrimpBillToCustomer,
 };
