@@ -109,13 +109,17 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ลงเวรพนักงานรายวัน — แอดมินบันทึก · ทุกคนอ่านได้
+    // ลงเวรพนักงานรายวัน — แอดมินติ๊กมือ · ติ๊กอัตโนมัติจากยอดขาย (markedSource sale) เท่านั้น — พนักงานติ๊กมือไม่ได้
     match /dailyStaffAttendance/{docId} {
       allow read: if isApproved();
-      allow create, update: if isAdmin()
+      allow create, update: if isApproved()
         && request.resource.data.dateKey is string
         && request.resource.data.staffUid is string
-        && request.resource.data.present == true;
+        && request.resource.data.present == true
+        && (
+          isAdmin()
+          || request.resource.data.markedSource == 'sale'
+        );
       allow delete: if isAdmin();
     }
 

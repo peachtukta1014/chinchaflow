@@ -62,6 +62,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
         present: checked,
         markedBy: member?.name || member?.email,
         markedByUid: member?.uid || member?.id,
+        actingMember: member,
       });
       await refreshDayAndMonth({ forceMonth: true });
       setFlash(checked ? t('staffAttendanceSaved') : t('staffAttendanceRemoved'));
