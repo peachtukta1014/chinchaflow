@@ -1,15 +1,47 @@
 import { CUSTOMERS } from '../constants/customers.js';
-import { fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest';
-import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId';
-import { customerHasLineUserId } from '../lib/lineCustomerContacts';
+import { customerMatchesLabel } from '../lib/customerAliases.js';
+import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch.js';
+import {
+  normalizeDismissedLineOaSet,
+  normalizePendingLinkByUid,
+  partitionLineOaContacts,
+  findAllCustomersByLineUserId,
+} from '../lib/lineOaContactModel.js';
+import { customerHasLineUserId } from '../lib/lineCustomerContacts.js';
+import { fsGetDoc, fsListCollection, fsSetDoc } from '../lib/firestoreRest.js';
+import { normalizeLineUserId, isValidLineUserId } from '../lib/lineUserId.js';
 
 const SHRIMP_LINE_CONFIG = 'config/shrimpLine';
 
-export function normalizeDismissedLineOaSet(raw) {
-  const list = Array.isArray(raw) ? raw : [];
-  return new Set(
-    list.map((u) => normalizeLineUserId(u)).filter((u) => isValidLineUserId(u)),
-  );
+export {
+  normalizeDismissedLineOaSet,
+  normalizePendingLinkByUid,
+  partitionLineOaContacts,
+  findAllCustomersByLineUserId,
+};
+
+export async function fetchPendingLinkByUid() {
+  try {
+    const doc = await fsGetDoc(SHRIMP_LINE_CONFIG);
+    return normalizePendingLinkByUid(doc?.pendingLinkByUid);
+  } catch {
+    return {};
+  }
+}
+
+/** ลบคำขอผูกจาก「ผูกไอดีลูกค้า」หลังแอดมินจับคู่หรือซ่อนรายการ */
+export async function clearPendingLinkRequest(lineUserId) {
+  const uid = normalizeLineUserId(lineUserId);
+  if (!isValidLineUserId(uid)) return;
+
+  const doc = (await fsGetDoc(SHRIMP_LINE_CONFIG)) || {};
+  const prev = normalizePendingLinkByUid(doc.pendingLinkByUid);
+  if (!prev[uid]) return;
+  delete prev[uid];
+  await fsSetDoc(SHRIMP_LINE_CONFIG, {
+    pendingLinkByUid: prev,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 export async function fetchDismissedLineOaUids() {
@@ -30,14 +62,16 @@ export async function dismissLineOaPendingUid(lineUserId) {
   const prev = normalizeDismissedLineOaSet(doc.dismissedLineOaUids);
   prev.add(uid);
 
+  const pendingLinkByUid = normalizePendingLinkByUid(doc.pendingLinkByUid);
+  delete pendingLinkByUid[uid];
+
   await fsSetDoc(SHRIMP_LINE_CONFIG, {
     dismissedLineOaUids: [...prev],
+    pendingLinkByUid,
     updatedAt: new Date().toISOString(),
   });
   return prev;
 }
-import { customerMatchesLabel } from '../lib/customerAliases';
-import { compactNameMatch } from '../lib/customerNameMatch';
 
 function orderTime(o) {
   return String(o.createdAt || o.deliveryDate || '');
@@ -62,7 +96,10 @@ function collectOrderNames(o) {
  * รวมลูกค้า LINE OA — เฉพาะแชทตรง (ไม่รวมคนในกลุ่มภายใน)
  */
 export async function fetchLineOaContacts({ directOnly = true } = {}) {
-  const orders = await fsListCollection('lineOrders', 300);
+  const [orders, pendingLinkByUid] = await Promise.all([
+    fsListCollection('lineOrders', 300),
+    fetchPendingLinkByUid(),
+  ]);
   const byUid = new Map();
 
   for (const o of orders) {
@@ -93,16 +130,47 @@ export async function fetchLineOaContacts({ directOnly = true } = {}) {
     collectOrderNames(o).forEach((n) => { if (n) row.displayNames.add(n); });
   }
 
+  for (const [uid, meta] of Object.entries(pendingLinkByUid)) {
+    const norm = normalizeLineUserId(uid);
+    if (!isValidLineUserId(norm)) continue;
+    let row = byUid.get(norm);
+    if (!row) {
+      row = {
+        lineUserId: norm,
+        displayNames: new Set(),
+        orderCount: 0,
+        lastOrderAt: meta.requestedAt || '',
+        lastDeliveryDate: '',
+        fromGroup: false,
+        linkRequested: true,
+        linkRequestedAt: meta.requestedAt || '',
+      };
+      byUid.set(norm, row);
+    } else {
+      row.linkRequested = true;
+      row.linkRequestedAt = meta.requestedAt || row.linkRequestedAt || '';
+      if (!row.lastOrderAt && meta.requestedAt) row.lastOrderAt = meta.requestedAt;
+    }
+  }
+
   return [...byUid.values()]
-    .map((r) => ({
-      lineUserId: r.lineUserId,
-      displayNames: [...r.displayNames],
-      orderCount: r.orderCount,
-      lastOrderAt: r.lastOrderAt,
-      lastDeliveryDate: r.lastDeliveryDate,
-      suggestedName: [...r.displayNames][0] || 'ลูกค้า LINE',
-      fromGroup: r.fromGroup,
-    }))
+    .map((r) => {
+      const names = [...r.displayNames];
+      if (r.linkRequested && names.length === 0) {
+        names.push('ขอผูก LINE (รอแอดมิน)');
+      }
+      return {
+        lineUserId: r.lineUserId,
+        displayNames: names,
+        orderCount: r.orderCount,
+        lastOrderAt: r.lastOrderAt,
+        lastDeliveryDate: r.lastDeliveryDate,
+        suggestedName: names[0] || 'ลูกค้า LINE',
+        fromGroup: r.fromGroup,
+        linkRequested: !!r.linkRequested,
+        linkRequestedAt: r.linkRequestedAt || '',
+      };
+    })
     .sort((a, b) => b.lastOrderAt.localeCompare(a.lastOrderAt));
 }
 
@@ -140,22 +208,6 @@ export function findCustomerByExactName(allCustomers, name) {
   const n = (name || '').trim();
   if (!n) return null;
   return allCustomers.find((c) => exactCustomerNameMatch(c.name, n)) || null;
-}
-
-/** แยกราย LINE OA ตามว่าผูกรายชื่อหลักแล้วหรือยัง */
-export function partitionLineOaContacts(contacts, allCustomers, dismissedUids = null) {
-  const dismissed = dismissedUids instanceof Set
-    ? dismissedUids
-    : normalizeDismissedLineOaSet(dismissedUids);
-
-  const pending = [];
-  const linked = [];
-  for (const contact of contacts) {
-    const match = findCustomerByLineUserId(allCustomers, contact.lineUserId);
-    if (match) linked.push({ contact, customer: match });
-    else if (!dismissed.has(contact.lineUserId)) pending.push(contact);
-  }
-  return { pending, linked };
 }
 
 /** แนะนำร้านในรายชื่อหลัก (27+ทั่วไป) จากชื่อในออเดอร์ LINE */

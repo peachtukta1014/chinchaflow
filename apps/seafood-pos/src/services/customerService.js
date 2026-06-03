@@ -302,6 +302,19 @@ export async function updateCustomer(id, data, { merge = false } = {}) {
 /**
  * ผูก UID จากแท็บ LINE รอผูก — role: billing | order | auto
  */
+/** ผูก UID เดียวกับหลายร้าน (ร้านแรก auto/billing · ร้านถัดไป = คนสั่งใน LINE) */
+export async function linkLineOaUidToCustomerIds(customerIds, lineUserId) {
+  const ids = [...new Set((customerIds || []).filter(Boolean))];
+  if (!ids.length) throw new Error('ไม่ได้เลือกร้าน');
+  let map;
+  for (let i = 0; i < ids.length; i += 1) {
+    const role = i === 0 ? 'auto' : 'order';
+    const r = await linkLineOaUidToCustomer(ids[i], lineUserId, role);
+    map = r.map;
+  }
+  return { map };
+}
+
 export async function linkLineOaUidToCustomer(customerId, lineUserId, role = 'auto') {
   if (!customerId) throw new Error('ไม่พบรหัสลูกค้า');
   const uid = normalizeLineUserId(lineUserId);

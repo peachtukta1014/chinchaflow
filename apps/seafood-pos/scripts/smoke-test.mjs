@@ -279,13 +279,52 @@ try {
   const link = requireWebhook('../../webhook-core/src/shrimpLineCustomerLink.js');
   assert(link.isLinkCustomerCommand('ผูกไอดีลูกค้า'), 'คำสั่งผูกไอดีลูกค้า');
   assert(link.parseLinkCustomerShopName('ผูกไอดีลูกค้า ตาจุ้ย') === 'ตาจุ้ย', 'ชื่อร้านหลังคำสั่ง');
+  const pending = requireWebhook('../../webhook-core/src/shrimpLinePendingLink.js');
+  const norm = pending.normalizePendingLinkMap({ Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1: { requestedAt: 'x' } });
+  assert(norm.Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1?.source === 'link_cmd', 'pendingLinkByUid normalize');
   const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
   assert(intent.classifyShrimpLineMessage('ผูกไอดีลูกค้า', null) === 'link_customer', 'intent link_customer');
   const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   assert(wh.includes("intent === 'link_customer'"), 'webhook link_customer handler');
   assert(wh.includes("source: 'shrimp'"), 'webhook log line_messages');
+  const linkSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpLineCustomerLink.js'),
+    'utf8',
+  );
+  assert(linkSrc.includes('registerPendingLinkRequest'), 'link cmd registers pending');
 } catch (e) {
   fail('linkCustomerCmd', e);
+}
+
+try {
+  const {
+    normalizePendingLinkByUid,
+    partitionLineOaContacts,
+  } = await import('../src/lib/lineOaContactModel.js');
+  const uid = 'Uddddddddddddddddddddddddddddddd4';
+  const pendingMap = normalizePendingLinkByUid({ [uid]: { requestedAt: '2026-06-03' } });
+  assert(pendingMap[uid], 'pending link map');
+  const contacts = [{
+    lineUserId: uid,
+    displayNames: ['ขอผูก LINE (รอแอดมิน)'],
+    orderCount: 0,
+    linkRequested: true,
+    linkedCustomers: [],
+  }];
+  const { pending } = partitionLineOaContacts(contacts, [], new Set());
+  assert(pending.length === 1, 'link request ขึ้นรอผูกแม้ไม่มีออเดอร์');
+  const { multiLinkGroupsPending, LINE_OA_MULTI_LINK_GROUPS } = await import('../src/lib/lineOaLinkGroups.js');
+  assert(LINE_OA_MULTI_LINK_GROUPS.some((g) => g.id === 'tajuoy-both'), 'ตาจุ้ยสองร้าน');
+  const groups = multiLinkGroupsPending(uid, (id) => (
+    id === 'c2'
+      ? { id: 'c2', name: 'ตาจุ้ยหนึ่ง', lineContacts: [] }
+      : id === 'c3'
+        ? { id: 'c3', name: 'ตาจุ้ยสอง', lineContacts: [] }
+        : null
+  ));
+  assert(groups.length === 1 && groups[0].customerIds.length === 2, 'multi link ตาจุ้ย');
+} catch (e) {
+  fail('lineOaPendingLink', e);
 }
 
 try {

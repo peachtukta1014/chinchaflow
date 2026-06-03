@@ -8,6 +8,7 @@ const {
 } = require('./shrimpLinePush');
 const { isStaffLineUserId } = require('./shrimpStaffLineUids');
 const { setLineOrderSession } = require('./lineOrderSession');
+const { registerPendingLinkRequest, clearPendingLinkRequest } = require('./shrimpLinePendingLink');
 const {
   LINE_CONTACT_ROLE_BILLING,
   getBillingLineUserId,
@@ -45,11 +46,11 @@ function replyLinkAlreadyLinked(name) {
   return `✅ LINE นี้ผูกกับ「${name}」อยู่แล้ว — สั่งได้เลยครับ`;
 }
 
-function replyLinkAskShopName() {
+function replyLinkWaitAdmin() {
   return (
-    '🔗 ผูกไอดีลูกค้า\n\n'
-    + 'พิมพ์ชื่อร้านในระบบให้ตรง (เช่น ตาจุ้ย ป่าตอง)\n'
-    + 'หรือส่งครั้งเดียว: ผูกไอดีลูกค้า [ชื่อร้าน]'
+    '✅ รับคำขอผูก LINE แล้วครับ\n\n'
+    + 'แอดมินจะจับคู่ร้านให้ในแอป — ไม่ต้องสั่งอาหารก่อน\n'
+    + 'ไม่ต้องพิมพ์ชื่อร้าน เพียงรอแจ้งจากร้าน'
   );
 }
 
@@ -72,7 +73,10 @@ function replyLinkNotFound(shopName) {
 
 async function performLinkCustomer(db, admin, userId, shopName) {
   const name = String(shopName || '').trim();
-  if (!name) return { reply: replyLinkAskShopName() };
+  if (!name) {
+    await registerPendingLinkRequest(db, admin, userId);
+    return { reply: replyLinkWaitAdmin() };
+  }
 
   const existing = await findCustomerByLineUserId(db, userId);
   if (existing?.name) {
@@ -100,6 +104,7 @@ async function performLinkCustomer(db, admin, userId, shopName) {
     };
   }
 
+  await clearPendingLinkRequest(db, admin, userId);
   return { reply: replyLinkSuccess(customer, role) };
 }
 
@@ -133,30 +138,36 @@ async function processShrimpLinkCustomer(db, admin, {
   }
 
   if (session.customerLink?.step === 'shop_name') {
-    const shopName = String(text || '').trim();
-    if (isLinkCustomerCommand(shopName)) {
-      return { reply: replyLinkAskShopName() };
-    }
     await setLineOrderSession(
       db,
       session.id,
       { customerLink: null },
       serverTimestamp,
     );
-    return performLinkCustomer(db, admin, userId, shopName);
+    await registerPendingLinkRequest(db, admin, userId);
+    const existing = await findCustomerByLineUserId(db, userId);
+    if (existing?.name) {
+      return { reply: replyLinkAlreadyLinked(existing.name) };
+    }
+    return { reply: replyLinkWaitAdmin() };
   }
 
   if (isLinkCustomerCommand(text)) {
     await setLineOrderSession(
       db,
       session.id,
-      { customerLink: { step: 'shop_name' } },
+      { customerLink: null },
       serverTimestamp,
     );
-    return { reply: replyLinkAskShopName() };
+    const existing = await findCustomerByLineUserId(db, userId);
+    if (existing?.name) {
+      return { reply: replyLinkAlreadyLinked(existing.name) };
+    }
+    await registerPendingLinkRequest(db, admin, userId);
+    return { reply: replyLinkWaitAdmin() };
   }
 
-  return { reply: replyLinkAskShopName() };
+  return { reply: replyLinkWaitAdmin() };
 }
 
 module.exports = {
