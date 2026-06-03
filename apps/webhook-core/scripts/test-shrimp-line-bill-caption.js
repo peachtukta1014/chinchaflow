@@ -3,7 +3,7 @@ const {
   lineBillUnpaidHint,
   lineBillPaidThankYouCaption,
   LINE_BILL_PAID_THANK_YOU,
-  LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
+  buildLineBillTransferAccountsText,
 } = require('../src/shrimpLinePush');
 
 assert.strictEqual(lineBillUnpaidHint('cash', 0, 1000), '');
@@ -15,11 +15,21 @@ assert.strictEqual(lineBillPaidThankYouCaption('credit', 0, 3520), '');
 assert.strictEqual(lineBillPaidThankYouCaption('transfer', 500, 3520), '');
 assert.strictEqual(lineBillPaidThankYouCaption('credit', null, 3520), '');
 
+const accounts = buildLineBillTransferAccountsText();
+assert.ok(accounts.includes('บัญชีแม่'), accounts);
+assert.ok(accounts.includes('538 203 8136'), accounts);
+assert.ok(accounts.includes('บัญชีพีช'), accounts);
+assert.ok(accounts.includes('033 3318 237'), accounts);
+assert.ok(accounts.includes('พร้อมเพย์'), accounts);
+assert.ok(accounts.includes('094 940 8665'), accounts);
+assert.ok(!accounts.includes('<tel:'), accounts);
+assert.ok(!accounts.includes('PromptPay'), accounts);
+
 const credit = lineBillUnpaidHint('credit', null, 3520);
 assert.ok(credit.includes('ค้างชำระ ฿3,520'), credit);
-assert.ok(credit.includes(LINE_BILL_TRANSFER_ACCOUNTS_TEXT), credit);
-assert.ok(credit.includes('<tel:5382038136|538 203 8136>'), credit);
-assert.ok(credit.includes('<tel:0949408665|094 940 8665>'), credit);
+assert.ok(credit.includes('บัญชีแม่'), credit);
+assert.ok(credit.includes('พร้อมเพย์'), credit);
+assert.ok(!credit.includes('<tel:'), credit);
 
 const partial = lineBillUnpaidHint('credit', 500, 3520);
 assert.ok(partial.includes('ค้างชำระ ฿500'), partial);
