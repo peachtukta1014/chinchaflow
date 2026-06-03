@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import BillTemplate from '../components/BillTemplate';
 import { saleToBillData } from './billDataFromSale';
+import { resolveBillCustomer } from './resolveBillCustomer';
 
 export { normalizeLineItem } from './billRowMap';
 
@@ -53,7 +54,8 @@ export async function generateBillImage(bill, customer = {}) {
     throw new Error('สร้างภาพบิลได้เฉพาะในเบราว์เซอร์');
   }
 
-  const data = saleToBillData(bill, customer);
+  const resolvedCustomer = await resolveBillCustomer(bill, customer);
+  const data = saleToBillData(bill, resolvedCustomer);
   const host = document.createElement('div');
   host.setAttribute('aria-hidden', 'true');
   host.style.cssText = 'position:fixed;left:-10000px;top:0;z-index:-1;pointer-events:none;';

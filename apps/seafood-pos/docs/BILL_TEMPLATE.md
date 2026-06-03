@@ -19,6 +19,11 @@
 - `src/lib/generateBillImage.js` — render + ส่งออก JPEG
 - `public/bill-assets/line-oa-qr.png` — QR LINE
 
+## หัวบิล (ลูกค้า)
+
+- **เบอร์โทร** — ดึงจาก `customers/{id}.phone` หรือ `bill.phone` (บันทึกตอนออกบิล)
+- **ผู้รับเงิน** — จ่ายสด: ชื่อคนที่ออกบิล (`recordedBy`) · เครดิต: ว่างจนมีสลิป · โอน: ชื่อจากยืนยันสลิป
+
 ## ยอดเงิน
 
 ไม่หักส่วนลดสมาชิก — `totalAmount` = ยอดขายจริง

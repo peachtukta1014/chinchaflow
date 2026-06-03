@@ -5,6 +5,21 @@ import { TEMPLATE_ROW_NAMES } from './billTemplateRows.js';
 
 export { TEMPLATE_ROW_NAMES };
 
+/** ชื่อคนออกบิล / ส่งของ — ใช้ลงชื่อผู้บันทึกและกรณีจ่ายสด */
+export function billDelivererName(bill, customer = {}) {
+  return String(bill.recordedBy || bill.senderName || customer.recordedBy || '').trim();
+}
+
+/** ผู้รับเงินบนบิล — สลิปยืนยันก่อน · จ่ายสดใช้ชื่อคนออกบิล */
+export function billMoneyReceiverName(bill, customer = {}) {
+  const explicit = String(
+    bill.moneyReceiverName || bill.confirmedByName || bill.paymentConfirmedByName || '',
+  ).trim();
+  if (explicit) return explicit;
+  if (bill.paymentType === 'cash') return billDelivererName(bill, customer);
+  return '';
+}
+
 /** แปลงรายการขาย → ชื่อแถวบนฟอร์มใบส่งของ */
 export function resolveTemplateRowName(item) {
   const row = normalizeLineItem(item);
@@ -113,6 +128,7 @@ export function saleToBillData(bill, customer = {}) {
   const deliveryAddress = String(
     customer.zone || bill.zone || customer.address || bill.deliveryAddress || '',
   ).trim();
+  const delivererName = billDelivererName(bill, customer);
 
   return {
     bookNo: bill.bookNo || '',
@@ -127,9 +143,8 @@ export function saleToBillData(bill, customer = {}) {
     items: Array.from(byTemplate.values()),
     extraLines,
     totalAmount: subtotal,
-    senderName: bill.recordedBy || bill.senderName || customer.recordedBy || '',
-    moneyReceiverName:
-      bill.moneyReceiverName || bill.confirmedByName || bill.paymentConfirmedByName || '',
+    senderName: delivererName,
+    moneyReceiverName: billMoneyReceiverName(bill, customer),
     paymentNote: lineBillPaymentNote(bill.paymentType),
     creditTransfer: billCreditTransferBlock(bill),
     paymentType: bill.paymentType || '',
