@@ -7,7 +7,9 @@ export const APP_CREDITS = {
   ownerTitle: 'เจ้าของชินชา & โกอ้วน · ผู้ออกแบบระบบร้าน',
   /** บทบาทที่ทำจริงทุกวัน */
   ownerRoles: 'กำหนดทิศทาง · บริหารหน้าร้าน & LINE · ผู้ใช้หลักบนมือถือ',
-  devName: 'พี่เซอ (Peter)',
-  devRole: 'Senior Full-stack Developer by @ Cursor',
-  devByline: 'คู่คิดและลงมือ — เริ่มจากศูนย์จนออนไลน์จริงอยู่ในคลาวด์ ปัจจุบันนี้',
+  devLabel: 'Powered by',
+  devName: 'Peter · พี่เซอ',
+  devRole: 'Senior Full-stack Developer',
+  devPlatform: 'Cursor · Cloud Agent',
+  devByline: 'Co-built from zero to live in the cloud',
 };

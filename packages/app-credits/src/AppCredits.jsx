@@ -14,6 +14,7 @@ const THEMES = {
       divider: 'bg-amber-500/30',
       devName: 'text-amber-200',
       devRole: 'text-amber-400/85',
+      devPlatform: 'text-amber-100 font-mono',
       devByline: 'text-amber-600/90',
     },
     bar: {
@@ -28,6 +29,7 @@ const THEMES = {
       divider: 'bg-amber-900/15',
       devName: 'text-amber-950',
       devRole: 'text-amber-800/75',
+      devPlatform: 'text-amber-900 font-mono',
       devByline: 'text-amber-700/70',
     },
   },
@@ -44,6 +46,7 @@ const THEMES = {
       divider: 'bg-cyan-500/25',
       devName: 'text-cyan-100',
       devRole: 'text-cyan-400/90',
+      devPlatform: 'text-cyan-200 font-mono',
       devByline: 'text-slate-500',
     },
     bar: {
@@ -58,6 +61,7 @@ const THEMES = {
       divider: 'bg-slate-200',
       devName: 'text-slate-900',
       devRole: 'text-blue-600/90',
+      devPlatform: 'text-blue-700 font-mono',
       devByline: 'text-slate-500',
     },
   },
@@ -94,10 +98,11 @@ export default function AppCredits({ theme = 'tea', placement = 'login', classNa
 
         <div className={`my-2 h-px w-12 mx-auto ${t.divider}`} aria-hidden />
 
-        <p className={`text-[8px] font-black tracking-[0.2em] uppercase ${t.devLabel}`}>สายพัฒนา</p>
+        <p className={`text-[8px] font-black tracking-[0.2em] uppercase ${t.devLabel}`}>{c.devLabel}</p>
         <p className={`text-[10px] font-black mt-0.5 ${t.devName}`}>{c.devName}</p>
         <p className={`text-[9px] font-semibold mt-0.5 ${t.devRole}`}>{c.devRole}</p>
-        <p className={`text-[8px] mt-0.5 leading-snug tracking-wide ${t.devByline}`}>{c.devByline}</p>
+        <p className={`text-[10px] font-bold tracking-wide mt-1 ${t.devPlatform}`}>{c.devPlatform}</p>
+        <p className={`text-[8px] mt-1 leading-snug tracking-wide ${t.devByline}`}>{c.devByline}</p>
       </div>
     </footer>
   );
