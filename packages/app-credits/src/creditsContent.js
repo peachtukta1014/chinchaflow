@@ -9,5 +9,5 @@ export const APP_CREDITS = {
   ownerRoles: 'กำหนดทิศทาง · บริหารหน้าร้าน & LINE · ผู้ใช้หลักบนมือถือ',
   devName: 'พี่เซอ (Peter)',
   devRole: 'Senior Full-stack Developer by @ Cursor',
-  devByline: 'คู่คิดและลงมือ — พาที่พีชใช้อยู่ทุกวันจากออฟไลน์สู่ออนไลน์',
+  devByline: 'คู่คิดและลงมือ — เริ่มจากศูนย์จนออนไลน์จริงอยู่ในคลาวด์ ปัจจุบันนี้',
 };
