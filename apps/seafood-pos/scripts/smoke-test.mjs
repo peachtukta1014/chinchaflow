@@ -186,6 +186,20 @@ try {
   assert(Math.abs(liveM.costPerKg - grandWithTransport / 35) < 0.02, 'by-size batch → lot COGS/kg');
   assert(Math.abs(liveM.purchaseCostPerKg - shrimpTotal / 35) < 0.02, 'by-size batch → purchase/kg');
   assert(Math.abs(liveM.lineReceivedCostBaht - grandWithTransport) < 1, 'by-size batch totalCost');
+  const { aggregateDailySales } = await import('../src/lib/salesAggregate.js');
+  const { computeLotCostTotals } = await import('../src/lib/lotCostSplit.js');
+  const lot = computeLotCostTotals([bySizeBatch]);
+  const sales = aggregateDailySales([
+    {
+      total: 15000,
+      items: [
+        { type: 'live', weightKg: 10, lineTotal: 10000 },
+        { type: 'dead', weightKg: 5, lineTotal: 5000 },
+      ],
+    },
+  ]);
+  const cogs = sales.liveKg * lot.liveCostPerKg + sales.deadKg * lot.deadCostPerKg;
+  assert(sales.revenueTotal === 15000 && Math.round(cogs) === 7643, 'receive→lot→sales COGS chain');
 } catch (e) {
   fail('stockReceiveCost', e);
 }

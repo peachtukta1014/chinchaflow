@@ -99,7 +99,10 @@ export default function InventoryScreen({
   const sizeBKg = parseFloat(sizeB) || 0;
   const sizeCKg = parseFloat(sizeC) || 0;
   const sizeTotalKg = sizeAKg + sizeBKg + sizeCKg;
-  const sizeWarning = sizeMode === 'by_size' && liveKg > 0 && Math.abs(sizeTotalKg - liveKg) > 0.001;
+  /** โหมดแยกไซซ์ — น้ำหนักรวม = A+B+C (ไม่ต้องพึ่งช่องบนแยก) */
+  const receiveLiveKg = sizeMode === 'by_size' ? sizeTotalKg : liveKg;
+  const sizeHintMismatch =
+    sizeMode === 'by_size' && liveKg > 0 && Math.abs(sizeTotalKg - liveKg) > 0.001;
 
   const bySizeShrimpCost =
     sizeMode === 'by_size'
@@ -118,7 +121,7 @@ export default function InventoryScreen({
 
   const liveReceiveCost =
     sizeMode === 'by_size' ? bySizeShrimpCost + transport : liveKg * costPerKg + transport;
-  const liveEffectiveCost = liveKg > 0 ? liveReceiveCost / liveKg : 0;
+  const liveEffectiveCost = receiveLiveKg > 0 ? liveReceiveCost / receiveLiveKg : 0;
 
   const deadReceiveCost = deadKg * costPerKg + transport;
   const deadEffectiveCost = deadKg > 0 ? deadReceiveCost / deadKg : 0;
@@ -292,7 +295,13 @@ export default function InventoryScreen({
   };
 
   const handleReceiveLive = async () => {
-    if (!rcvLive || liveKg <= 0) return alert(`ใส่น้ำหนัก${STOCK_LINE.live.full} (กก.) ครับ`);
+    if (receiveLiveKg <= 0) {
+      return alert(
+        sizeMode === 'by_size'
+          ? 'ใส่น้ำหนักแต่ละไซซ์ (A / B / C) ครับ — แต่ละไซซ์กก. ไม่เท่ากันได้'
+          : `ใส่น้ำหนัก${STOCK_LINE.live.full} (กก.) ครับ`,
+      );
+    }
     if (sizeMode === 'mixed' && !rcvCost) return alert('ใส่ราคาซื้อ/กก.ด้วยครับ');
     if (sizeMode === 'by_size') {
       const missing = missingSizePriceLabel({
@@ -304,26 +313,24 @@ export default function InventoryScreen({
         priceC,
       });
       if (missing) return alert(`ใส่ราคา/กก. ของไซซ์ ${missing} ด้วยครับ`);
-      if (bySizeShrimpCost <= 0) return alert('ใส่ราคาแต่ละไซซ์ที่มีน้ำหนักครับ');
-    }
-    if (sizeWarning) {
-      return alert(`ยอดรวมไซต์ (${sizeTotalKg.toFixed(3)} กก.) ไม่ตรงกับ ${STOCK_LINE.live.label} (${liveKg.toFixed(3)} กก.) ครับ`);
+      if (bySizeShrimpCost <= 0) return alert('ใส่กก. และราคา/กก. ของไซซ์ที่รับเข้าครับ');
     }
     setSaving(true);
     try {
       const { grandTotal: savedTotal, effectiveCost: savedCost } = await createStockBatchRecord({
-        liveKg,
+        liveKg: receiveLiveKg,
         deadKg: 0,
-        costPerKg: sizeMode === 'by_size' && liveKg > 0 ? bySizeShrimpCost / liveKg : costPerKg,
+        costPerKg:
+          sizeMode === 'by_size' && receiveLiveKg > 0 ? bySizeShrimpCost / receiveLiveKg : costPerKg,
         transport,
         note: rcvNote,
         sizeBreakdown: buildSizeBreakdown(),
         shrimpCost: sizeMode === 'by_size' ? bySizeShrimpCost : null,
       });
-      await updateMainStock(stock.live + liveKg, stock.dead);
+      await updateMainStock(stock.live + receiveLiveKg, stock.dead);
       alert(
         `✅ บันทึกรับเข้า — ${STOCK_LINE.live.full}\n` +
-          `${liveKg.toFixed(3)} กก. · ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ\n` +
+          `${receiveLiveKg.toFixed(3)} กก. · ล็อตวันนี้รวม ${todayReceiveCount + 1} รายการ\n` +
           `ต้นทุน: ฿${savedTotal.toLocaleString()} (฿${savedCost.toFixed(2)}/กก.)`,
       );
       onReceived?.();
@@ -623,13 +630,18 @@ export default function InventoryScreen({
                     </span>
                   </div>
                 )}
-                <div className={`flex justify-between text-xs font-bold px-1 ${sizeWarning ? 'text-red-600' : 'text-emerald-600'}`}>
-                  <span>รวมน้ำหนัก A+B+C</span>
-                  <span>
-                    {sizeTotalKg.toFixed(3)} กก.
-                    {sizeWarning && ` ≠ ${liveKg.toFixed(3)} กก.`}
-                  </span>
+                <div className={`flex justify-between text-xs font-bold px-1 ${sizeHintMismatch ? 'text-amber-700' : 'text-emerald-600'}`}>
+                  <span>รวมน้ำหนัก A+B+C (ใช้บันทึก)</span>
+                  <span>{sizeTotalKg.toFixed(3)} กก.</span>
                 </div>
+                {sizeHintMismatch && (
+                  <p className="text-[10px] text-amber-700 px-1">
+                    ช่องน้ำหนักบน (
+                    {liveKg.toFixed(3)}
+                    {' '}
+                    กก.) ไม่ตรงผลรวมไซซ์ — ระบบบันทึกตาม A+B+C
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -637,7 +649,7 @@ export default function InventoryScreen({
           <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-200">
             <div className="flex justify-between text-sm text-slate-600">
               <span>น้ำหนัก</span>
-              <span className="font-bold">{liveKg.toFixed(3)} กก.</span>
+              <span className="font-bold">{receiveLiveKg.toFixed(3)} กก.</span>
             </div>
             {sizeMode === 'by_size' && bySizeShrimpCost > 0 && (
               <div className="flex justify-between text-sm text-slate-600">
