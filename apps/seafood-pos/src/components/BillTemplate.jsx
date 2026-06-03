@@ -91,7 +91,7 @@ function getItemRowData(data, row, extraQueue) {
 
   if (!hasValues) {
     return {
-      label: '',
+      label: row.matchName || '',
       quantity: '',
       pricePerUnit: '',
       amount: '',
@@ -255,7 +255,7 @@ export default function BillTemplate({ data }) {
               ? 'text-[#2563eb] text-base font-bold leading-snug break-words'
               : rowValue.isFilled
                 ? 'text-sm font-semibold text-gray-900 leading-snug break-words'
-                : 'text-sm leading-snug break-words';
+                : 'text-sm font-semibold text-gray-800 leading-snug break-words';
 
             return (
               <tr key={row.key} className={BILL_TABLE_DATA_ROW_CLASS}>
