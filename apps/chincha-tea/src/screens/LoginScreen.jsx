@@ -11,7 +11,7 @@ import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
 import { fsGetDoc, fsPatch, fsSetUserProfile } from '../lib/firestoreRest';
 import { isBootstrapAdminEmail } from '../lib/constants';
-import { AppCredits, PlatformMark } from '@chincha/app-credits';
+import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
 import { T } from '../lib/i18n';
 
 function authErrorKey(code) {
@@ -175,7 +175,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
         style={{ backgroundImage: 'url(/chincha-logo.jpg)', backgroundSize: '110px', backgroundRepeat: 'repeat' }}
       />
       <div className="relative z-10 text-center mb-8 w-full pt-[max(1.5rem,env(safe-area-inset-top))]">
-        <PlatformMark theme="tea" size="md" showTagline lang={lang} className="mb-3" />
+        <PlatformMark theme="tea" size="md" showTagline lang={lang} className="mb-2" />
+        <CreditsStrip theme="tea" onDark className="mb-3 px-2" />
         <img src="/chincha-logo.jpg" alt="CHINCHA" className="w-36 h-36 rounded-full object-cover mx-auto mb-4 border-4 border-amber-300 shadow-2xl" />
         <h1 className="text-3xl font-black text-amber-300 tracking-widest">CHINCHA</h1>
         <p className="text-amber-500 text-sm mt-1">{t('tagline')}</p>
@@ -252,7 +253,6 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
           {mode === 'login' ? '→ สมัครสมาชิกใหม่' : '← มีบัญชีแล้ว'}
         </button>
       </div>
-      <AppCredits theme="tea" placement="login" className="relative z-10 w-full mt-6 shrink-0" />
     </div>
   );
 }

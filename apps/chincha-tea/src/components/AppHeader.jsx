@@ -1,4 +1,4 @@
-import { PlatformMark } from '@chincha/app-credits';
+import { CreditsStrip } from '@chincha/app-credits';
 import { hardReloadApp } from '../lib/reloadApp';
 import { getAppBuildLabel } from '../lib/appBuildInfo';
 
@@ -13,7 +13,6 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
       <div className="flex items-center gap-3 min-w-0">
         <img src="/chincha-logo.jpg" alt="" className="w-10 h-10 rounded-full border-2 border-amber-300 shrink-0 object-cover" />
         <div className="min-w-0">
-          <PlatformMark theme="tea" size="sm" className="text-left mb-0.5" />
           <p className="font-black text-amber-300 leading-none">{t('appName')}</p>
           <p className="text-amber-700 text-[10px] truncate">{member.name}</p>
           {getAppBuildLabel() && (
@@ -21,6 +20,7 @@ export default function AppHeader({ member, lang, setLang, onLogout, t }) {
               {getAppBuildLabel()}
             </p>
           )}
+          <CreditsStrip theme="tea" onDark className="text-left mt-1 max-w-[220px]" />
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">

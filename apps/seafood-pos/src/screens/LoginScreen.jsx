@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, isFirebaseReady } from '../firebase';
 import { getShrimpSignupRole, isBootstrapAdminEmail } from '../constants';
-import { AppCredits, PlatformMark } from '@chincha/app-credits';
+import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
 
 export default function LoginScreen({ onLogin }) {
@@ -87,7 +87,8 @@ export default function LoginScreen({ onLogin }) {
 
       <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-h-0">
         <div className="text-center mb-8 pt-[max(1.5rem,env(safe-area-inset-top))]">
-          <PlatformMark theme="shrimp" size="md" showTagline className="mb-3" />
+          <PlatformMark theme="shrimp" size="md" showTagline className="mb-2" />
+          <CreditsStrip theme="shrimp" onDark className="mb-3 px-2" />
         <img src="/logo.jpg" alt="โกอ้วน คลังซีฟู้ด" className="w-44 h-44 object-contain mx-auto mb-4 rounded-3xl shadow-2xl drop-shadow-[0_0_30px_rgba(96,165,250,0.3)]" />
         <h1 className="text-2xl font-black text-white mb-1">โกอ้วน คลังซีฟู้ด</h1>
         <p className="text-slate-400 text-sm font-medium tracking-wide">ระบบจัดการสต๊อกและจุดขาย</p>
@@ -128,7 +129,6 @@ export default function LoginScreen({ onLogin }) {
         {!isFirebaseReady && <p className="text-yellow-400 text-xs text-center">⚠️ Firebase config ยังไม่ครบ</p>}
       </div>
       </div>
-      <AppCredits theme="shrimp" placement="login" className="relative z-10 w-full mt-6 shrink-0" />
     </div>
   );
 }
