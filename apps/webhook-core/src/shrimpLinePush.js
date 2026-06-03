@@ -175,6 +175,16 @@ function lineBillUnpaidHint(paymentType, remainingAmount, total) {
   ].join('\n');
 }
 
+/** ขอบคุณในแชท LINE — ตรง BILL_PAID_THANK_YOU_MESSAGE ใน apps/seafood-pos/src/lib/billPaymentDisplay.js */
+const LINE_BILL_PAID_THANK_YOU =
+  'ขอบคุณที่ไว้วางใจและอุดหนุน โกอ้วน คลังซีฟู้ด — ยินดีให้บริการท่านเสมอ';
+
+function lineBillPaidThankYouCaption(paymentType, remainingAmount, total) {
+  if (!lineBillPaymentNote(paymentType)) return '';
+  if (lineBillUnpaidHint(paymentType, remainingAmount, total)) return '';
+  return LINE_BILL_PAID_THANK_YOU;
+}
+
 async function pushShrimpBillToCustomer(db, admin, {
   lineUserId,
   imageBase64,
@@ -209,11 +219,13 @@ async function pushShrimpBillToCustomer(db, admin, {
   const { url } = await uploadBillJpeg(admin, buffer, billNo);
   const paidNote = lineBillPaymentNote(paymentType);
   const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total);
+  const thankYou = lineBillPaidThankYouCaption(paymentType, remainingAmount, total);
   const caption = [
     '📋 ใบส่งของ — โกอ้วน คลังซีฟู้ด',
     billNo ? `เลขที่ ${billNo}` : null,
     customerName ? `ลูกค้า ${customerName}` : null,
     paidNote ? `✅ ${paidNote}` : null,
+    thankYou || null,
     creditHint || null,
   ]
     .filter(Boolean)
@@ -246,6 +258,8 @@ module.exports = {
   linkedCustomerNameForOrder,
   linkLineUserToCustomers,
   lineBillUnpaidHint,
+  lineBillPaidThankYouCaption,
+  LINE_BILL_PAID_THANK_YOU,
   LINE_BILL_TRANSFER_ACCOUNTS_TEXT,
   pushShrimpBillToCustomer,
 };
