@@ -1,5 +1,12 @@
 const { defaultDeliveryDateKeyBangkok } = require('./parseDeliveryDate');
 const { getShrimpLineDeliveryWindow } = require('./shrimpLineConfig');
+const {
+  LINE_CONTACT_ROLE_BILLING,
+  appendLineContact,
+  customerHasLineUserId,
+  legacyLineUserIdFromContacts,
+  normalizeLineContacts,
+} = require('./lineCustomerContacts');
 const { saveLineOrders } = require('./saveShrimpLineOrders');
 const { verifyLineLiffIdToken } = require('./verifyLineLiffToken');
 const { normalizeLineUserId } = require('./shrimpLinePush');
@@ -56,24 +63,37 @@ async function releaseLineUserIdFromOthers(db, admin, lineUserId, keepCustomerId
   const uid = normalizeLineUserId(lineUserId);
   if (!uid || !keepCustomerId) return;
 
+  const MAIN = new Set(Array.from({ length: 27 }, (_, i) => `c${i + 1}`));
   const snap = await db.collection('customers').get();
   const batch = db.batch();
   let touched = false;
+  const ts = admin.firestore.FieldValue.serverTimestamp();
 
   for (const doc of snap.docs) {
     if (doc.id === keepCustomerId) continue;
-    if (normalizeLineUserId(doc.data()?.lineUserId) !== uid) continue;
+    if (MAIN.has(doc.id) && MAIN.has(keepCustomerId)) continue;
+    const data = doc.data() || {};
+    if (!customerHasLineUserId(data, uid)) continue;
+    const next = normalizeLineContacts(data).filter((c) => c.uid !== uid);
     batch.set(doc.ref, {
-      lineUserId: '',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lineContacts: next,
+      lineUserId: legacyLineUserIdFromContacts(next),
+      updatedAt: ts,
     }, { merge: true });
     touched = true;
   }
 
-  batch.set(db.collection('customers').doc(keepCustomerId), {
-    lineUserId: uid,
-    lineUserIdLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  const keepRef = db.collection('customers').doc(keepCustomerId);
+  const keepSnap = await keepRef.get();
+  const keepData = keepSnap.data() || {};
+  const contacts = customerHasLineUserId(keepData, uid)
+    ? normalizeLineContacts(keepData)
+    : appendLineContact(normalizeLineContacts(keepData), uid, LINE_CONTACT_ROLE_BILLING);
+  batch.set(keepRef, {
+    lineContacts: contacts,
+    lineUserId: legacyLineUserIdFromContacts(contacts),
+    lineUserIdLinkedAt: ts,
+    updatedAt: ts,
   }, { merge: true });
   touched = true;
 

@@ -42,10 +42,10 @@
 - **พฤติกรรมหลังแก้:** 18:00 เมื่อวาน – 15:00 วันนี้ → ส่งวันนี้ · หลัง 15:00 → พรุ่งนี้
 - **ถ้าพังอีก ให้เช็กก่อน:** ค่าใน Firestore `config/shrimpLine` · deploy **functions** หลัง merge
 
-### (รอ merge) — LINE หลาย UID ต่อร้าน (billing / order)
+### 2026-06-03 — LINE หลาย UID ต่อร้าน (billing / order) — PR รอบนี้
 
-- **ปัญหา/คำขอ:** ร้านเดียวหลายคนสั่ง LINE · ส่งบิลเฉพาะคนโอน · คนสั่งเพิ่มอัตโนมัติ
-- **แก้แล้ว (บน branch `cursor/line-contacts-multi-uid-eb83`):** `customers.lineContacts[]` role `billing` | `order` · UI รายชื่อลูกค้า · webhook `linkLineUserToCustomers` เพิ่ม order
-- **ไฟล์/จุดสำคัญ:** `lineCustomerContacts.js`, `MembersScreen` / `LineUidFields`, `resolveLineUserId.js`, `shrimpLinePush.js`
-- **พฤติกรรมหลังแก้:** ส่งบิล/สลิป → UID billing เท่านั้น · สั่ง LINE → ถ้ามี billing แล้ว UID ใหม่เป็น order
-- **ถ้าพังอีก ให้เช็กก่อน:** circular dep ใน webhook (`shrimpLinePush` ↔ `lineCustomerContacts`) · ยังไม่ merge main
+- **ปัญหา/คำขอ:** ร้านเดียวหลายคนสั่ง LINE · ส่งบิลเฉพาะคนโอน/เจ้าของ · คนสั่งอื่นเพิ่มอัตโนมัติ · เจ้าของ 2 ร้าน = 2 แถวรายชื่อ
+- **แก้แล้ว:** `customers.lineContacts[]` (`billing` | `order`) · UI รายชื่อลูกค้า · ส่งบิลใช้ billing เท่านั้น · webhook ผูก order เมื่อมี billing แล้ว
+- **ไฟล์/จุดสำคัญ:** `lineCustomerContacts.js`, `LineUidFields.jsx`, `customerService.js`, `resolveLineUserId.js`, `shrimpLinePush.js`
+- **พฤติกรรมหลังแก้:** ช่อง「เจ้าของ/โอน」= billing · 「คนสั่งใน LINE」= order (คั่น comma) · สั่ง LINE ครั้งแรกหลังมี billing → UID ใหม่เป็น order อัตโนมัติ
+- **ถ้าพังอีก ให้เช็กก่อน:** `lineContacts` ใน Firestore · deploy **hosting + functions** · billing ซ้ำข้ามร้านหลัก c1–c27 ได้

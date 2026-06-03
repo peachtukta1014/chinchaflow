@@ -1,4 +1,9 @@
 const { normalizeLineUserId } = require('./shrimpLinePush');
+const {
+  customerHasLineUserId,
+  getBillingLineUserId,
+  normalizeLineContacts,
+} = require('./lineCustomerContacts');
 const { customerMatchesName } = require('./customerNameAliases');
 
 /** ร้านหลัก c1–c27 — ต้องผูก LINE ครบก่อนเปิดกฎถามชื่อ/เบอร์ลูกค้าใหม่ */
@@ -16,7 +21,7 @@ function exactCustomerNameMatch(a, b) {
 }
 
 function isLinkedLineCustomer(data) {
-  return !!normalizeLineUserId(data?.lineUserId);
+  return normalizeLineContacts(data).length > 0;
 }
 
 function profileMissingFields(data) {
@@ -42,9 +47,18 @@ async function findCustomerByLineUserId(db, lineUserId) {
   const uid = normalizeLineUserId(lineUserId);
   if (!uid) return null;
   const snap = await db.collection('customers').where('lineUserId', '==', uid).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() };
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  }
+  const all = await db.collection('customers').get();
+  for (const doc of all.docs) {
+    const data = doc.data() || {};
+    if (customerHasLineUserId(data, uid)) {
+      return { id: doc.id, ...data };
+    }
+  }
+  return null;
 }
 
 async function countLinkedMainCatalogShops(db) {
@@ -52,7 +66,7 @@ async function countLinkedMainCatalogShops(db) {
   let count = 0;
   for (const doc of snap.docs) {
     if (!MAIN_CATALOG_SHOP_IDS.has(doc.id)) continue;
-    if (normalizeLineUserId(doc.data()?.lineUserId)) count += 1;
+    if (isLinkedLineCustomer(doc.data())) count += 1;
   }
   return count;
 }

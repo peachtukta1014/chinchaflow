@@ -1,5 +1,14 @@
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 const { customerMatchesName } = require('./customerNameAliases');
+const { LINE_UID_RE, normalizeLineUserId } = require('./lineUserId');
+const {
+  LINE_CONTACT_ROLE_BILLING,
+  LINE_CONTACT_ROLE_ORDER,
+  appendLineContact,
+  customerHasLineUserId,
+  legacyLineUserIdFromContacts,
+  normalizeLineContacts,
+} = require('./lineCustomerContacts');
 
 function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
@@ -7,16 +16,6 @@ function compact(s) {
 
 function exactCustomerNameMatch(a, b) {
   return compact(a) === compact(b);
-}
-
-const LINE_UID_RE = /^U[a-fA-F0-9]{32}$/;
-
-function normalizeLineUserId(raw) {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  if (LINE_UID_RE.test(s)) return s;
-  const m = s.match(/U[a-fA-F0-9]{32}/);
-  return m ? m[0] : '';
 }
 
 async function verifyShrimpStaff(db, uid) {
@@ -74,6 +73,14 @@ async function findCustomerNameByLineUserId(db, lineUserId) {
       const name = snap.docs[0].data()?.name;
       return name ? String(name).trim() : null;
     }
+    const all = await db.collection('customers').get();
+    for (const doc of all.docs) {
+      const data = doc.data() || {};
+      if (customerHasLineUserId(data, uid)) {
+        const name = data.name;
+        return name ? String(name).trim() : null;
+      }
+    }
   } catch (err) {
     console.warn('findCustomerNameByLineUserId', err.message);
   }
@@ -86,9 +93,11 @@ async function buildCustomerNameByLineUidMap(db) {
   const snap = await db.collection('customers').get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
-    const uid = normalizeLineUserId(data.lineUserId);
     const name = String(data.name || '').trim();
-    if (uid && name) map.set(uid, name);
+    if (!name) continue;
+    for (const row of normalizeLineContacts(data)) {
+      map.set(row.uid, name);
+    }
   }
   return map;
 }
@@ -99,7 +108,7 @@ function linkedCustomerNameForOrder(order, uidMap) {
   return order?.customerName || null;
 }
 
-/** ผูก LINE UID กับลูกค้าใน Firestore เมื่อชื่อตรงจากออเดอร์ LINE */
+/** ผูก LINE UID กับลูกค้าเมื่อชื่อตรง — มี billing แล้วเพิ่มเป็น「สั่งใน LINE」 */
 async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames }) {
   const uid = normalizeLineUserId(lineUserId);
   if (!uid) return;
@@ -109,14 +118,32 @@ async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames })
   const snap = await db.collection('customers').get();
   const batch = db.batch();
   let count = 0;
+  const ts = admin.firestore.FieldValue.serverTimestamp();
 
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     const name = data.name || '';
     const matched = names.some((n) => customerMatchesName({ name, aliases: data.aliases }, n));
     if (!matched) continue;
-    if (data.lineUserId === uid) continue;
-    batch.set(doc.ref, { lineUserId: uid, lineUserIdLinkedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    if (customerHasLineUserId(data, uid)) continue;
+
+    const contacts = normalizeLineContacts(data);
+    const hasBilling = contacts.some((c) => c.role === LINE_CONTACT_ROLE_BILLING);
+    let next;
+    if (hasBilling) {
+      next = appendLineContact(contacts, uid, LINE_CONTACT_ROLE_ORDER);
+    } else {
+      next = appendLineContact([], uid, LINE_CONTACT_ROLE_BILLING);
+    }
+    batch.set(
+      doc.ref,
+      {
+        lineContacts: next,
+        lineUserId: legacyLineUserIdFromContacts(next),
+        lineUserIdLinkedAt: ts,
+      },
+      { merge: true },
+    );
     count += 1;
     if (count >= 20) break;
   }

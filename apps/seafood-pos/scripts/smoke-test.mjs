@@ -207,6 +207,40 @@ try {
 
 try {
   const {
+    getBillingLineUserId,
+    customerHasLineUserId,
+    findCustomerByAnyLineUid,
+    lineContactsFromForm,
+    normalizeLineContacts,
+  } = await import('../src/lib/lineCustomerContacts.js');
+  const billing = 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
+  const order = 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';
+  const shop = {
+    name: 'ร้านทดสอบ',
+    lineUserId: billing,
+    lineContacts: [
+      { uid: billing, role: 'billing' },
+      { uid: order, role: 'order' },
+    ],
+  };
+  assert(getBillingLineUserId(shop) === billing, 'billing uid สำหรับส่งบิล');
+  assert(customerHasLineUserId(shop, order), 'order uid จับร้านได้');
+  assert(!customerHasLineUserId(shop, 'Uccccccccccccccccccccccccccccccc3'), 'uid แปลกไม่จับ');
+  const fromForm = lineContactsFromForm({
+    lineUserId: billing,
+    lineOrderUserIds: `${order}, ${billing}`,
+  });
+  assert(fromForm.length === 2, 'ฟอร์มรวม billing + order');
+  const hit = findCustomerByAnyLineUid([shop], order);
+  assert(hit?.name === 'ร้านทดสอบ', 'หาร้านจาก order uid');
+  const legacy = { lineUserId: billing };
+  assert(normalizeLineContacts(legacy).length === 1, 'legacy lineUserId = billing');
+} catch (e) {
+  fail('lineCustomerContacts', e);
+}
+
+try {
+  const {
     formatLineOrderWeightSummary,
     summarizeLineOrderItemWeights,
     summarizeLineOrdersWeights,

@@ -7,6 +7,13 @@ import {
   labelsFromCustomerForm,
 } from '../lib/customerAliases';
 import { compactNameMatch, exactCustomerNameMatch } from '../lib/customerNameMatch';
+import {
+  getBillingLineUserId,
+  getOrderLineUserIds,
+  legacyLineUserIdFromContacts,
+  lineContactsFromForm,
+  normalizeLineContacts,
+} from '../lib/lineCustomerContacts';
 
 function compactName(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();
@@ -119,7 +126,18 @@ export function isBuiltinCustomer(c) {
   return c.source === 'builtin' || CUSTOMERS.some((b) => b.id === c.id);
 }
 
-function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases, aliasesText, defaultRiverSize }) {
+function customerPayload({
+  name,
+  zone,
+  phone,
+  notes,
+  lineUserId,
+  lineOrderUserIds,
+  hidden,
+  aliases,
+  aliasesText,
+  defaultRiverSize,
+}) {
   const parsed = customerFieldsFromForm({ name, aliasesText, aliases });
   const payload = {
     name: parsed.name,
@@ -130,8 +148,9 @@ function customerPayload({ name, zone, phone, notes, lineUserId, hidden, aliases
   payload.aliases = parsed.aliases;
   const riverDefault = String(defaultRiverSize || '').trim();
   if (riverDefault) payload.defaultRiverSize = riverDefault;
-  const line = normalizeLineUserId(lineUserId);
-  payload.lineUserId = line || '';
+  const contacts = lineContactsFromForm({ lineUserId, lineOrderUserIds });
+  payload.lineContacts = contacts;
+  payload.lineUserId = legacyLineUserIdFromContacts(contacts);
   if (hidden === true) payload.hidden = true;
   if (hidden === false) payload.hidden = false;
   return payload;
@@ -144,7 +163,8 @@ function assertSaved(doc, want, id) {
   if (want.name && doc.name !== want.name) {
     throw new Error(`บันทึกชื่อไม่สำเร็จ (ในระบบยังเป็น "${doc.name || '—'}")`);
   }
-  if (want.lineUserId && normalizeLineUserId(doc.lineUserId) !== want.lineUserId) {
+  const savedBilling = getBillingLineUserId(doc);
+  if (want.lineUserId && savedBilling !== want.lineUserId) {
     throw new Error('บันทึก LINE UID ไม่สำเร็จ — ลองอีกครั้งหรือรีเฟรชแอป');
   }
   if (want.hidden === true && doc.hidden !== true) {
@@ -175,13 +195,43 @@ function mergeCustomerFields(base, data) {
     phone: pick('phone'),
     notes: pick('notes'),
     lineUserId: pick('lineUserId'),
+    lineOrderUserIds: pick('lineOrderUserIds'),
     hidden: 'hidden' in data ? data.hidden : base.hidden,
   };
 }
 
+/** ถอด UID สั่งออกจากร้านอื่น (billing ซ้ำข้ามร้านได้ — เจ้าของ 2 ร้าน) */
+async function releaseOrderLineUidFromOthers(lineUserId, keepCustomerId) {
+  const uid = normalizeLineUserId(lineUserId);
+  if (!uid || !keepCustomerId) return { cleared: [] };
+
+  const map = await fetchCustomersMap();
+  const cleared = [];
+
+  for (const [otherId, doc] of Object.entries(map)) {
+    if (otherId === keepCustomerId) continue;
+    const contacts = normalizeLineContacts(doc);
+    if (!contacts.some((c) => c.uid === uid)) continue;
+
+    const next = contacts.filter((c) => c.uid !== uid);
+    const base = await loadCustomerBase(otherId);
+    const want = customerPayload(mergeCustomerFields(base, {
+      lineUserId: legacyLineUserIdFromContacts(next),
+      lineOrderUserIds: getOrderLineUserIds({ lineContacts: next }).join(', '),
+    }));
+    await withTimeout(fsSetDoc(`customers/${otherId}`, {
+      ...want,
+      updatedAt: new Date().toISOString(),
+    }));
+    cleared.push(otherId);
+  }
+
+  return { cleared };
+}
+
 /**
- * ถ้า UID ถูกผูกกับลูกค้าอื่นอยู่แล้ว ให้ถอดออก (กันแท็บ LINE OA / ลูกหนี้ชี้ผิดคน)
- * ลูกค้า cx_* ที่ซ้ำ UID จะถูกลบถาวร — มักเกิดจากกด「เพิ่มใหม่」แทน「ผูกลูกค้าเดิม」
+ * ถ้า UID billing ถูกผูกกับลูกค้าอื่น — ถอดเฉพาะเมื่อเป็น UID เดียว (legacy)
+ * billing ซ้ำข้ามร้านหลัก (c1–c27) อนุญาต · cx_* ซ้ำจะลบ
  */
 export async function releaseLineUserIdFromOthers(lineUserId, keepCustomerId) {
   const uid = normalizeLineUserId(lineUserId);
@@ -193,7 +243,13 @@ export async function releaseLineUserIdFromOthers(lineUserId, keepCustomerId) {
 
   for (const [otherId, doc] of Object.entries(map)) {
     if (otherId === keepCustomerId) continue;
-    if (normalizeLineUserId(doc.lineUserId) !== uid) continue;
+    const billing = getBillingLineUserId(doc);
+    if (billing !== uid && !normalizeLineContacts(doc).some((c) => c.uid === uid && c.role === 'billing')) {
+      continue;
+    }
+    if (CUSTOMERS.some((b) => b.id === otherId) && CUSTOMERS.some((b) => b.id === keepCustomerId)) {
+      continue;
+    }
 
     if (isDeletableCustomer({ id: otherId })) {
       await withTimeout(fsDelete(`customers/${otherId}`));
@@ -203,8 +259,12 @@ export async function releaseLineUserIdFromOthers(lineUserId, keepCustomerId) {
       continue;
     }
 
+    const contacts = normalizeLineContacts(doc).filter((c) => c.uid !== uid);
     const base = await loadCustomerBase(otherId);
-    const want = customerPayload(mergeCustomerFields(base, { lineUserId: '' }));
+    const want = customerPayload(mergeCustomerFields(base, {
+      lineUserId: legacyLineUserIdFromContacts(contacts),
+      lineOrderUserIds: getOrderLineUserIds({ lineContacts: contacts }).join(', '),
+    }));
     await withTimeout(fsSetDoc(`customers/${otherId}`, {
       ...want,
       updatedAt: new Date().toISOString(),
@@ -226,6 +286,11 @@ export async function updateCustomer(id, data, { merge = false } = {}) {
   if (want.lineUserId) {
     await releaseLineUserIdFromOthers(want.lineUserId, id);
   }
+  for (const c of want.lineContacts || []) {
+    if (c.role === 'order') {
+      await releaseOrderLineUidFromOthers(c.uid, id);
+    }
+  }
   const doc = await withTimeout(fsGetDoc(`customers/${id}`));
   return assertSaved(doc, want, id);
 }
@@ -245,6 +310,14 @@ export async function createCustomer(data) {
     ...want,
     createdAt: new Date().toISOString(),
   }));
+  if (want.lineUserId) {
+    await releaseLineUserIdFromOthers(want.lineUserId, id);
+  }
+  for (const c of want.lineContacts || []) {
+    if (c.role === 'order') {
+      await releaseOrderLineUidFromOthers(c.uid, id);
+    }
+  }
   const doc = await withTimeout(fsGetDoc(`customers/${id}`));
   assertSaved(doc, want, id);
   return id;
@@ -280,6 +353,7 @@ export async function hideCustomerFromList(id) {
     zone: builtin?.zone || '',
     phone: '',
     lineUserId: '',
+    lineOrderUserIds: '',
     hidden: true,
   });
   await withTimeout(fsSetDoc(`customers/${id}`, {
