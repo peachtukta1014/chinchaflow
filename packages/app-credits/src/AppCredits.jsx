@@ -7,7 +7,10 @@ const THEMES = {
       studio: 'text-amber-200/90',
       name: 'text-amber-100',
       alias: 'text-amber-300/95',
+      roleLabel: 'text-amber-600/80',
+      ownerTitle: 'text-amber-200/95',
       roles: 'text-amber-500/90',
+      devLabel: 'text-amber-600/80',
       divider: 'bg-amber-500/30',
       devName: 'text-amber-200',
       devRole: 'text-amber-400/85',
@@ -18,7 +21,10 @@ const THEMES = {
       studio: 'text-amber-800/70',
       name: 'text-amber-950',
       alias: 'text-amber-800',
+      roleLabel: 'text-amber-800/60',
+      ownerTitle: 'text-amber-950',
       roles: 'text-amber-700/80',
+      devLabel: 'text-amber-800/60',
       divider: 'bg-amber-900/15',
       devName: 'text-amber-950',
       devRole: 'text-amber-800/75',
@@ -31,7 +37,10 @@ const THEMES = {
       studio: 'text-cyan-200/90',
       name: 'text-white',
       alias: 'text-cyan-300/95',
+      roleLabel: 'text-slate-500',
+      ownerTitle: 'text-cyan-100/95',
       roles: 'text-slate-400',
+      devLabel: 'text-slate-500',
       divider: 'bg-cyan-500/25',
       devName: 'text-cyan-100',
       devRole: 'text-cyan-400/90',
@@ -42,7 +51,10 @@ const THEMES = {
       studio: 'text-slate-500',
       name: 'text-slate-900',
       alias: 'text-slate-700',
+      roleLabel: 'text-slate-400',
+      ownerTitle: 'text-slate-800',
       roles: 'text-slate-500',
+      devLabel: 'text-slate-400',
       divider: 'bg-slate-200',
       devName: 'text-slate-900',
       devRole: 'text-blue-600/90',
@@ -74,13 +86,18 @@ export default function AppCredits({ theme = 'tea', placement = 'login', classNa
           {c.ownerName}
         </p>
         <p className={`text-[10px] font-bold tracking-wide mt-0.5 ${t.alias}`}>{c.ownerAlias}</p>
-        <p className={`text-[9px] leading-snug mt-1.5 ${t.roles}`}>{c.ownerRoles}</p>
+        <p className={`text-[8px] font-black tracking-[0.2em] uppercase mt-2 ${t.roleLabel}`}>ตำแหน่ง</p>
+        <p className={`font-bold leading-snug mt-0.5 ${isLogin ? 'text-[11px]' : 'text-[10px]'} ${t.ownerTitle}`}>
+          {c.ownerTitle}
+        </p>
+        <p className={`text-[9px] leading-snug mt-1 ${t.roles}`}>{c.ownerRoles}</p>
 
         <div className={`my-2 h-px w-12 mx-auto ${t.divider}`} aria-hidden />
 
-        <p className={`text-[10px] font-black ${t.devName}`}>{c.devName}</p>
+        <p className={`text-[8px] font-black tracking-[0.2em] uppercase ${t.devLabel}`}>สายพัฒนา</p>
+        <p className={`text-[10px] font-black mt-0.5 ${t.devName}`}>{c.devName}</p>
         <p className={`text-[9px] font-semibold mt-0.5 ${t.devRole}`}>{c.devRole}</p>
-        <p className={`text-[8px] mt-0.5 tracking-wide ${t.devByline}`}>{c.devByline}</p>
+        <p className={`text-[8px] mt-0.5 leading-snug tracking-wide ${t.devByline}`}>{c.devByline}</p>
       </div>
     </footer>
   );
