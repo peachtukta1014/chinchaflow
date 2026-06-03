@@ -17,13 +17,15 @@ assert.strictEqual(lineBillPaidThankYouCaption('credit', null, 3520), '');
 
 const accounts = buildLineBillTransferAccountsText();
 assert.ok(accounts.includes('บัญชีแม่'), accounts);
+assert.ok(accounts.includes('กสิกรไทย / KBank'), accounts);
 assert.ok(accounts.includes('538 203 8136'), accounts);
+assert.ok(accounts.includes('วิไลรัตน์ จินดาพล'), accounts);
 assert.ok(accounts.includes('บัญชีพีช'), accounts);
 assert.ok(accounts.includes('033 3318 237'), accounts);
-assert.ok(accounts.includes('พร้อมเพย์'), accounts);
+assert.ok(accounts.includes('อภินันท์ ชัยราบ (พีช)'), accounts);
+assert.ok(accounts.includes('พร้อมเพย์ / PromptPay'), accounts);
 assert.ok(accounts.includes('094 940 8665'), accounts);
 assert.ok(!accounts.includes('<tel:'), accounts);
-assert.ok(!accounts.includes('PromptPay'), accounts);
 
 const credit = lineBillUnpaidHint('credit', null, 3520);
 assert.ok(credit.includes('ค้างชำระ ฿3,520'), credit);
