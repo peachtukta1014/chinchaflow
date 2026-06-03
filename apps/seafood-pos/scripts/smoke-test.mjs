@@ -265,6 +265,30 @@ try {
 }
 
 try {
+  const { pickLatestLineIds } = await import('../src/lib/lineIds.js');
+  const gid = 'Caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
+  const { groupId } = pickLatestLineIds([
+    { groupId: gid, userId: 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2', createdAt: '2026-06-03T10:00:00Z' },
+  ]);
+  assert(groupId === gid, 'pickLatestLineIds จาก line_messages');
+} catch (e) {
+  fail('lineIds', e);
+}
+
+try {
+  const link = requireWebhook('../../webhook-core/src/shrimpLineCustomerLink.js');
+  assert(link.isLinkCustomerCommand('ผูกไอดีลูกค้า'), 'คำสั่งผูกไอดีลูกค้า');
+  assert(link.parseLinkCustomerShopName('ผูกไอดีลูกค้า ตาจุ้ย') === 'ตาจุ้ย', 'ชื่อร้านหลังคำสั่ง');
+  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  assert(intent.classifyShrimpLineMessage('ผูกไอดีลูกค้า', null) === 'link_customer', 'intent link_customer');
+  const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
+  assert(wh.includes("intent === 'link_customer'"), 'webhook link_customer handler');
+  assert(wh.includes("source: 'shrimp'"), 'webhook log line_messages');
+} catch (e) {
+  fail('linkCustomerCmd', e);
+}
+
+try {
   const {
     formatLineOrderWeightSummary,
     summarizeLineOrderItemWeights,

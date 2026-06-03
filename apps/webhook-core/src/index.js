@@ -24,6 +24,7 @@ const {
 const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
+const { processShrimpLinkCustomer } = require('./shrimpLineCustomerLink');
 const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
 const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
 const { detectMessageLang } = require('./orderMessageLang');
@@ -129,6 +130,16 @@ exports.lineWebhook = functions
         const userId     = event.source.userId;
         const groupId    = event.source.groupId || event.source.roomId || null;
         const replyToken = event.replyToken;
+        if (!admin.apps.length) admin.initializeApp();
+        const ts = admin.firestore.FieldValue.serverTimestamp();
+        db().collection('line_messages').add({
+          userId,
+          groupId,
+          text,
+          source: 'shrimp',
+          createdAt: ts,
+        }).catch((e) => console.warn('line_messages log', e));
+
         const session = await getLineOrderSession(db(), groupId, userId);
         const intent = classifyShrimpLineMessage(text, session);
 
@@ -192,6 +203,24 @@ exports.lineWebhook = functions
           } catch (err) {
             console.error('shrimp today orders', err);
             await lineReply(replyToken, '⚠️ ดึงรายการออเดอร์ไม่สำเร็จ ลองใหม่ครับ', token);
+          }
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
+        if (intent === 'link_customer') {
+          try {
+            const { reply } = await processShrimpLinkCustomer(db(), admin, {
+              text,
+              userId,
+              groupId,
+              session,
+              serverTimestamp: ts,
+            });
+            await lineReply(replyToken, reply, token);
+          } catch (err) {
+            console.error('shrimp link customer', err);
+            await lineReply(replyToken, '⚠️ ผูกไอดีไม่สำเร็จ ลองใหม่หรือติดต่อร้านครับ', token);
           }
           await completeLineEvent(db(), event);
           continue;
