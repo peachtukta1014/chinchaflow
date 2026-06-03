@@ -20,7 +20,6 @@ export const TEMPLATE_ROW_NAMES = {
  * @property {BillRowKind} kind
  * @property {string} [label] section header text
  * @property {string} [matchName] item row — ชื่อใน items[]
- * @property {string} [emptyLabel] แถวจุดไข่เมื่อยังไม่มียอด
  */
 
 /** @type {BillTemplateRow[]} */
@@ -31,18 +30,8 @@ export const FIXED_TEMPLATE_ROWS = [
     label: 'ประเภท กุ้งแม่น้ำตัวเป็นๆ [ขึ้นมาจากแม่น้ำถึงมือคุณ]',
   },
   { key: 'live-large', kind: 'item', matchName: TEMPLATE_ROW_NAMES.large },
-  {
-    key: 'live-medium',
-    kind: 'item',
-    matchName: TEMPLATE_ROW_NAMES.medium,
-    emptyLabel: '···· กุ้งแม่น้ำ กลาง [B] 6-8ตัว/Kg',
-  },
-  {
-    key: 'live-small',
-    kind: 'item',
-    matchName: TEMPLATE_ROW_NAMES.small,
-    emptyLabel: '···· กุ้งแม่น้ำ เล็ก [C] 9-13ตัว/Kg',
-  },
+  { key: 'live-medium', kind: 'item', matchName: TEMPLATE_ROW_NAMES.medium },
+  { key: 'live-small', kind: 'item', matchName: TEMPLATE_ROW_NAMES.small },
   { key: 'spacer-before-dead', kind: 'spacer' },
   {
     key: 'dead-section',
@@ -50,18 +39,8 @@ export const FIXED_TEMPLATE_ROWS = [
     label: 'ประเภท กุ้งแม่น้ำตัวตาย [สดใหม่ทุกวัน]',
   },
   { key: 'dead-large', kind: 'item', matchName: TEMPLATE_ROW_NAMES.dead_large },
-  {
-    key: 'dead-medium',
-    kind: 'item',
-    matchName: TEMPLATE_ROW_NAMES.dead_medium,
-    emptyLabel: '···· กุ้งแม่น้ำตาย กลาง [B] 6-8ตัว/Kg',
-  },
-  {
-    key: 'dead-small',
-    kind: 'item',
-    matchName: TEMPLATE_ROW_NAMES.dead_small,
-    emptyLabel: '···· กุ้งแม่น้ำตาย เล็ก [C] 9-13ตัว/Kg',
-  },
+  { key: 'dead-medium', kind: 'item', matchName: TEMPLATE_ROW_NAMES.dead_medium },
+  { key: 'dead-small', kind: 'item', matchName: TEMPLATE_ROW_NAMES.dead_small },
   { key: 'extra-1', kind: 'extra' },
   { key: 'extra-2', kind: 'extra' },
   { key: 'extra-3', kind: 'extra' },

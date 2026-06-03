@@ -13,6 +13,9 @@ import { FIXED_TEMPLATE_ROWS } from '../lib/billTemplateRows';
 
 export { FIXED_TEMPLATE_ROWS };
 
+/** ความสูงแถวข้อมูลในตาราง — ให้ทุกบรรทัดเท่ากัน (รวมแถวว่าง / หมวดอื่นๆ) */
+const BILL_TABLE_DATA_ROW_CLASS = 'h-9 text-center align-middle';
+
 function formatCellMoney(n) {
   const v = parseFloat(n);
   if (!Number.isFinite(v) || v === 0) return '';
@@ -88,11 +91,10 @@ function getItemRowData(data, row, extraQueue) {
 
   if (!hasValues) {
     return {
-      label: row.emptyLabel || row.matchName || '',
+      label: '',
       quantity: '',
       pricePerUnit: '',
       amount: '',
-      isPlaceholder: Boolean(row.emptyLabel),
       isFilled: false,
     };
   }
@@ -102,7 +104,6 @@ function getItemRowData(data, row, extraQueue) {
     quantity: formatBillQuantityKg(matched.quantity),
     pricePerUnit: formatCellPrice(matched.pricePerUnit),
     amount: formatCellMoney(matched.amount),
-    isPlaceholder: false,
     isFilled: true,
   };
 }
@@ -238,8 +239,8 @@ export default function BillTemplate({ data }) {
 
             if (row.kind === 'spacer') {
               return (
-                <tr key={row.key} className="h-2">
-                  <td colSpan={4} className="border-b border-[#1e3a8a]/30 p-0" />
+                <tr key={row.key} className={BILL_TABLE_DATA_ROW_CLASS}>
+                  <td colSpan={4} className="border-b border-[#1e3a8a] p-0 h-9" />
                 </tr>
               );
             }
@@ -250,28 +251,26 @@ export default function BillTemplate({ data }) {
                 : getItemRowData(data, row, extraQueue);
 
             const isExtraLine = row.kind === 'extra' && rowValue.isExtra;
-            const labelCls = rowValue.isPlaceholder
-              ? 'text-gray-400 text-xs font-medium italic leading-snug break-words'
-              : isExtraLine
-                ? 'text-[#2563eb] text-base font-bold leading-snug break-words'
-                : rowValue.isFilled
-                  ? 'text-sm font-semibold text-gray-900 leading-snug break-words'
-                  : 'text-sm font-semibold text-gray-800 leading-snug break-words';
+            const labelCls = isExtraLine
+              ? 'text-[#2563eb] text-base font-bold leading-snug break-words'
+              : rowValue.isFilled
+                ? 'text-sm font-semibold text-gray-900 leading-snug break-words'
+                : 'text-sm leading-snug break-words';
 
             return (
-              <tr key={row.key} className="min-h-[2.25rem] text-center align-middle">
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle py-0.5 px-0.5">
+              <tr key={row.key} className={BILL_TABLE_DATA_ROW_CLASS}>
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle h-9 py-0 px-0.5">
                   <TableNum>{rowValue.quantity}</TableNum>
                 </td>
                 <td
-                  className={`border-r border-b border-[#1e3a8a] text-left px-2 py-1 align-middle ${labelCls}`}
+                  className={`border-r border-b border-[#1e3a8a] text-left px-2 align-middle h-9 py-0 ${labelCls}`}
                 >
-                  {rowValue.label}
+                  {rowValue.label || '\u00a0'}
                 </td>
-                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle py-0.5">
+                <td className="border-r border-b border-[#1e3a8a] text-red-600 text-lg font-black bg-slate-50/50 align-middle h-9 py-0">
                   <TableNum>{rowValue.pricePerUnit}</TableNum>
                 </td>
-                <td className="border-b border-[#1e3a8a] text-red-600 text-lg font-black align-middle py-0.5 px-2">
+                <td className="border-b border-[#1e3a8a] text-red-600 text-lg font-black align-middle h-9 py-0 px-2">
                   <TableNum align="right">{rowValue.amount}</TableNum>
                 </td>
               </tr>
