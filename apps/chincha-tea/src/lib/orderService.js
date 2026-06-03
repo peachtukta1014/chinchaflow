@@ -1,4 +1,5 @@
 import { fsPost } from './firestoreRest';
+import { ensurePrimaryStaffPresentOnSale } from './staffAttendanceService';
 
 export async function saveTeaOrder({
   dateKey,
@@ -19,4 +20,9 @@ export async function saveTeaOrder({
     lang,
     createdAt: new Date().toISOString(),
   });
+  try {
+    await ensurePrimaryStaffPresentOnSale({ dateKey, member });
+  } catch (e) {
+    console.warn('ensurePrimaryStaffPresentOnSale failed', e);
+  }
 }

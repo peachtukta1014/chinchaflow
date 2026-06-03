@@ -1,4 +1,4 @@
-import { isPrimaryStaffEmail, STAFF_DAILY_WAGE } from './constants';
+import { isPrimaryStaffEmail, PRIMARY_STAFF, STAFF_DAILY_WAGE } from './constants';
 import { listDateKeysInRange } from './payrollPeriod';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import {
@@ -78,6 +78,7 @@ export async function setStaffPresent({
   present,
   markedBy,
   markedByUid,
+  markedSource,
 }) {
   const docId = attendanceDocId(dateKey, staffUid);
   if (!present) {
@@ -93,11 +94,39 @@ export async function setStaffPresent({
     present: true,
     markedBy: markedBy || 'แอดมิน',
     markedByUid: markedByUid || '',
+    ...(markedSource ? { markedSource } : {}),
     updatedAt: now,
     createdAt: now,
   });
   invalidateCache(MONTH_CACHE_PREFIX);
   return saved;
+}
+
+/** บันทึกเวรพนักงานหลักอัตโนมัติเมื่อมีการขายวันนั้น (ครั้งแรกของวัน) */
+export async function ensurePrimaryStaffPresentOnSale({
+  dateKey,
+  member,
+}) {
+  if (!dateKey) return { ok: false, reason: 'no_date' };
+  const { staff } = await getPrimaryAttendanceStaff();
+  if (!staff?.id) return { ok: false, reason: 'no_staff' };
+
+  const dayRows = await getAttendanceForDate(dateKey);
+  if (isStaffPresentOnDate(staff.id, dayRows)) {
+    return { ok: true, skipped: true, reason: 'already_present' };
+  }
+
+  const markedByName = member?.name || member?.email || 'ระบบ';
+  await setStaffPresent({
+    dateKey,
+    staffUid: staff.id,
+    staffName: staff.name || PRIMARY_STAFF.displayName,
+    present: true,
+    markedBy: markedByName,
+    markedByUid: member?.uid || member?.id || '',
+    markedSource: 'sale',
+  });
+  return { ok: true, skipped: false };
 }
 
 /** สรุปเวรในรอบ 15 วัน — รวมรายการวันที่มาทำงานต่อคน */
