@@ -15,7 +15,12 @@ function computePaymentAmounts(total, paymentType, paidAmountInput = 0) {
   return { paidAmount: paid, remainingAmount: Math.max(0, t - paid) };
 }
 import { billAmount } from '../src/lib/salesAggregate.js';
-import { saleToBillData, resolveTemplateRowName, TEMPLATE_ROW_NAMES } from '../src/lib/billDataFromSale.js';
+import {
+  saleToBillData,
+  resolveTemplateRowName,
+  TEMPLATE_ROW_NAMES,
+  billMoneyReceiverName,
+} from '../src/lib/billDataFromSale.js';
 import { FIXED_TEMPLATE_ROWS } from '../src/lib/billTemplateRows.js';
 import { customRowsToCartItems } from '../src/lib/customCartItem.js';
 import { sumCartStockKg } from '../src/lib/cartStock.js';
@@ -141,6 +146,36 @@ try {
   assert(data.items[0].quantity === '2', 'บิลเก็บน้ำหนักเป็น kg');
   assert(data.totalAmount === 2200, 'ยอดรวมไม่หักส่วนลด');
   assert(data.customerName === 'ปุ้ย', 'ชื่อลูกค้าถูกต้อง');
+  const cashBill = saleToBillData(
+    {
+      billNo: 'CASH1',
+      customerName: 'ร้านทดสอบ',
+      paymentType: 'cash',
+      recordedBy: 'Gmc-Peach',
+      total: 1000,
+      items: [],
+    },
+    {},
+  );
+  assert(cashBill.moneyReceiverName === 'Gmc-Peach', 'จ่ายสด → ผู้รับเงิน = คนออกบิล');
+  assert(cashBill.senderName === 'Gmc-Peach', 'จ่ายสด → ผู้บันทึก/ส่งของ = คนออกบิล');
+  const creditBill = saleToBillData(
+    { paymentType: 'credit', recordedBy: 'Gmc-Peach', total: 500, items: [] },
+    {},
+  );
+  assert(creditBill.moneyReceiverName === '', 'เครดิต → ผู้รับเงินว่างจนมีสลิป');
+  assert(
+    billMoneyReceiverName(
+      { paymentType: 'transfer', confirmedByName: 'พี่โก๊ะ' },
+      {},
+    ) === 'พี่โก๊ะ',
+    'โอน+ยืนยัน → ใช้ชื่อผู้รับเงินจากสลิป',
+  );
+  const withPhone = saleToBillData(
+    { customerName: 'ร้าน A', zone: 'ป่าตอง', items: [], total: 0 },
+    { phone: '081-234-5678' },
+  );
+  assert(withPhone.customerPhone === '081-234-5678', 'เบอร์จากรายชื่อลูกค้าแสดงบนบิล');
 } catch (e) {
   fail('billDataFromSale', e);
 }
