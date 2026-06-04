@@ -16,6 +16,7 @@
       ],
       "rewrites": [
         { "source": "/liff-order.html", "destination": "/liff-order.html" },
+        { "source": "/liff-slip.html", "destination": "/liff-slip.html" },
         { "source": "**", "destination": "/index.html" }
       ]
     },

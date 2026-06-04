@@ -38,6 +38,7 @@ const {
   pushShrimpBillToCustomer,
 } = require('./shrimpLinePush');
 const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
+const { handleShrimpLiffSlipRequest } = require('./shrimpLiffSlip');
 const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
 const {
@@ -436,6 +437,46 @@ exports.shrimpLiffOrder = functions
         return;
       }
       console.error('shrimpLiffOrder', err);
+      res.status(500).json({ error: err.message || 'failed' });
+    }
+  });
+
+// ── LIFF ฝากสลิป (LINE id_token + รูป base64) ─────────────────────────────────
+exports.shrimpLiffSlip = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'GET') {
+      res.status(200).json({
+        ok: true,
+        hint: 'POST { idToken, imageBase64, billNo? }',
+      });
+      return;
+    }
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const result = await handleShrimpLiffSlipRequest(db(), admin, req.body || {});
+      res.json(result);
+    } catch (err) {
+      const code = err.code || 'failed';
+      if (code === 'missing_id_token' || code === 'invalid_id_token') {
+        res.status(401).json({ error: code, hint: 'เปิดจาก LINE OA อีกครั้ง' });
+        return;
+      }
+      if (code === 'invalid_image' || code === 'invalid_slip') {
+        res.status(400).json({ error: code, hint: 'เลือกรูปสลิปใหม่ (ไม่เกิน 9 MB)' });
+        return;
+      }
+      if (code === 'liff_not_configured') {
+        res.status(500).json({ error: code, hint: 'ตั้ง LINE_LIFF_ID / LINE_LIFF_SLIP_ID' });
+        return;
+      }
+      console.error('shrimpLiffSlip', err);
       res.status(500).json({ error: err.message || 'failed' });
     }
   });

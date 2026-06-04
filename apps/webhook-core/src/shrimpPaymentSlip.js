@@ -114,6 +114,67 @@ async function suggestBillForLineUser(db, lineUserId) {
 }
 
 /**
+ * บันทึกสลิปจาก buffer (แชตรูป / LIFF อัปโหลด)
+ */
+async function recordPaymentSlipSubmission(db, admin, {
+  lineUserId,
+  buffer,
+  lineMessageId = null,
+  source = 'line_chat',
+  billNoHint = null,
+}) {
+  const userId = normalizeLineUserId(lineUserId);
+  if (!userId || !buffer?.length) {
+    const err = new Error('invalid_slip');
+    err.code = 'invalid_slip';
+    throw err;
+  }
+
+  const { url: imageUrl } = await uploadSlipImage(admin, buffer, userId);
+  const customerName = await findCustomerNameByLineUserId(db, userId);
+  let suggested = await suggestBillForLineUser(db, userId);
+  const hintBill = String(billNoHint || '').trim();
+  if (hintBill) {
+    const sale = await findSaleByBillNo(db, hintBill);
+    if (sale) {
+      suggested = {
+        billNo: hintBill,
+        saleId: sale.id,
+        customerName: sale.customerName || suggested?.customerName || null,
+        remainingAmount: saleRemaining(sale) || parseFloat(sale.total) || 0,
+        total: parseFloat(sale.total) || 0,
+      };
+    } else if (!suggested) {
+      suggested = { billNo: hintBill, saleId: null, customerName: null };
+    }
+  }
+
+  const docRef = await db.collection('paymentSlipSubmissions').add({
+    status: 'pending',
+    lineUserId: userId,
+    lineMessageId,
+    imageUrl,
+    source,
+    customerName: customerName || suggested?.customerName || null,
+    suggestedBillNo: suggested?.billNo || hintBill || null,
+    suggestedSaleId: suggested?.saleId || null,
+    billNo: suggested?.billNo || hintBill || null,
+    saleId: suggested?.saleId || null,
+    remainingAmount: suggested?.remainingAmount ?? null,
+    total: suggested?.total ?? null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    ok: true,
+    imageUrl,
+    submissionId: docRef.id,
+    suggestedBillNo: suggested?.billNo || hintBill || null,
+    message: SLIP_RECEIVED_REPLY,
+  };
+}
+
+/**
  * รับรูปสลิปจากลูกค้าในแชต 1:1 — เก็บคิวรอพนักงานยืนยันในแอป
  */
 async function processShrimpPaymentSlipImage(db, admin, { event, token }) {
@@ -132,31 +193,21 @@ async function processShrimpPaymentSlipImage(db, admin, { event, token }) {
     return { ok: false };
   }
 
-  const { url: imageUrl } = await uploadSlipImage(admin, buffer, userId);
-  const customerName = await findCustomerNameByLineUserId(db, userId);
-  const suggested = await suggestBillForLineUser(db, userId);
-
-  await db.collection('paymentSlipSubmissions').add({
-    status: 'pending',
+  const result = await recordPaymentSlipSubmission(db, admin, {
     lineUserId: userId,
+    buffer,
     lineMessageId: messageId || null,
-    imageUrl,
-    customerName: customerName || suggested?.customerName || null,
-    suggestedBillNo: suggested?.billNo || null,
-    suggestedSaleId: suggested?.saleId || null,
-    billNo: suggested?.billNo || null,
-    saleId: suggested?.saleId || null,
-    remainingAmount: suggested?.remainingAmount ?? null,
-    total: suggested?.total ?? null,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    source: 'line_chat',
   });
 
   await lineReply(event.replyToken, SLIP_RECEIVED_REPLY, token);
-  return { ok: true, imageUrl, suggestedBillNo: suggested?.billNo || null };
+  return result;
 }
 
 module.exports = {
+  SLIP_RECEIVED_REPLY,
   processShrimpPaymentSlipImage,
+  recordPaymentSlipSubmission,
   suggestBillForLineUser,
   isOpenSale,
   saleRemaining,

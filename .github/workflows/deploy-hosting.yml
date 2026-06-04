@@ -88,6 +88,26 @@ jobs:
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve LIFF slip ID (secret or auto-provision)
+        id: liff_slip
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_LIFF_SLIP_ID: ${{ secrets.LINE_LIFF_SLIP_ID }}
+          VITE_LIFF_SLIP_ID: ${{ secrets.VITE_LIFF_SLIP_ID }}
+        run: |
+          set -euo pipefail
+          ID="${LINE_LIFF_SLIP_ID:-${VITE_LIFF_SLIP_ID:-}}"
+          if [ -z "$ID" ] && [ -f apps/webhook-core/shrimp-liff-slip-id.json ]; then
+            ID=$(node -p "require('./apps/webhook-core/shrimp-liff-slip-id.json').liffId")
+          fi
+          if [ -z "$ID" ]; then
+            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>/dev/null | tail -1 || true)
+          fi
+          if [ -z "$ID" ]; then
+            echo "::warning::VITE_LIFF_SLIP_ID missing — LIFF ฝากสลิปจะยังไม่เปิดจนกว่าจะตั้งค่า"
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
       - name: Build seafood-pos
         run: npm run build --workspace=apps/seafood-pos
         env:
@@ -99,6 +119,7 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID:              ${{ secrets.VITE_FIREBASE_APP_ID_SHRIMP }}
           VITE_LIFF_ID:                      ${{ steps.liff.outputs.id || secrets.VITE_LIFF_ID }}
+          VITE_LIFF_SLIP_ID:                 ${{ steps.liff_slip.outputs.id || secrets.VITE_LIFF_SLIP_ID }}
 
       - name: Deploy to Firebase Hosting (shrimp)
         uses: FirebaseExtended/action-hosting-deploy@v0
