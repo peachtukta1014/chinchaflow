@@ -4,7 +4,7 @@ import { PAY } from '../constants';
 import { dateKeyBangkok, formatDateThaiShort, formatViewDateLabel } from '../lib/date';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
-import { debtCustomerKey } from '../lib/debtCustomerKey';
+import { buildDebtCustomerRows, sumDebtCustomerRows } from '../lib/debtCustomerKey';
 import { openSalesForCustomer, paymentTypeLabel } from '../lib/saleFifo';
 import { fsListCollection, fsQueryOpenSales, fsQuerySales } from '../lib/firestoreRest';
 import { billAmount } from '../lib/salesAggregate';
@@ -61,7 +61,10 @@ function CustomerFifoPanel({
   }, [open, row.customerId, row.customerName, onRefresh]);
 
   const debt = debtByKey.get(row.key);
-  const totalOwed = debt?.totalDebt ?? fifoBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0);
+  const fifoRemain = fifoBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0);
+  const totalOwed =
+    parseFloat(debt?.totalDebt)
+    || (fifoRemain > 0 ? fifoRemain : parseFloat(row.totalDebt) || 0);
 
   const handleFifoPay = async () => {
     const amt = parseFloat(payInput);
@@ -357,7 +360,12 @@ export default function CustomerAccountsScreen({
     if (!debtsOnly) loadDaySales({ background: true });
   }, 45000);
 
-  const totalDebt = customerDebts.reduce((s, c) => s + (parseFloat(c.totalDebt) || 0), 0);
+  const customerRows = useMemo(
+    () => buildDebtCustomerRows(customerDebts, openSalesIndex),
+    [customerDebts, openSalesIndex],
+  );
+
+  const totalDebt = useMemo(() => sumDebtCustomerRows(customerRows), [customerRows]);
 
   const sortedDaySales = useMemo(
     () => [...daySales].sort((a, b) => String(b.timestamp || b.billNo || '').localeCompare(String(a.timestamp || a.billNo || ''))),
@@ -422,32 +430,6 @@ export default function CustomerAccountsScreen({
     return m;
   }, [customerDebts]);
 
-  const customerRows = useMemo(() => {
-    const map = new Map();
-    for (const d of customerDebts) {
-      map.set(d.id, {
-        key: d.id,
-        customerId: d.customerId || d.id,
-        customerName: d.customerName || 'ลูกค้า',
-        zone: d.zone || 'ทั่วไป',
-        totalDebt: d.totalDebt || 0,
-      });
-    }
-    for (const s of openSalesIndex) {
-      if ((parseFloat(s.remainingAmount) || 0) <= 0) continue;
-      const key = debtCustomerKey(s.customerId, s.customerName);
-      if (!key || map.has(key)) continue;
-      map.set(key, {
-        key,
-        customerId: s.customerId,
-        customerName: s.customerName || 'ลูกค้า',
-        zone: s.zone || 'ทั่วไป',
-        totalDebt: parseFloat(s.remainingAmount) || 0,
-      });
-    }
-    return [...map.values()].sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0));
-  }, [customerDebts, openSalesIndex]);
-
   return (
     <div className="p-5 space-y-4 pb-8">
       {billSheet && (
@@ -462,7 +444,7 @@ export default function CustomerAccountsScreen({
         <p className="text-orange-100 text-xs font-bold mb-1">ลูกหนี้รวม (AR)</p>
         <p className="text-3xl font-black">฿{totalDebt.toLocaleString()}</p>
         <p className="text-orange-100 text-xs mt-1">
-          {customerDebts.length} ราย · รับชำระผ่อนแบบ FIFO
+          {customerRows.length} ราย · รับชำระผ่อนแบบ FIFO
         </p>
       </div>
 
