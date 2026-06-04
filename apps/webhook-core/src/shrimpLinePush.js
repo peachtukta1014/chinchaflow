@@ -1,4 +1,5 @@
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const { getShrimpSlipLiffOpenUrl } = require('./provisionShrimpLiff');
 const { customerMatchesName } = require('./customerNameAliases');
 const { LINE_UID_RE, normalizeLineUserId } = require('./lineUserId');
 const {
@@ -182,15 +183,20 @@ function buildLineBillTransferAccountsText() {
 
 const LINE_BILL_TRANSFER_ACCOUNTS_TEXT = buildLineBillTransferAccountsText();
 
-function lineBillUnpaidHint(paymentType, remainingAmount, total) {
+function lineBillUnpaidHint(paymentType, remainingAmount, total, billNo) {
   const remain = parseFloat(remainingAmount);
   const unpaid = Number.isFinite(remain) && remain > 0
     ? remain
     : (paymentType === 'credit' ? parseFloat(total) || 0 : 0);
   if (unpaid <= 0) return '';
+  const slipUrl = getShrimpSlipLiffOpenUrl(billNo);
+  const slipLine = slipUrl
+    ? `📷 ฝากสลิปยืนยันโอน: ${slipUrl}`
+    : '📷 ฝากสลิป: กดเมนู「ฝากสลิปยืนยันการโอน」ด้านล่าง';
   return [
     `ค้างชำระ ฿${unpaid.toLocaleString('th-TH')}`,
     buildLineBillTransferAccountsText(),
+    slipLine,
   ].join('\n');
 }
 
@@ -237,7 +243,7 @@ async function pushShrimpBillToCustomer(db, admin, {
 
   const { url } = await uploadBillJpeg(admin, buffer, billNo);
   const paidNote = lineBillPaymentNote(paymentType);
-  const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total);
+  const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total, billNo);
   const thankYou = lineBillPaidThankYouCaption(paymentType, remainingAmount, total);
   const caption = [
     '📋 ใบส่งของ — โกอ้วน คลังซีฟู้ด',

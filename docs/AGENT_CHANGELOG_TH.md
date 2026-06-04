@@ -26,7 +26,21 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
-### 2026-06-04 — กุ้ง: ลูกหนี้รวม (AR) แสดง ฿0 ทั้งที่มีบิลค้าง (branch cursor-พี่เซอdebt-ar-zero-ea63)
+### 2026-06-04 — กุ้ง: LIFF ฝากสลิป + Rich Menu B (branch cursor-พี่เซอliff-slip-deposit-ea63)
+
+- **ปัญหา/คำขอ:** ลูกค้าอายุมากหุบ Rich Menu ไม่เป็น — หา 📎 ส่งสลิปยาก · ต้องการหน้าฝากสลิปแบบ LIFF + ลิงก์ในบิลค้าง
+- **แก้แล้ว:** `liff-slip.html` + `shrimpLiffSlip` function · บิลค้างแนบลิงก์ LIFF · help เมนู A/B/C · provision `shrimp-liff-slip-id.json`
+- **ไฟล์/จุดสำคัญ:** `LineSlipLiffApp.jsx`, `shrimpLiffSlip.js`, `shrimpLinePush.js`, `docs/LINE_RICH_MENU_TH.md`
+- **พฤติกรรมหลังแก้:** กดเมนู B → เลือกรูปสลิป → คิว `paymentSlipSubmissions` เหมือนส่งในแชต
+- **ถ้าพังอีก ให้เช็กก่อน:** Rich Menu B ชี้ `liff.line.me/<LIFF_SLIP_ID>` · deploy **hosting + functions** · Secrets `LINE_LIFF_SLIP_ID`
+
+### 2026-06-04 — กุ้ง: ข้อความช่วยเหลือ LINE สั้นลง (PR #167)
+
+- **ปัญหา/คำขอ:** ข้อความบอทยาว · เมนูสั่งกุ้ง → สั่งออเดอร์ · แจ้งคีย์ยกเลิก
+- **แก้แล้ว:** `helpCustomerTh/En` สั้นลง · รับ `วิธีสั่งซื้อ` / `สอบถาม` จาก Rich Menu
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy **functions** (webhook-core)
+
+### 2026-06-04 — กุ้ง: ลูกหนี้รวม (AR) แสดง ฿0 ทั้งที่มีบิลค้าง (PR #166)
 
 - **ปัญหา/คำขอ:** แท็บลูกหนี้ — การ์ด「ลูกหนี้รวม」เป็น ฿0 / รายลูกค้ายอด ฿0 ทั้งที่มีบิลค้างใน sales
 - **แก้แล้ว:** `buildDebtCustomerRows` รวม `customerDebts` + บิล `remainingAmount > 0` · ยอดรวม AR จากแถวเดียวกับรายการ · แถวลูกค้า fallback `row.totalDebt` เมื่อยังไม่ขยาย FIFO

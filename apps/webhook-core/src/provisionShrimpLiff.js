@@ -4,6 +4,7 @@
  */
 
 const DEFAULT_ENDPOINT = 'https://ko-seafood.top/liff-order.html';
+const SLIP_DEFAULT_ENDPOINT = 'https://ko-seafood.top/liff-slip.html';
 
 async function lineFetch(url, token, options = {}) {
   const r = await fetch(url, {
@@ -81,9 +82,25 @@ function liffOpenUrl(liffId) {
   return `https://liff.line.me/${String(liffId).trim()}`;
 }
 
+function resolveShrimpSlipLiffId() {
+  return String(process.env.LINE_LIFF_SLIP_ID || process.env.VITE_LIFF_SLIP_ID || '').trim();
+}
+
+/** URL เปิด LIFF ฝากสลิป — ใส่ในข้อความบิลค้าง / help */
+function getShrimpSlipLiffOpenUrl(billNo) {
+  const id = resolveShrimpSlipLiffId();
+  if (!id) return '';
+  const base = liffOpenUrl(id);
+  const bill = String(billNo || '').trim();
+  if (!bill) return base;
+  return `${base}?billNo=${encodeURIComponent(bill)}`;
+}
+
 module.exports = {
   DEFAULT_ENDPOINT,
+  SLIP_DEFAULT_ENDPOINT,
   ensureShrimpLiffApp,
   liffOpenUrl,
   normalizeEndpoint,
+  getShrimpSlipLiffOpenUrl,
 };

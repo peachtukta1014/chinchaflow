@@ -54,6 +54,23 @@ jobs:
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve LIFF slip ID (secret or auto-provision)
+        id: liff_slip
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_LIFF_SLIP_ID: ${{ secrets.LINE_LIFF_SLIP_ID }}
+          VITE_LIFF_SLIP_ID: ${{ secrets.VITE_LIFF_SLIP_ID }}
+        run: |
+          set -euo pipefail
+          ID="${LINE_LIFF_SLIP_ID:-${VITE_LIFF_SLIP_ID:-}}"
+          if [ -z "$ID" ] && [ -f apps/webhook-core/shrimp-liff-slip-id.json ]; then
+            ID=$(node -p "require('./apps/webhook-core/shrimp-liff-slip-id.json').liffId")
+          fi
+          if [ -z "$ID" ]; then
+            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>/dev/null | tail -1 || true)
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
       - name: Write env vars for functions
         run: |
           {
@@ -62,6 +79,7 @@ jobs:
             echo "LINE_TEA_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_TEA_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
             echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
+            echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions

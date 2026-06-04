@@ -11,10 +11,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
-const { ensureShrimpLiffApp, liffOpenUrl, DEFAULT_ENDPOINT } = require('../src/provisionShrimpLiff.js');
+const {
+  ensureShrimpLiffApp,
+  liffOpenUrl,
+  DEFAULT_ENDPOINT,
+  SLIP_DEFAULT_ENDPOINT,
+  normalizeEndpoint,
+} = require('../src/provisionShrimpLiff.js');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_LIFF_JSON = path.join(__dirname, '../shrimp-liff-id.json');
+const REPO_LIFF_SLIP_JSON = path.join(__dirname, '../shrimp-liff-slip-id.json');
 
 function readRepoLiffId() {
   try {
@@ -35,16 +42,31 @@ function argValue(flag) {
   return i >= 0 ? args[i + 1] : null;
 }
 
-const endpoint = argValue('--endpoint') || process.env.SHRIMP_LIFF_ENDPOINT || DEFAULT_ENDPOINT;
+const endpoint = argValue('--endpoint')
+  || process.env.SHRIMP_LIFF_ENDPOINT
+  || (args.includes('--slip') ? SLIP_DEFAULT_ENDPOINT : DEFAULT_ENDPOINT);
+
+function readRepoJson(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return '';
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return String(data.liffId || '').trim();
+  } catch {
+    return '';
+  }
+}
 
 async function main() {
   if (!ensure && !printUrl) {
-    console.error('Usage: --ensure [--endpoint URL] [--print-url]');
+    console.error('Usage: --ensure [--endpoint URL] [--slip] [--print-url]');
     process.exit(2);
   }
 
+  const isSlip = args.includes('--slip') || normalizeEndpoint(endpoint) === normalizeEndpoint(SLIP_DEFAULT_ENDPOINT);
   const preset = String(
-    process.env.LINE_LIFF_ID || process.env.VITE_LIFF_ID || readRepoLiffId() || '',
+    isSlip
+      ? (process.env.LINE_LIFF_SLIP_ID || process.env.VITE_LIFF_SLIP_ID || readRepoJson(REPO_LIFF_SLIP_JSON) || '')
+      : (process.env.LINE_LIFF_ID || process.env.VITE_LIFF_ID || readRepoLiffId() || ''),
   ).trim();
   if (preset) {
     console.log(preset);
@@ -55,7 +77,12 @@ async function main() {
   const liffId = await ensureShrimpLiffApp({
     token: process.env.LINE_CHANNEL_ACCESS_TOKEN,
     endpoint,
+    description: isSlip ? 'ฝากสลิป · โกอ้วน คลังซีฟู้ด' : 'สั่งกุ้ง · โกอ้วน คลังซีฟู้ด',
   });
+  const outJson = isSlip ? REPO_LIFF_SLIP_JSON : REPO_LIFF_JSON;
+  if (ensure && liffId) {
+    fs.writeFileSync(outJson, `${JSON.stringify({ liffId, endpoint: normalizeEndpoint(endpoint) }, null, 2)}\n`);
+  }
   console.log(liffId);
   if (printUrl) console.error(liffOpenUrl(liffId));
 }

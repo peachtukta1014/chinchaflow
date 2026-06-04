@@ -54,7 +54,8 @@ assert(classifyShrimpLineMessage('EN', null) === 'help_en', 'help_en intent');
 assert(classifyShrimpLineMessage('2', null) === 'help_en', 'help_en digit 2');
 
 const helpTh = replyHelpCustomerThai();
-assert(/สั่งได้ 2 ทาง/.test(helpTh), 'help th short how-to');
+assert(/เมนูด้านล่าง/.test(helpTh), 'help th menu layout');
+assert(/ฝากสลิปยืนยันการโอน/.test(helpTh), 'help th slip menu label');
 assert(/สั่งออเดอร์/.test(helpTh), 'help th rich menu label');
 assert(!/สั่งกุ้ง/.test(helpTh), 'help th no old menu label');
 assert(!/น้ำหนักต่อรายการ/.test(helpTh), 'help th no weight line');
@@ -65,7 +66,8 @@ assert(/ภาษาอังกฤษ: พิมพ์ EN/.test(helpTh), 'help 
 assert(!/မြန်မာ|အော်ဒါ/.test(helpTh), 'help th no burmese block');
 
 const helpEn = replyHelpCustomerEnglish();
-assert(/How to order/.test(helpEn), 'help en short how-to');
+assert(/Bottom menu/.test(helpEn), 'help en menu layout');
+assert(/upload transfer slip/i.test(helpEn), 'help en slip menu');
 assert(/ภาษาไทย: พิมพ์ ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
 
 console.log('\nall shrimp i18n order tests passed\n');

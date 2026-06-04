@@ -22,6 +22,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         liffOrder: path.resolve(__dirname, 'liff-order.html'),
+        liffSlip: path.resolve(__dirname, 'liff-slip.html'),
       },
       output: {
         manualChunks(id) {
