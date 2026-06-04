@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-04 — กุ้ง: ลูกหนี้รวม (AR) แสดง ฿0 ทั้งที่มีบิลค้าง (branch cursor-พี่เซอdebt-ar-zero-ea63)
+
+- **ปัญหา/คำขอ:** แท็บลูกหนี้ — การ์ด「ลูกหนี้รวม」เป็น ฿0 / รายลูกค้ายอด ฿0 ทั้งที่มีบิลค้างใน sales
+- **แก้แล้ว:** `buildDebtCustomerRows` รวม `customerDebts` + บิล `remainingAmount > 0` · ยอดรวม AR จากแถวเดียวกับรายการ · แถวลูกค้า fallback `row.totalDebt` เมื่อยังไม่ขยาย FIFO
+- **ไฟล์/จุดสำคัญ:** `debtCustomerKey.js`, `CustomerAccountsScreen.jsx`, smoke `debtCustomerRows`
+- **พฤติกรรมหลังแก้:** มีบิลค้างแต่เอกสารหนี้ยังไม่อัปเดต → AR รวมและรายชื่อไม่เป็น 0
+- **ถ้าพังอีก ให้เช็กก่อน:** `fsQueryOpenSales` · `incrementCustomerDebt` · `reconcileDebtsFromSales`
+
 ### 2026-06-03 — กุ้ง: รับเข้าแยกไซซ์ A/B/C ใส่ราคา/กก. ต่อไซซ์ (branch cursor/stock-receive-size-price-bf33)
 
 - **ปัญหา/คำขอ:** รับเข้าแยกไซซ์ — ราคา A/B/C ไม่เท่ากัน ใส่ราคารวม/กก. เดียวไม่ได้

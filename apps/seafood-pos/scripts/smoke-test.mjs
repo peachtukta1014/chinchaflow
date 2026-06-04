@@ -893,6 +893,26 @@ try {
 }
 
 try {
+  const { buildDebtCustomerRows, sumDebtCustomerRows } = await import('../src/lib/debtCustomerKey.js');
+  const openOnly = buildDebtCustomerRows([], [
+    { customerId: 'c1', customerName: 'ร้าน A', remainingAmount: 500 },
+    { customerId: 'c1', customerName: 'ร้าน A', remainingAmount: 300 },
+  ]);
+  assert(openOnly.length === 1 && openOnly[0].totalDebt === 800, 'AR rows from open sales only');
+  assert(sumDebtCustomerRows(openOnly) === 800, 'AR total from open sales');
+  const mixed = buildDebtCustomerRows(
+    [{ id: 'c2', customerId: 'c2', customerName: 'ร้าน B', totalDebt: 1200 }],
+    [{ customerId: 'c2', customerName: 'ร้าน B', remainingAmount: 400 }],
+  );
+  assert(mixed.length === 1 && mixed[0].totalDebt === 1200, 'AR prefers customerDebts doc');
+  const acctSrc = fs.readFileSync(path.join(root, 'src/screens/CustomerAccountsScreen.jsx'), 'utf8');
+  assert(acctSrc.includes('buildDebtCustomerRows'), 'accounts uses buildDebtCustomerRows');
+  assert(acctSrc.includes('sumDebtCustomerRows'), 'accounts uses sumDebtCustomerRows');
+} catch (e) {
+  fail('debtCustomerRows', e);
+}
+
+try {
   const { saleRemainingAmount, isOpenSaleForSlip } = await import('../src/lib/paymentSlipOpenSale.js');
   assert(saleRemainingAmount({ paymentType: 'credit', total: 500 }) === 500, 'saleRemainingAmount credit');
   assert(!isOpenSaleForSlip({ paymentType: 'transfer', remainingAmount: 0 }), 'closed transfer not open');
