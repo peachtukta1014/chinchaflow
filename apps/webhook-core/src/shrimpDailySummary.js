@@ -98,7 +98,7 @@ function isShrimpSummaryCommand(text) {
 }
 
 const SHRIMP_SUMMARY_CMD = { test: (t) => isShrimpSummaryCommand(t) };
-const SHRIMP_HELP_CMD = /^(help|ช่วยเหลือ|ช่วย|คำสั่ง|menu|วิธี|สอบถาม)(\s|$)/i;
+const SHRIMP_HELP_CMD = /^(help|ช่วยเหลือ|ช่วย|คำสั่ง|menu|วิธี|สอบถาม|วิธีสั่งซื้อ)(\s|$)/i;
 
 const SHRIMP_HELP_TEXT = [
   '🤖 บอทร้านกุ้ง — โกอ้วน คลังซีฟู้ด',
