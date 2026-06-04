@@ -48,17 +48,18 @@ const thReply = replyOrderOk('th', 1, '2026-05-31', [
 assert(/รับออเดอร์/.test(thReply), 'order ok thai');
 
 assert(classifyShrimpLineMessage('ช่วยเหลือ', null) === 'help', 'help intent thai');
+assert(classifyShrimpLineMessage('สอบถาม', null) === 'help', 'help intent สอบถาม rich menu');
 assert(classifyShrimpLineMessage('EN', null) === 'help_en', 'help_en intent');
 assert(classifyShrimpLineMessage('2', null) === 'help_en', 'help_en digit 2');
 
 const helpTh = replyHelpCustomerThai();
-assert(/คู่มือการสั่งซื้อ/.test(helpTh), 'help th formal header');
+assert(/สั่งได้ 2 ทาง/.test(helpTh), 'help th short how-to');
 assert(/094-940-8665/.test(helpTh), 'help th contact phone peach');
+assert(/ภาษาอังกฤษ: พิมพ์ EN/.test(helpTh), 'help th english switch');
 assert(!/မြန်မာ|အော်ဒါ/.test(helpTh), 'help th no burmese block');
 
 const helpEn = replyHelpCustomerEnglish();
-assert(/Ordering & contact guide/.test(helpEn), 'help en formal header');
-assert(/For Thai, reply: Help or ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
-assert(/For English, reply: 2 or EN/.test(helpTh), 'help th english switch all-english');
+assert(/How to order/.test(helpEn), 'help en short how-to');
+assert(/ภาษาไทย: พิมพ์ ช่วยเหลือ/.test(helpEn), 'help en thai switch hint');
 
 console.log('\nall shrimp i18n order tests passed\n');
