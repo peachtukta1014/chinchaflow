@@ -1,23 +1,65 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CUSTOMERS } from '../constants/customers.js';
+import { fetchLiffCustomerCatalog } from './liffOrderApi.js';
 import { Bilingual, BilingualHeading, BilingualHint, BilingualInline } from './Bilingual.jsx';
 import { LIFF_COPY as T } from './liffCopy.js';
 
-const CATALOG = CUSTOMERS.filter((c) => c.id !== 'general');
+const PREVIEW_CATALOG = CUSTOMERS.filter((c) => c.id !== 'general');
 
-export function CustomerPicker({ onSelect, onClose, onBack }) {
+export function CustomerPicker({
+  idToken,
+  initialCatalog,
+  onSelect,
+  onClose,
+  onBack,
+}) {
   const [q, setQ] = useState('');
+  const [catalog, setCatalog] = useState(initialCatalog || PREVIEW_CATALOG);
+  const [loading, setLoading] = useState(Boolean(idToken && !initialCatalog?.length));
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    if (!idToken) {
+      setCatalog(initialCatalog || PREVIEW_CATALOG);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError('');
+
+    fetchLiffCustomerCatalog(idToken)
+      .then((res) => {
+        if (cancelled) return;
+        const rows = Array.isArray(res.customers) ? res.customers : [];
+        setCatalog(rows.length ? rows : (initialCatalog || PREVIEW_CATALOG));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadError(e?.message || T.loadError.th);
+        if (initialCatalog?.length) setCatalog(initialCatalog);
+        else setCatalog(PREVIEW_CATALOG);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [idToken, initialCatalog]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return CATALOG;
-    return CATALOG.filter(
+    if (!needle) return catalog;
+    return catalog.filter(
       (c) =>
         c.name.toLowerCase().includes(needle)
         || (c.zone || '').toLowerCase().includes(needle)
         || (c.aliases || []).some((a) => a.toLowerCase().includes(needle)),
     );
-  }, [q]);
+  }, [q, catalog]);
 
   return (
     <>
@@ -40,24 +82,37 @@ export function CustomerPicker({ onSelect, onClose, onBack }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
+          disabled={loading}
         />
-        <ul className="space-y-2">
-          {filtered.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(c)}
-                className="w-full text-left min-h-[52px] px-4 py-3 rounded-2xl border border-slate-200 bg-white active:bg-sky-50"
-              >
-                <p className="font-bold text-slate-900">{c.name}</p>
-                {c.zone && (
-                  <p className="text-xs text-slate-500 mt-0.5">{c.zone}</p>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-        {filtered.length === 0 && (
+        {loading && (
+          <p className="text-center text-sm text-slate-500 py-6">
+            <BilingualInline th={T.loading.th} en={T.loading.en} />
+          </p>
+        )}
+        {loadError && !loading && (
+          <p className="text-center text-sm text-amber-700 py-2 mb-2" role="status">
+            {loadError}
+          </p>
+        )}
+        {!loading && (
+          <ul className="space-y-2">
+            {filtered.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(c)}
+                  className="w-full text-left min-h-[52px] px-4 py-3 rounded-2xl border border-slate-200 bg-white active:bg-sky-50"
+                >
+                  <p className="font-bold text-slate-900">{c.name}</p>
+                  {c.zone && (
+                    <p className="text-xs text-slate-500 mt-0.5">{c.zone}</p>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && filtered.length === 0 && (
           <p className="text-center text-sm text-slate-500 py-8">
             <BilingualInline th={T.pickEmpty.th} en={T.pickEmpty.en} />
           </p>

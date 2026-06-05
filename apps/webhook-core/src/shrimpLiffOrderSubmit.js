@@ -18,6 +18,10 @@ const {
   upsertCustomerProfile,
   MAIN_CATALOG_SHOP_IDS,
 } = require('./shrimpLineCustomerProfile');
+const {
+  buildLiffCustomerCatalog,
+  loadCustomerById,
+} = require('./shrimpBuiltinCustomers');
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
@@ -111,9 +115,8 @@ async function resolveCustomerForLiff(db, admin, {
   const uid = normalizeLineUserId(lineUserId);
   let customer = null;
 
-  if (customerId && MAIN_CATALOG_SHOP_IDS.has(customerId)) {
-    const snap = await db.collection('customers').doc(customerId).get();
-    if (snap.exists) customer = { id: snap.id, ...snap.data() };
+  if (customerId) {
+    customer = await loadCustomerById(db, customerId);
   }
 
   if (!customer && uid) {
@@ -189,7 +192,8 @@ async function getLiffContext(db, lineUserId) {
     };
   }
 
-  return { mode: 'pick', customer: null };
+  const customers = await buildLiffCustomerCatalog(db);
+  return { mode: 'pick', customer: null, customers };
 }
 
 async function submitLiffOrder(db, admin, body, verified) {
@@ -228,7 +232,7 @@ async function submitLiffOrder(db, admin, body, verified) {
   const customerName = String(customer.name || '').trim();
   const items = riverItems.map((it) => ({ ...it, customerName }));
 
-  if (linkUid && customer.id && MAIN_CATALOG_SHOP_IDS.has(customer.id)) {
+  if (linkUid && customer.id) {
     await releaseLineUserIdFromOthers(db, admin, lineUserId, customer.id);
   }
 
@@ -283,6 +287,11 @@ async function handleShrimpLiffOrderRequest(db, admin, body) {
     return { ok: true, ...ctx, lineDisplayName: verified.name || '' };
   }
 
+  if (action === 'catalog') {
+    const customers = await buildLiffCustomerCatalog(db);
+    return { ok: true, customers };
+  }
+
   if (action === 'submit') {
     return submitLiffOrder(db, admin, body, verified);
   }
@@ -296,4 +305,5 @@ module.exports = {
   handleShrimpLiffOrderRequest,
   buildItemsFromPayload,
   getLiffContext,
+  buildLiffCustomerCatalog,
 };
