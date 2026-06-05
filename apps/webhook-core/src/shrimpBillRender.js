@@ -347,7 +347,7 @@ function buildSatoriTree(data, logoUrl, qrUrl) {
         el('div', { style: { display: 'flex', width: 150, flexDirection: 'column' } }, [fieldLine('วันที่ส่ง', data.date)]),
       ]),
       fieldLine('เบอร์โทร', data.customerPhone || ''),
-      fieldLine('ที่อยู่', data.deliveryAddress || data.address || ''),
+      fieldLine('ที่อยู่', data.deliveryAddress || ''),
     ]),
     el('div', {
       style: {

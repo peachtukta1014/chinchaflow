@@ -301,6 +301,18 @@ try {
   );
   assert(fullBill.customerPhone === '0899999999', 'billData carries customer phone');
   assert(fullBill.deliveryAddress.includes('ทดสอบ'), 'billData carries customer address');
+  const noAddrBill = saleToBillData(
+    { billNo: 'NA', customerName: 'อีสานรสเด็ด', items: [], total: 0 },
+    { phone: '0899088208', address: '' },
+  );
+  assert(noAddrBill.customerPhone === '0899088208', 'phone on bill');
+  assert(noAddrBill.deliveryAddress === '', 'no address stays empty');
+  assert(noAddrBill.address === '0899088208', 'legacy address field may combine phone only');
+  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillRender.js'), 'utf8');
+  assert(
+    !renderSrc.includes("data.deliveryAddress || data.address"),
+    'bill address line must not fall back to legacy address (shows phone)',
+  );
 } catch (e) {
   fail('resolveBillCustomer', e);
 }

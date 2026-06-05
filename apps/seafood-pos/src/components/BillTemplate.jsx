@@ -210,7 +210,7 @@ export default function BillTemplate({ data }) {
           </div>
         </div>
         <FieldLine label="เบอร์โทร" value={data.customerPhone || ''} />
-        <FieldLine label="ที่อยู่" value={data.deliveryAddress || data.address || ''} />
+        <FieldLine label="ที่อยู่" value={data.deliveryAddress || ''} />
       </div>
 
       <table className="w-full border-collapse border-2 border-[#1e3a8a] bg-white text-sm shadow-sm">
