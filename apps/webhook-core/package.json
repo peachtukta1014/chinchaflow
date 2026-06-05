@@ -12,7 +12,6 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "@fontsource/sarabun": "^5.2.5",
     "@resvg/resvg-js": "^2.6.2",
     "dotenv": "^16.4.5",
     "firebase-admin": "^12.0.0",
