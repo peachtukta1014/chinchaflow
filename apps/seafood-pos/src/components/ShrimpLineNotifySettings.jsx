@@ -170,7 +170,7 @@ export default function ShrimpLineNotifySettings() {
             />
           </label>
           <label className="text-[10px] font-bold text-slate-500 block">
-            สิ้นสุดรอบ (วันนี้) — ชม.
+            สิ้นสุดรอบส่งวันนี้ — ชม. (ก่อนเวลานี้)
             <input
               type="number"
               min={0}
@@ -189,6 +189,10 @@ export default function ShrimpLineNotifySettings() {
         <p className="text-[10px] text-slate-600 bg-slate-50 px-3 py-2 rounded-xl">
           ช่วงปัจจุบัน: {formatLineDeliveryWindowLabel(normalizeLineDeliveryWindow(form))}
           {' → ส่งวันนี้ · นอกช่วง → พรุ่งนี้'}
+          <span className="block mt-1 text-slate-500">
+            ตัวอย่าง: สิ้นสุด 15 = ก่อน 15:00 น. ส่งวันนี้ · 15:00 น. ขึ้นไป ส่งพรุ่งนี้
+            (ตั้ง 16 = ก่อน 16:00 น. ส่งวันนี้)
+          </span>
         </p>
       </div>
 

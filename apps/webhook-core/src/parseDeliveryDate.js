@@ -158,6 +158,16 @@ function formatDateThai(dateKey) {
   return `${d}/${mo}/${(y + 543) % 100}`;
 }
 
+/** วันนี้ / พรุ่งนี้ / วันอื่น — สำหรับข้อความตอบลูกค้า */
+function deliveryDateKind(dateKey, now = new Date()) {
+  const d = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return 'other';
+  const today = dateKeyBangkok(now);
+  if (d === today) return 'today';
+  if (d === tomorrowFromDate(now)) return 'tomorrow';
+  return 'other';
+}
+
 /** วันจาก session ที่เลยวันนี้แล้วไม่ใช้ซ้ำ (กันออเดอร์ใหม่ติดวันส่งเก่า) */
 function coalesceSessionDeliveryDate(sessionDateKey, today = todayBKK()) {
   const s = String(sessionDateKey || '').trim();
@@ -195,6 +205,7 @@ module.exports = {
   DEFAULT_TODAY_WINDOW,
   parseDeliveryDateFromText,
   formatDateThai,
+  deliveryDateKind,
   dateKeyFromParts,
   coalesceSessionDeliveryDate,
   resolveLineOrderDeliveryDate,

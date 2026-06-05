@@ -1,5 +1,5 @@
 const { linePush } = require('./teaDailySummary');
-const { formatDateThai } = require('./parseDeliveryDate');
+const { formatDateThai, deliveryDateKind } = require('./parseDeliveryDate');
 const { getShrimpLineConfig } = require('./shrimpLineConfig');
 
 function collectNotifyTargets(config) {
@@ -24,16 +24,22 @@ async function pushToTargets(targets, text, token) {
   return { sent: results.filter((r) => r.ok).length, targets: results };
 }
 
-function formatShrimpOrderMessage(data) {
+function formatShrimpOrderMessage(data, now = new Date()) {
   const name = data.customerName || 'ลูกค้า';
   const dateLabel = data.deliveryDate ? formatDateThai(data.deliveryDate) : '—';
+  const kind = data.deliveryDate ? deliveryDateKind(data.deliveryDate, now) : 'other';
+  let shipLine = `ส่ง: ${dateLabel}${data.deliveryDate ? ` (${data.deliveryDate})` : ''}`;
+  if (kind === 'today') shipLine = `📅 ส่งวันนี้ — ${dateLabel}`;
+  if (kind === 'tomorrow') {
+    shipLine = `📅 ส่งพรุ่งนี้ — ${dateLabel} (เลยเวลารับส่งวันนี้)`;
+  }
   const items = (data.items || [])
     .map((i) => `• ${i.product} ${i.qty || ''} ${i.unit || ''}`.trim())
     .join('\n');
   const lines = [
     '🦐 ออเดอร์ LINE ใหม่',
     `ลูกค้า: ${name}`,
-    `ส่ง: ${dateLabel}${data.deliveryDate ? ` (${data.deliveryDate})` : ''}`,
+    shipLine,
   ];
   if (items) lines.push(items);
   if (data.rawText) lines.push(`"${String(data.rawText).slice(0, 80)}"`);

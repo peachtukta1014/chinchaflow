@@ -42,10 +42,22 @@ assert(
 const myReply = replyRiverPrompt('my', { qty: 2.5, unit: 'กก' }, '2026-05-31');
 assert(/သေး/.test(myReply), 'river prompt burmese');
 
-const thReply = replyOrderOk('th', 1, '2026-05-31', [
+const todayReply = replyOrderOk('th', 1, '2026-05-28', [
   { product: 'กุ้งกลาง', qty: 2, unit: 'กก', customerName: 'ปุ้ย' },
-]);
-assert(/รับออเดอร์/.test(thReply), 'order ok thai');
+], { now: new Date('2026-05-28T10:00:00+07:00') });
+assert(/ส่งวันนี้/.test(todayReply), 'order ok today label');
+
+const tomorrowAuto = replyOrderOk('th', 1, '2026-05-29', [
+  { product: 'กุ้งกลาง', qty: 2, unit: 'กก', customerName: 'ปุ้ย' },
+], { now: new Date('2026-05-28T16:00:00+07:00') });
+assert(/ส่งพรุ่งนี้/.test(tomorrowAuto), 'order ok tomorrow label');
+assert(/เลยเวลารับส่งวันนี้/.test(tomorrowAuto), 'tomorrow auto mentions cutoff');
+
+const tomorrowExplicit = replyOrderOk('th', 1, '2026-05-29', [
+  { product: 'กุ้งกลาง', qty: 2, unit: 'กก', customerName: 'ปุ้ย' },
+], { now: new Date('2026-05-28T16:00:00+07:00'), explicitDeliveryDate: true });
+assert(/ส่งพรุ่งนี้/.test(tomorrowExplicit), 'explicit tomorrow');
+assert(!/เลยเวลารับส่งวันนี้/.test(tomorrowExplicit), 'explicit tomorrow no cutoff line');
 
 assert(classifyShrimpLineMessage('ช่วยเหลือ', null) === 'help', 'help intent thai');
 assert(classifyShrimpLineMessage('สอบถาม', null) === 'help', 'help intent สอบถาม rich menu');

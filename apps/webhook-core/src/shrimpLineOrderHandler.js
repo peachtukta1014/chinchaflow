@@ -54,7 +54,9 @@ async function shouldVerifyCustomerProfile(db, groupId) {
 }
 
 async function tryCompleteOrder(db, admin, session, ts, ctx) {
-  const { items, text, userId, groupId, deliveryDate, replyLang } = ctx;
+  const {
+    items, text, userId, groupId, deliveryDate, replyLang, explicitDeliveryDate = false,
+  } = ctx;
 
   let linkedCustomerName = null;
   if (userId && !groupId) {
@@ -120,7 +122,9 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
 
   return {
     ok: true,
-    reply: replyOrderOk(replyLang, orderCount, deliveryDate, replyItems),
+    reply: replyOrderOk(replyLang, orderCount, deliveryDate, replyItems, {
+      explicitDeliveryDate,
+    }),
   };
 }
 
@@ -369,6 +373,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     groupId,
     deliveryDate,
     replyLang,
+    explicitDeliveryDate: Boolean(parsedDate),
   });
 }
 

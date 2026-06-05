@@ -4,8 +4,8 @@ const {
   resolveLineOrderDeliveryDate,
   defaultDeliveryDateKeyBangkok,
   parseDeliveryDateFromText,
+  deliveryDateKind,
 } = require('../src/parseDeliveryDate');
-
 function assert(cond, msg) {
   if (!cond) {
     console.error('FAIL:', msg);
@@ -43,4 +43,23 @@ assert(
   }) === '2026-05-28',
   'pending ค้างข้าม cutoff ยังใช้วันส่งเดิม',
 );
+
+const at1530 = new Date('2026-05-28T15:30:00+07:00');
+assert(
+  defaultDeliveryDateKeyBangkok(at1530, { startHour: 18, endHour: 15 }) === '2026-05-29',
+  '15:30 + end 15 → พรุ่งนี้',
+);
+assert(
+  defaultDeliveryDateKeyBangkok(at1530, { startHour: 18, endHour: 16 }) === '2026-05-28',
+  '15:30 + end 16 → วันนี้ (ตามค่าในแอปถ้าตั้ง 16)',
+);
+assert(
+  deliveryDateKind('2026-05-28', new Date('2026-05-28T10:00:00+07:00')) === 'today',
+  'deliveryDateKind today',
+);
+assert(
+  deliveryDateKind('2026-05-29', new Date('2026-05-28T16:00:00+07:00')) === 'tomorrow',
+  'deliveryDateKind tomorrow',
+);
+
 console.log('all parseDeliveryDate tests passed');

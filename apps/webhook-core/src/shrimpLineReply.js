@@ -1,4 +1,4 @@
-const { formatDateThai } = require('./parseDeliveryDate');
+const { formatDateThai, deliveryDateKind } = require('./parseDeliveryDate');
 const { MIN_WEIGHT_KG, MAX_WEIGHT_KG } = require('./orderWeight');
 
 const PRODUCT_LABEL = {
@@ -41,9 +41,20 @@ function formatItemsSummary(items, lang) {
     .join('\n');
 }
 
-function deliveryLabelForLang(deliveryDate, lang) {
+function deliveryLabelForLang(deliveryDate, lang, now = new Date()) {
   const th = formatDateThai(deliveryDate);
   const key = L(lang);
+  const kind = deliveryDateKind(deliveryDate, now);
+  if (kind === 'today') {
+    if (key === 'my') return `ယနေ့ ${th}`;
+    if (key === 'en') return `Today ${th}`;
+    return `วันนี้ ${th}`;
+  }
+  if (kind === 'tomorrow') {
+    if (key === 'my') return `မနက်ဖြန် ${th}`;
+    if (key === 'en') return `Tomorrow ${th}`;
+    return `พรุ่งนี้ ${th}`;
+  }
   if (key === 'my') return `ပို့ဆောင်ရက် ${th} (${deliveryDate})`;
   if (key === 'en') return `Delivery ${th} (${deliveryDate})`;
   return `${th} (${deliveryDate})`;
@@ -57,6 +68,33 @@ const M = {
       `✅ အော်ဒါ လက်ခံပြီး (${n})\n📅 ${dl}\n\n${summary}`,
     en: (n, dl, summary) =>
       `✅ Order received (${n})\n📅 ${dl}\n\n${summary}`,
+  },
+  orderOkToday: {
+    th: (n, dl, summary) =>
+      `✅ รับออเดอร์แล้วครับ (${n} ราย)\n📅 ส่งวันนี้ — ${dl}\n\n${summary}`,
+    my: (n, dl, summary) =>
+      `✅ အော်ဒါ လက်ခံပြီး (${n})\n📅 ယနေ့ — ${dl}\n\n${summary}`,
+    en: (n, dl, summary) =>
+      `✅ Order received (${n})\n📅 Deliver today — ${dl}\n\n${summary}`,
+  },
+  orderOkTomorrowExplicit: {
+    th: (n, dl, summary) =>
+      `✅ รับออเดอร์แล้วครับ (${n} ราย)\n📅 ส่งพรุ่งนี้ — ${dl}\n\n${summary}`,
+    my: (n, dl, summary) =>
+      `✅ အော်ဒါ လက်ခံပြီး (${n})\n📅 မနက်ဖြန် — ${dl}\n\n${summary}`,
+    en: (n, dl, summary) =>
+      `✅ Order received (${n})\n📅 Deliver tomorrow — ${dl}\n\n${summary}`,
+  },
+  orderOkTomorrow: {
+    th: (n, dl, summary) =>
+      `✅ รับออเดอร์แล้วครับ (${n} ราย)\n📅 ส่งพรุ่งนี้ — ${dl}\n`
+      + `⏰ เลยเวลารับส่งวันนี้แล้ว — ระบบตั้งเป็นวันส่งถัดไป\n\n${summary}`,
+    my: (n, dl, summary) =>
+      `✅ အော်ဒါ လက်ခံပြီး (${n})\n📅 မနက်ဖြန် — ${dl}\n`
+      + `⏰ ယနေ့ပို့မရ — နောက်ရက်သို့ သတ်မှတ်\n\n${summary}`,
+    en: (n, dl, summary) =>
+      `✅ Order received (${n})\n📅 Deliver tomorrow — ${dl}\n`
+      + `⏰ Past today’s cutoff — scheduled for the next delivery day\n\n${summary}`,
   },
   parseFail: {
     th: (help) => `ยังอ่านรายการไม่ได้ครับ\n\n${help}`,
@@ -204,10 +242,18 @@ function orderFormatHelp(lang) {
   return M.help[L(lang)]();
 }
 
-function replyOrderOk(lang, orderCount, deliveryDate, items) {
-  const dl = deliveryLabelForLang(deliveryDate, lang);
+function replyOrderOk(lang, orderCount, deliveryDate, items, opts = {}) {
+  const { now = new Date(), explicitDeliveryDate = false } = opts;
+  const dl = deliveryLabelForLang(deliveryDate, lang, now);
   const summary = formatItemsSummary(items, lang);
-  return M.orderOk[L(lang)](orderCount, dl, summary);
+  const kind = deliveryDateKind(deliveryDate, now);
+  const key = L(lang);
+  if (kind === 'tomorrow') {
+    if (explicitDeliveryDate) return M.orderOkTomorrowExplicit[key](orderCount, dl, summary);
+    return M.orderOkTomorrow[key](orderCount, dl, summary);
+  }
+  if (kind === 'today') return M.orderOkToday[key](orderCount, dl, summary);
+  return M.orderOk[key](orderCount, dl, summary);
 }
 
 function replyParseFail(lang) {
