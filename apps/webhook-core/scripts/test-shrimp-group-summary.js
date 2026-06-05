@@ -6,6 +6,10 @@ const {
   aggregateDailySales,
   buildShrimpSummaryMessage,
 } = require('../src/shrimpDailySummary');
+const {
+  formatFamilyTodayOrdersReply,
+  collectFamilyOrderRows,
+} = require('../src/shrimpTodayOrdersSummary');
 const { classifyShrimpGroupKeyboard } = require('../src/shrimpGroupKeyboard');
 const { replyHelpCustomerThai } = require('../src/shrimpLineReply');
 
@@ -113,5 +117,40 @@ assert(!familyMsg.includes('A ใหญ่'), 'family summary no inline size lab
 
 const oaMsg = buildShrimpSummaryMessage(agg, '2026-06-05', { familyGroup: false });
 assert(oaMsg.includes('A ใหญ่ 0.0 · B กลาง 3.0'), 'non-group keeps inline grades');
+
+const zoneByName = {
+  จ๊ะเขียด: 'ป่าตอง',
+  ปุ้ย: 'ป่าตอง',
+  อ้อม: 'ราไวย์',
+};
+const resolveZone = (name) => zoneByName[name] || 'ทั่วไป';
+const sampleOrders = [
+  {
+    deliveryDate: '2026-06-05',
+    items: [{ customerName: 'จ๊ะเขียด', product: 'กุ้งเล็ก', qty: 3, unit: 'กก' }],
+  },
+  {
+    deliveryDate: '2026-06-05',
+    items: [{ customerName: 'ปุ้ย', product: 'กุ้งเล็ก', qty: 2, unit: 'กก' }],
+  },
+  {
+    deliveryDate: '2026-06-05',
+    items: [{ customerName: 'อ้อม', product: 'กุ้งเล็ก', qty: 4, unit: 'กก' }],
+  },
+];
+const orderMsg = formatFamilyTodayOrdersReply(sampleOrders, '2026-06-05', resolveZone);
+assert(orderMsg.includes('รายการออเดอร์ลูกค้า'), 'orders header');
+assert(orderMsg.includes('วันที่ '), 'orders date line');
+assert(/ป่าตอง[\s\S]*จ๊ะเขียด[\s\S]*ปุ้ย/.test(orderMsg), 'patong zone block');
+assert(/ราไวย์[\s\S]*อ้อม/.test(orderMsg), 'rawai zone block');
+assert(orderMsg.includes('ยอดรวมทั้งหมด'), 'orders total header');
+assert(orderMsg.includes('A=0.0KG'), 'orders A total');
+assert(orderMsg.includes('B=0.0KG'), 'orders B total');
+assert(orderMsg.includes('C=9.0KG'), 'orders C total');
+assert(orderMsg.includes('รวม 9.0KG'), 'orders sum kg');
+assert(!orderMsg.includes('📦 ออเดอร์ส่งวันนี้'), 'family orders not old header');
+
+const { gradeKg } = collectFamilyOrderRows(sampleOrders, '2026-06-05', resolveZone);
+assert(gradeKg.small === 9, 'grade small kg sum');
 
 console.log('\nall shrimp group summary tests passed\n');

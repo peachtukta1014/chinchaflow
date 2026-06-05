@@ -7,18 +7,19 @@ const {
   buildCustomerNameByLineUidMap,
   normalizeLineUserId,
 } = require('./shrimpLinePush');
+const { customerMatchesName } = require('./customerNameAliases');
 
 const ORDER_WORD_RE = /(?:ออ[ร์]*เดอร?์?|ออเดอร์|order)/i;
+
+/** ลำดับแสดงโซนในกลุ่มครอบครัว */
+const ZONE_DISPLAY_ORDER = ['ป่าตอง', 'กะทู้', 'ภูเก็ต', 'ราไวย์', 'ทั่วไป'];
 
 function isShrimpTodayOrdersCommand(text) {
   const raw = String(text || '').trim();
   if (!raw) return false;
 
-  // "สรุปออเดอร์" / "สรุปรายการออเดอร์" — ขึ้นต้นด้วย สรุป + มีคำว่า ออเดอร์
   if (/^สรุป.*(ออเดอร์|order|รายการ)/i.test(raw)) return true;
-  // "สรุปรายการวันนี้"
   if (/^สรุปรายการวันนี้/i.test(raw)) return true;
-  // "รายการวันนี้" / "รายการออเดอร์วันนี้"
   if (/^รายการ.*(วันนี้|ออเดอร์)/i.test(raw)) return true;
 
   if (!ORDER_WORD_RE.test(raw)) return false;
@@ -28,10 +29,6 @@ function isShrimpTodayOrdersCommand(text) {
   return false;
 }
 
-/**
- * ยกเลิกออเดอร์ล่าสุดของ lineUserId ที่ยัง pending อยู่
- * @returns {{ cancelled: object|null, message: string }}
- */
 async function cancelLatestPendingOrderForUser(db, lineUserId) {
   if (!lineUserId) return { cancelled: null, message: 'ไม่พบข้อมูลผู้ใช้ครับ' };
 
@@ -46,7 +43,6 @@ async function cancelLatestPendingOrderForUser(db, lineUserId) {
       .get();
   } catch (err) {
     console.warn('cancelLatestPendingOrderForUser query', err.message);
-    // fallback without orderBy (index อาจยังไม่ build)
     const fallback = await db
       .collection('lineOrders')
       .where('lineUserId', '==', lineUserId)
@@ -85,7 +81,6 @@ async function cancelLatestPendingOrderForUser(db, lineUserId) {
 
   const dateLabel = data.deliveryDate ? ` (ส่ง ${formatDateThai(data.deliveryDate)})` : '';
 
-  // นับออเดอร์ที่เหลือจริงด้วย count() — ถูกต้องเสมอไม่ติด limit
   let pending = 0;
   try {
     const countSnap = await db
@@ -96,7 +91,6 @@ async function cancelLatestPendingOrderForUser(db, lineUserId) {
       .get();
     pending = countSnap.data().count;
   } catch {
-    // fallback: ประมาณจาก query เดิม (อาจต่ำกว่าจริงถ้า > limit)
     pending = Math.max(0, snap.docs.length - 1);
   }
 
@@ -133,10 +127,6 @@ function aggregateByProduct(orders) {
     .join('\n');
 }
 
-/**
- * @param {import('firebase-admin/firestore').Firestore} db
- * @param {string} [dateKey] — วันส่งที่ถือเป็น "วันนี้" (default Bangkok today)
- */
 function enrichOrdersWithLinkedCustomers(orders, uidMap) {
   return orders.map((o) => {
     const uid = normalizeLineUserId(o?.lineUserId);
@@ -150,34 +140,146 @@ function enrichOrdersWithLinkedCustomers(orders, uidMap) {
   });
 }
 
-async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK()) {
-  const uidMap = await buildCustomerNameByLineUidMap(db);
-  let snap;
-  try {
-    snap = await db
-      .collection('lineOrders')
-      .where('status', '==', 'pending')
-      .where('deliveryDate', '<=', dateKey)
-      .orderBy('deliveryDate', 'asc')
-      .get();
-  } catch (err) {
-    console.warn('today orders query', err.message);
-    const all = await db.collection('lineOrders').where('status', '==', 'pending').limit(200).get();
-    const docs = enrichOrdersWithLinkedCustomers(
-      all.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((o) => (o.deliveryDate || '') <= dateKey)
-        .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate))),
-      uidMap,
-    );
-    return formatTodayOrdersReply(docs, dateKey);
+/** ชื่อสั้นสำหรับแสดงในกลุ่ม — ตัดคำว่า ร้าน / ส่วนหลัง comma */
+function formatCustomerShortName(name) {
+  let s = String(name || '—').trim();
+  if (/^ร้าน\s+/.test(s)) s = s.replace(/^ร้าน\s+/, '').trim();
+  const comma = s.search(/[,，、]/);
+  if (comma > 0) s = s.slice(0, comma).trim();
+  return s || '—';
+}
+
+function sizeLabelFromProduct(product) {
+  const p = String(product || '');
+  if (/ตาย|dead/i.test(p)) return 'ตาย';
+  if (/ใหญ่|large|\ba\b/i.test(p)) return 'ใหญ่';
+  if (/กลาง|medium|\bb\b/i.test(p)) return 'กลาง';
+  if (/เล็ก|small|\bc\b/i.test(p)) return 'เล็ก';
+  return '—';
+}
+
+function sizeLabelToGradeKey(sizeLabel) {
+  if (sizeLabel === 'ใหญ่') return 'large';
+  if (sizeLabel === 'กลาง') return 'medium';
+  if (sizeLabel === 'เล็ก') return 'small';
+  return null;
+}
+
+function qtyToKg(qty) {
+  return parseFloat(qty) || 0;
+}
+
+function zoneSortIndex(zone) {
+  const z = String(zone || 'ทั่วไป').trim() || 'ทั่วไป';
+  const i = ZONE_DISPLAY_ORDER.indexOf(z);
+  if (i >= 0) return i;
+  return ZONE_DISPLAY_ORDER.length + 1;
+}
+
+async function buildCustomerZoneResolver(db) {
+  const snap = await db.collection('customers').get();
+  const records = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return (customerName) => {
+    const want = String(customerName || '').trim();
+    if (!want) return 'ทั่วไป';
+    for (const rec of records) {
+      if (customerMatchesName(rec, want)) {
+        return String(rec.zone || 'ทั่วไป').trim() || 'ทั่วไป';
+      }
+    }
+    return 'ทั่วไป';
+  };
+}
+
+/**
+ * รวมรายการตามโซน + ลูกค้า + ไซซ์ (กก.)
+ * @returns {{ rows: Array, gradeKg: { large, medium, small } }}
+ */
+function collectFamilyOrderRows(orders, dateKey, resolveZone) {
+  const merged = new Map();
+  const gradeKg = { large: 0, medium: 0, small: 0 };
+
+  for (const o of orders) {
+    const late = (o.deliveryDate || '') < dateKey;
+    for (const it of o.items || []) {
+      const customerName = formatCustomerShortName(it.customerName || o.customerName);
+      const zone = resolveZone(customerName);
+      const sizeLabel = sizeLabelFromProduct(it.product);
+      const qtyKg = qtyToKg(it.qty);
+      const gradeKey = sizeLabelToGradeKey(sizeLabel);
+      if (gradeKey) gradeKg[gradeKey] += qtyKg;
+
+      const key = `${zone}|${customerName}|${sizeLabel}`;
+      const prev = merged.get(key);
+      if (prev) {
+        prev.qtyKg += qtyKg;
+        prev.late = prev.late || late;
+      } else {
+        merged.set(key, { zone, customerName, sizeLabel, qtyKg, late });
+      }
+    }
   }
 
-  const orders = enrichOrdersWithLinkedCustomers(
-    snap.docs.map((d) => ({ id: d.id, ...d.data() })),
-    uidMap,
-  );
-  return formatTodayOrdersReply(orders, dateKey);
+  const rows = [...merged.values()].sort((a, b) => {
+    const z = zoneSortIndex(a.zone) - zoneSortIndex(b.zone);
+    if (z !== 0) return z;
+    const n = a.customerName.localeCompare(b.customerName, 'th');
+    if (n !== 0) return n;
+    return a.sizeLabel.localeCompare(b.sizeLabel, 'th');
+  });
+
+  return { rows, gradeKg };
+}
+
+function formatFamilyTodayOrdersReply(orders, dateKey, resolveZone) {
+  const lines = [
+    'รายการออเดอร์ลูกค้า',
+    `วันที่ ${formatDateThai(dateKey)}`,
+    '',
+  ];
+
+  if (orders.length === 0) {
+    lines.push('ยังไม่มีออเดอร์รอส่งวันนี้ครับ');
+    return lines.join('\n');
+  }
+
+  const overdue = orders.filter((o) => (o.deliveryDate || '') < dateKey);
+  if (overdue.length > 0) {
+    lines.push(`⚠️ ค้างส่ง ${overdue.length} ออเดอร์`);
+    lines.push('');
+  }
+
+  const { rows, gradeKg } = collectFamilyOrderRows(orders, dateKey, resolveZone);
+
+  const byZone = new Map();
+  for (const row of rows) {
+    if (!byZone.has(row.zone)) byZone.set(row.zone, []);
+    byZone.get(row.zone).push(row);
+  }
+  const zones = [...byZone.keys()].sort((a, b) => zoneSortIndex(a) - zoneSortIndex(b));
+
+  zones.forEach((zone, zi) => {
+    if (zi > 0) lines.push('');
+    lines.push(zone);
+    const zoneRows = byZone.get(zone);
+    const nameWidth = Math.max(...zoneRows.map((r) => r.customerName.length), 4);
+    for (const row of zoneRows) {
+      const name = row.customerName.padEnd(nameWidth, ' ');
+      const lateMark = row.late ? ' ⚠️' : '';
+      const qtyStr = row.qtyKg % 1 === 0 ? String(row.qtyKg) : row.qtyKg.toFixed(1);
+      lines.push(`${name}  ${row.sizeLabel} ${qtyStr} กก.${lateMark}`);
+    }
+  });
+
+  const totalKg = gradeKg.large + gradeKg.medium + gradeKg.small;
+  lines.push('');
+  lines.push('ยอดรวมทั้งหมด');
+  lines.push(`A=${gradeKg.large.toFixed(1)}KG`);
+  lines.push(`B=${gradeKg.medium.toFixed(1)}KG`);
+  lines.push(`C=${gradeKg.small.toFixed(1)}KG`);
+  lines.push(`รวม ${totalKg.toFixed(1)}KG`);
+
+  return lines.join('\n');
 }
 
 function formatTodayOrdersReply(orders, dateKey) {
@@ -227,8 +329,52 @@ function formatTodayOrdersReply(orders, dateKey) {
   return lines.join('\n');
 }
 
+async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK(), { familyGroup = false } = {}) {
+  const uidMap = await buildCustomerNameByLineUidMap(db);
+  const resolveZone = familyGroup ? await buildCustomerZoneResolver(db) : null;
+
+  let snap;
+  try {
+    snap = await db
+      .collection('lineOrders')
+      .where('status', '==', 'pending')
+      .where('deliveryDate', '<=', dateKey)
+      .orderBy('deliveryDate', 'asc')
+      .get();
+  } catch (err) {
+    console.warn('today orders query', err.message);
+    const all = await db.collection('lineOrders').where('status', '==', 'pending').limit(200).get();
+    const orders = enrichOrdersWithLinkedCustomers(
+      all.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((o) => (o.deliveryDate || '') <= dateKey)
+        .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate))),
+      uidMap,
+    );
+    if (familyGroup && resolveZone) {
+      return formatFamilyTodayOrdersReply(orders, dateKey, resolveZone);
+    }
+    return formatTodayOrdersReply(orders, dateKey);
+  }
+
+  const orders = enrichOrdersWithLinkedCustomers(
+    snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    uidMap,
+  );
+
+  if (familyGroup && resolveZone) {
+    return formatFamilyTodayOrdersReply(orders, dateKey, resolveZone);
+  }
+  return formatTodayOrdersReply(orders, dateKey);
+}
+
 module.exports = {
   buildShrimpTodayOrdersSummary,
   isShrimpTodayOrdersCommand,
   cancelLatestPendingOrderForUser,
+  formatCustomerShortName,
+  sizeLabelFromProduct,
+  collectFamilyOrderRows,
+  formatFamilyTodayOrdersReply,
+  ZONE_DISPLAY_ORDER,
 };
