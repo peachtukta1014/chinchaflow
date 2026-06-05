@@ -311,9 +311,12 @@ function buildSatoriTree(data, logoUrl, qrUrl) {
       el('div', { style: { display: 'flex', gap: 12 } }, [
         el('img', { src: logoUrl, style: { width: 56, height: 56, borderRadius: 28 } }),
         el('div', { style: { display: 'flex', flexDirection: 'column' } }, [
-          txt('โกอ้วนคลังซีฟู๊ดภูเก็ต', { fontSize: 22, fontWeight: 800, color: '#1a365d' }),
-          txt('📞 094-6693628 (โกอ้วน)', { fontSize: 11, marginTop: 4 }),
-          txt('📞 094-9408665 (พีช)', { fontSize: 11 }),
+          txt('โกอ้วนคลังซีฟู๊ดภูเก็ต', { fontSize: 22, fontWeight: 700, color: '#1a365d' }),
+          txt('โทร. 094-6693628 (โกอ้วน)', { fontSize: 11, marginTop: 4, fontWeight: 600 }),
+          txt('โทร. 094-9408665 (พีช)', { fontSize: 11, fontWeight: 600 }),
+          txt('โกอ้วนคลังซีฟู๊ด ภูเก็ต · Ko Ao Seafood Phuket', {
+            fontSize: 10, marginTop: 4, fontWeight: 600, color: '#1e3a8a',
+          }),
         ]),
       ]),
       el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: 11 } }, [

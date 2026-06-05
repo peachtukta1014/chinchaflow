@@ -3,7 +3,7 @@ import { Send, Share2 } from 'lucide-react';
 import { generateBillImage, downloadBillImageBlob } from '../lib/generateBillImage';
 import { shareToLine } from '../lib/shareLine';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
-import { buildBillDataForCloud } from '../lib/shrimpBillApi';
+import { buildBillDataForCloudResolved } from '../lib/shrimpBillApi';
 import { resolveLineUserId } from '../lib/resolveLineUserId';
 import { isValidLineUserId } from '../lib/lineUserId';
 
@@ -42,7 +42,7 @@ export default function LineShareButton({
     setBusy(true);
     try {
       const uid = (await getLineUid()) || lineUserId;
-      const billData = buildBillDataForCloud(bill, customer || {});
+      const billData = await buildBillDataForCloudResolved(bill, customer || {});
 
       if (isValidLineUserId(uid)) {
         await pushBillToLineCustomer({

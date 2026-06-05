@@ -295,6 +295,7 @@ export default function CustomerAccountsScreen({
         name: tx.customerName,
         zone: tx.zone,
         phone: tx.phone,
+        address: tx.address,
       },
       staffName: tx.recordedBy,
     });

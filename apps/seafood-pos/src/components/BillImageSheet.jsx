@@ -5,7 +5,11 @@ import {
   generateBillImage,
   revokeBillImageUrl,
 } from '../lib/generateBillImage';
-import { buildBillDataForCloud, fetchShrimpBillImage } from '../lib/shrimpBillApi';
+import {
+  buildBillDataForCloud,
+  fetchShrimpBillImage,
+} from '../lib/shrimpBillApi';
+import { resolveBillCustomer } from '../lib/resolveBillCustomer';
 import { shareToLine } from '../lib/shareLine';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
 import { resolveLineUserIdDetails } from '../lib/resolveLineUserId';
@@ -25,19 +29,29 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   });
   const [lineUidLoading, setLineUidLoading] = useState(true);
   const [pushBusy, setPushBusy] = useState(false);
+  const [billCustomer, setBillCustomer] = useState(null);
 
   useEffect(() => {
     if (!bill) return undefined;
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setBillCustomer(null);
     const billForImage = {
       ...bill,
       recordedBy: bill?.recordedBy || staffName || '',
     };
     const load = async () => {
+      const resolved = await resolveBillCustomer(billForImage, customer || {});
+      if (cancelled) return;
+      setBillCustomer(resolved);
+      const billData = buildBillDataForCloud(billForImage, resolved);
       try {
-        const { blob: b, objectUrl } = await fetchShrimpBillImage(billForImage, customer || {});
+        const { blob: b, objectUrl } = await fetchShrimpBillImage(
+          billForImage,
+          resolved,
+          { billData },
+        );
         if (cancelled) {
           revokeBillImageUrl(objectUrl);
           return;
@@ -46,7 +60,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
         setPreviewUrl(objectUrl);
       } catch (cloudErr) {
         console.warn('fetchShrimpBillImage fallback', cloudErr);
-        const { blob: b, objectUrl } = await generateBillImage(billForImage, customer || {});
+        const { blob: b, objectUrl } = await generateBillImage(billForImage, resolved);
         if (cancelled) {
           revokeBillImageUrl(objectUrl);
           return;
@@ -68,7 +82,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const lookupLineUid = React.useCallback(async () => {
     setLineUidLoading(true);
     try {
-      const details = await resolveLineUserIdDetails(customer, bill);
+      const details = await resolveLineUserIdDetails(billCustomer || customer, bill);
       setLineUserId(details.uid || '');
       const billUid = details.billUid || '';
       const profileUid = details.profileUid || details.uid || '';
@@ -85,7 +99,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
     } finally {
       setLineUidLoading(false);
     }
-  }, [customer, bill]);
+  }, [customer, bill, billCustomer]);
 
   useEffect(() => {
     if (!bill) return undefined;
@@ -127,7 +141,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
         lineUserId,
         billData: buildBillDataForCloud(
           { ...bill, recordedBy: bill?.recordedBy || staffName || '' },
-          customer || {},
+          billCustomer || customer || {},
         ),
         billNo: bill?.billNo,
         customerName: bill?.customerName || customer?.name,
