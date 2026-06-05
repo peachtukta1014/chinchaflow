@@ -44,6 +44,8 @@ const slipApp = fs.readFileSync(
   'utf8',
 );
 assert(slipApp.includes('ฝากสลิป'), 'LineSlipLiffApp copy');
+assert(slipApp.includes('เลือกรูปจากคลังภาพ'), 'slip LIFF gallery picker');
+assert(!slipApp.includes('capture='), 'slip LIFF must not force camera');
 assert(SLIP_DEFAULT_ENDPOINT.includes('liff-slip.html'), 'slip default endpoint');
 assert(typeof readSlipLiffIdFromRepo === 'function', 'readSlipLiffIdFromRepo export');
 delete process.env.LINE_LIFF_SLIP_ID;

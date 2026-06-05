@@ -150,7 +150,6 @@ export default function LineSlipLiffApp() {
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={onFile}
       />
@@ -161,8 +160,11 @@ export default function LineSlipLiffApp() {
         disabled={busy}
         className="w-full py-5 rounded-2xl bg-orange-500 text-white font-black text-lg active:scale-[0.98] disabled:opacity-50"
       >
-        เลือกรูปสลิป / ถ่ายรูป
+        เลือกรูปจากคลังภาพ
       </button>
+      <p className="text-center text-slate-400 text-xs leading-relaxed -mt-2">
+        ใช้ภาพสลิปที่แอปธนาคารเซฟไว้ในมือถือได้เลย (ไม่ต้องถ่ายกระดาษ)
+      </p>
 
       {preview ? (
         <div className="bg-slate-800 rounded-2xl p-3">
