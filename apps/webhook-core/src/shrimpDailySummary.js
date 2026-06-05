@@ -54,29 +54,26 @@ function aggregateDailySales(bills) {
   };
 }
 
-async function buildShrimpSummaryForDate(db, dateKey) {
-  const snap = await db.collection('sales').where('dateKey', '==', dateKey).get();
-  const bills = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const s = aggregateDailySales(bills);
-
-  const lines = [
-    '📊 สรุปยอดขายวันนี้ — โกอ้วน คลังซีฟู้ด',
-    `📅 ${dateKey}`,
-    '',
-    `💰 ยอดขายรวม: ${formatMoney(s.revenueTotal)}`,
-    `🧾 ${s.billCount} บิล`,
-    '',
-    `🦐 กุ้งเป็น: ${s.liveKg.toFixed(1)} กก. (${formatMoney(s.liveRevenue)})`,
-    `   A ใหญ่ ${(s.gradeKg.large || 0).toFixed(1)} · B กลาง ${(s.gradeKg.medium || 0).toFixed(1)} · C เล็ก ${(s.gradeKg.small || 0).toFixed(1)} กก.`,
-    `🦐 กุ้งตาย: ${s.deadKg.toFixed(1)} กก. (${formatMoney(s.deadRevenue)})`,
-    '',
-    '💵 ชำระเงิน',
-    `   สด ${formatMoney(s.pay.cash)} · โอน ${formatMoney(s.pay.transfer)}`,
-    `   เครดิต ${formatMoney(s.pay.credit)} · ผ่อน ${formatMoney(s.pay.installment)}`,
-    '',
-    '— จากบิลในแอป POS',
+/** บรรทัดแยกน้ำหนัก A/B/C — กลุ่มครอบครัวใช้รูปแบบหลายบรรทัด */
+function formatGradeKgLines(s, { familyGroup = false } = {}) {
+  const a = (s.gradeKg.large || 0).toFixed(1);
+  const b = (s.gradeKg.medium || 0).toFixed(1);
+  const c = (s.gradeKg.small || 0).toFixed(1);
+  if (familyGroup) {
+    const total = s.liveKg.toFixed(1);
+    return [
+      `   A=${a}KG`,
+      `   B=${b}KG`,
+      `   C=${c}KG`,
+      `   รวม ${total}KG`,
+    ];
+  }
+  return [
+    `   A ใหญ่ ${a} · B กลาง ${b} · C เล็ก ${c} กก.`,
   ];
+}
 
+function buildShrimpSummaryMessage(s, dateKey, { familyGroup = false } = {}) {
   if (s.billCount === 0) {
     return [
       '📊 สรุปยอดขายวันนี้ — โกอ้วน คลังซีฟู้ด',
@@ -87,7 +84,33 @@ async function buildShrimpSummaryForDate(db, dateKey) {
     ].join('\n');
   }
 
+  const lines = [
+    '📊 สรุปยอดขายวันนี้ — โกอ้วน คลังซีฟู้ด',
+    `📅 ${dateKey}`,
+    '',
+    `💰 ยอดขายรวม: ${formatMoney(s.revenueTotal)}`,
+    `🧾 ${s.billCount} บิล`,
+    '',
+    `🦐 กุ้งเป็น: ${s.liveKg.toFixed(1)} กก. (${formatMoney(s.liveRevenue)})`,
+    ...formatGradeKgLines(s, { familyGroup }),
+    `🦐 กุ้งตาย: ${s.deadKg.toFixed(1)} กก. (${formatMoney(s.deadRevenue)})`,
+    '',
+    '💵 ชำระเงิน',
+    `   สด ${formatMoney(s.pay.cash)} · โอน ${formatMoney(s.pay.transfer)}`,
+    `   เครดิต ${formatMoney(s.pay.credit)} · ผ่อน ${formatMoney(s.pay.installment)}`,
+    '',
+    '— จากบิลในแอป POS',
+  ];
+
   return lines.join('\n');
+}
+
+async function buildShrimpSummaryForDate(db, dateKey, { familyGroup = false } = {}) {
+  const snap = await db.collection('sales').where('dateKey', '==', dateKey).get();
+  const bills = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const s = aggregateDailySales(bills);
+
+  return buildShrimpSummaryMessage(s, dateKey, { familyGroup });
 }
 
 function isShrimpSummaryCommand(text) {
@@ -123,7 +146,10 @@ const SHRIMP_HELP_TEXT = [
 ].join('\n');
 
 module.exports = {
+  aggregateDailySales,
   buildShrimpSummaryForDate,
+  buildShrimpSummaryMessage,
+  formatGradeKgLines,
   isShrimpSummaryCommand,
   SHRIMP_HELP_CMD,
   SHRIMP_HELP_TEXT,
