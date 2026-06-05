@@ -93,40 +93,65 @@ export async function confirmPaymentSlip({
     throw new Error('บิลนี้ปิดแล้ว');
   }
 
-  if (sale.paymentType === 'installment' && remain > 0) {
-    await applyPaymentToSale(sale, remain);
-  } else {
-    await updateSalePayment(sale, 'transfer');
+  const confirmingAt = new Date().toISOString();
+  const staffLabel = staffMember?.displayName || staffMember?.email || '';
+  const priorStatus = slip.status || 'pending';
+
+  if (priorStatus !== 'confirmed') {
+    await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
+      status: 'confirming',
+      confirmingAt,
+      confirmingByName: staffLabel,
+    });
   }
 
-  const refreshed = await fsGetDoc(`sales/${sale.id}`);
-  const customer = sale.customerId
-    ? await fsGetDoc(`customers/${sale.customerId}`).catch(() => null)
-    : null;
-
-  let pushResult = { pushed: false };
-  if (pushPaidBill) {
-    try {
-      const receiverName = staffMember?.displayName || staffMember?.email || '';
-      pushResult = await pushPaidBillToLine(refreshed || sale, customer, receiverName);
-    } catch (e) {
-      console.error('pushPaidBillToLine', e);
-      pushResult = { pushed: false, reason: e.message || 'push_failed' };
+  let refreshed = sale;
+  try {
+    if (sale.paymentType === 'installment' && remain > 0) {
+      await applyPaymentToSale(sale, remain);
+    } else {
+      await updateSalePayment(sale, 'transfer');
     }
+
+    refreshed = await fsGetDoc(`sales/${sale.id}`);
+    const customer = sale.customerId
+      ? await fsGetDoc(`customers/${sale.customerId}`).catch(() => null)
+      : null;
+
+    let pushResult = { pushed: false };
+    if (pushPaidBill) {
+      try {
+        const receiverName = staffMember?.displayName || staffMember?.email || '';
+        pushResult = await pushPaidBillToLine(refreshed || sale, customer, receiverName);
+      } catch (e) {
+        console.error('pushPaidBillToLine', e);
+        pushResult = { pushed: false, reason: e.message || 'push_failed' };
+      }
+    }
+
+    await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
+      status: 'confirmed',
+      billNo: refreshed?.billNo || sale.billNo,
+      saleId: sale.id,
+      remainingAmount: 0,
+      confirmedAt: new Date().toISOString(),
+      confirmedByUid: staffMember?.uid || '',
+      confirmedByName: staffLabel,
+      ...(pushResult.pushed ? { paidBillPushedAt: new Date().toISOString() } : {}),
+    });
+
+    return { sale: refreshed || sale, pushResult };
+  } catch (err) {
+    if (priorStatus !== 'confirmed') {
+      await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
+        status: priorStatus === 'confirming' ? 'pending' : priorStatus,
+        confirmingAt: null,
+        confirmingByName: null,
+        confirmError: String(err?.message || err).slice(0, 200),
+      }).catch(() => {});
+    }
+    throw err;
   }
-
-  await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
-    status: 'confirmed',
-    billNo: refreshed?.billNo || sale.billNo,
-    saleId: sale.id,
-    remainingAmount: 0,
-    confirmedAt: new Date().toISOString(),
-    confirmedByUid: staffMember?.uid || '',
-    confirmedByName: staffMember?.displayName || staffMember?.email || '',
-    ...(pushResult.pushed ? { paidBillPushedAt: new Date().toISOString() } : {}),
-  });
-
-  return { sale: refreshed || sale, pushResult };
 }
 
 export async function rejectPaymentSlip(slip, staffMember, reason = '') {

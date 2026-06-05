@@ -158,7 +158,7 @@ export default function App() {
     if (!member || stockBatches.length === 0) return;
     syncMainStockFromBatches(stock, stockBatches)
       .then((val) => { if (val) setStock(val); })
-      .catch(() => {});
+      .catch((e) => console.warn('syncMainStockFromBatches', e));
   }, [member, stockBatches]);
 
   const effectiveStock = useMemo(

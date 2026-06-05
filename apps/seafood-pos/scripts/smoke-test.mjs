@@ -1019,6 +1019,16 @@ try {
   assert(filtered.some((o) => o.id === '1'), 'บอร์ด: ค้างส่ง 30 วันยังแสดง');
   assert(!filtered.some((o) => o.id === '2'), 'บอร์ด: ซ่อนออเดอร์ส่งเกิน 14 วันล่วงหน้า');
   assert(!filtered.some((o) => o.id === '3'), 'บอร์ด: ไม่รวม done');
+  const delivering = filterPendingLineOrdersForBoard([
+    { id: 'd1', status: 'delivering', deliveryDate: today },
+  ], { maxDate: shiftDateKey(today, 14) });
+  assert(delivering.length === 1, 'บอร์ด: รวม delivering');
+  const { countPendingLineOrdersForBadge } = await import('../src/lib/lineOrderBadge.js');
+  assert(countPendingLineOrdersForBadge([
+    { status: 'pending' },
+    { status: 'delivering' },
+    { status: 'done' },
+  ]) === 2, 'badge นับ delivering');
 } catch (e) {
   fail('filterPendingLineOrdersForBoard', e);
 }

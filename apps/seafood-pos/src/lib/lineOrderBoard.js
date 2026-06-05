@@ -12,7 +12,7 @@ export const LINE_ORDER_BOARD_FUTURE_DAYS = 14;
 export function filterPendingLineOrdersForBoard(rows, { maxDate } = {}) {
   return (rows || []).filter((o) => {
     if (o.status === 'cancelled' || o.status === 'done') return false;
-    if (o.status !== 'pending') return false;
+    if (o.status !== 'pending' && o.status !== 'delivering') return false;
     const dk = String(o.deliveryDate || '');
     if (!dk || !/^\d{4}-\d{2}-\d{2}$/.test(dk)) return true;
     if (maxDate && dk > maxDate) return false;

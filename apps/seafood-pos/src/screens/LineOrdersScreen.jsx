@@ -16,7 +16,9 @@ import { fsGetDoc } from '../lib/firestoreRest';
 import {
   cancelLineOrder as cancelLineOrderService,
   fetchLineOrdersForBoard,
+  beginLineOrderDelivery,
   markLineOrderDoneOnly,
+  releaseLineOrderDelivery,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
 import {
@@ -68,7 +70,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     setLoading(false);
   }, []);
 
-  useIntervalWhen(true, loadOrders, 30000);
+  useIntervalWhen(true, loadOrders, 45000, { pauseWhenHidden: true });
 
   const cancelLineOrder = async (order) => {
     if (!order || order.status !== 'pending' || savingId) return;
@@ -92,7 +94,10 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
   const openDeliverySheet = async (order) => {
     if (!order || order.status !== 'pending' || savingId || deliverySheet) return;
     if (order.salesId) {
-      confirmDeliveryLegacyDone(order);
+      const ok = window.confirm(
+        'ออเดอร์นี้มีบิลแล้ว\n\nกดตกลง = ปิดสถานะเป็น「ส่งแล้ว」โดยไม่ตัดสต๊อก/ไม่สร้างบิลซ้ำ',
+      );
+      if (ok) confirmDeliveryLegacyDone(order);
       return;
     }
 
@@ -147,6 +152,15 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       return;
     }
 
+    const recordedBy = user?.name || 'พนักงาน';
+    try {
+      await beginLineOrderDelivery(order.id, recordedBy);
+    } catch (lockErr) {
+      alert(lockErr.message || 'มีคนกำลังบันทึกออเดอร์นี้อยู่');
+      setSavingId(null);
+      return;
+    }
+
     const avail = getEffectiveStock(stock, stockBatches);
     let stockDeducted = false;
     let postDeduction = null;
@@ -160,12 +174,10 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
         cartItems,
         customer,
         total,
-        recordedBy: user?.name || 'พนักงาน',
+        recordedBy,
       });
 
-      setOrders((prev) => prev.map((o) => (o.id === order.id
-        ? { ...o, status: 'done', salesId, billNo }
-        : o)));
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
       setDeliverySheet(null);
       onSaleRecorded?.();
       onOrderDone?.();
@@ -184,12 +196,14 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
           );
         } catch (restoreErr) {
           console.error('restore stock after LINE save failed', restoreErr);
+          await releaseLineOrderDelivery(order.id).catch(() => {});
           alert(
             `${formatFirestoreSaveError(err)}\n\n⚠️ คืนสต๊อกอัตโนมัติไม่สำเร็จ — แจ้งแอดมินตรวจยอดคลัง`,
           );
           return;
         }
       }
+      await releaseLineOrderDelivery(order.id).catch(() => {});
       alert(formatFirestoreSaveError(err));
     } finally {
       setSavingId(null);
@@ -210,10 +224,11 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     [orders, allCustomers],
   );
 
-  const isPending = (o) => o.status === 'pending';
-  const overdue = ordersWithDate.filter((o) => o.effectiveDeliveryDate < today);
-  const dueToday = ordersWithDate.filter((o) => o.effectiveDeliveryDate === today);
-  const upcoming = ordersWithDate.filter((o) => o.effectiveDeliveryDate > today);
+  const isPending = (o) => o.status === 'pending' || o.status === 'delivering';
+  const pendingOnly = (o) => isPending(o);
+  const overdue = ordersWithDate.filter((o) => pendingOnly(o) && o.effectiveDeliveryDate < today);
+  const dueToday = ordersWithDate.filter((o) => pendingOnly(o) && o.effectiveDeliveryDate === today);
+  const upcoming = ordersWithDate.filter((o) => pendingOnly(o) && o.effectiveDeliveryDate > today);
   const groupedFuture = upcoming.reduce((acc, o) => {
     const k = o.effectiveDeliveryDate || 'ไม่ระบุ';
     (acc[k] = acc[k] || []).push(o);
@@ -248,9 +263,14 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
           </span>
         ) : isPending(o) ? (
           <div className="flex flex-col gap-1 shrink-0">
+            {o.status === 'delivering' && (
+              <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg text-center">
+                กำลังบันทึก…
+              </span>
+            )}
             <button
               type="button"
-              disabled={savingId === o.id}
+              disabled={savingId === o.id || o.status === 'delivering'}
               onClick={() => openDeliverySheet(o)}
               className="text-xs bg-green-500 text-white font-bold px-3 py-1.5 rounded-xl active:scale-95 disabled:opacity-50"
             >
@@ -284,7 +304,7 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
 
   const renderSection = (title, items, accent = '') => {
     if (items.length === 0) return null;
-    const pendingCount = items.filter(isPending).length;
+    const pendingCount = items.filter(pendingOnly).length;
     const weightSummary = formatLineOrderWeightSummary(summarizeLineOrdersWeights(items));
     return (
       <div key={title}>

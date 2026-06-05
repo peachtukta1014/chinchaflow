@@ -24,6 +24,49 @@ function withTimeout(promise, ms = 12000) {
   ]);
 }
 
+const DELIVERY_LOCK_MS = 5 * 60 * 1000;
+
+function isDeliveryLockStale(order) {
+  if (!order?.deliveringAt) return true;
+  const t = new Date(order.deliveringAt).getTime();
+  return Number.isNaN(t) || Date.now() - t > DELIVERY_LOCK_MS;
+}
+
+/** ล็อคออเดอร์ก่อนตัดสต๊อก — กันสองเครื่องส่งซ้ำ */
+export async function beginLineOrderDelivery(orderId, recordedBy) {
+  const fresh = await fsGetDoc(`lineOrders/${orderId}`);
+  if (!fresh) throw new Error('ไม่พบออเดอร์ LINE นี้แล้ว');
+  if (fresh.status === 'cancelled') throw new Error('ออเดอร์นี้ถูกยกเลิกแล้ว');
+  if (fresh.status === 'done') return { fresh, locked: false };
+
+  if (fresh.status === 'delivering') {
+    if (!isDeliveryLockStale(fresh) && fresh.deliveringBy && fresh.deliveringBy !== recordedBy) {
+      throw new Error(`มี ${fresh.deliveringBy} กำลังบันทึกส่งของอยู่ — รอสักครู่แล้วลองใหม่`);
+    }
+  } else if (fresh.status !== 'pending') {
+    throw new Error('ออเดอร์นี้ไม่อยู่ในสถานะรอส่ง');
+  }
+
+  const now = new Date().toISOString();
+  await fsPatch(`lineOrders/${orderId}`, {
+    status: 'delivering',
+    deliveringAt: now,
+    deliveringBy: recordedBy || 'พนักงาน',
+  });
+  return { fresh: { ...fresh, status: 'delivering', deliveringAt: now, deliveringBy: recordedBy }, locked: true };
+}
+
+export async function releaseLineOrderDelivery(orderId) {
+  if (!orderId) return;
+  const fresh = await fsGetDoc(`lineOrders/${orderId}`).catch(() => null);
+  if (!fresh || fresh.status !== 'delivering') return;
+  await fsPatch(`lineOrders/${orderId}`, {
+    status: 'pending',
+    deliveringAt: null,
+    deliveringBy: null,
+  });
+}
+
 /**
  * โหลดออเดอร์รอส่งบนบอร์ด — รวมค้างส่งทุกอายุ (ไม่ตัดที่ 7 วัน) + query แบ่งหน้า
  */

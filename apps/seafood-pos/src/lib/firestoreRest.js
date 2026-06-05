@@ -267,14 +267,14 @@ export async function fsRunQuery(structuredQuery) {
 const LINE_ORDERS_PAGE_SIZE = 100;
 const LINE_ORDERS_MAX_PAGES = 8;
 
-function pendingLineOrdersStructuredQuery({ limit = LINE_ORDERS_PAGE_SIZE, startAfterCreatedAt } = {}) {
+function lineOrdersByStatusStructuredQuery(status, { limit = LINE_ORDERS_PAGE_SIZE, startAfterCreatedAt } = {}) {
   const structuredQuery = {
     from: [{ collectionId: 'lineOrders' }],
     where: {
       fieldFilter: {
         field: { fieldPath: 'status' },
         op: 'EQUAL',
-        value: { stringValue: 'pending' },
+        value: { stringValue: status },
       },
     },
     orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
@@ -289,14 +289,13 @@ function pendingLineOrdersStructuredQuery({ limit = LINE_ORDERS_PAGE_SIZE, start
   return structuredQuery;
 }
 
-/** โหลดออเดอร์ pending ทั้งหมด (แบ่งหน้า — กันตัดที่ 100 รายการ) */
-export async function fsQueryAllPendingLineOrders() {
+async function fsQueryLineOrdersByStatus(status) {
   const merged = [];
   const seen = new Set();
   let cursor = null;
 
   for (let page = 0; page < LINE_ORDERS_MAX_PAGES; page += 1) {
-    const batch = await fsRunQuery(pendingLineOrdersStructuredQuery({
+    const batch = await fsRunQuery(lineOrdersByStatusStructuredQuery(status, {
       startAfterCreatedAt: cursor,
     }));
     if (batch.length === 0) break;
@@ -316,10 +315,24 @@ export async function fsQueryAllPendingLineOrders() {
     cursor = nextCursor;
   }
 
+  return merged;
+}
+
+/** โหลดออเดอร์รอส่ง + กำลังบันทึก (แบ่งหน้า) */
+export async function fsQueryAllPendingLineOrders() {
+  const pending = await fsQueryLineOrdersByStatus('pending');
+  const delivering = await fsQueryLineOrdersByStatus('delivering');
+  const seen = new Set();
+  const merged = [];
+  for (const row of [...pending, ...delivering]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
   if (merged.length > 0) return merged;
 
   const all = await fsListCollection('lineOrders', 500);
-  return all.filter((o) => o.status === 'pending');
+  return all.filter((o) => o.status === 'pending' || o.status === 'delivering');
 }
 
 /** บิลจากออเดอร์ LINE — ใช้กันสร้างซ้ำเมื่อ patch ออเดอร์ล้มเหลว */
@@ -514,9 +527,11 @@ export async function fsListStockAdjustments(limit = 200) {
   return rows.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
-/** บิลมียอดค้าง — ใช้แท็บลูกหนี้/FIFO (มักมีไม่กี่สิบบิล ไม่ใช่ทั้งระบบ) */
-export async function fsQueryOpenSales(limit = 120) {
-  const docs = await fsRunQuery({
+const OPEN_SALES_PAGE_SIZE = 100;
+const OPEN_SALES_MAX_PAGES = 6;
+
+function openSalesStructuredQuery({ limit = OPEN_SALES_PAGE_SIZE, startAfterCreatedAt } = {}) {
+  const structuredQuery = {
     from: [{ collectionId: 'sales' }],
     where: {
       fieldFilter: {
@@ -525,33 +540,107 @@ export async function fsQueryOpenSales(limit = 120) {
         value: { doubleValue: 0 },
       },
     },
+    orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }],
     limit,
-  });
-  if (docs.length > 0) return sortSalesFifoAsc(docs);
+  };
+  if (startAfterCreatedAt) {
+    structuredQuery.startAt = {
+      values: [{ timestampValue: startAfterCreatedAt }],
+      before: false,
+    };
+  }
+  return structuredQuery;
+}
 
-  const recent = await fsListCollection('sales', 80);
+/** บิลมียอดค้าง — แบ่งหน้า (กัน cap 120 ตัดลูกค้าท้ายๆ ออกจาก index AR) */
+export async function fsQueryOpenSales(limit = 600) {
+  const maxPages = Math.max(1, Math.ceil(limit / OPEN_SALES_PAGE_SIZE));
+  const merged = [];
+  const seen = new Set();
+  let cursor = null;
+
+  for (let page = 0; page < Math.min(maxPages, OPEN_SALES_MAX_PAGES); page += 1) {
+    const batch = await fsRunQuery(openSalesStructuredQuery({
+      startAfterCreatedAt: cursor,
+    }));
+    if (batch.length === 0) break;
+
+    let added = 0;
+    for (const row of batch) {
+      if (seen.has(row.id)) continue;
+      if ((parseFloat(row.remainingAmount) || 0) <= 0) continue;
+      seen.add(row.id);
+      merged.push(row);
+      added += 1;
+    }
+
+    if (batch.length < OPEN_SALES_PAGE_SIZE || added === 0) break;
+    const last = batch[batch.length - 1];
+    const nextCursor = last.createdAt || null;
+    if (!nextCursor || nextCursor === cursor) break;
+    cursor = nextCursor;
+  }
+
+  if (merged.length > 0) return sortSalesFifoAsc(merged);
+
+  const recent = await fsListCollection('sales', 200);
   return sortSalesFifoAsc(
     recent.filter((d) => (parseFloat(d.remainingAmount) || 0) > 0),
   );
 }
 
-/** บิลขายของลูกค้าคนเดียว — ใช้ตอนรับชำระผ่อน/FIFO */
-export async function fsQuerySalesByCustomer(customerId, limit = 80) {
+const CUSTOMER_SALES_PAGE_SIZE = 100;
+const CUSTOMER_SALES_MAX_PAGES = 4;
+
+/** บิลขายของลูกค้าคนเดียว — query ตาม customerId แบ่งหน้า (ไม่พึ่ง open sales ทั้งระบบ) */
+export async function fsQuerySalesByCustomer(customerId, limit = 400) {
   if (!customerId) return [];
-  const docs = await fsRunQuery({
-    from: [{ collectionId: 'sales' }],
-    where: {
-      fieldFilter: {
-        field: { fieldPath: 'customerId' },
-        op: 'EQUAL',
-        value: { stringValue: customerId },
+  const maxPages = Math.max(1, Math.ceil(limit / CUSTOMER_SALES_PAGE_SIZE));
+  const merged = [];
+  const seen = new Set();
+  let cursor = null;
+
+  for (let page = 0; page < Math.min(maxPages, CUSTOMER_SALES_MAX_PAGES); page += 1) {
+    const structuredQuery = {
+      from: [{ collectionId: 'sales' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'customerId' },
+          op: 'EQUAL',
+          value: { stringValue: customerId },
+        },
       },
-    },
-    limit,
-  });
-  if (docs.length > 0) return sortSalesDesc(docs);
-  const open = await fsQueryOpenSales(limit);
-  return sortSalesDesc(open.filter((d) => d.customerId === customerId));
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+      limit: CUSTOMER_SALES_PAGE_SIZE,
+    };
+    if (cursor) {
+      structuredQuery.startAt = {
+        values: [{ timestampValue: cursor }],
+        before: false,
+      };
+    }
+    const batch = await fsRunQuery(structuredQuery);
+    if (batch.length === 0) break;
+
+    let added = 0;
+    for (const row of batch) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      merged.push(row);
+      added += 1;
+    }
+
+    if (batch.length < CUSTOMER_SALES_PAGE_SIZE || added === 0) break;
+    const last = batch[batch.length - 1];
+    const nextCursor = last.createdAt || null;
+    if (!nextCursor || nextCursor === cursor) break;
+    cursor = nextCursor;
+  }
+
+  if (merged.length > 0) return sortSalesDesc(merged);
+
+  const recent = await fsListCollection('sales', 300);
+  return sortSalesDesc(recent.filter((d) => d.customerId === customerId));
 }
 
 /**
