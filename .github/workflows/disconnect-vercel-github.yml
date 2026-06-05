@@ -1,29 +1,32 @@
 # ล้างลิงก์ Vercel บน GitHub repo (homepage + deployment environments)
 # โปรเจกต์ deploy จริงผ่าน Firebase Hosting เท่านั้น — ดู deploy-hosting.yml
+#
+# ก่อนรัน: repo Settings → Actions → General → Workflow permissions → Read and write
+# (ถ้า homepage ยังลบไม่ได้) ใส่ GitHub PAT ใน repo Secrets ชื่อ GITHUB_ADMIN_TOKEN
 name: Disconnect Vercel from GitHub
 
 on:
   workflow_dispatch:
 
-permissions:
-  administration: write
-  deployments: write
-
 jobs:
   cleanup:
     name: Clear Vercel homepage and environments
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+      administration: write
     steps:
       - name: Clear repository homepage (removes vercel.app link on repo header)
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN || github.token }}
         run: |
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}" -f homepage='' \
             --jq '{homepage, name}'
 
       - name: Delete Vercel GitHub deployment environments
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN || github.token }}
         run: |
           set +e
           for env in Preview Production "Production – chincha-shrimp"; do
