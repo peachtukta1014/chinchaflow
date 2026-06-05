@@ -145,7 +145,7 @@ chincha/
 
 | Secret (Dashboard หรือ GitHub repo Secrets) | ใช้ทำอะไร |
 |-------------------------------------------|-----------|
-| `GITHUB_ADMIN_TOKEN` | PAT แก้ homepage / ลบ deployment environments (workflow `disconnect-vercel-github.yml`) |
+| `ADMIN_TOKEN` | PAT แก้ homepage / ลบ deployment environments (workflow `disconnect-vercel-github.yml`) |
 
 สร้าง PAT: GitHub → Settings → Developer settings → Fine-grained token → repo `chinchaflow` → **Administration: Read and write** (หรือ classic token scope `repo` เต็ม)
 
