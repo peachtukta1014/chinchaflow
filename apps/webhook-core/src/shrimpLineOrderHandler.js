@@ -1,6 +1,7 @@
 const {
   parseOrderItems,
   parseSimpleOrderLine,
+  parseSimpleOrderItems,
   parseRiverPrawnPendingLine,
   simpleToOrderItem,
   pendingToItems,
@@ -259,6 +260,7 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
   const riverPending = parseRiverPrawnPendingLine(body);
   let items = parseOrderItems(body);
   const simple = parseSimpleOrderLine(body);
+  const simpleItems = parseSimpleOrderItems(body);
 
   if (simple?.kind === 'invalid_weight') {
     return {
@@ -286,7 +288,9 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
     }
     items = pendingToItems(session.pending, simple.product);
     await setLineOrderSession(db, session.id, { pending: null, replyLang }, ts);
-  } else if (simple?.kind === 'item') {
+  } else if (simpleItems.length > 0 && items.length === 0) {
+    items = simpleItems;
+  } else if (simple?.kind === 'item' && items.length === 0) {
     const it = simpleToOrderItem(simple);
     if (it) items = [it];
   } else if (riverPending?.kind === 'pending_river' && items.length === 0) {

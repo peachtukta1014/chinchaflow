@@ -327,6 +327,8 @@ function invalidWeightResult(qty, unit) {
 function parseSimpleOrderLine(line) {
   const raw = String(line || '').trim();
   if (!raw || /กุ้ง/.test(raw)) return null;
+  // หลายบรรทัด → ใช้ parseSimpleOrderItems แทน (อย่า collapse แล้วแมตช์ท้ายบรรทัดผิดคน)
+  if (/\r?\n/.test(raw)) return null;
 
   const sizeOnly = raw.match(/^(ใหญ่|กลาง|เล็ก|ตาย|a|b|c|large|medium|small|s|m|l)$/i);
   if (sizeOnly) {
@@ -409,6 +411,72 @@ function simpleToOrderItem(simple) {
   return items[0] || null;
 }
 
+/** บรรทัดเดียวหลายชื่อ: ปุ้ย กลาง 2 จะเขียด กลาง 3 */
+function scanSimpleOrderSegments(line) {
+  const t = normalizeOrderText(line);
+  if (!t || /กุ้ง/.test(t)) return [];
+
+  const sizeAlt =
+    'ใหญ่|กลาง|เล็ก|ตาย|large|medium|small|a|b|c|s|m|l';
+  const segmentRe = new RegExp(
+    `([฀-๿A-Za-z0-9][฀-๿A-Za-z0-9\\s.'-]{0,28}?)\\s+(${sizeAlt})\\s*([\\d.,]+)(?=\\s|$)`,
+    'gi',
+  );
+  const items = [];
+  let m;
+  while ((m = segmentRe.exec(t)) !== null) {
+    const product = sizeWordToProduct(m[2]);
+    if (!product) continue;
+    const qty = parseFloat(String(m[3]).replace(',', '.'));
+    const unit = 'กก';
+    if (getOrderWeightIssue(qty, unit)) continue;
+    const customerName = (m[1] || '').trim();
+    if (!customerName || customerName.length < 2) continue;
+    pushItem(items, product, qty, unit, customerName);
+  }
+  return items;
+}
+
+/**
+ * รูปแบบสั้น (ปุ้ย กลาง 2) หลายบรรทัดในกลุ่ม — แยกบรรทัดละลูกค้า
+ * ไม่รวม newline เป็นข้อความเดียว (กันแมตช์ชื่อรวม เช่น ปุ้ย กลาง 2 จะเขียด → qty 3)
+ */
+function parseSimpleOrderItems(text) {
+  const raw = String(text || '').trim();
+  if (!raw || /กุ้ง/.test(raw)) return [];
+
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const items = [];
+
+  if (lines.length > 1) {
+    for (const line of lines) {
+      const simple = parseSimpleOrderLine(line);
+      if (simple?.kind !== 'item') continue;
+      const it = simpleToOrderItem(simple);
+      if (it) items.push(it);
+    }
+  } else {
+    const scanned = scanSimpleOrderSegments(raw);
+    if (scanned.length > 0) {
+      items.push(...scanned);
+    } else {
+      const simple = parseSimpleOrderLine(raw);
+      if (simple?.kind === 'item') {
+        const it = simpleToOrderItem(simple);
+        if (it) items.push(it);
+      }
+    }
+  }
+
+  const seen = new Set();
+  return items.filter((it) => {
+    const key = `${it.customerName}|${it.product}|${it.qty}|${it.unit}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function pendingToItems(pending, productName) {
   if (!pending?.qty) return [];
   const items = [];
@@ -439,6 +507,7 @@ module.exports = {
   parseRiverPrawnPendingLine,
   parseRiverPrawnWithSize,
   simpleToOrderItem,
+  parseSimpleOrderItems,
   pendingToItems,
   formatRiverSizePrompt,
   sizeWordToProduct,
