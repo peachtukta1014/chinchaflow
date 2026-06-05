@@ -1,0 +1,39 @@
+# ล้างลิงก์ Vercel บน GitHub repo (homepage + deployment environments)
+# โปรเจกต์ deploy จริงผ่าน Firebase Hosting เท่านั้น — ดู deploy-hosting.yml
+name: Disconnect Vercel from GitHub
+
+on:
+  workflow_dispatch:
+
+permissions:
+  administration: write
+  deployments: write
+
+jobs:
+  cleanup:
+    name: Clear Vercel homepage and environments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear repository homepage (removes vercel.app link on repo header)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}" -f homepage='' \
+            --jq '{homepage, name}'
+
+      - name: Delete Vercel GitHub deployment environments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          for env in Preview Production "Production – chincha-shrimp"; do
+            encoded=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$env")
+            echo "Deleting environment: $env"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${encoded}" && echo "  deleted" || echo "  skip (missing or already removed)"
+          done
+
+      - name: Reminder — disconnect Vercel app (manual)
+        run: |
+          echo "::notice::Hosting จริง: Firebase (chincha-tea.web.app, ko-seafood.top)"
+          echo "::notice::ถ้ายังมีโปรเจกต์ใน Vercel: vercel.com → Project → Settings → Git → Disconnect"
+          echo "::notice::หรือ github.com → Settings → Integrations → Vercel → เอา chinchaflow ออก"
