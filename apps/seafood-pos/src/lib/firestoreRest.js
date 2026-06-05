@@ -264,42 +264,91 @@ export async function fsRunQuery(structuredQuery) {
   return rows.filter((row) => row.document).map(docFromRow);
 }
 
-/** โหลดออเดอร์ LINE — มี fallback ถ้า index ยังไม่พร้อม */
-export async function fsQueryLineOrders({ pendingOnly = false, minDeliveryDate } = {}) {
-  if (pendingOnly && minDeliveryDate) {
-    const filtered = await fsRunQuery({
-      from: [{ collectionId: 'lineOrders' }],
-      where: {
-        compositeFilter: {
-          op: 'AND',
-          filters: [
-            {
-              fieldFilter: {
-                field: { fieldPath: 'deliveryDate' },
-                op: 'GREATER_THAN_OR_EQUAL',
-                value: { stringValue: minDeliveryDate },
-              },
-            },
-            {
-              fieldFilter: {
-                field: { fieldPath: 'status' },
-                op: 'EQUAL',
-                value: { stringValue: 'pending' },
-              },
-            },
-          ],
-        },
+const LINE_ORDERS_PAGE_SIZE = 100;
+const LINE_ORDERS_MAX_PAGES = 8;
+
+function pendingLineOrdersStructuredQuery({ limit = LINE_ORDERS_PAGE_SIZE, startAfterCreatedAt } = {}) {
+  const structuredQuery = {
+    from: [{ collectionId: 'lineOrders' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'status' },
+        op: 'EQUAL',
+        value: { stringValue: 'pending' },
       },
-      limit: 100,
-    });
-    if (filtered.length > 0) return filtered;
+    },
+    orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+    limit,
+  };
+  if (startAfterCreatedAt) {
+    structuredQuery.startAt = {
+      values: [{ timestampValue: startAfterCreatedAt }],
+      before: false,
+    };
+  }
+  return structuredQuery;
+}
+
+/** โหลดออเดอร์ pending ทั้งหมด (แบ่งหน้า — กันตัดที่ 100 รายการ) */
+export async function fsQueryAllPendingLineOrders() {
+  const merged = [];
+  const seen = new Set();
+  let cursor = null;
+
+  for (let page = 0; page < LINE_ORDERS_MAX_PAGES; page += 1) {
+    const batch = await fsRunQuery(pendingLineOrdersStructuredQuery({
+      startAfterCreatedAt: cursor,
+    }));
+    if (batch.length === 0) break;
+
+    let added = 0;
+    for (const row of batch) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      merged.push(row);
+      added += 1;
+    }
+
+    if (batch.length < LINE_ORDERS_PAGE_SIZE || added === 0) break;
+    const last = batch[batch.length - 1];
+    const nextCursor = last.createdAt || null;
+    if (!nextCursor || nextCursor === cursor) break;
+    cursor = nextCursor;
+  }
+
+  if (merged.length > 0) return merged;
+
+  const all = await fsListCollection('lineOrders', 500);
+  return all.filter((o) => o.status === 'pending');
+}
+
+/** บิลจากออเดอร์ LINE — ใช้กันสร้างซ้ำเมื่อ patch ออเดอร์ล้มเหลว */
+export async function fsQuerySaleByLineOrderId(lineOrderId) {
+  if (!lineOrderId) return null;
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'sales' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'lineOrderId' },
+        op: 'EQUAL',
+        value: { stringValue: String(lineOrderId) },
+      },
+    },
+    limit: 1,
+  });
+  return docs[0] || null;
+}
+
+/** @deprecated ใช้ fsQueryAllPendingLineOrders สำหรับบอร์ด */
+export async function fsQueryLineOrders({ pendingOnly = false, minDeliveryDate } = {}) {
+  if (pendingOnly) {
+    return fsQueryAllPendingLineOrders();
   }
 
   const all = await fsListCollection('lineOrders', 200);
   return all
     .filter((o) => {
       if (minDeliveryDate && (o.deliveryDate || '') < minDeliveryDate) return false;
-      if (pendingOnly && o.status !== 'pending') return false;
       return true;
     })
     .sort((a, b) => {

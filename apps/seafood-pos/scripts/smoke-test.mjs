@@ -982,6 +982,69 @@ try {
   fail('LIFF OA', e);
 }
 
+try {
+  const {
+    computeStockAfterSaleDeduction,
+    planFifoBatchDeduction,
+    normalizeStockValues,
+  } = await import('../src/lib/stockDeductionPlan.js');
+  const avail = { live: 100, dead: 0 };
+  const batches = [
+    { id: 'b1', remainingLiveKg: 60, remainingDeadKg: 0, liveKg: 60, deadKg: 0 },
+    { id: 'b2', remainingLiveKg: 40, remainingDeadKg: 0, liveKg: 40, deadKg: 0 },
+  ];
+  const post = computeStockAfterSaleDeduction(avail, 25, 0, batches);
+  assert(post.stock.live === 75 && post.batches[0].remainingLiveKg === 35, 'LINE rollback: post-deduction stock');
+  const restored = normalizeStockValues(post.stock.live + 25, post.stock.dead);
+  assert(Math.abs(restored.live - 100) < 0.01, 'LINE rollback: post-deduction + kg = เดิม');
+  const { batchesAfter } = planFifoBatchDeduction(batches, { liveKg: 25, deadKg: 0 });
+  assert(batchesAfter[0].remainingLiveKg === 35, 'planFifoBatchDeduction ตัดล็อตแรก');
+} catch (e) {
+  fail('computeStockAfterSaleDeduction', e);
+}
+
+try {
+  const { filterPendingLineOrdersForBoard } = await import('../src/lib/lineOrderBoard.js');
+  const today = dateKeyBangkok();
+  const old = shiftDateKey(today, -30);
+  const far = shiftDateKey(today, 30);
+  const rows = [
+    { id: '1', status: 'pending', deliveryDate: old },
+    { id: '2', status: 'pending', deliveryDate: far },
+    { id: '3', status: 'done', deliveryDate: old },
+  ];
+  const filtered = filterPendingLineOrdersForBoard(rows, {
+    maxDate: shiftDateKey(today, 14),
+  });
+  assert(filtered.some((o) => o.id === '1'), 'บอร์ด: ค้างส่ง 30 วันยังแสดง');
+  assert(!filtered.some((o) => o.id === '2'), 'บอร์ด: ซ่อนออเดอร์ส่งเกิน 14 วันล่วงหน้า');
+  assert(!filtered.some((o) => o.id === '3'), 'บอร์ด: ไม่รวม done');
+} catch (e) {
+  fail('filterPendingLineOrdersForBoard', e);
+}
+
+try {
+  const lineOrdersScreen = fs.readFileSync(
+    path.join(root, 'src/screens/LineOrdersScreen.jsx'),
+    'utf8',
+  );
+  assert(
+    lineOrdersScreen.includes('computeStockAfterSaleDeduction'),
+    'LineOrdersScreen ใช้ post-deduction ก่อน restore',
+  );
+  assert(
+    lineOrdersScreen.includes('postDeduction.stock'),
+    'LineOrdersScreen ส่ง postDeduction เข้า restoreStockForSale',
+  );
+  const lineSvc = fs.readFileSync(path.join(root, 'src/services/lineOrderService.js'), 'utf8');
+  assert(lineSvc.includes('fsQuerySaleByLineOrderId'), 'saveLineOrderDelivery กันบิลซ้ำ');
+  assert(lineSvc.includes('idempotent'), 'saveLineOrderDelivery idempotent done');
+  const fsRest = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
+  assert(fsRest.includes('fsQueryAllPendingLineOrders'), 'query ออเดอร์ pending แบ่งหน้า');
+} catch (e) {
+  fail('LINE delivery hardening', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);

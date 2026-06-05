@@ -1,7 +1,19 @@
 import { DEFAULT_PAYMENT_TYPE } from '../constants/payments';
 import { dateKeyBangkok, shiftDateKey } from '../lib/date';
+import {
+  filterPendingLineOrdersForBoard,
+  LINE_ORDER_BOARD_FUTURE_DAYS,
+  sortLineOrdersForBoard,
+} from '../lib/lineOrderBoard';
 import { countPendingLineOrdersForBadge } from '../lib/lineOrderBadge';
-import { fsListCollection, fsPatch, fsPost, fsQueryLineOrders } from '../lib/firestoreRest';
+import {
+  fsGetDoc,
+  fsListCollection,
+  fsPatch,
+  fsPost,
+  fsQueryAllPendingLineOrders,
+  fsQuerySaleByLineOrderId,
+} from '../lib/firestoreRest';
 import { actualQtyOf } from '../lib/lineOrderToSale';
 import { incrementCustomerDebt } from './debtService';
 
@@ -13,46 +25,30 @@ function withTimeout(promise, ms = 12000) {
 }
 
 /**
- * โหลดออเดอร์รอส่งบนบอร์ด — รวมค้างส่ง (วันส่งผ่านมา) และวันนี้/ข้างหน้า
- * กันออเดอร์เมื่อคืนที่ deliveryDate คลาดไม่หายจากรายการ
+ * โหลดออเดอร์รอส่งบนบอร์ด — รวมค้างส่งทุกอายุ (ไม่ตัดที่ 7 วัน) + query แบ่งหน้า
  */
 export async function fetchLineOrdersForBoard() {
   const today = dateKeyBangkok();
-  const minDate = shiftDateKey(today, -7);
-  const maxDate = shiftDateKey(today, 14);
+  const maxDate = shiftDateKey(today, LINE_ORDER_BOARD_FUTURE_DAYS);
 
   let rows = [];
   try {
-    rows = await fsQueryLineOrders({ pendingOnly: true, minDeliveryDate: minDate });
+    rows = await fsQueryAllPendingLineOrders();
   } catch (e) {
-    console.warn('fsQueryLineOrders', e);
+    console.warn('fsQueryAllPendingLineOrders', e);
   }
 
   if (rows.length === 0) {
     try {
-      rows = await fsListCollection('lineOrders', 200);
+      rows = await fsListCollection('lineOrders', 500);
     } catch (e) {
       console.warn('fsListCollection lineOrders', e);
       return [];
     }
   }
 
-  return rows
-    .filter((o) => {
-      if (o.status === 'cancelled' || o.status === 'done') return false;
-      if (o.status !== 'pending') return false;
-      const dk = String(o.deliveryDate || '');
-      if (!dk || !/^\d{4}-\d{2}-\d{2}$/.test(dk)) return true;
-      return dk >= minDate && dk <= maxDate;
-    })
-    .sort((a, b) => {
-      const da = a.deliveryDate || '';
-      const db = b.deliveryDate || '';
-      if (da !== db) return da.localeCompare(db);
-      const ta = a.createdAt || '';
-      const tb = b.createdAt || '';
-      return String(tb).localeCompare(String(ta));
-    });
+  return filterPendingLineOrdersForBoard(rows, { maxDate })
+    .sort(sortLineOrdersForBoard);
 }
 
 /** @deprecated */
@@ -77,19 +73,8 @@ export async function markLineOrderDoneOnly(orderId) {
   await fsPatch(`lineOrders/${orderId}`, { status: 'done' });
 }
 
-export async function saveLineOrderDelivery({
-  order,
-  cartItems,
-  customer,
-  total,
-  recordedBy,
-}) {
-  const billNo = `LINE-${Date.now().toString().slice(-8)}`;
-  const dateKey = order.deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(order.deliveryDate)
-    ? order.deliveryDate
-    : dateKeyBangkok();
-  const now = new Date().toISOString();
-  const fulfilledItems = cartItems.map((i) => ({
+function buildFulfilledItems(cartItems) {
+  return cartItems.map((i) => ({
     productId: i.productId,
     productName: i.productName,
     orderedQty: i.orderedQty,
@@ -97,10 +82,21 @@ export async function saveLineOrderDelivery({
     actualQty: actualQtyOf(i),
     lineTotal: i.total,
   }));
+}
 
-  const lineUid = order.lineUserId || customer.lineUserId || null;
-
-  const salesId = await withTimeout(fsPost('sales', {
+function buildSalePayload({
+  billNo,
+  dateKey,
+  now,
+  customer,
+  cartItems,
+  total,
+  recordedBy,
+  order,
+  lineUid,
+  fulfilledItems,
+}) {
+  return {
     billNo,
     dateKey,
     customerName: customer.name,
@@ -129,7 +125,87 @@ export async function saveLineOrderDelivery({
     lineUserId: lineUid,
     lineRawText: order.rawText || '',
     fulfilledItems,
+  };
+}
+
+async function completeLineOrderPatch(orderId, {
+  salesId,
+  billNo,
+  now,
+  fulfilledItems,
+}) {
+  await withTimeout(fsPatch(`lineOrders/${orderId}`, {
+    status: 'done',
+    salesId: salesId || null,
+    billNo,
+    completedAt: now,
+    fulfilledItems,
   }));
+}
+
+/**
+ * บันทึกส่งของจากออเดอร์ LINE — idempotent (กดซ้ำ / timeout ไม่สร้างบิลซ้ำ)
+ */
+export async function saveLineOrderDelivery({
+  order,
+  cartItems,
+  customer,
+  total,
+  recordedBy,
+}) {
+  const fresh = await fsGetDoc(`lineOrders/${order.id}`);
+  if (!fresh) {
+    throw new Error('ไม่พบออเดอร์ LINE นี้แล้ว');
+  }
+  if (fresh.status === 'cancelled') {
+    throw new Error('ออเดอร์นี้ถูกยกเลิกแล้ว');
+  }
+
+  const fulfilledItems = buildFulfilledItems(cartItems);
+  const lineUid = fresh.lineUserId || order.lineUserId || customer.lineUserId || null;
+
+  if (fresh.status === 'done' && fresh.salesId) {
+    return {
+      salesId: fresh.salesId,
+      billNo: fresh.billNo,
+      fulfilledItems: fresh.fulfilledItems || fulfilledItems,
+      idempotent: true,
+    };
+  }
+
+  const dateKey = fresh.deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(fresh.deliveryDate)
+    ? fresh.deliveryDate
+    : dateKeyBangkok();
+  const now = fresh.completedAt || new Date().toISOString();
+
+  let salesId = fresh.salesId || null;
+  let billNo = fresh.billNo || null;
+
+  const existingSale = salesId
+    ? { id: salesId, billNo }
+    : await fsQuerySaleByLineOrderId(order.id);
+
+  if (existingSale?.id) {
+    salesId = existingSale.id;
+    billNo = billNo || existingSale.billNo || `LINE-${String(salesId).slice(-8)}`;
+    await completeLineOrderPatch(order.id, { salesId, billNo, now, fulfilledItems });
+    return { salesId, billNo, fulfilledItems, recovered: true };
+  }
+
+  billNo = `LINE-${Date.now().toString().slice(-8)}`;
+
+  salesId = await withTimeout(fsPost('sales', buildSalePayload({
+    billNo,
+    dateKey,
+    now,
+    customer,
+    cartItems,
+    total,
+    recordedBy,
+    order: fresh,
+    lineUid,
+    fulfilledItems,
+  })));
 
   if (total > 0) {
     await withTimeout(incrementCustomerDebt(customer.id, {
@@ -141,13 +217,7 @@ export async function saveLineOrderDelivery({
     }, total));
   }
 
-  await withTimeout(fsPatch(`lineOrders/${order.id}`, {
-    status: 'done',
-    salesId: salesId || null,
-    billNo,
-    completedAt: now,
-    fulfilledItems,
-  }));
+  await completeLineOrderPatch(order.id, { salesId, billNo, now, fulfilledItems });
 
-  return { salesId, billNo, now, fulfilledItems };
+  return { salesId, billNo, fulfilledItems };
 }

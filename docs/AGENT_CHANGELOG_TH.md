@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: ส่งของ LINE คืนสต๊อกถูก + กันบิลซ้ำ + บอร์ดไม่ตัดค้างเก่า
+
+- **ปัญหา/คำขอ:** บันทึกส่ง LINE ล้มเหลวแล้วคืนสต๊อกผิด (state เก่า) · กดซ้ำสร้างบิลซ้ำ · ออเดอร์ค้าง >7 วันหายจากบอร์ด · query cap 100
+- **แก้แล้ว:** `computeStockAfterSaleDeduction` + restore ด้วยยอดหลังตัด · `saveLineOrderDelivery` idempotent + `fsQuerySaleByLineOrderId` · `filterPendingLineOrdersForBoard` (ไม่ตัด min 7 วัน) · `fsQueryAllPendingLineOrders` แบ่งหน้า
+- **ไฟล์/จุดสำคัญ:** `stockService.js`, `LineOrdersScreen.jsx`, `lineOrderService.js`, `lineOrderBoard.js`, `firestoreRest.js`
+- **พฤติกรรมหลังแก้:** ค้างส่งทุกอายุยังขึ้นบอร์ด (ซ่อนแค่ส่งล่วงหน้า >14 วัน) · timeout กดซ้ำไม่สร้าง sale ซ้ำ
+- **ถ้าพังอีก ให้เช็กก่อน:** index `lineOrders` status+createdAt · บิลค้าง `lineOrderId` ใน sales
+
 ### 2026-06-05 — ถอน Vercel ออกจาก repo (ไม่มีในโค้ด)
 
 - **ปัญหา/คำขอ:** ลบลิงก์ Vercel บนหัว GitHub repo / ไม่ใช้ Vercel deploy

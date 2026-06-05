@@ -12,13 +12,19 @@ import { lineItemsToCartItems } from '../lib/lineOrderToSale';
 import { PRODUCTS } from '../constants';
 import { mergeCustomerLists, refreshCustomersMap, subscribeCustomers } from '../services/customerService';
 import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
+import { fsGetDoc } from '../lib/firestoreRest';
 import {
   cancelLineOrder as cancelLineOrderService,
   fetchLineOrdersForBoard,
   markLineOrderDoneOnly,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
-import { deductStockForSale, getEffectiveStock, restoreStockForSale } from '../services/stockService';
+import {
+  computeStockAfterSaleDeduction,
+  deductStockForSale,
+  getEffectiveStock,
+  restoreStockForSale,
+} from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 import { useIntervalWhen } from '../lib/useIntervalWhen';
 
@@ -124,13 +130,32 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     if (!order) return;
 
     setSavingId(order.id);
+
+    let freshOrder;
+    try {
+      freshOrder = await fsGetDoc(`lineOrders/${order.id}`);
+    } catch {
+      freshOrder = order;
+    }
+    if (freshOrder?.status === 'done' && freshOrder?.salesId) {
+      alert(`ออเดอร์นี้ส่งแล้ว\nบิล ${freshOrder.billNo || freshOrder.salesId}`);
+      setOrders((prev) => prev.map((o) => (o.id === order.id
+        ? { ...o, status: 'done', salesId: freshOrder.salesId, billNo: freshOrder.billNo }
+        : o)));
+      setDeliverySheet(null);
+      setSavingId(null);
+      return;
+    }
+
     const avail = getEffectiveStock(stock, stockBatches);
     let stockDeducted = false;
+    let postDeduction = null;
     try {
+      postDeduction = computeStockAfterSaleDeduction(avail, liveKg, deadKg, stockBatches);
       await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
       stockDeducted = true;
 
-      const { salesId, billNo } = await saveLineOrderDelivery({
+      const { salesId, billNo, recovered } = await saveLineOrderDelivery({
         order,
         cartItems,
         customer,
@@ -144,15 +169,25 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       setDeliverySheet(null);
       onSaleRecorded?.();
       onOrderDone?.();
-      alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}`);
+      const note = recovered ? '\n(ซิงก์สถานะออเดอร์จากบิลเดิม)' : '';
+      alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}${note}`);
     } catch (err) {
       console.error(err);
-      if (stockDeducted) {
+      if (stockDeducted && postDeduction) {
         try {
-          const after = getEffectiveStock(stock, stockBatches);
-          await restoreStockForSale(after, liveKg, deadKg, updateMainStock, stockBatches);
+          await restoreStockForSale(
+            postDeduction.stock,
+            liveKg,
+            deadKg,
+            updateMainStock,
+            postDeduction.batches,
+          );
         } catch (restoreErr) {
           console.error('restore stock after LINE save failed', restoreErr);
+          alert(
+            `${formatFirestoreSaveError(err)}\n\n⚠️ คืนสต๊อกอัตโนมัติไม่สำเร็จ — แจ้งแอดมินตรวจยอดคลัง`,
+          );
+          return;
         }
       }
       alert(formatFirestoreSaveError(err));
