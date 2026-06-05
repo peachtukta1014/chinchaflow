@@ -97,6 +97,7 @@ export function buildBillData({
       customerId: selectedCustomer,
       customerLineUserId: customer.lineUserId || null,
       zone: customer.zone,
+      address: String(customer.address || '').trim(),
       phone: String(customer.phone || '').trim(),
       items: cartItems,
       total,

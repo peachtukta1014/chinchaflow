@@ -7,6 +7,7 @@ const ERROR_HINTS = {
   empty_order: 'เลือกกุ้งและน้ำหนักอย่างน้อยหนึ่งรายการ',
   invalid_weight: 'น้ำหนักไม่ถูกต้อง (0.01–20 กก.)',
   customer_required: 'เลือกชื่อลูกค้าในรายชื่อ',
+  customer_not_found: 'ไม่พบร้านในระบบ — เลือกใหม่หรือแจ้งร้าน',
 };
 
 function shrimpLiffUrl() {
@@ -33,6 +34,11 @@ async function postLiff(body) {
 /** @param {string} idToken */
 export function fetchLiffContext(idToken) {
   return postLiff({ action: 'context', idToken });
+}
+
+/** รายชื่อลูกค้า (ร้านหลัก + ที่บันทึกจาก OA ใน Firestore) */
+export function fetchLiffCustomerCatalog(idToken) {
+  return postLiff({ action: 'catalog', idToken });
 }
 
 export function submitLiffOrder({

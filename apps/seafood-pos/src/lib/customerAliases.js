@@ -84,6 +84,7 @@ export function customerToFormFields(customer) {
     aliasesText: aliasOnly.join(', '),
     defaultRiverSize: customer?.defaultRiverSize || '',
     zone: customer?.zone || '',
+    address: customer?.address || '',
     phone: customer?.phone || '',
     lineUserId: customer?.lineUserId || '',
     lineOrderUserIds: formatOrderLineUserIdsForEdit(customer),

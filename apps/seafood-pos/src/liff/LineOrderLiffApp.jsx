@@ -865,8 +865,11 @@ export default function LineOrderLiffApp() {
   );
 
   if (step === 'pick') {
+    const catalogFromContext = Array.isArray(ctx?.customers) ? ctx.customers : undefined;
     return shell(
       <CustomerPicker
+        idToken={isPreview ? undefined : session.idToken}
+        initialCatalog={catalogFromContext}
         onSelect={(c) => {
           const cust = { id: c.id, name: c.name, zone: c.zone };
           setPickedCustomer(cust);
