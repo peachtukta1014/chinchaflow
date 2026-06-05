@@ -97,7 +97,22 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only functions --project chincha-eeed6 --non-interactive --force
+          deploy_all() {
+            firebase deploy --only functions --project chincha-eeed6 --non-interactive --force
+          }
+          deploy_slip_only() {
+            firebase deploy --only functions:shrimpLiffSlip --project chincha-eeed6 --non-interactive --force
+          }
+          if deploy_all; then
+            exit 0
+          fi
+          echo "Full deploy failed — retry once after 30s (GCP parallel update flake)..."
+          sleep 30
+          if deploy_all; then
+            exit 0
+          fi
+          echo "Full deploy still failing — retry shrimpLiffSlip only..."
+          deploy_slip_only
 
       - name: Wait and verify webhooks (must return 200 ok)
         continue-on-error: true
