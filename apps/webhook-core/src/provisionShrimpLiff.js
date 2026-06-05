@@ -3,7 +3,11 @@
  * ใช้ใน CI ก่อน build/deploy — LIFF ID ไม่ใช่ secret (ฝังใน client ได้)
  */
 
+const fs = require('fs');
+const path = require('path');
+
 const DEFAULT_ENDPOINT = 'https://ko-seafood.top/liff-order.html';
+const SLIP_LIFF_JSON = path.join(__dirname, '../shrimp-liff-slip-id.json');
 const SLIP_DEFAULT_ENDPOINT = 'https://ko-seafood.top/liff-slip.html';
 
 async function lineFetch(url, token, options = {}) {
@@ -82,8 +86,23 @@ function liffOpenUrl(liffId) {
   return `https://liff.line.me/${String(liffId).trim()}`;
 }
 
+function readSlipLiffIdFromRepo() {
+  try {
+    if (!fs.existsSync(SLIP_LIFF_JSON)) return '';
+    const data = JSON.parse(fs.readFileSync(SLIP_LIFF_JSON, 'utf8'));
+    return String(data.liffId || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 function resolveShrimpSlipLiffId() {
-  return String(process.env.LINE_LIFF_SLIP_ID || process.env.VITE_LIFF_SLIP_ID || '').trim();
+  return String(
+    process.env.LINE_LIFF_SLIP_ID
+    || process.env.VITE_LIFF_SLIP_ID
+    || readSlipLiffIdFromRepo()
+    || '',
+  ).trim();
 }
 
 /** URL เปิด LIFF ฝากสลิป — ใส่ในข้อความบิลค้าง / help */
@@ -99,8 +118,11 @@ function getShrimpSlipLiffOpenUrl(billNo) {
 module.exports = {
   DEFAULT_ENDPOINT,
   SLIP_DEFAULT_ENDPOINT,
+  SLIP_LIFF_JSON,
   ensureShrimpLiffApp,
   liffOpenUrl,
   normalizeEndpoint,
+  readSlipLiffIdFromRepo,
+  resolveShrimpSlipLiffId,
   getShrimpSlipLiffOpenUrl,
 };

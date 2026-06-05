@@ -13,7 +13,8 @@ export function useLiffSlipSession() {
   const [state, setState] = useState({ status: 'loading' });
 
   useEffect(() => {
-    const liffId = (import.meta.env.VITE_LIFF_SLIP_ID || import.meta.env.VITE_LIFF_ID || '').trim();
+    // ห้าม fallback ไป VITE_LIFF_ID (สั่งออเดอร์) — endpoint คนละหน้า จะได้ Invalid LIFF ID
+    const liffId = (import.meta.env.VITE_LIFF_SLIP_ID || '').trim();
     const isProdHost = /(^|\.)ko-seafood\.top$/i.test(window.location.hostname);
     const preview = !liffId && !isProdHost;
 
@@ -54,9 +55,13 @@ export function useLiffSlipSession() {
         });
       } catch (e) {
         if (!cancelled) {
+          const raw = String(e?.message || '');
+          const friendly = /invalid liff id/i.test(raw)
+            ? 'ระบบฝากสลิปกำลังเปิดใช้ — ลองใหม่ในอีกสักครู่ หรือส่งรูปสลิปในแชต LINE'
+            : (raw || 'เปิดจาก LINE ไม่สำเร็จ');
           setState({
             status: 'error',
-            error: e?.message || 'เปิดจาก LINE ไม่สำเร็จ',
+            error: friendly,
           });
         }
       }
