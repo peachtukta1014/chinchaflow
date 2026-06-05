@@ -1034,6 +1034,31 @@ try {
 }
 
 try {
+  const { boardLineOrdersFromRows } = await import('../src/lib/lineOrderBoard.js');
+  const today = dateKeyBangkok();
+  const board = boardLineOrdersFromRows([
+    { id: 'a', status: 'pending', deliveryDate: today },
+    { id: 'b', status: 'delivering', deliveryDate: today },
+    { id: 'c', status: 'done', deliveryDate: today },
+  ]);
+  assert(board.length === 2, 'boardLineOrdersFromRows รวม pending+delivering');
+} catch (e) {
+  fail('boardLineOrdersFromRows', e);
+}
+
+try {
+  const lineOrdersScreen = fs.readFileSync(
+    path.join(root, 'src/screens/LineOrdersScreen.jsx'),
+    'utf8',
+  );
+  assert(lineOrdersScreen.includes('useLineOrdersFeed'), 'LineOrdersScreen ใช้ snapshot feed');
+  const appJsx = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
+  assert(appJsx.includes('subscribeLineOrdersBoard'), 'App badge ใช้ snapshot feed');
+} catch (e) {
+  fail('line orders snapshot wiring', e);
+}
+
+try {
   const lineOrdersScreen = fs.readFileSync(
     path.join(root, 'src/screens/LineOrdersScreen.jsx'),
     'utf8',

@@ -1,10 +1,6 @@
 import { DEFAULT_PAYMENT_TYPE } from '../constants/payments';
-import { dateKeyBangkok, shiftDateKey } from '../lib/date';
-import {
-  filterPendingLineOrdersForBoard,
-  LINE_ORDER_BOARD_FUTURE_DAYS,
-  sortLineOrdersForBoard,
-} from '../lib/lineOrderBoard';
+import { dateKeyBangkok } from '../lib/date';
+import { boardLineOrdersFromRows } from '../lib/lineOrderBoard';
 import { countPendingLineOrdersForBadge } from '../lib/lineOrderBadge';
 import {
   fsGetDoc,
@@ -71,9 +67,6 @@ export async function releaseLineOrderDelivery(orderId) {
  * โหลดออเดอร์รอส่งบนบอร์ด — รวมค้างส่งทุกอายุ (ไม่ตัดที่ 7 วัน) + query แบ่งหน้า
  */
 export async function fetchLineOrdersForBoard() {
-  const today = dateKeyBangkok();
-  const maxDate = shiftDateKey(today, LINE_ORDER_BOARD_FUTURE_DAYS);
-
   let rows = [];
   try {
     rows = await fsQueryAllPendingLineOrders();
@@ -90,8 +83,7 @@ export async function fetchLineOrdersForBoard() {
     }
   }
 
-  return filterPendingLineOrdersForBoard(rows, { maxDate })
-    .sort(sortLineOrdersForBoard);
+  return boardLineOrdersFromRows(rows);
 }
 
 /** @deprecated */
