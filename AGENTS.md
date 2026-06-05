@@ -82,6 +82,53 @@ Each app needs `apps/<app>/.env.local` (gitignored) with `VITE_FIREBASE_*` keys.
 
 Without these vars, the login UI still renders but Firebase Auth/Firestore calls fail (`storageNotReady` on submit).
 
+### Cloud Agent Secrets (cursor.com → Dashboard → Cloud Agents → Secrets)
+
+Peach maintains these in the Dashboard (copy values from **GitHub → repo → Settings → Secrets** — same names where possible). **Do not guess** Firebase config; read from env or ask Peach.
+
+| Secret name (Dashboard) | Used for |
+|-------------------------|----------|
+| `VITE_FIREBASE_API_KEY` | both apps |
+| `VITE_FIREBASE_AUTH_DOMAIN` | both apps |
+| `VITE_FIREBASE_DATABASE_URL` | both apps (may be empty) |
+| `VITE_FIREBASE_PROJECT_ID` | `chincha-eeed6` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | both apps |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | both apps |
+| `VITE_FIREBASE_APP_ID_SHRIMP` | กุ้ง — maps to `VITE_FIREBASE_APP_ID` in `apps/seafood-pos/.env.local` |
+| `VITE_FIREBASE_APP_ID_TEA` | ชา — maps to `VITE_FIREBASE_APP_ID` in `apps/chincha-tea/.env.local` |
+| `SHRIMP_AGENT_EMAIL` | E2E กุ้ง (e.g. `peachtukta1014@gmail.com`) |
+| `SHRIMP_AGENT_PASSWORD` | E2E กุ้ง — Dashboard only, never Slack/git |
+| `TEA_AGENT_EMAIL` | E2E ชา (bootstrap: `gmc-peach@chincha.pos` or `peachtukta1014@gmail.com`) |
+| `TEA_AGENT_PASSWORD` | E2E ชา — Dashboard only |
+
+Before build/dev that needs Firebase, materialize `.env.local` from secrets (Cloud Agent session):
+
+```bash
+# กุ้ง
+cat > apps/seafood-pos/.env.local <<EOF
+VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
+VITE_FIREBASE_DATABASE_URL=${VITE_FIREBASE_DATABASE_URL}
+VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
+VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
+VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID_SHRIMP}
+EOF
+
+# ชา
+cat > apps/chincha-tea/.env.local <<EOF
+VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
+VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
+VITE_FIREBASE_DATABASE_URL=${VITE_FIREBASE_DATABASE_URL}
+VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
+VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
+VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID_TEA}
+EOF
+```
+
+After adding or changing Dashboard secrets, **start a new Cloud Agent session** (old sessions do not pick up new secrets).
+
 ### Verify without cloud login
 
 Logic-only regression (no Firebase):
