@@ -342,7 +342,7 @@ exports.lineWebhookTea = functions
 // ── พนักงานส่งภาพบิลให้ลูกค้าทาง LINE OA (Bearer Firebase ID token) ─────────────
 exports.shrimpPushBill = functions
   .region('asia-southeast1')
-  .runWith({ timeoutSeconds: 60, memory: '1GiB' })
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
@@ -404,7 +404,7 @@ exports.shrimpPushBill = functions
 // ── พนักงานสร้างภาพบิลบน Cloud (Satori) — Bearer Firebase ID token ───────────
 exports.shrimpRenderBill = functions
   .region('asia-southeast1')
-  .runWith({ timeoutSeconds: 60, memory: '1GiB' })
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
