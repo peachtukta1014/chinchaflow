@@ -27,6 +27,7 @@ const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { processShrimpLinkCustomer } = require('./shrimpLineCustomerLink');
 const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
 const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
+const { isShrimpGroupChat } = require('./shrimpGroupKeyboard');
 const { detectMessageLang } = require('./orderMessageLang');
 const { replyHelpCustomerThai, replyHelpCustomerEnglish, replyCancelFail } = require('./shrimpLineReply');
 const {
@@ -186,7 +187,9 @@ exports.lineWebhook = functions
         if (intent === 'summary') {
           try {
             const dateKey = todayBKK();
-            const summary = await buildShrimpSummaryForDate(db(), dateKey);
+            const summary = await buildShrimpSummaryForDate(db(), dateKey, {
+              familyGroup: isShrimpGroupChat(groupId),
+            });
             await lineReply(replyToken, summary, token);
           } catch (err) {
             console.error('shrimp summary', err);
