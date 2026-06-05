@@ -23,6 +23,7 @@ const ERROR_HINTS = {
 
 export async function pushBillToLineCustomer({
   lineUserId,
+  billData,
   blob,
   billNo,
   customerName,
@@ -34,24 +35,39 @@ export async function pushBillToLineCustomer({
   const user = auth?.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบ');
 
-  const imageBase64 = await blobToBase64(blob);
   const idToken = await user.getIdToken();
   const url = `https://${region}-${projectId}.cloudfunctions.net/shrimpPushBill`;
+  const body = billData
+    ? {
+      lineUserId,
+      billData,
+      billNo: billNo || billData.billNo,
+      customerName: customerName || billData.customerName,
+      paymentType: paymentType || billData.paymentType,
+      remainingAmount,
+      total: total ?? billData.totalAmount,
+    }
+    : {
+      lineUserId,
+      imageBase64: await blobToBase64(blob),
+      billNo,
+      customerName,
+      paymentType,
+      remainingAmount,
+      total,
+    };
+
+  if (!billData && !body.imageBase64) {
+    throw new Error('ไม่มีข้อมูลบิลสำหรับส่ง LINE');
+  }
+
   const r = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${idToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      lineUserId,
-      imageBase64,
-      billNo,
-      customerName,
-      paymentType,
-      remainingAmount,
-      total,
-    }),
+    body: JSON.stringify(body),
   });
 
   const json = await r.json().catch(() => ({}));

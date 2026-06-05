@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Send, Share2 } from 'lucide-react';
-import { generateBillImage } from '../lib/generateBillImage';
+import { generateBillImage, downloadBillImageBlob } from '../lib/generateBillImage';
 import { shareToLine } from '../lib/shareLine';
-import { downloadBillImageBlob } from '../lib/generateBillImage';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
+import { buildBillDataForCloud } from '../lib/shrimpBillApi';
 import { resolveLineUserId } from '../lib/resolveLineUserId';
 import { isValidLineUserId } from '../lib/lineUserId';
 
@@ -41,24 +41,24 @@ export default function LineShareButton({
     }
     setBusy(true);
     try {
-      const { blob, objectUrl } = await generateBillImage(bill, customer || {});
-
       const uid = (await getLineUid()) || lineUserId;
+      const billData = buildBillDataForCloud(bill, customer || {});
+
       if (isValidLineUserId(uid)) {
         await pushBillToLineCustomer({
           lineUserId: uid,
-          blob,
+          billData,
           billNo: bill.billNo,
           customerName: bill.customerName || customer?.name,
           paymentType: bill.paymentType,
           remainingAmount: bill.remainingAmount,
           total: bill.total,
         });
-        URL.revokeObjectURL(objectUrl);
         alert('✅ ส่งใบส่งของให้ลูกค้าใน LINE แล้ว');
         return;
       }
 
+      const { blob, objectUrl } = await generateBillImage(bill, customer || {});
       const res = await shareToLine({
         blob,
         title: bill.billNo,

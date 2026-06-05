@@ -30,13 +30,14 @@ async function verifyShrimpStaff(db, uid) {
   return user;
 }
 
-async function uploadBillJpeg(admin, buffer, billNo) {
+async function uploadBillImage(admin, buffer, billNo, contentType = 'image/jpeg') {
   const bucket = admin.storage().bucket();
   const safe = String(billNo || 'bill').replace(/[^\w.-]+/g, '_').slice(0, 48);
-  const path = `lineBills/${Date.now()}_${safe}.jpg`;
+  const ext = contentType.includes('png') ? 'png' : 'jpg';
+  const path = `lineBills/${Date.now()}_${safe}.${ext}`;
   const file = bucket.file(path);
   await file.save(buffer, {
-    metadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=3600' },
+    metadata: { contentType, cacheControl: 'public, max-age=3600' },
   });
   await file.makePublic();
   const url = `https://storage.googleapis.com/${bucket.name}/${path}`;
@@ -213,6 +214,7 @@ function lineBillPaidThankYouCaption(paymentType, remainingAmount, total) {
 async function pushShrimpBillToCustomer(db, admin, {
   lineUserId,
   imageBase64,
+  billData,
   billNo,
   customerName,
   paymentType,
@@ -233,15 +235,30 @@ async function pushShrimpBillToCustomer(db, admin, {
     throw err;
   }
 
-  const raw = String(imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
-  const buffer = Buffer.from(raw, 'base64');
-  if (!buffer.length || buffer.length > 9 * 1024 * 1024) {
-    const err = new Error('invalid_image');
-    err.code = 'invalid_image';
-    throw err;
+  let buffer;
+  let contentType = 'image/jpeg';
+  if (billData && typeof billData === 'object') {
+    const { renderShrimpBillJpeg } = require('./shrimpBillRender');
+    buffer = await renderShrimpBillJpeg(billData);
+    contentType = 'image/png';
+    billNo = billNo || billData.billNo;
+    customerName = customerName || billData.customerName;
+    total = total ?? billData.totalAmount;
+    paymentType = paymentType || billData.paymentType;
+    if (remainingAmount == null && billData.creditTransfer?.unpaidAmount != null) {
+      remainingAmount = billData.creditTransfer.unpaidAmount;
+    }
+  } else {
+    const raw = String(imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
+    buffer = Buffer.from(raw, 'base64');
+    if (!buffer.length || buffer.length > 9 * 1024 * 1024) {
+      const err = new Error('invalid_image');
+      err.code = 'invalid_image';
+      throw err;
+    }
   }
 
-  const { url } = await uploadBillJpeg(admin, buffer, billNo);
+  const { url } = await uploadBillImage(admin, buffer, billNo, contentType);
   const paidNote = lineBillPaymentNote(paymentType);
   const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total, billNo);
   const thankYou = lineBillPaidThankYouCaption(paymentType, remainingAmount, total);

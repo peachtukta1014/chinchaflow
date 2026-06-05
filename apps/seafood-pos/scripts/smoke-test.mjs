@@ -259,6 +259,30 @@ try {
 }
 
 try {
+  const { renderShrimpBillJpeg } = requireWebhook('../../webhook-core/src/shrimpBillRender.js');
+  const serverRows = requireWebhook('../../webhook-core/src/shrimpBillTemplateRows.js').FIXED_TEMPLATE_ROWS;
+  assert(serverRows.length === FIXED_TEMPLATE_ROWS.length, 'server bill template row count');
+  const sampleBill = saleToBillData({
+    billNo: 'SMOKE-BILL',
+    customerName: 'ทดสอบบิล',
+    dateKey: '2026-06-05',
+    items: [{ productId: 'large', weightKg: 1.5, lineTotal: 500, pricePerKg: 333 }],
+    total: 500,
+  });
+  const png = await renderShrimpBillJpeg(sampleBill);
+  assert(Buffer.isBuffer(png) && png.length > 8000, 'server Satori bill render');
+  const whBill = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
+  assert(whBill.includes('shrimpRenderBill'), 'shrimpRenderBill function');
+  assert(whBill.includes('billData'), 'shrimpPushBill accepts billData');
+  const linePush = fs.readFileSync(path.join(root, 'src/lib/linePushBill.js'), 'utf8');
+  assert(linePush.includes('billData'), 'client linePushBill billData path');
+  const billApi = fs.readFileSync(path.join(root, 'src/lib/shrimpBillApi.js'), 'utf8');
+  assert(billApi.includes('shrimpRenderBill'), 'shrimpBillApi calls render endpoint');
+} catch (e) {
+  fail('shrimpBillServerRender', e);
+}
+
+try {
   assert(billAmount({ total: 500 }) === 500, 'billAmount');
 } catch (e) {
   fail('billAmount', e);

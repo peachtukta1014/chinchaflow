@@ -5,6 +5,7 @@ import {
   generateBillImage,
   revokeBillImageUrl,
 } from '../lib/generateBillImage';
+import { buildBillDataForCloud, fetchShrimpBillImage } from '../lib/shrimpBillApi';
 import { shareToLine } from '../lib/shareLine';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
 import { resolveLineUserIdDetails } from '../lib/resolveLineUserId';
@@ -34,15 +35,27 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
       ...bill,
       recordedBy: bill?.recordedBy || staffName || '',
     };
-    generateBillImage(billForImage, customer || {})
-      .then(({ blob: b, objectUrl }) => {
+    const load = async () => {
+      try {
+        const { blob: b, objectUrl } = await fetchShrimpBillImage(billForImage, customer || {});
         if (cancelled) {
           revokeBillImageUrl(objectUrl);
           return;
         }
         setBlob(b);
         setPreviewUrl(objectUrl);
-      })
+      } catch (cloudErr) {
+        console.warn('fetchShrimpBillImage fallback', cloudErr);
+        const { blob: b, objectUrl } = await generateBillImage(billForImage, customer || {});
+        if (cancelled) {
+          revokeBillImageUrl(objectUrl);
+          return;
+        }
+        setBlob(b);
+        setPreviewUrl(objectUrl);
+      }
+    };
+    load()
       .catch((e) => {
         if (!cancelled) setError(e.message || 'สร้างภาพไม่สำเร็จ');
       })
@@ -112,7 +125,10 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
     try {
       await pushBillToLineCustomer({
         lineUserId,
-        blob,
+        billData: buildBillDataForCloud(
+          { ...bill, recordedBy: bill?.recordedBy || staffName || '' },
+          customer || {},
+        ),
         billNo: bill?.billNo,
         customerName: bill?.customerName || customer?.name,
         paymentType: bill?.paymentType,

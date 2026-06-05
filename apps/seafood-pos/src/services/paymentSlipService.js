@@ -1,4 +1,3 @@
-import { generateBillImage, revokeBillImageUrl } from '../lib/generateBillImage';
 import {
   fsGetDoc,
   fsPatch,
@@ -7,6 +6,7 @@ import {
   fsQuerySalesByCustomer,
 } from '../lib/firestoreRest';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
+import { buildBillDataForCloud } from '../lib/shrimpBillApi';
 import { isValidLineUserId } from '../lib/lineUserId';
 import { saleRemainingAmount } from '../lib/paymentSlipOpenSale';
 import { resolveLineUserId } from '../lib/resolveLineUserId';
@@ -59,23 +59,16 @@ async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
     moneyReceiverName: receiver,
     confirmedByName: receiver,
   };
-  let objectUrl = null;
-  try {
-    const { blob, objectUrl: url } = await generateBillImage(paidSale, customer || {});
-    objectUrl = url;
-    await pushBillToLineCustomer({
-      lineUserId,
-      blob,
-      billNo: paidSale.billNo,
-      customerName: paidSale.customerName,
-      paymentType: 'transfer',
-      remainingAmount: 0,
-      total: paidSale.total,
-    });
-    return { pushed: true, lineUserId };
-  } finally {
-    revokeBillImageUrl(objectUrl);
-  }
+  await pushBillToLineCustomer({
+    lineUserId,
+    billData: buildBillDataForCloud(paidSale, customer || {}),
+    billNo: paidSale.billNo,
+    customerName: paidSale.customerName,
+    paymentType: 'transfer',
+    remainingAmount: 0,
+    total: paidSale.total,
+  });
+  return { pushed: true, lineUserId };
 }
 
 /**
