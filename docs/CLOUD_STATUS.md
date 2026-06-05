@@ -6,7 +6,8 @@
 
 1. GitHub repo → **Settings** → **Actions** → **General** → **Workflow permissions** → เลือก **Read and write permissions** → Save
 2. GitHub → **Actions** → **Disconnect Vercel from GitHub** → **Run workflow** (ล้าง homepage + environments บน repo)
-   - ถ้า workflow ล้มเหลวที่ homepage: ใส่ PAT ใน repo **Secrets** ชื่อ `ADMIN_TOKEN` (สิทธิ์ repo admin) แล้วรัน workflow อีกครั้ง
+   - ถ้า workflow แดง **404 / Not Found**: PAT ใน `ADMIN_TOKEN` **ไม่ได้ผูก repo `chinchaflow`** หรือไม่มี Administration — สร้าง Fine-grained token ใหม่ (เฉพาะ repo นี้) แล้วอัปเดต secret
+   - **มือถือไม่รอ workflow:** หน้า repo → **About** (ไอคอนเฟือง) → ลบช่อง Website → Save
 3. [vercel.com](https://vercel.com) → โปรเจกต์ที่ผูก repo นี้ → **Settings → Git → Disconnect** (หรือลบโปรเจกต์)
 4. GitHub → **Settings** (บัญชี) → **Integrations** → **Vercel** → เอา `chinchaflow` ออกจากสิทธิ์ (ถ้ายังติด)
 
