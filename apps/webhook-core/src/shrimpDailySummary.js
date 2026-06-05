@@ -92,6 +92,8 @@ async function buildShrimpSummaryForDate(db, dateKey) {
 
 function isShrimpSummaryCommand(text) {
   const t = String(text || '').trim();
+  // สรุปออเดอร์ / สรุปรายการ → today orders (ไม่ใช่ยอดขาย POS)
+  if (/^สรุป.*(ออเดอร์|order|รายการ)/i.test(t)) return false;
   if (/^(สรุป|สรุปวันนี้|ยอดขาย|ยอดขายวันนี้|ปิดวัน|summary|daily|รายงาน)(\s|$)/i.test(t)) return true;
   if (/ยอดขาย.*(วันนี้|สรุป)|(สรุป|ปิดวัน).*ยอดขาย/i.test(t)) return true;
   return false;
