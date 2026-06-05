@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: วาดบิล + ส่ง LINE บน Cloud (Satori)
+
+- **ปัญหา/คำขอ:** ส่งบิล LINE ช้า ~10 วิ — มือถือ html2canvas + อัปโหลด base64 ใหญ่
+- **แก้แล้ว:** แอปส่ง `billData` (จาก `saleToBillData`) → Functions วาดด้วย Satori+Resvg → Storage → LINE · preview ใช้ `shrimpRenderBill` · fallback html2canvas ถ้า Cloud ล้ม
+- **ไฟล์/จุดสำคัญ:** `webhook-core/src/shrimpBillRender.js`, `shrimpBillTemplateRows.js`, `shrimpRenderBill`, `shrimpPushBill` · `seafood-pos/src/lib/shrimpBillApi.js`, `linePushBill.js`, `BillImageSheet`, `LineShareButton`, `paymentSlipService`
+- **พฤติกรรมหลังแก้:** ต้อง deploy **ทั้ง** functions (`deploy-functions.yml`) และ hosting กุ้ง — ฝั่ง client เก่ายังส่ง base64 ได้จนกว่าจะอัปเดต
+- **ถ้าพังอีก ให้เช็กก่อน:** ฟอนต์ `@fontsource/sarabun` ใน bundle · `SHRIMP_PUBLIC_ORIGIN` โหลด logo/QR · memory `shrimpPushBill`/`shrimpRenderBill` 1GiB
+
 ### 2026-06-05 — กุ้ง: ชีตส่ง LINE ไม่รีเซ็ตน้ำหนักที่พิมพ์
 
 - **ปัญหา/คำขอ:** ใส่ 4.3 กก. สักพักกลับเป็น 4 ตามที่สั่ง (ก่อนกดบันทึก)

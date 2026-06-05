@@ -342,12 +342,12 @@ exports.lineWebhookTea = functions
 // ── พนักงานส่งภาพบิลให้ลูกค้าทาง LINE OA (Bearer Firebase ID token) ─────────────
 exports.shrimpPushBill = functions
   .region('asia-southeast1')
-  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ timeoutSeconds: 60, memory: '1GiB' })
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     if (req.method === 'GET') {
-      res.status(200).json({ ok: true, hint: 'POST { lineUserId, imageBase64, billNo?, customerName? }' });
+      res.status(200).json({ ok: true, hint: 'POST { lineUserId, billData? | imageBase64, billNo?, customerName? }' });
       return;
     }
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -366,6 +366,7 @@ exports.shrimpPushBill = functions
       const result = await pushShrimpBillToCustomer(db(), admin, {
         lineUserId: body.lineUserId,
         imageBase64: body.imageBase64,
+        billData: body.billData,
         billNo: body.billNo,
         customerName: body.customerName,
         paymentType: body.paymentType,
@@ -397,6 +398,45 @@ exports.shrimpPushBill = functions
       }
       console.error('shrimpPushBill', err);
       res.status(500).json({ error: err.message || 'failed' });
+    }
+  });
+
+// ── พนักงานสร้างภาพบิลบน Cloud (Satori) — Bearer Firebase ID token ───────────
+exports.shrimpRenderBill = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 60, memory: '1GiB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    if (req.method === 'GET') {
+      res.status(200).json({ ok: true, hint: 'POST { billData }' });
+      return;
+    }
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const authHeader = req.headers.authorization || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!idToken) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      await verifyShrimpStaff(db(), decoded.uid);
+
+      const billData = req.body?.billData;
+      if (!billData || typeof billData !== 'object') {
+        res.status(400).json({ error: 'billData_required' });
+        return;
+      }
+      const { renderShrimpBillJpeg } = require('./shrimpBillRender');
+      const buffer = await renderShrimpBillJpeg(billData);
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      res.status(200).send(buffer);
+    } catch (err) {
+      console.error('shrimpRenderBill', err);
+      res.status(500).json({ error: err.message || 'render_failed' });
     }
   });
 
