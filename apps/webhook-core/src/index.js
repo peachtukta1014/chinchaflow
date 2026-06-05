@@ -142,7 +142,7 @@ exports.lineWebhook = functions
         }).catch((e) => console.warn('line_messages log', e));
 
         const session = await getLineOrderSession(db(), groupId, userId);
-        const intent = classifyShrimpLineMessage(text, session);
+        const intent = classifyShrimpLineMessage(text, session, { groupId });
 
         if (intent === 'ignore') {
           await completeLineEvent(db(), event);

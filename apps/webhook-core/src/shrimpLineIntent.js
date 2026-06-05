@@ -16,6 +16,7 @@ const { isShrimpSummaryCommand, SHRIMP_HELP_CMD } = require('./shrimpDailySummar
 const SHRIMP_HELP_EN_CMD = /^(2|en|english|eng)(\s|$)/i;
 const { isShrimpTodayOrdersCommand } = require('./shrimpTodayOrdersSummary');
 const { isLinkCustomerCommand } = require('./shrimpLineCustomerLink');
+const { classifyShrimpGroupKeyboard, isShrimpGroupChat } = require('./shrimpGroupKeyboard');
 
 const CANCEL_ORDER_CMD = /^(ยกเลิก|cancel|ยกเลิกออเดอร์|ยกเลิกorder|cancel\s*order|ပယ်ဖျက်)(\s|$)/i;
 
@@ -90,7 +91,7 @@ function isShrimpLiffOpenCommand(text) {
   return LIFF_OPEN_CMD.test(String(text || '').trim());
 }
 
-function classifyShrimpLineMessage(text, session) {
+function classifyShrimpLineMessage(text, session, { groupId = null } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return 'ignore';
 
@@ -106,10 +107,17 @@ function classifyShrimpLineMessage(text, session) {
   if (session?.customerLink?.step === 'shop_name') return 'link_customer';
   if (isLinkCustomerCommand(raw)) return 'link_customer';
 
-  if (isShrimpSessionContinuation(session)) return 'order';
-
+  // สรุป/ยกเลิก ต้องทำงานแม้มี session ค้าง (กลุ่มครอบครัวพิมพ์สรุประหว่างสั่ง)
   if (isShrimpTodayOrdersCommand(raw)) return 'today_orders';
   if (isShrimpSummaryCommand(raw)) return 'summary';
+
+  if (isShrimpGroupChat(groupId)) {
+    const groupKey = classifyShrimpGroupKeyboard(raw);
+    if (groupKey) return groupKey;
+  }
+
+  if (isShrimpSessionContinuation(session)) return 'order';
+
   if (isShrimpOrderCommand(raw)) return 'order';
 
   return 'ignore';
