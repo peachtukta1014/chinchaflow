@@ -12,10 +12,7 @@ jobs:
   cleanup:
     name: Clear Vercel homepage and environments
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
-      administration: write
+    # ใช้ PAT จาก secrets.ADMIN_TOKEN เป็นตัวเรียก API — ไม่ขอ administration บน GITHUB_TOKEN
     steps:
       - name: Clear repository homepage (removes vercel.app link on repo header)
         env:
