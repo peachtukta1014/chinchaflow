@@ -26,6 +26,13 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: เสถียรภาพรอบ 2 (ลูกหนี้, poll, lock, สลิป)
+
+- **ปัญหา/คำขอ:** เคลียร์ medium จากรีวิว — AR cap 120, poll 30s, สองเครื่องส่งซ้ำ, สลิป/slip state, FIFO stale, sync stock เงียบ
+- **แก้แล้ว:** `fsQueryOpenSales`/`fsQuerySalesByCustomer` แบ่งหน้า · FIFO re-read บิลก่อนหัก · `beginLineOrderDelivery` lock · สลิป `confirming` ก่อนปิดบิล · บอร์ดเฉพาะ pending/delivering + ลบออกทันหลังส่ง · poll 45s + pause เมื่อแท็บซ่อน · `syncMainStockFromBatches` log warn
+- **ไฟล์/จุดสำคัญ:** `firestoreRest.js`, `salesService.js`, `lineOrderService.js`, `LineOrdersScreen.jsx`, `paymentSlipService.js`, `useIntervalWhen.js`
+- **ถ้าพังอีก ให้เช็กก่อน:** Firestore index `sales` remainingAmount+createdAt · `lineOrders` status+createdAt · สถานะ `delivering` ค้าง >5 นาที
+
 ### 2026-06-05 — กุ้ง: ส่งของ LINE คืนสต๊อกถูก + กันบิลซ้ำ + บอร์ดไม่ตัดค้างเก่า
 
 - **ปัญหา/คำขอ:** บันทึกส่ง LINE ล้มเหลวแล้วคืนสต๊อกผิด (state เก่า) · กดซ้ำสร้างบิลซ้ำ · ออเดอร์ค้าง >7 วันหายจากบอร์ด · query cap 100

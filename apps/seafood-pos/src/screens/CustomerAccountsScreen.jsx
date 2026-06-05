@@ -62,9 +62,11 @@ function CustomerFifoPanel({
 
   const debt = debtByKey.get(row.key);
   const fifoRemain = fifoBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || 0), 0);
-  const totalOwed =
-    parseFloat(debt?.totalDebt)
-    || (fifoRemain > 0 ? fifoRemain : parseFloat(row.totalDebt) || 0);
+  const totalOwed = Math.max(
+    parseFloat(debt?.totalDebt) || 0,
+    fifoRemain,
+    parseFloat(row.totalDebt) || 0,
+  );
 
   const handleFifoPay = async () => {
     const amt = parseFloat(payInput);
@@ -77,7 +79,7 @@ function CustomerFifoPanel({
     }
     setBusy(true);
     try {
-      const res = await applyFifoCustomerPayment(row.customerId, row.customerName, amt, fifoBills);
+      const res = await applyFifoCustomerPayment(row.customerId, row.customerName, amt);
       await onRefresh();
       setPayInput('');
       const lines = res.allocations.map((a, i) => (
@@ -311,7 +313,7 @@ export default function CustomerAccountsScreen({
 
   const loadOpenSalesIndex = useCallback(async ({ background = false } = {}) => {
     try {
-      setOpenSalesIndex(await fsQueryOpenSales(120));
+      setOpenSalesIndex(await fsQueryOpenSales(600));
     } catch (e) {
       console.warn('fsQueryOpenSales', e);
       if (!background) setOpenSalesIndex((prev) => prev);

@@ -358,17 +358,18 @@ export async function applyPaymentToSale(sale, paymentAmount) {
   return { applied: add, paymentType, paidAmount, remainingAmount: newRemain };
 }
 
-/** โหลดเฉพาะบิลค้างของลูกค้า (ไม่ดึง sales ทั้งระบบ) */
+/** โหลดเฉพาะบิลค้างของลูกค้า — query ตาม customerId ก่อน แล้วค่อย fallback index แบ่งหน้า */
 export async function fetchCustomerOpenSales(customerId, customerName) {
   let sales = [];
   if (customerId) {
-    sales = await fsQuerySalesByCustomer(customerId, 80);
+    sales = await fsQuerySalesByCustomer(customerId, 400);
   }
-  const queue = openSalesForCustomer(sales, customerId, customerName);
+  let queue = openSalesForCustomer(sales, customerId, customerName);
   if (queue.length > 0) return queue;
 
-  const open = await fsQueryOpenSales(120);
-  return openSalesForCustomer(open, customerId, customerName);
+  const open = await fsQueryOpenSales(600);
+  queue = openSalesForCustomer(open, customerId, customerName);
+  return queue;
 }
 
 /** รับชำระลูกค้าแบบ FIFO — หักบิลเก่าก่อน */
@@ -376,14 +377,12 @@ export async function applyFifoCustomerPayment(
   customerId,
   customerName,
   paymentAmount,
-  prefetchedOpenSales = null,
+  _prefetchedOpenSales = null,
 ) {
   const amount = parseFloat(paymentAmount) || 0;
   if (amount <= 0) throw new Error('ใส่ยอดที่รับชำระ');
 
-  const sales = prefetchedOpenSales
-    || await fetchCustomerOpenSales(customerId, customerName);
-  const queue = openSalesForCustomer(sales, customerId, customerName);
+  const queue = await fetchCustomerOpenSales(customerId, customerName);
   if (queue.length === 0) throw new Error('ไม่มีบิลค้าง');
 
   let left = amount;
@@ -391,10 +390,13 @@ export async function applyFifoCustomerPayment(
 
   for (const sale of queue) {
     if (left <= 0) break;
-    const remain = parseFloat(sale.remainingAmount) || 0;
+    if (!sale?.id) continue;
+    const live = await fsGetDoc(`sales/${sale.id}`).catch(() => null);
+    const bill = live || sale;
+    const remain = parseFloat(bill.remainingAmount) || 0;
     if (remain <= 0) continue;
     const slice = Math.min(left, remain);
-    const result = await applyPaymentToSale(sale, slice);
+    const result = await applyPaymentToSale(bill, slice);
     allocations.push({
       billNo: sale.billNo || sale.id,
       dateKey: sale.dateKey,
