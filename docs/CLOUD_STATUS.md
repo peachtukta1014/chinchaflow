@@ -1,5 +1,15 @@
 # เช็คสถานะบนคลาว (chincha-eeed6)
 
+**Deploy ฝั่งเว็บ:** Firebase Hosting เท่านั้น (GitHub Actions `deploy-hosting.yml`) — **ไม่ใช้ Vercel**
+
+ถ้าบน GitHub repo ยังเห็นลิงก์ `*.vercel.app` ด้านบน หรือ environment ชื่อ Preview / Production จาก Vercel:
+
+1. GitHub → **Actions** → **Disconnect Vercel from GitHub** → **Run workflow** (ล้าง homepage + environments บน repo)
+2. [vercel.com](https://vercel.com) → โปรเจกต์ที่ผูก repo นี้ → **Settings → Git → Disconnect** (หรือลบโปรเจกต์)
+3. GitHub → **Settings** (บัญชี) → **Integrations** → **Vercel** → เอา `chinchaflow` ออกจากสิทธิ์ (ถ้ายังติด)
+
+---
+
 ## Hosting — ใช้งานได้
 | แอพ | URL |
 |-----|-----|

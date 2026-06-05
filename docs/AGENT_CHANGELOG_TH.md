@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — ถอน Vercel ออกจาก repo (ไม่มีในโค้ด)
+
+- **ปัญหา/คำขอ:** ลบลิงก์ Vercel บนหัว GitHub repo / ไม่ใช้ Vercel deploy
+- **แก้แล้ว:** workflow `disconnect-vercel-github.yml` (รันมือครั้งเดียว) · เอกสารใน `CLOUD_STATUS.md`
+- **ไฟล์/จุดสำคัญ:** `.github/workflows/disconnect-vercel-github.yml`, `docs/CLOUD_STATUS.md`
+- **พฤติกรรมหลังแก้:** homepage repo ว่าง · ไม่มี environment Preview/Production จาก Vercel (หลังรัน workflow)
+- **ถ้าพังอีก ให้เช็กก่อน:** ยังผูก Vercel ที่ vercel.com / GitHub Integrations → disconnect ตามขั้นใน CLOUD_STATUS
+
 ### 2026-06-04 — กุ้ง: LIFF ฝากสลิป + Rich Menu B (branch cursor-พี่เซอliff-slip-deposit-ea63)
 
 - **ปัญหา/คำขอ:** ลูกค้าอายุมากหุบ Rich Menu ไม่เป็น — หา 📎 ส่งสลิปยาก · ต้องการหน้าฝากสลิปแบบ LIFF + ลิงก์ในบิลค้าง
