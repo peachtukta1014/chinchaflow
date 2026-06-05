@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   actualQtyOf,
@@ -33,6 +33,7 @@ export function LineDeliveryConfirmSheet({
   const [draftPrice, setDraftPrice] = useState({});
   const [ackMismatch, setAckMismatch] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const sheetOrderIdRef = useRef(null);
 
   const autoCustomer = useMemo(
     () => resolveLineCustomer(
@@ -49,7 +50,11 @@ export function LineDeliveryConfirmSheet({
     [order.customerName, allCustomers],
   );
 
+  /** รีเซ็ตตะกร้าเฉพาะตอนเปิดออเดอร์ใหม่ — อย่ารีเซ็ตเมื่อรายชื่อลูกค้าโหลดทีหลัง (เคยทำ 4.3 กลับเป็น 4 ตามที่สั่ง) */
   useEffect(() => {
+    if (!order?.id) return;
+    if (sheetOrderIdRef.current === order.id) return;
+    sheetOrderIdRef.current = order.id;
     setLines(initialCart);
     setDraftQty({});
     setDraftPrice({});
@@ -58,7 +63,18 @@ export function LineDeliveryConfirmSheet({
       ? suggestions[0].customer.id
       : autoCustomer.id;
     setSelectedCustomerId(initialId || autoCustomer.id || '');
-  }, [initialCart, order?.id, autoCustomer.id, suggestions]);
+  }, [order?.id, initialCart, autoCustomer, suggestions]);
+
+  useEffect(() => {
+    if (!order?.id || sheetOrderIdRef.current !== order.id) return;
+    setSelectedCustomerId((prev) => {
+      if (prev && prev !== 'general') return prev;
+      const initialId = lineCustomerNeedsManualPick(autoCustomer) && suggestions[0]
+        ? suggestions[0].customer.id
+        : autoCustomer.id;
+      return initialId || prev || '';
+    });
+  }, [order?.id, autoCustomer.id, suggestions]);
 
   const customer = useMemo(() => {
     const hit = allCustomers.find((c) => c.id === selectedCustomerId);
