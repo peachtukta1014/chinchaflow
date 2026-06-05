@@ -1052,6 +1052,11 @@ try {
     'utf8',
   );
   assert(lineOrdersScreen.includes('useLineOrdersFeed'), 'LineOrdersScreen ใช้ snapshot feed');
+  const lineSheet = fs.readFileSync(path.join(root, 'src/screens/LineDeliveryConfirmSheet.jsx'), 'utf8');
+  assert(
+    lineSheet.includes('sheetOrderIdRef'),
+    'LineDeliveryConfirmSheet ไม่รีเซ็ตน้ำหนักเมื่อโหลดลูกค้าทีหลัง',
+  );
   const appJsx = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   assert(appJsx.includes('subscribeLineOrdersBoard'), 'App badge ใช้ snapshot feed');
 } catch (e) {
