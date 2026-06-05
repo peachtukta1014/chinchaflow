@@ -26,6 +26,12 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: บิล Cloud — หัวบิลกล่อง + เบอร์/ที่อยู่ว่าง
+
+- **ปัญหา/คำขอ:** หัวบิลยังมี □ (emoji 📞) · เบอร์/ที่อยู่ลูกค้าจากรายชื่อไม่ขึ้นบนบิล Cloud
+- **แก้แล้ว:** หัวบิลใช้ `โทร.` แทน emoji · `fetchShrimpBillImage` / `BillImageSheet` เรียก `resolveBillCustomer` (โหลด Firestore + จับชื่อ alias เช่น เจ๊เขียด→c1)
+- **ไฟล์:** `resolveBillCustomer.js`, `shrimpBillApi.js`, `BillImageSheet.jsx`, `shrimpBillRender.js`
+
 ### 2026-06-05 — กุ้ง: ฟอนต์บิล Cloud ขึ้นกล่อง (Satori)
 
 - **ปัญหา/คำขอ:** ภาพบิลจาก `shrimpRenderBill` ตัวเลข/วันที่/หัวตารางเป็น □

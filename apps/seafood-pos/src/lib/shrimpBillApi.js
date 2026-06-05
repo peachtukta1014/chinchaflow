@@ -3,6 +3,7 @@
  */
 import { auth } from '../firebase';
 import { saleToBillData } from './billDataFromSale';
+import { resolveBillCustomer } from './resolveBillCustomer';
 import { FIREBASE_PROJECT_ID } from './viteEnv.js';
 
 const region = import.meta.env.VITE_FUNCTIONS_REGION || 'asia-southeast1';
@@ -21,17 +22,23 @@ async function authHeaders(json = true) {
   return { ...base, Authorization: `Bearer ${token}` };
 }
 
-/** payload สำหรับ Cloud จากบิลขาย + ลูกค้า */
+/** payload สำหรับ Cloud จากบิลขาย + ลูกค้า (sync — ใช้เมื่อ resolve แล้ว) */
 export function buildBillDataForCloud(bill, customer = {}) {
   return saleToBillData(bill, customer || {});
+}
+
+/** โหลดเบอร์/ที่อยู่จากรายชื่อลูกค้า แล้วคืน billData สำหรับ Cloud */
+export async function buildBillDataForCloudResolved(bill, customer = {}) {
+  const resolved = await resolveBillCustomer(bill, customer || {});
+  return saleToBillData(bill, resolved);
 }
 
 /**
  * สร้างภาพบิลบน Cloud
  * @returns {Promise<{ blob: Blob, objectUrl: string }>}
  */
-export async function fetchShrimpBillImage(bill, customer = {}) {
-  const billData = buildBillDataForCloud(bill, customer);
+export async function fetchShrimpBillImage(bill, customer = {}, options = {}) {
+  const billData = options.billData ?? await buildBillDataForCloudResolved(bill, customer);
   const r = await fetch(functionsBase('shrimpRenderBill'), {
     method: 'POST',
     headers: await authHeaders(),

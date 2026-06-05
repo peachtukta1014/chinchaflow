@@ -280,8 +280,29 @@ try {
   assert(linePush.includes('billData'), 'client linePushBill billData path');
   const billApi = fs.readFileSync(path.join(root, 'src/lib/shrimpBillApi.js'), 'utf8');
   assert(billApi.includes('shrimpRenderBill'), 'shrimpBillApi calls render endpoint');
+  assert(billApi.includes('buildBillDataForCloudResolved'), 'cloud bill resolves customer profile');
+  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillRender.js'), 'utf8');
+  assert(!renderSrc.includes('📞'), 'server bill header must not use emoji (Satori tofu)');
+  assert(renderSrc.includes('โทร.'), 'server bill header uses text phone label');
+  const billSheet = fs.readFileSync(path.join(root, 'src/components/BillImageSheet.jsx'), 'utf8');
+  assert(billSheet.includes('resolveBillCustomer'), 'BillImageSheet resolves customer before cloud render');
 } catch (e) {
   fail('shrimpBillServerRender', e);
+}
+
+try {
+  const { exactCustomerNameMatch } = await import('../src/lib/customerNameMatch.js');
+  const { CUSTOMERS } = await import('../src/constants/customers.js');
+  const c1 = CUSTOMERS.find((c) => c.id === 'c1');
+  assert(c1 && exactCustomerNameMatch('เจ๊เขียด', c1.name), 'เจ๊เขียด matches จ๊ะขียด registry');
+  const fullBill = saleToBillData(
+    { billNo: 'X', customerName: 'เจ๊เขียด', items: [], total: 0 },
+    { phone: '0899999999', address: '123 ถ.ทดสอบ ภูเก็ต' },
+  );
+  assert(fullBill.customerPhone === '0899999999', 'billData carries customer phone');
+  assert(fullBill.deliveryAddress.includes('ทดสอบ'), 'billData carries customer address');
+} catch (e) {
+  fail('resolveBillCustomer', e);
 }
 
 try {
