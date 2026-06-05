@@ -248,6 +248,12 @@ try {
     { phone: '081-234-5678' },
   );
   assert(withPhone.customerPhone === '081-234-5678', 'เบอร์จากรายชื่อลูกค้าแสดงบนบิล');
+  const withAddr = saleToBillData(
+    { customerName: 'ร้าน A', zone: 'ป่าตอง', items: [], total: 0 },
+    { address: '123/4 ถ.วิชิต ภูเก็ต', phone: '0811111111' },
+  );
+  assert(withAddr.deliveryAddress === '123/4 ถ.วิชิต ภูเก็ต', 'บิลใช้ที่อยู่จริง ไม่ใช่โซน');
+  assert(withAddr.deliveryAddress !== 'ป่าตอง', 'โซนไม่ขึ้นช่องที่อยู่บนบิล');
 } catch (e) {
   fail('billDataFromSale', e);
 }

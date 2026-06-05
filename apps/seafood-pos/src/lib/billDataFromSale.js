@@ -1,4 +1,5 @@
 import { dateKeyBangkok, formatDateThaiShort } from './date.js';
+import { customerBillAddress } from './customerBillAddress.js';
 import { normalizeLineItem } from './billRowMap.js';
 import { billCreditTransferBlock, lineBillPaymentNote } from './lineBillPaymentNote.js';
 import { TEMPLATE_ROW_NAMES } from './billTemplateRows.js';
@@ -125,9 +126,7 @@ export function saleToBillData(bill, customer = {}) {
     items.map(normalizeLineItem).reduce((s, i) => s + i.total, 0);
 
   const customerPhone = String(customer.phone || bill.phone || '').trim();
-  const deliveryAddress = String(
-    customer.zone || bill.zone || customer.address || bill.deliveryAddress || '',
-  ).trim();
+  const deliveryAddress = customerBillAddress(customer, bill);
   const delivererName = billDelivererName(bill, customer);
 
   return {

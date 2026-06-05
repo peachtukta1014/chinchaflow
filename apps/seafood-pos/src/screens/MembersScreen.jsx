@@ -29,6 +29,7 @@ const EMPTY_CUSTOMER_FORM = {
   aliasesText: '',
   defaultRiverSize: '',
   zone: '',
+  address: '',
   phone: '',
   lineUserId: '',
   lineOrderUserIds: '',
@@ -214,8 +215,8 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
           <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
           {readOnly
-            ? 'ดูเบอร์ / โซน / ที่อยู่ส่งของ — แก้ไขได้เฉพาะแอดมินและแมนเนเจอร์'
-            : 'รายชื่อหลัก 27 ร้าน + ทั่วไป — แก้ไขได้ทุกราย ลูกค้า LINE ที่ยังไม่ผูกอยู่แท็บ「LINE รอผูก」'}
+            ? 'ดูเบอร์ / โซน / ที่อยู่บนบิล — แก้ไขได้เฉพาะแอดมินและแมนเนเจอร์'
+            : 'รายชื่อหลัก 27 ร้าน + ทั่วไป — โซน = พื้นที่จัดกลุ่ม · ที่อยู่ = บ้านเลขที่ขึ้นบิล · ลูกค้า LINE รอผูกอยู่แท็บ「LINE รอผูก」'}
           {!readOnly && (
             <>
               <br />
@@ -261,7 +262,13 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
             <input
               value={newCus.zone}
               onChange={(e) => setNewCus((p) => ({ ...p, zone: e.target.value }))}
-              placeholder="โซน (เช่น ป่าตอง)"
+              placeholder="โซน (เช่น ป่าตอง, ราไวย์)"
+              className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm outline-none"
+            />
+            <input
+              value={newCus.address}
+              onChange={(e) => setNewCus((p) => ({ ...p, address: e.target.value }))}
+              placeholder="ที่อยู่บนบิล (บ้านเลขที่ตามทะเบียนราษฎร์)"
               className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2.5 text-sm outline-none"
             />
             <input
@@ -335,7 +342,13 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
                     <input
                       value={cusEditData.zone}
                       onChange={(e) => setCusEditData((p) => ({ ...p, zone: e.target.value }))}
-                      placeholder="โซน"
+                      placeholder="โซน (พื้นที่)"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"
+                    />
+                    <input
+                      value={cusEditData.address}
+                      onChange={(e) => setCusEditData((p) => ({ ...p, address: e.target.value }))}
+                      placeholder="ที่อยู่บนบิล (บ้านเลขที่ตามทะเบียน)"
                       className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none"
                     />
                     <input
@@ -420,7 +433,14 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
                           </span>
                         )}
                         {c.zone && (
-                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{c.zone}</span>
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                            โซน {c.zone}
+                          </span>
+                        )}
+                        {c.address && (
+                          <span className="text-[10px] text-slate-500 truncate max-w-[12rem]" title={c.address}>
+                            {c.address}
+                          </span>
                         )}
                         {c.phone && <span className="text-[10px] text-slate-400">{c.phone}</span>}
                         {formatLineContactsSummary(c) && (

@@ -23,6 +23,9 @@ export async function resolveBillCustomer(bill, customerHint = {}) {
   const zone = String(
     customerHint.zone || bill.zone || fromStore?.zone || builtin?.zone || '',
   ).trim();
+  const address = String(
+    customerHint.address || bill.address || fromStore?.address || builtin?.address || '',
+  ).trim();
   return {
     ...(builtin || {}),
     ...(fromStore || {}),
@@ -31,6 +34,7 @@ export async function resolveBillCustomer(bill, customerHint = {}) {
     name: bill.customerName || customerHint.name || builtin?.name || fromStore?.name || '',
     phone,
     zone,
+    address,
     lineUserId:
       customerHint.lineUserId || bill.customerLineUserId || fromStore?.lineUserId || builtin?.lineUserId || null,
   };

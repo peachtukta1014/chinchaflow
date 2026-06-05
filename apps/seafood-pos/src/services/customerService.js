@@ -133,6 +133,7 @@ export function isBuiltinCustomer(c) {
 function customerPayload({
   name,
   zone,
+  address,
   phone,
   notes,
   lineUserId,
@@ -146,6 +147,7 @@ function customerPayload({
   const payload = {
     name: parsed.name,
     zone: String(zone || '').trim(),
+    address: String(address || '').trim(),
     phone: String(phone || '').trim(),
     notes: String(notes || '').trim(),
   };
@@ -196,6 +198,7 @@ function mergeCustomerFields(base, data) {
     aliasesText: pick('aliasesText'),
     defaultRiverSize: pick('defaultRiverSize'),
     zone: pick('zone'),
+    address: pick('address'),
     phone: pick('phone'),
     notes: pick('notes'),
     lineUserId: pick('lineUserId'),
