@@ -1,9 +1,17 @@
 /**
  * กฎแสดงออเดอร์รอส่งบนบอร์ด LINE (แยกจาก Firestore query เพื่อทดสอบ logic ได้)
  */
+import { dateKeyBangkok, shiftDateKey } from './date.js';
 
 /** ไม่ซ่อนออเดอร์ค้างส่งที่เลยวันส่งแล้ว — เดิม 7 วันทำให้หายจากบอร์ด */
 export const LINE_ORDER_BOARD_FUTURE_DAYS = 14;
+
+/** กรอง+เรียงรายการบอร์ดจากแถวดิบ (REST หรือ snapshot) */
+export function boardLineOrdersFromRows(rows) {
+  const today = dateKeyBangkok();
+  const maxDate = shiftDateKey(today, LINE_ORDER_BOARD_FUTURE_DAYS);
+  return filterPendingLineOrdersForBoard(rows, { maxDate }).sort(sortLineOrdersForBoard);
+}
 
 /**
  * @param {Array} rows

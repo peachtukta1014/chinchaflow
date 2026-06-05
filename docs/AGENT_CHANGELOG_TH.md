@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: ออเดอร์ LINE real-time (snapshot)
+
+- **ปัญหา/คำขอ:** ออเดอร์ใหม่/ส่งแล้วไม่อัปเดตทันที — poll 30–45 วิช้า
+- **แก้แล้ว:** `subscribeLineOrdersBoard` (Firestore `onSnapshot` pending+delivering) แชร์ทั้งบอร์ด+badge · ล้มเหลว → REST ทุก 60 วิ · rules รองรับ `deliveringAt/By`, สลิป `confirming`
+- **ไฟล์/จุดสำคัญ:** `lineOrdersFeed.js`, `useLineOrdersFeed.js`, `LineOrdersScreen.jsx`, `App.jsx`, `firestore.rules`, `lineOrderBoard.js`
+- **พฤติกรรมหลังแก้:** ออเดอร์ LINE ขึ้น/หายทันทีเมื่อ webhook หรือเครื่องอื่นบันทึก · ปริมาณ ~10–22 บิล/วัน ไม่ต้อง paginate เพิ่ม
+- **ถ้าพังอีก ให้เช็กก่อน:** login Firebase ในแอป · listener error ใน console → fallback REST
+
 ### 2026-06-05 — กุ้ง: เสถียรภาพรอบ 2 (ลูกหนี้, poll, lock, สลิป)
 
 - **ปัญหา/คำขอ:** เคลียร์ medium จากรีวิว — AR cap 120, poll 30s, สองเครื่องส่งซ้ำ, สลิป/slip state, FIFO stale, sync stock เงียบ

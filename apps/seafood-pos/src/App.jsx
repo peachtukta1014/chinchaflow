@@ -4,7 +4,10 @@ import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'l
 import { auth } from './firebase';
 import { subscribeShrimpMember } from './lib/authSession';
 import { fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
-import { fetchPendingLineOrderCount } from './services/lineOrderService';
+import {
+  countLineOrdersBoardBadge,
+  subscribeLineOrdersBoard,
+} from './lib/lineOrdersFeed';
 import {
   getEffectiveStock,
   normalizeStockValues,
@@ -168,11 +171,6 @@ export default function App() {
 
   const canPollOrders = Boolean(member && FIREBASE_PROJECT_ID);
 
-  const refreshPendingOrderBadge = useCallback(() => {
-    if (!canPollOrders) return;
-    fetchPendingLineOrderCount().then(setPendingOrders);
-  }, [canPollOrders]);
-
   useEffect(() => {
     if (!member) return;
     ensureNotifyPermission();
@@ -181,19 +179,10 @@ export default function App() {
   useEffect(() => {
     if (!canPollOrders) return undefined;
     registerBadgeServiceWorker();
-    refreshPendingOrderBadge();
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refreshPendingOrderBadge();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', refreshPendingOrderBadge);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', refreshPendingOrderBadge);
-    };
-  }, [canPollOrders, refreshPendingOrderBadge]);
-
-  useIntervalWhen(canPollOrders, refreshPendingOrderBadge, 30000);
+    return subscribeLineOrdersBoard((rows, { ready }) => {
+      if (ready) setPendingOrders(countLineOrdersBoardBadge(rows));
+    });
+  }, [canPollOrders]);
 
   useEffect(() => {
     if (!member) {
@@ -316,7 +305,6 @@ export default function App() {
 
   const onSaleDeleted = useCallback(() => {
     bumpSalesAndStock();
-    fetchPendingLineOrderCount().then(setPendingOrders);
   }, [bumpSalesAndStock]);
 
   if (member === undefined) {
@@ -491,9 +479,6 @@ export default function App() {
               stockBatches={stockBatches}
               updateMainStock={updateMainStock}
               onSaleRecorded={bumpSalesAndStock}
-              onOrderDone={() => {
-                fetchPendingLineOrderCount().then(setPendingOrders);
-              }}
             />
           </Suspense>
         )}

@@ -15,7 +15,6 @@ import { findCustomerByLineUserId } from '../services/lineOaCustomerService';
 import { fsGetDoc } from '../lib/firestoreRest';
 import {
   cancelLineOrder as cancelLineOrderService,
-  fetchLineOrdersForBoard,
   beginLineOrderDelivery,
   markLineOrderDoneOnly,
   releaseLineOrderDelivery,
@@ -28,11 +27,10 @@ import {
   restoreStockForSale,
 } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
-import { useIntervalWhen } from '../lib/useIntervalWhen';
+import { useLineOrdersFeed } from '../hooks/useLineOrdersFeed';
 
 export default function LineOrdersScreen({ user, stock, stockBatches = [], updateMainStock, onSaleRecorded, onOrderDone }) {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { orders, loading } = useLineOrdersFeed(true);
   const [savingId, setSavingId] = useState(null);
   const [deliverySheet, setDeliverySheet] = useState(null);
   const [loadedPrices, setLoadedPrices] = useState({});
@@ -64,14 +62,6 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       .catch(() => {});
   }, []);
 
-  const loadOrders = useCallback(async () => {
-    const rows = await fetchLineOrdersForBoard();
-    setOrders(rows);
-    setLoading(false);
-  }, []);
-
-  useIntervalWhen(true, loadOrders, 45000, { pauseWhenHidden: true });
-
   const cancelLineOrder = async (order) => {
     if (!order || order.status !== 'pending' || savingId) return;
     const label = order.displayCustomerName || order.customerName
@@ -81,7 +71,6 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     setSavingId(order.id);
     try {
       await cancelLineOrderService(order.id, user?.name || 'พนักงาน');
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
       onOrderDone?.();
     } catch (err) {
       console.error(err);
@@ -126,7 +115,6 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
 
   const confirmDeliveryLegacyDone = async (order) => {
     await markLineOrderDoneOnly(order.id);
-    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'done' } : o)));
     onOrderDone?.();
   };
 
@@ -144,9 +132,6 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
     }
     if (freshOrder?.status === 'done' && freshOrder?.salesId) {
       alert(`ออเดอร์นี้ส่งแล้ว\nบิล ${freshOrder.billNo || freshOrder.salesId}`);
-      setOrders((prev) => prev.map((o) => (o.id === order.id
-        ? { ...o, status: 'done', salesId: freshOrder.salesId, billNo: freshOrder.billNo }
-        : o)));
       setDeliverySheet(null);
       setSavingId(null);
       return;
@@ -177,7 +162,6 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
         recordedBy,
       });
 
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
       setDeliverySheet(null);
       onSaleRecorded?.();
       onOrderDone?.();
