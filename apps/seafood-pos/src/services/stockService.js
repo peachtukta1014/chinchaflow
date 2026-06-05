@@ -4,6 +4,19 @@ import { dateKeyBangkok } from '../lib/date';
 import { fsPatch, fsPost, fsSetStockDoc, fsAtomicStockBatchCommit } from '../lib/firestoreRest';
 import { STOCK_LINE } from '../constants/stockLines';
 import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
+import {
+  computeStockAfterSaleDeduction,
+  normalizeStockValues,
+  planFifoBatchDeduction,
+  sumStockFromBatches,
+} from '../lib/stockDeductionPlan';
+
+export {
+  computeStockAfterSaleDeduction,
+  normalizeStockValues,
+  planFifoBatchDeduction,
+  sumStockFromBatches,
+};
 
 function withTimeout(promise, ms = 10000) {
   return Promise.race([
@@ -14,46 +27,8 @@ function withTimeout(promise, ms = 10000) {
 
 /** ตัดคงเหลือทีละรายการในล็อต (วันเก่า → รายการเก่า) */
 export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
-  let liveLeft = liveKg;
-  let deadLeft = deadKg;
-  const patches = [];
-
-  for (const b of sortBatchesFifoOrder(batches)) {
-    if (liveLeft <= 0 && deadLeft <= 0) break;
-    let remLive = parseFloat(b.remainingLiveKg ?? b.liveKg) || 0;
-    let remDead = parseFloat(b.remainingDeadKg ?? b.deadKg) || 0;
-    let newLive = remLive;
-    let newDead = remDead;
-
-    if (liveLeft > 0 && remLive > 0) {
-      const take = Math.min(liveLeft, remLive);
-      newLive = remLive - take;
-      liveLeft -= take;
-    }
-    if (deadLeft > 0 && remDead > 0) {
-      const take = Math.min(deadLeft, remDead);
-      newDead = remDead - take;
-      deadLeft -= take;
-    }
-
-    if (newLive !== remLive || newDead !== remDead) {
-      patches.push({
-        id: b.id,
-        remainingLiveKg: normalizeStockValues(newLive, 0).live,
-        remainingDeadKg: normalizeStockValues(0, newDead).dead,
-        _kgTypes: b._fsKgTypes || {},
-      });
-    }
-  }
-
-  if (liveLeft > 0.001 || deadLeft > 0.001) {
-    throw new Error(
-      `สต๊อกในล็อตไม่พอ (ขาด ${STOCK_LINE.live.tag} ${liveLeft.toFixed(2)} กก. / ${STOCK_LINE.dead.tag} ${deadLeft.toFixed(2)} กก.)`,
-    );
-  }
-
+  const { patches } = planFifoBatchDeduction(batches, { liveKg, deadKg });
   await fsAtomicStockBatchCommit(patches);
-
   return patches;
 }
 
@@ -445,24 +420,6 @@ export async function restoreStockForSale(stock, liveKg, deadKg, updateMainStock
   return updateMainStock(
     normalizeStockValues(nextLive, nextDead).live,
     normalizeStockValues(nextLive, nextDead).dead,
-  );
-}
-
-export function normalizeStockValues(live, dead) {
-  return {
-    live: Math.max(0, parseFloat(Number(live).toFixed(3))),
-    dead: Math.max(0, parseFloat(Number(dead).toFixed(3))),
-  };
-}
-
-/** รวมคงเหลือจากล็อต FIFO */
-export function sumStockFromBatches(batches = []) {
-  return batches.reduce(
-    (acc, b) => ({
-      live: acc.live + (parseFloat(b.remainingLiveKg ?? b.liveKg) || 0),
-      dead: acc.dead + (parseFloat(b.remainingDeadKg ?? b.deadKg) || 0),
-    }),
-    { live: 0, dead: 0 },
   );
 }
 
