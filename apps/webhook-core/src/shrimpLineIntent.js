@@ -91,23 +91,41 @@ function isShrimpLiffOpenCommand(text) {
   return LIFF_OPEN_CMD.test(String(text || '').trim());
 }
 
+/** ในกลุ่มครอบครัว/พนักงาน — ตอบเฉพาะรับออเดอร์ + สรุป (ไม่รบกวนแชททั่วไป) */
+const SHRIMP_GROUP_ALLOWED_INTENTS = new Set(['order', 'summary', 'today_orders']);
+
+function applyShrimpGroupOrdersOnlyFilter(intent, groupId) {
+  if (!isShrimpGroupChat(groupId)) return intent;
+  return SHRIMP_GROUP_ALLOWED_INTENTS.has(intent) ? intent : 'ignore';
+}
+
 function classifyShrimpLineMessage(text, session, { groupId = null } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return 'ignore';
 
-  if (isShrimpLiffOpenCommand(raw)) return 'open_liff';
-
-  if (SHRIMP_HELP_EN_CMD.test(raw) && !isShrimpSessionContinuation(session) && !isShrimpOrderCommand(raw)) {
-    return 'help_en';
+  if (isShrimpLiffOpenCommand(raw)) {
+    return applyShrimpGroupOrdersOnlyFilter('open_liff', groupId);
   }
 
-  if (SHRIMP_HELP_CMD.test(raw)) return 'help';
-  if (isShrimpCancelCommand(raw)) return 'cancel_order';
+  if (SHRIMP_HELP_EN_CMD.test(raw) && !isShrimpSessionContinuation(session) && !isShrimpOrderCommand(raw)) {
+    return applyShrimpGroupOrdersOnlyFilter('help_en', groupId);
+  }
 
-  if (session?.customerLink?.step === 'shop_name') return 'link_customer';
-  if (isLinkCustomerCommand(raw)) return 'link_customer';
+  if (SHRIMP_HELP_CMD.test(raw)) {
+    return applyShrimpGroupOrdersOnlyFilter('help', groupId);
+  }
+  if (isShrimpCancelCommand(raw)) {
+    return applyShrimpGroupOrdersOnlyFilter('cancel_order', groupId);
+  }
 
-  // สรุป/ยกเลิก ต้องทำงานแม้มี session ค้าง (กลุ่มครอบครัวพิมพ์สรุประหว่างสั่ง)
+  if (session?.customerLink?.step === 'shop_name') {
+    return applyShrimpGroupOrdersOnlyFilter('link_customer', groupId);
+  }
+  if (isLinkCustomerCommand(raw)) {
+    return applyShrimpGroupOrdersOnlyFilter('link_customer', groupId);
+  }
+
+  // สรุปต้องทำงานแม้มี session ค้าง (กลุ่มครอบครัวพิมพ์สรุประหว่างสั่ง)
   if (isShrimpTodayOrdersCommand(raw)) return 'today_orders';
   if (isShrimpSummaryCommand(raw)) return 'summary';
 

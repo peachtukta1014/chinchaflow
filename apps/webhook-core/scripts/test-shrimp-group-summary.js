@@ -50,6 +50,39 @@ assert(
   'group key 3 ignored in DM',
 );
 
+assert(
+  classifyShrimpLineMessage('ช่วยเหลือ', null, { groupId }) === 'ignore',
+  'help silent in group',
+);
+assert(
+  classifyShrimpLineMessage('help', null, { groupId }) === 'ignore',
+  'help en keyword silent in group',
+);
+assert(
+  classifyShrimpLineMessage('EN', null, { groupId }) === 'ignore',
+  'EN silent in group',
+);
+assert(
+  classifyShrimpLineMessage('ยกเลิก', null, { groupId }) === 'ignore',
+  'cancel silent in group',
+);
+assert(
+  classifyShrimpLineMessage('ฟอร์ม', null, { groupId }) === 'ignore',
+  'liff silent in group',
+);
+assert(
+  classifyShrimpLineMessage('สวัสดีครับ', null, { groupId }) === 'ignore',
+  'general chat silent in group',
+);
+assert(
+  classifyShrimpLineMessage('ช่วยเหลือ', null, { groupId: null }) === 'help',
+  'help still works in OA DM',
+);
+assert(
+  classifyShrimpLineMessage('ปุ้ย กุ้ง 2 กก', null, { groupId }) === 'order',
+  'order still works in group',
+);
+
 const helpTh = replyHelpCustomerThai();
 assert(!/สรุปออเดอร์/.test(helpTh), 'help th no order summary key');
 assert(!/^1$|คีย์ 1|กด 1/m.test(helpTh), 'help th no group digit key 1');
