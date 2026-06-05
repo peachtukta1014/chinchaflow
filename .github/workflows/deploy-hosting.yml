@@ -101,10 +101,19 @@ jobs:
             ID=$(node -p "require('./apps/webhook-core/shrimp-liff-slip-id.json').liffId")
           fi
           if [ -z "$ID" ]; then
-            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>/dev/null | tail -1 || true)
-          fi
-          if [ -z "$ID" ]; then
-            echo "::warning::VITE_LIFF_SLIP_ID missing — LIFF ฝากสลิปจะยังไม่เปิดจนกว่าจะตั้งค่า"
+            set +e
+            PROVISION_OUT=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>&1)
+            PROVISION_EXIT=$?
+            set -e
+            echo "$PROVISION_OUT"
+            ID=$(echo "$PROVISION_OUT" | tail -1)
+            if [ "$PROVISION_EXIT" -ne 0 ] || [ -z "$ID" ]; then
+              echo "::warning::VITE_LIFF_SLIP_ID missing — LIFF ฝากสลิปจะยังไม่เปิดจนกว่าจะตั้งค่า"
+              ID=""
+            elif [ -f apps/webhook-core/shrimp-liff-slip-id.json ]; then
+              echo "shrimp-liff-slip-id.json written in CI (commit to repo if ID is new)"
+              cat apps/webhook-core/shrimp-liff-slip-id.json
+            fi
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 

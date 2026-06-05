@@ -67,7 +67,18 @@ jobs:
             ID=$(node -p "require('./apps/webhook-core/shrimp-liff-slip-id.json').liffId")
           fi
           if [ -z "$ID" ]; then
-            ID=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>/dev/null | tail -1 || true)
+            set +e
+            PROVISION_OUT=$(node apps/webhook-core/scripts/provision-shrimp-liff.mjs --ensure --slip 2>&1)
+            PROVISION_EXIT=$?
+            set -e
+            echo "$PROVISION_OUT"
+            ID=$(echo "$PROVISION_OUT" | tail -1)
+            if [ "$PROVISION_EXIT" -ne 0 ] || [ -z "$ID" ]; then
+              echo "::warning::LINE_LIFF_SLIP_ID missing — ลิงก์ฝากสลิปในบิลค้างยังไม่เปิด"
+              ID=""
+            elif [ -f apps/webhook-core/shrimp-liff-slip-id.json ]; then
+              cat apps/webhook-core/shrimp-liff-slip-id.json
+            fi
           fi
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 

@@ -6,6 +6,8 @@ const {
   getShrimpSlipLiffOpenUrl,
   liffOpenUrl,
   SLIP_DEFAULT_ENDPOINT,
+  readSlipLiffIdFromRepo,
+  resolveShrimpSlipLiffId,
 } = require('../src/provisionShrimpLiff');
 const { lineBillUnpaidHint } = require('../src/shrimpLinePush');
 const fs = require('fs');
@@ -43,6 +45,10 @@ const slipApp = fs.readFileSync(
 );
 assert(slipApp.includes('ฝากสลิป'), 'LineSlipLiffApp copy');
 assert(SLIP_DEFAULT_ENDPOINT.includes('liff-slip.html'), 'slip default endpoint');
+assert(typeof readSlipLiffIdFromRepo === 'function', 'readSlipLiffIdFromRepo export');
+delete process.env.LINE_LIFF_SLIP_ID;
+delete process.env.VITE_LIFF_SLIP_ID;
+assert(resolveShrimpSlipLiffId() === readSlipLiffIdFromRepo(), 'resolveShrimpSlipLiffId reads repo json');
 
 console.log('\nall shrimp liff slip tests passed\n');
 console.log('Rich Menu B URI (ตั้งใน LINE Manager):', liffOpenUrl('2010271574-SlipTest01'));

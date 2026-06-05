@@ -955,6 +955,10 @@ try {
   assert(liffApp.includes("setStep('identity')"), 'LIFF identity routing');
   const prov = requireWebhook('../../webhook-core/src/provisionShrimpLiff.js');
   assert(typeof prov.ensureShrimpLiffApp === 'function', 'provisionShrimpLiff');
+  assert(typeof prov.readSlipLiffIdFromRepo === 'function', 'readSlipLiffIdFromRepo');
+  const slipSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSlipSession.js'), 'utf8');
+  assert(slipSession.includes('VITE_LIFF_SLIP_ID'), 'slip session uses VITE_LIFF_SLIP_ID');
+  assert(!slipSession.includes('VITE_LIFF_ID ||'), 'slip session must not fallback to order LIFF ID');
   const verifyMod = requireWebhook('../../webhook-core/src/verifyLineLiffToken.js');
   const prevLiff = process.env.LINE_LIFF_ID;
   const prevLoginCh = process.env.LINE_LOGIN_CHANNEL_ID;
