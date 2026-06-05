@@ -26,13 +26,19 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-05 — กุ้ง: ฟอนต์บิล Cloud ขึ้นกล่อง (Satori)
+
+- **ปัญหา/คำขอ:** ภาพบิลจาก `shrimpRenderBill` ตัวเลข/วันที่/หัวตารางเป็น □
+- **แก้แล้ว:** ใช้ Sarabun **TTF เต็มชุด** ใน `apps/webhook-core/assets/fonts/` แทน subset woff จาก `@fontsource` (Satori ไม่รวม unicode-range แบบ CSS)
+- **ไฟล์:** `shrimpBillRender.js`, `assets/fonts/Sarabun-*.ttf`
+
 ### 2026-06-05 — กุ้ง: วาดบิล + ส่ง LINE บน Cloud (Satori)
 
 - **ปัญหา/คำขอ:** ส่งบิล LINE ช้า ~10 วิ — มือถือ html2canvas + อัปโหลด base64 ใหญ่
 - **แก้แล้ว:** แอปส่ง `billData` (จาก `saleToBillData`) → Functions วาดด้วย Satori+Resvg → Storage → LINE · preview ใช้ `shrimpRenderBill` · fallback html2canvas ถ้า Cloud ล้ม
 - **ไฟล์/จุดสำคัญ:** `webhook-core/src/shrimpBillRender.js`, `shrimpBillTemplateRows.js`, `shrimpRenderBill`, `shrimpPushBill` · `seafood-pos/src/lib/shrimpBillApi.js`, `linePushBill.js`, `BillImageSheet`, `LineShareButton`, `paymentSlipService`
 - **พฤติกรรมหลังแก้:** ต้อง deploy **ทั้ง** functions (`deploy-functions.yml`) และ hosting กุ้ง — ฝั่ง client เก่ายังส่ง base64 ได้จนกว่าจะอัปเดต
-- **ถ้าพังอีก ให้เช็กก่อน:** ฟอนต์ `@fontsource/sarabun` ใน bundle · `SHRIMP_PUBLIC_ORIGIN` โหลด logo/QR · memory `shrimpPushBill`/`shrimpRenderBill` 1GiB
+- **ถ้าพังอีก ให้เช็กก่อน:** ฟอนต์ TTF ใน `webhook-core/assets/fonts/` (subset woff ทำให้ขึ้นกล่อง) · `SHRIMP_PUBLIC_ORIGIN` โหลด logo/QR · memory `1GB`
 
 ### 2026-06-05 — กุ้ง: ชีตส่ง LINE ไม่รีเซ็ตน้ำหนักที่พิมพ์
 

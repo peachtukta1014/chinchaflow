@@ -10,10 +10,8 @@ const {
 } = require('./shrimpBillTemplateRows');
 
 const PUBLIC_ORIGIN = process.env.SHRIMP_PUBLIC_ORIGIN || 'https://ko-seafood.top';
-const FONT_DIR = path.join(
-  path.dirname(require.resolve('@fontsource/sarabun/package.json')),
-  'files',
-);
+/** TTF เต็มชุด (ไทย+เลข) — subset woff ของ @fontsource ทำให้ Satori ขึ้นกล่อง */
+const FONT_DIR = path.join(__dirname, '../assets/fonts');
 
 let fontCache = null;
 const imageCache = new Map();
@@ -86,16 +84,14 @@ function readBundledFont(fileName) {
   return fs.readFileSync(filePath);
 }
 
-/** ฟอนต์จาก @fontsource/sarabun — ไม่พึ่ง network ตอน cold start */
+/** ฟอนต์ Sarabun TTF ใน repo — ไม่พึ่ง network ตอน cold start */
 function loadBillFonts() {
   if (fontCache) return fontCache;
   const defs = [
-    ['sarabun-thai-400-normal.woff', 400],
-    ['sarabun-thai-700-normal.woff', 700],
-    ['sarabun-thai-800-normal.woff', 800],
-    ['sarabun-latin-400-normal.woff', 400],
-    ['sarabun-latin-700-normal.woff', 700],
-    ['sarabun-latin-800-normal.woff', 800],
+    ['Sarabun-Regular.ttf', 400],
+    ['Sarabun-Bold.ttf', 700],
+    ['Sarabun-ExtraBold.ttf', 800],
+    ['Sarabun-ExtraBold.ttf', 900],
   ];
   fontCache = defs.map(([fileName, weight]) => ({
     name: 'Sarabun',

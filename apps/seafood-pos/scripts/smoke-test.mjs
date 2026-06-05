@@ -269,6 +269,8 @@ try {
     items: [{ productId: 'large', weightKg: 1.5, lineTotal: 500, pricePerKg: 333 }],
     total: 500,
   });
+  const fontDir = path.join(root, '../../apps/webhook-core/assets/fonts');
+  assert(fs.existsSync(path.join(fontDir, 'Sarabun-Regular.ttf')), 'bill font TTF bundled');
   const png = await renderShrimpBillJpeg(sampleBill);
   assert(Buffer.isBuffer(png) && png.length > 8000, 'server Satori bill render');
   const whBill = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
