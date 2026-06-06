@@ -991,6 +991,10 @@ try {
   const acctSrc = fs.readFileSync(path.join(root, 'src/screens/CustomerAccountsScreen.jsx'), 'utf8');
   assert(acctSrc.includes('buildDebtCustomerRows'), 'accounts uses buildDebtCustomerRows');
   assert(acctSrc.includes('sumDebtCustomerRows'), 'accounts uses sumDebtCustomerRows');
+  const fsRestDebt = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
+  assert(fsRestDebt.includes('createDebtDoc'), 'fsIncrementDebt สร้าง customerDebts ถ้ายังไม่มี');
+  assert(fsRestDebt.includes('isFirestoreNotFoundError'), 'fsIncrementDebt จับ NOT_FOUND');
+  assert(fsRestDebt.includes('isFirestoreAlreadyExistsError'), 'fsIncrementDebt retry เมื่อสร้างซ้ำ');
 } catch (e) {
   fail('debtCustomerRows', e);
 }
