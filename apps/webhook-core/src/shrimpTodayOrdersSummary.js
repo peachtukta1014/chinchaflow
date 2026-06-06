@@ -290,6 +290,7 @@ function formatTodayOrdersReplyFamily(orders, dateKey) {
 module.exports = {
   buildShrimpTodayOrdersSummary,
   formatTodayOrdersReply,
+  formatOrderCompactLine,
   isShrimpTodayOrdersCommand,
   cancelLatestPendingOrderForUser,
 };

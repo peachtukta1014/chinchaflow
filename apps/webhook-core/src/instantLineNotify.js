@@ -1,6 +1,7 @@
 const { linePush } = require('./teaDailySummary');
 const { formatDateThai, deliveryDateKind } = require('./parseDeliveryDate');
 const { getShrimpLineConfig } = require('./shrimpLineConfig');
+const { formatOrderCompactLine } = require('./shrimpTodayOrdersSummary');
 
 function collectNotifyTargets(config) {
   const targets = new Set();
@@ -15,6 +16,16 @@ function collectNotifyTargets(config) {
   return targets;
 }
 
+function resolveNotifyTargets(config, orderData) {
+  const targets = collectNotifyTargets(config);
+  const notifyGroupId = String(config?.notifyGroupId || '').trim();
+  // ออเดอร์จากกลุ่ม LINE — ไม่ push ซ้ำเข้ากลุ่ม (เห็น reply บอทในแชตอยู่แล้ว)
+  if (orderData?.lineGroupId && notifyGroupId) {
+    targets.delete(notifyGroupId);
+  }
+  return targets;
+}
+
 async function pushToTargets(targets, text, token) {
   if (!token || !text || !targets.size) return { sent: 0, targets: [] };
   const results = [];
@@ -24,7 +35,17 @@ async function pushToTargets(targets, text, token) {
   return { sent: results.filter((r) => r.ok).length, targets: results };
 }
 
-function formatShrimpOrderMessage(data, now = new Date()) {
+function formatShrimpOrderMessage(data, now = new Date(), { compact = false } = {}) {
+  if (compact) {
+    const items = formatOrderCompactLine(data);
+    const dateLabel = data.deliveryDate ? formatDateThai(data.deliveryDate) : '—';
+    const kind = data.deliveryDate ? deliveryDateKind(data.deliveryDate, now) : 'other';
+    let ship = dateLabel;
+    if (kind === 'today') ship = `วันนี้ ${dateLabel}`;
+    else if (kind === 'tomorrow') ship = `พรุ่งนี้ ${dateLabel}`;
+    return `🦐 ${items} · ส่ง ${ship}`;
+  }
+
   const name = data.customerName || 'ลูกค้า';
   const dateLabel = data.deliveryDate ? formatDateThai(data.deliveryDate) : '—';
   const kind = data.deliveryDate ? deliveryDateKind(data.deliveryDate, now) : 'other';
@@ -76,10 +97,22 @@ async function notifyShrimpLineOrder(db, orderData) {
   if (config.instantOrderNotify === false) return { skipped: 'disabled' };
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) return { skipped: 'no_token' };
-  const targets = collectNotifyTargets(config);
-  if (!targets.size) return { skipped: 'no_targets' };
-  const text = formatShrimpOrderMessage(orderData);
-  return pushToTargets(targets, text, token);
+  const targets = resolveNotifyTargets(config, orderData);
+  if (!targets.size) {
+    if (orderData.lineGroupId) return { skipped: 'group_order_no_push' };
+    return { skipped: 'no_targets' };
+  }
+  const notifyGroupId = String(config.notifyGroupId || '').trim();
+  const textByTarget = new Map();
+  for (const to of targets) {
+    const compact = notifyGroupId && to === notifyGroupId;
+    textByTarget.set(to, formatShrimpOrderMessage(orderData, new Date(), { compact }));
+  }
+  const results = [];
+  for (const [to, text] of textByTarget) {
+    results.push({ to, ok: await linePush(to, text, token) });
+  }
+  return { sent: results.filter((r) => r.ok).length, targets: results };
 }
 
 async function notifyTeaRestock(db, restockData) {
@@ -96,6 +129,7 @@ async function notifyTeaRestock(db, restockData) {
 
 module.exports = {
   collectNotifyTargets,
+  resolveNotifyTargets,
   formatShrimpOrderMessage,
   formatTeaRestockMessage,
   notifyShrimpLineOrder,
