@@ -150,6 +150,82 @@ async function notifyShrimpLineOrdersAfterSave(db, orders, { groupId = null } = 
   return { sent: totalSent, details };
 }
 
+function formatShrimpPaymentSlipMessage(slip) {
+  const name = slip.customerName || 'ลูกค้า';
+  const bill = slip.suggestedBillNo || slip.billNo || '—';
+  const amount = slip.remainingAmount ?? slip.total;
+  const amountLine = amount != null && Number(amount) > 0
+    ? ` · ค้าง ฿${Number(amount).toLocaleString('th-TH')}`
+    : '';
+  return [
+    '💳 สลิปโอนรอตรวจ (LINE OA)',
+    `ลูกค้า: ${name}`,
+    `บิล: ${bill}${amountLine}`,
+    '',
+    '— เปิดแอปโกอ้วน → ยอดขาย → แท็บสลิป',
+  ].join('\n');
+}
+
+function formatShrimpSaleDeleteRequestMessage(alert) {
+  const bill = alert.billNo || alert.saleId || '—';
+  const name = alert.customerName || '';
+  const amount = alert.amount;
+  const amountLine = amount != null ? ` · ฿${Number(amount).toLocaleString('th-TH')}` : '';
+  const reason = alert.reason ? `\nเหตุผล: ${alert.reason}` : '';
+  return [
+    '⚠️ แมนเนเจอร์ขอให้ลบบิล',
+    `บิล: ${bill}${name ? ` · ${name}` : ''}${amountLine}`,
+    `โดย: ${alert.requestedByName || 'แมนเนเจอร์'}${reason}`,
+    '',
+    '— เปิดแอปโกอ้วน → ยอดขาย → ลบบิล (แอดมิน)',
+  ].join('\n');
+}
+
+async function notifyShrimpPaymentSlip(db, slipData, { submissionId = null } = {}) {
+  if (!slipData || slipData.status !== 'pending') return { skipped: 'not_pending' };
+  const config = await getShrimpLineConfig(db);
+  if (config.instantSlipNotify === false) return { skipped: 'disabled' };
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) return { skipped: 'no_token' };
+  const targets = collectNotifyTargets(config);
+  if (!targets.size) return { skipped: 'no_targets' };
+  const text = formatShrimpPaymentSlipMessage(slipData);
+  const result = await pushToTargets(targets, text, token);
+  if (submissionId && result.sent > 0) {
+    try {
+      await db.collection('paymentSlipSubmissions').doc(submissionId).update({
+        notifySentAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('notifyShrimpPaymentSlip notifySentAt', err.message);
+    }
+  }
+  return result;
+}
+
+async function notifyShrimpSaleDeleteRequest(db, alertData, { alertId = null } = {}) {
+  if (!alertData || alertData.type !== 'sale_delete_request' || alertData.status !== 'pending') {
+    return { skipped: 'not_pending_request' };
+  }
+  const config = await getShrimpLineConfig(db);
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) return { skipped: 'no_token' };
+  const targets = collectNotifyTargets(config);
+  if (!targets.size) return { skipped: 'no_targets' };
+  const text = formatShrimpSaleDeleteRequestMessage(alertData);
+  const result = await pushToTargets(targets, text, token);
+  if (alertId && result.sent > 0) {
+    try {
+      await db.collection('shrimpAdminAlerts').doc(alertId).update({
+        notifySentAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('notifyShrimpSaleDeleteRequest notifySentAt', err.message);
+    }
+  }
+  return result;
+}
+
 async function notifyTeaRestock(db, restockData) {
   if (!restockData || restockData.purchaseStatus === 'purchased') return { skipped: 'purchased' };
   const config = await getTeaLineConfig(db);
@@ -166,8 +242,12 @@ module.exports = {
   collectNotifyTargets,
   resolveNotifyTargets,
   formatShrimpOrderMessage,
+  formatShrimpPaymentSlipMessage,
+  formatShrimpSaleDeleteRequestMessage,
   formatTeaRestockMessage,
   notifyShrimpLineOrder,
   notifyShrimpLineOrdersAfterSave,
+  notifyShrimpPaymentSlip,
+  notifyShrimpSaleDeleteRequest,
   notifyTeaRestock,
 };

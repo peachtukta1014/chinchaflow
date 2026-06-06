@@ -16,12 +16,11 @@ export default function SalesHubScreen({
   localBills = [],
   refreshKey = 0,
   active = true,
-  isAdmin = false,
+  member = null,
   stock = null,
   stockBatches = [],
   updateMainStock,
   onSaleDeleted,
-  member = null,
 }) {
   const [subTab, setSubTab] = useState('summary');
   const [pendingSlipCount, setPendingSlipCount] = useState(0);
@@ -57,7 +56,7 @@ export default function SalesHubScreen({
           localBills={localBills}
           refreshKey={refreshKey}
           active={active}
-          isAdmin={isAdmin}
+          member={member}
           stock={stock}
           stockBatches={stockBatches}
           updateMainStock={updateMainStock}
@@ -74,7 +73,7 @@ export default function SalesHubScreen({
           refreshKey={refreshKey}
           active={active}
           debtsOnly
-          isAdmin={isAdmin}
+          member={member}
           stock={stock}
           stockBatches={stockBatches}
           updateMainStock={updateMainStock}

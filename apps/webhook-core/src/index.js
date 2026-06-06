@@ -41,7 +41,12 @@ const {
 const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
 const { handleShrimpLiffSlipRequest } = require('./shrimpLiffSlip');
 const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
-const { notifyShrimpLineOrder, notifyTeaRestock } = require('./instantLineNotify');
+const {
+  notifyShrimpLineOrder,
+  notifyShrimpPaymentSlip,
+  notifyShrimpSaleDeleteRequest,
+  notifyTeaRestock,
+} = require('./instantLineNotify');
 const {
   getShrimpLiffId,
   buildLiffOrderFlex,
@@ -598,6 +603,36 @@ exports.onTeaRestockCreated = functions
       else console.log('onTeaRestockCreated sent', result.sent);
     } catch (err) {
       console.error('onTeaRestockCreated', err);
+    }
+  });
+
+exports.onShrimpPaymentSlipCreated = functions
+  .region('asia-southeast1')
+  .firestore.document('paymentSlipSubmissions/{submissionId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = snap.data();
+      if (data?.notifySentAt) return;
+      const result = await notifyShrimpPaymentSlip(db(), data, { submissionId: snap.id });
+      if (result.skipped) console.log('onShrimpPaymentSlipCreated', result.skipped);
+      else console.log('onShrimpPaymentSlipCreated sent', result.sent);
+    } catch (err) {
+      console.error('onShrimpPaymentSlipCreated', err);
+    }
+  });
+
+exports.onShrimpAdminAlertCreated = functions
+  .region('asia-southeast1')
+  .firestore.document('shrimpAdminAlerts/{alertId}')
+  .onCreate(async (snap) => {
+    try {
+      const data = snap.data();
+      if (data?.notifySentAt) return;
+      const result = await notifyShrimpSaleDeleteRequest(db(), data, { alertId: snap.id });
+      if (result.skipped) console.log('onShrimpAdminAlertCreated', result.skipped);
+      else console.log('onShrimpAdminAlertCreated sent', result.sent);
+    } catch (err) {
+      console.error('onShrimpAdminAlertCreated', err);
     }
   });
 

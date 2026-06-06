@@ -872,6 +872,9 @@ try {
     canAccessShrimpMainTab,
     canAccessShrimpOverlay,
     canSeeShrimpLiveStockBar,
+    canEditShrimpCustomers,
+    canDeleteShrimpSale,
+    canRequestShrimpSaleDelete,
     getDefaultMainTabForMember,
     getNextShrimpRole,
   } = await import('../src/lib/shrimpRoles.js');
@@ -894,13 +897,22 @@ try {
   const managerMember = { role: 'manager', email: 'mgr@example.com' };
   assert(canSeeShrimpLiveStockBar(managerMember), 'manager เห็นแถบสต๊อก');
   assert(!canSeeShrimpLiveStockBar(staffMember), 'staff ไม่เห็นแถบสต๊อก');
+  const adminMember = { role: 'admin', email: 'a@b.com' };
+  assert(canEditShrimpCustomers(adminMember), 'admin แก้ลูกค้าได้');
+  assert(!canEditShrimpCustomers(managerMember), 'manager แก้ลูกค้าไม่ได้');
+  assert(canDeleteShrimpSale(adminMember), 'admin ลบบิลได้');
+  assert(!canDeleteShrimpSale(managerMember), 'manager ลบบิลไม่ได้');
+  assert(canRequestShrimpSaleDelete(managerMember), 'manager ขอลบบิลได้');
+  assert(!canRequestShrimpSaleDelete(adminMember), 'admin ไม่ใช้ขอลบ');
   const appSrc = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   assert(
     appSrc.includes('showLiveStockBar && (\n        <LiveStockStickyBar'),
     'แถบสต๊อกด้านบนแสดงแอดมิน + แมนเนเจอร์',
   );
   assert(appSrc.includes('canAccessShrimpMainTab(member'), 'App จำกัดแท็บตาม role');
-  assert(appSrc.includes('readOnly={isStaff}'), 'ลูกค้า read-only สำหรับสตาฟ');
+  assert(appSrc.includes('readOnly={!isAdmin}'), 'ลูกค้า read-only ยกเว้นแอดมิน');
+  assert(appSrc.includes('fetchPendingPaymentSlips'), 'App โพลสลิปรอตรวจเพื่อแจ้งเตือน');
+  assert(appSrc.includes('AdminAlertsBanner'), 'แอดมินเห็นแจ้งเตือนขอลบบิล');
   if (/\buseMemo\s*\(/.test(appSrc)) {
     assert(
       /import\s+React,\s*\{[^}]*\buseMemo\b/.test(appSrc),
@@ -910,6 +922,8 @@ try {
   const rules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
   assert(rules.includes('canMutateShrimpOps'), 'firestore.rules มี canMutateShrimpOps');
   assert(rules.includes('paymentSlipSubmissions'), 'firestore.rules มี paymentSlipSubmissions');
+  assert(rules.includes('shrimpAdminAlerts'), 'firestore.rules มี shrimpAdminAlerts');
+  assert(rules.includes('!isManagerShrimp()'), 'firestore จำกัด manager แก้ลูกค้า');
   assert(rules.includes('lineBillPushes'), 'firestore.rules อ่าน lineBillPushes');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
   assert(
@@ -996,6 +1010,15 @@ try {
   assert(hub.includes('PaymentSlipsScreen'), 'SalesHub มีแท็บสลิป');
   const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   assert(wh.includes('processShrimpPaymentSlipImage'), 'lineWebhook รับรูปสลิป');
+  assert(wh.includes('onShrimpPaymentSlipCreated'), 'trigger แจ้งสลิป');
+  assert(wh.includes('onShrimpAdminAlertCreated'), 'trigger แจ้งขอลบบิล');
+  const notify = requireWebhook('../../webhook-core/src/instantLineNotify.js');
+  const slipMsg = notify.formatShrimpPaymentSlipMessage({
+    customerName: 'ร้านทดสอบ',
+    suggestedBillNo: 'B-001',
+    remainingAmount: 500,
+  });
+  assert(slipMsg.includes('สลิปโอนรอตรวจ'), 'ข้อความแจ้งสลิป LINE');
 } catch (e) {
   fail('paymentSlip UI', e);
 }
