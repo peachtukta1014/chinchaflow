@@ -242,9 +242,9 @@ service cloud.firestore {
 
     match /customers/{docId} {
       allow read: if isApprovedShrimp();
-      allow create, update: if canMutateShrimpOps();
+      allow create, update: if canMutateShrimpOps() && !isManagerShrimp();
       allow delete: if isAdminShrimp()
-        || (canMutateShrimpOps() && docId.matches('cx_.*'));
+        || (canMutateShrimpOps() && !isManagerShrimp() && docId.matches('cx_.*'));
     }
 
     // Config — stock (shrimp), LINE/settings (tea)
@@ -300,6 +300,19 @@ service cloud.firestore {
     match /lineBillPushes/{docId} {
       allow read: if isApprovedShrimp();
       allow create, update, delete: if false;
+    }
+
+    // แมนเนเจอร์ขอให้แอดมินลบบิล — แจ้งเตือนในแอป + LINE
+    match /shrimpAdminAlerts/{docId} {
+      allow read: if isAdminShrimp();
+      allow create: if isManagerShrimp()
+        && request.resource.data.type == 'sale_delete_request'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedByUid == request.auth.uid;
+      allow update: if isAdminShrimp()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resolvedAt', 'resolvedByUid', 'resolvedByName']);
+      allow delete: if isAdminShrimp();
     }
 
     // Deny everything else

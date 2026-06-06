@@ -15,6 +15,7 @@ const DEFAULT = {
   notifyGroupId: '',
   notifyUserIds: '',
   instantOrderNotify: true,
+  instantSlipNotify: true,
   lineDefaultStartHour: LINE_DELIVERY_WINDOW_DEFAULTS.startHour,
   lineDefaultEndHour: LINE_DELIVERY_WINDOW_DEFAULTS.endHour,
 };
@@ -80,6 +81,7 @@ export default function ShrimpLineNotifySettings() {
         notifyGroupId: (form.notifyGroupId || '').trim(),
         notifyUserIds: (form.notifyUserIds || '').trim(),
         instantOrderNotify: form.instantOrderNotify !== false,
+        instantSlipNotify: form.instantSlipNotify !== false,
         lineDefaultStartHour: window.startHour,
         lineDefaultEndHour: window.endHour,
         updatedAt: new Date().toISOString(),
@@ -144,6 +146,15 @@ export default function ShrimpLineNotifySettings() {
           className="w-4 h-4 rounded"
         />
         แจ้งทันทีเมื่อมีออเดอร์ LINE ใหม่
+      </label>
+      <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+        <input
+          type="checkbox"
+          checked={form.instantSlipNotify !== false}
+          onChange={(e) => setForm((p) => ({ ...p, instantSlipNotify: e.target.checked }))}
+          className="w-4 h-4 rounded"
+        />
+        แจ้งทันทีเมื่อลูกค้าส่งสลิปโอน (LINE OA)
       </label>
 
       <div className="pt-2 border-t border-slate-100 space-y-2">

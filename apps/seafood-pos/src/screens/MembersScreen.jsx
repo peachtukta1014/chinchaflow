@@ -215,7 +215,7 @@ export default function MembersScreen({ isAdmin = false, readOnly = false }) {
           <>
         <p className="text-[10px] text-slate-500 leading-relaxed">
           {readOnly
-            ? 'ดูเบอร์ / โซน / ที่อยู่บนบิล — แก้ไขได้เฉพาะแอดมินและแมนเนเจอร์'
+            ? 'ดูเบอร์ / โซน / ที่อยู่บนบิล — แก้ไขได้เฉพาะแอดมิน'
             : 'รายชื่อหลัก 27 ร้าน + ทั่วไป — โซน = พื้นที่จัดกลุ่ม · ที่อยู่ = บ้านเลขที่ขึ้นบิล · ลูกค้า LINE รอผูกอยู่แท็บ「LINE รอผูก」'}
           {!readOnly && (
             <>

@@ -3,6 +3,7 @@ const {
   findCustomerNameByLineUserId,
 } = require('./shrimpLinePush');
 const { lineReply } = require('./teaDailySummary');
+const { notifyShrimpPaymentSlip } = require('./instantLineNotify');
 
 const LINE_CONTENT_URL = 'https://api-data.line.me/v2/bot/message';
 
@@ -149,7 +150,7 @@ async function recordPaymentSlipSubmission(db, admin, {
     }
   }
 
-  const docRef = await db.collection('paymentSlipSubmissions').add({
+  const slipPayload = {
     status: 'pending',
     lineUserId: userId,
     lineMessageId,
@@ -163,7 +164,15 @@ async function recordPaymentSlipSubmission(db, admin, {
     remainingAmount: suggested?.remainingAmount ?? null,
     total: suggested?.total ?? null,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  };
+  const docRef = await db.collection('paymentSlipSubmissions').add(slipPayload);
+
+  try {
+    const notify = await notifyShrimpPaymentSlip(db, slipPayload, { submissionId: docRef.id });
+    if (notify.skipped) console.log('recordPaymentSlip notify', notify.skipped);
+  } catch (err) {
+    console.warn('recordPaymentSlip notify', err.message);
+  }
 
   return {
     ok: true,

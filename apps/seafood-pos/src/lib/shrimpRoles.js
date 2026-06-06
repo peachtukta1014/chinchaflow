@@ -36,6 +36,21 @@ export function canSeeShrimpLiveStockBar(member) {
   return isShrimpAdmin(member) || isShrimpManager(member);
 }
 
+/** แก้ไขรายชื่อลูกค้า / ผูก LINE — แอดมินเท่านั้น */
+export function canEditShrimpCustomers(member) {
+  return isShrimpAdmin(member);
+}
+
+/** ลบบิลออกจากระบบ — แอดมินเท่านั้น */
+export function canDeleteShrimpSale(member) {
+  return isShrimpAdmin(member);
+}
+
+/** แมนเนเจอร์ขอให้แอดมินลบบิล (แจ้งเตือนในแอป + LINE) */
+export function canRequestShrimpSaleDelete(member) {
+  return isShrimpManager(member);
+}
+
 /** แท็บหลักที่สตาฟ (ลูกมือ/ส่งของ) เห็น */
 export const STAFF_MAIN_TABS = ['pos', 'orders'];
 

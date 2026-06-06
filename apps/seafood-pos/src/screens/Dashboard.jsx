@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FileImage, Trash2 } from 'lucide-react';
+import { FileImage } from 'lucide-react';
 import { dateKeyBangkok, formatViewDateLabel } from '../lib/date';
 import { fsQuerySales } from '../lib/firestoreRest';
 import {
@@ -10,16 +10,18 @@ import {
 } from '../lib/salesAggregate';
 import { useIntervalWhen } from '../lib/useIntervalWhen';
 import { PAY } from '../constants';
-import { deleteSaleBill, updateSalePayment } from '../services/salesService';
+import { updateSalePayment } from '../services/salesService';
 import DateNavBar from '../components/DateNavBar';
 import BillImageSheet from '../components/BillImageSheet';
+import SaleBillActions from '../components/SaleBillActions';
+import { useSaleDeleteHandlers } from '../hooks/useSaleDeleteHandlers';
 import { STOCK_LINE } from '../constants/stockLines';
 
 export default function Dashboard({
   localBills = [],
   refreshKey = 0,
   active = true,
-  isAdmin = false,
+  member = null,
   stock = null,
   stockBatches = [],
   updateMainStock,
@@ -30,8 +32,23 @@ export default function Dashboard({
   const [loading, setLoading] = useState(true);
   const [salesLoadError, setSalesLoadError] = useState(false);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
-  const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
+
+  const {
+    canDelete,
+    canRequestDelete,
+    deleteBusyId,
+    requestBusyId,
+    handleDeleteSale,
+    handleRequestDeleteSale,
+  } = useSaleDeleteHandlers({
+    member,
+    stock,
+    stockBatches,
+    updateMainStock,
+    onSaleDeleted,
+    onLocalRemove: (id) => setFirestoreSales((prev) => prev.filter((b) => b.id !== id)),
+  });
 
   const loadSalesRest = useCallback(async ({ background = false } = {}) => {
     if (!import.meta.env.VITE_FIREBASE_PROJECT_ID) {
@@ -89,27 +106,6 @@ export default function Dashboard({
       loadSalesRest({ background: true });
     } finally {
       setPayUpdatingId(null);
-    }
-  };
-
-  const handleDeleteSale = async (tx) => {
-    if (!isAdmin || !tx.id || deleteBusyId) return;
-    const label = `${tx.billNo || tx.id} · ${tx.customerName} · ฿${billAmount(tx).toLocaleString()}`;
-    if (!window.confirm(
-      `ลบบิลนี้ออกจากระบบ?\n\n${label}\n\n` +
-        '· คืนยอดค้าง (ถ้ามี)\n· คืนสต๊อกกุ้ง\n· ออเดอร์ LINE กลับเป็นรอส่ง (ถ้ามี)\n\nกู้คืนไม่ได้',
-    )) return;
-    setDeleteBusyId(tx.id);
-    try {
-      await deleteSaleBill(tx, { stock, stockBatches, updateMainStock });
-      setFirestoreSales((prev) => prev.filter((b) => b.id !== tx.id));
-      onSaleDeleted?.();
-      alert('✅ ลบบิลแล้ว — บันทึกใหม่ได้ที่ออเดอร์ LINE หรือขายของ');
-    } catch (e) {
-      alert(e?.message || 'ลบบิลไม่สำเร็จ');
-      loadSalesRest({ background: true });
-    } finally {
-      setDeleteBusyId(null);
     }
   };
 
@@ -207,7 +203,6 @@ export default function Dashboard({
           <div className="space-y-3">
             {sortedSales.map((tx, i) => {
               const busy = payUpdatingId === tx.id;
-              const deleting = deleteBusyId === tx.id;
               const pt = PAY.find((p) => p.id === tx.paymentType);
               return (
                 <div key={tx.id || i} className="border border-slate-100 rounded-xl p-3">
@@ -260,18 +255,16 @@ export default function Dashboard({
                       <FileImage size={14} />
                       ดูภาพบิล / แชร์ LINE
                     </button>
-                    {isAdmin && tx.id && (
-                      <button
-                        type="button"
-                        disabled={deleting || busy}
-                        onClick={() => handleDeleteSale(tx)}
-                        className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
-                        title="ลบบิล (แอดมิน)"
-                      >
-                        <Trash2 size={14} />
-                        {deleting ? '…' : 'ลบ'}
-                      </button>
-                    )}
+                    <SaleBillActions
+                      tx={tx}
+                      canDelete={canDelete}
+                      canRequestDelete={canRequestDelete}
+                      deleteBusyId={deleteBusyId}
+                      requestBusyId={requestBusyId}
+                      payUpdatingId={payUpdatingId}
+                      onDelete={handleDeleteSale}
+                      onRequestDelete={handleRequestDeleteSale}
+                    />
                   </div>
                 </div>
               );

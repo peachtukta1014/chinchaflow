@@ -190,6 +190,22 @@ export async function fsPatch(path, data) {
   if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
 }
 
+/** สร้างเอกสารใหม่ใน collection (Firestore auto-ID) */
+export async function fsAddDoc(collection, data) {
+  if (!FS_BASE) throw new Error('Firestore ไม่ได้ตั้งค่า');
+  const fields = fsObj(data);
+  const r = await fetch(`${FS_BASE}/${collection}`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`Firestore ${collection} POST failed (HTTP ${r.status})`);
+  const json = await r.json();
+  const name = json.name || '';
+  const id = name.split('/').pop();
+  return { id, ...data };
+}
+
 /** สร้างหรืออัปเดตเอกสารตาม path (PATCH+updateMask หรือ POST ถ้ายังไม่มี) */
 export async function fsSetDoc(path, data) {
   if (!FS_BASE) throw new Error('Firestore ไม่ได้ตั้งค่า');

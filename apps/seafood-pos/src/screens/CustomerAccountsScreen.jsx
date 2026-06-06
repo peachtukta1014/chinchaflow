@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Trash2 } from 'lucide-react';
 import { PAY } from '../constants';
 import { dateKeyBangkok, formatDateThaiShort, formatViewDateLabel } from '../lib/date';
 import DateNavBar from '../components/DateNavBar';
@@ -12,10 +11,11 @@ import { useIntervalWhen } from '../lib/useIntervalWhen';
 import {
   applyFifoCustomerPayment,
   clearCustomerDebtAll,
-  deleteSaleBill,
   fetchCustomerOpenSales,
   updateSalePayment,
 } from '../services/salesService';
+import SaleBillActions from '../components/SaleBillActions';
+import { useSaleDeleteHandlers } from '../hooks/useSaleDeleteHandlers';
 
 function CustomerFifoPanel({
   row,
@@ -23,13 +23,12 @@ function CustomerFifoPanel({
   onRefresh,
   expandedKey,
   setExpandedKey,
-  isAdmin = false,
-  stock,
-  stockBatches = [],
-  updateMainStock,
-  onSaleDeleted,
+  canDelete = false,
+  canRequestDelete = false,
   deleteBusyId,
+  requestBusyId,
   onDeleteSale,
+  onRequestDeleteSale,
   onOpenBill,
 }) {
   const [payInput, setPayInput] = useState('');
@@ -234,18 +233,17 @@ function CustomerFifoPanel({
                       ดูภาพบิล / แชร์ LINE
                     </button>
                   )}
-                  {isAdmin && tx.id && onDeleteSale && (
-                    <button
-                      type="button"
-                      disabled={deleteBusyId === tx.id || busy}
-                      onClick={() => onDeleteSale(tx)}
-                      className="mt-2 w-full py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
-                      title="ลบบิล (แอดมิน) — คืนสต๊อกและเปิดออเดอร์ LINE กลับเป็นรอส่ง"
-                    >
-                      <Trash2 size={14} />
-                      {deleteBusyId === tx.id ? 'กำลังลบ…' : 'ลบบิลนี้'}
-                    </button>
-                  )}
+                  <SaleBillActions
+                    tx={tx}
+                    canDelete={canDelete}
+                    canRequestDelete={canRequestDelete}
+                    deleteBusyId={deleteBusyId}
+                    requestBusyId={requestBusyId}
+                    payUpdatingId={busy ? tx.id : null}
+                    onDelete={onDeleteSale}
+                    onRequestDelete={onRequestDeleteSale}
+                    layout="stack"
+                  />
                 </div>
               );
             })
@@ -269,7 +267,7 @@ export default function CustomerAccountsScreen({
   refreshKey = 0,
   active = true,
   debtsOnly = false,
-  isAdmin = false,
+  member = null,
   stock = null,
   stockBatches = [],
   updateMainStock,
@@ -284,7 +282,6 @@ export default function CustomerAccountsScreen({
   const [daySalesLoadError, setDaySalesLoadError] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [payUpdatingId, setPayUpdatingId] = useState(null);
-  const [deleteBusyId, setDeleteBusyId] = useState(null);
   const [billSheet, setBillSheet] = useState(null);
 
   const openBillSheet = useCallback((tx) => {
@@ -345,6 +342,22 @@ export default function CustomerAccountsScreen({
     await Promise.all(tasks);
   }, [loadDebtsRest, loadOpenSalesIndex, loadDaySales, debtsOnly]);
 
+  const {
+    canDelete,
+    canRequestDelete,
+    deleteBusyId,
+    requestBusyId,
+    handleDeleteSale,
+    handleRequestDeleteSale,
+  } = useSaleDeleteHandlers({
+    member,
+    stock,
+    stockBatches,
+    updateMainStock,
+    onSaleDeleted,
+    onLocalRemove: () => refreshAll(),
+  });
+
   useEffect(() => {
     if (!active) return undefined;
     loadOpenSalesIndex();
@@ -404,26 +417,6 @@ export default function CustomerAccountsScreen({
       alert('แก้สถานะไม่สำเร็จ');
     } finally {
       setPayUpdatingId(null);
-    }
-  };
-
-  const handleDeleteSale = async (tx) => {
-    if (!isAdmin || !tx.id || deleteBusyId) return;
-    const label = `${tx.billNo || tx.id} · ${tx.customerName} · ฿${billAmount(tx).toLocaleString()}`;
-    if (!window.confirm(
-      `ลบบิลนี้ออกจากระบบ?\n\n${label}\n\n` +
-        '· คืนยอดค้าง (ถ้ามี)\n· คืนสต๊อกกุ้ง\n· ออเดอร์ LINE กลับเป็นรอส่ง (ถ้ามี)\n\nกู้คืนไม่ได้',
-    )) return;
-    setDeleteBusyId(tx.id);
-    try {
-      await deleteSaleBill(tx, { stock, stockBatches, updateMainStock });
-      await refreshAll();
-      onSaleDeleted?.();
-      alert('✅ ลบบิลแล้ว — บันทึกใหม่ได้ที่ออเดอร์ LINE หรือขายของ');
-    } catch (e) {
-      alert(e?.message || 'ลบบิลไม่สำเร็จ');
-    } finally {
-      setDeleteBusyId(null);
     }
   };
 
@@ -494,7 +487,6 @@ export default function CustomerAccountsScreen({
               <div className="space-y-3 max-h-[42vh] overflow-y-auto pr-1">
                 {sortedDaySales.map((tx, i) => {
                   const busy = payUpdatingId === tx.id;
-                  const deleting = deleteBusyId === tx.id;
                   const pt = PAY.find((p) => p.id === tx.paymentType);
                   const itemCount = tx.items?.length ?? 0;
                   return (
@@ -544,18 +536,16 @@ export default function CustomerAccountsScreen({
                         >
                           ดูภาพบิล / แชร์ LINE
                         </button>
-                        {isAdmin && tx.id && (
-                          <button
-                            type="button"
-                            disabled={deleting || busy}
-                            onClick={() => handleDeleteSale(tx)}
-                            className="shrink-0 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
-                            title="ลบบิล (แอดมิน)"
-                          >
-                            <Trash2 size={14} />
-                            {deleting ? '…' : 'ลบ'}
-                          </button>
-                        )}
+                        <SaleBillActions
+                          tx={tx}
+                          canDelete={canDelete}
+                          canRequestDelete={canRequestDelete}
+                          deleteBusyId={deleteBusyId}
+                          requestBusyId={requestBusyId}
+                          payUpdatingId={payUpdatingId}
+                          onDelete={handleDeleteSale}
+                          onRequestDelete={handleRequestDeleteSale}
+                        />
                       </div>
                     </div>
                   );
@@ -588,12 +578,12 @@ export default function CustomerAccountsScreen({
                 onRefresh={refreshAll}
                 expandedKey={expandedKey}
                 setExpandedKey={setExpandedKey}
-                isAdmin={isAdmin}
-                stock={stock}
-                stockBatches={stockBatches}
-                updateMainStock={updateMainStock}
+                canDelete={canDelete}
+                canRequestDelete={canRequestDelete}
                 deleteBusyId={deleteBusyId}
+                requestBusyId={requestBusyId}
                 onDeleteSale={handleDeleteSale}
+                onRequestDeleteSale={handleRequestDeleteSale}
                 onOpenBill={openBillSheet}
               />
             ))}

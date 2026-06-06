@@ -4,6 +4,7 @@ import { ArrowLeft, BarChart2, LogOut, RefreshCw, ShoppingCart, Wallet } from 'l
 import { auth } from './firebase';
 import { subscribeShrimpMember } from './lib/authSession';
 import { fsGetDoc, fsQueryStockBatches } from './lib/firestoreRest';
+import { fetchPendingPaymentSlips } from './services/paymentSlipService';
 import {
   countLineOrdersBoardBadge,
   subscribeLineOrdersBoard,
@@ -37,6 +38,7 @@ import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import LoginScreen from './screens/LoginScreen';
 import POSMobile from './screens/POSMobile';
 import LiveStockStickyBar from './components/LiveStockStickyBar';
+import AdminAlertsBanner from './components/AdminAlertsBanner';
 import OfflineBanner from './components/OfflineBanner';
 import { stockLineFull } from './constants/stockLines';
 import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
@@ -84,6 +86,8 @@ export default function App() {
   const [stockOverlayLine, setStockOverlayLine] = useState('live');
   const [pendingOrders, setPendingOrders] = useState(0);
   const prevPendingOrdersRef = useRef(null);
+  const [pendingSlips, setPendingSlips] = useState(0);
+  const prevPendingSlipsRef = useRef(null);
   const [isOnline, setIsOnline] = useState(() => isNetworkOnline());
   const [offlinePendingCount, setOfflinePendingCount] = useState(0);
   const [pendingStockDeduction, setPendingStockDeduction] = useState({ live: 0, dead: 0 });
@@ -158,6 +162,43 @@ export default function App() {
   }, [member, stockRefresh, loadStockFromRest]);
 
   useIntervalWhen(Boolean(member), loadStockFromRest, 60000);
+
+  const loadPendingSlips = useCallback(async () => {
+    if (!member || !FIREBASE_PROJECT_ID) return;
+    try {
+      const rows = await fetchPendingPaymentSlips();
+      setPendingSlips(rows.length);
+    } catch (e) {
+      console.warn('loadPendingSlips', e);
+    }
+  }, [member]);
+
+  useEffect(() => {
+    if (!member) return;
+    loadPendingSlips();
+  }, [member, loadPendingSlips]);
+
+  useIntervalWhen(Boolean(member && FIREBASE_PROJECT_ID), loadPendingSlips, 45000);
+
+  useEffect(() => {
+    if (!member) {
+      setPendingSlips(0);
+      prevPendingSlipsRef.current = null;
+      return;
+    }
+    const prev = prevPendingSlipsRef.current;
+    if (prev !== null && pendingSlips > prev) {
+      const added = pendingSlips - prev;
+      showWebNotify(
+        'สลิปโอนรอตรวจ',
+        added === 1
+          ? 'ลูกค้าส่งสลิปยืนยันการโอน 1 รายการ'
+          : `มีสลิปรอตรวจ ${pendingSlips} รายการ`,
+        { tag: 'payment-slips', onClick: () => goMainTab('sales') },
+      );
+    }
+    prevPendingSlipsRef.current = pendingSlips;
+  }, [member, pendingSlips, goMainTab]);
 
   useEffect(() => {
     if (!member || stockBatches.length === 0) return;
@@ -411,6 +452,14 @@ export default function App() {
         onRetrySync={runOfflineSync}
       />
 
+      {isAdmin && (
+        <AdminAlertsBanner
+          member={member}
+          active={Boolean(member)}
+          onOpenSales={() => goMainTab('sales')}
+        />
+      )}
+
       {showLiveStockBar && (
         <LiveStockStickyBar
           live={effectiveStock.live}
@@ -463,7 +512,6 @@ export default function App() {
               localBills={transactions}
               refreshKey={salesRefresh}
               active={activeTab === 'sales'}
-              isAdmin={isAdmin}
               member={member}
               stock={stock}
               stockBatches={stockBatches}
@@ -487,7 +535,7 @@ export default function App() {
 
         {activeTab === 'members' && canAccessShrimpOverlay(member, 'members') && (
           <Suspense fallback={<TabLoading />}>
-            <MembersScreen isAdmin={isAdmin} readOnly={isStaff} />
+            <MembersScreen isAdmin={isAdmin} readOnly={!isAdmin} />
           </Suspense>
         )}
 
