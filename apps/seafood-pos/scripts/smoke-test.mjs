@@ -1019,6 +1019,14 @@ try {
     remainingAmount: 500,
   });
   assert(slipMsg.includes('สลิปโอนรอตรวจ'), 'ข้อความแจ้งสลิป LINE');
+  const customerUid = 'U0123456789abcdef0123456789abcdef';
+  const staffUid = 'Ufedcba9876543210fedcba9876543210';
+  const slipTargets = notify.resolveSlipNotifyTargets(
+    { notifyGroupId: 'C1234567890abcdefghijklmnopqrstuv', notifyUserIds: staffUid },
+    { lineUserId: customerUid },
+  );
+  assert(!slipTargets.has(customerUid), 'แจ้งสลิปไม่ push ไปหาคนส่งสลิป');
+  assert(slipTargets.has(staffUid), 'แจ้งสลิปยัง push staff');
 } catch (e) {
   fail('paymentSlip UI', e);
 }
