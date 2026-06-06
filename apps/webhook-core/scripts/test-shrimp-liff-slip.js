@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
 const {
   decodeImageBase64,
 } = require('../src/shrimpLiffSlip');
@@ -10,8 +12,6 @@ const {
   resolveShrimpSlipLiffId,
 } = require('../src/provisionShrimpLiff');
 const { lineBillUnpaidHint } = require('../src/shrimpLinePush');
-const fs = require('fs');
-const path = require('path');
 
 function assert(cond, msg) {
   if (!cond) {
@@ -27,6 +27,19 @@ const tinyPng = Buffer.from(
 );
 const b64 = `data:image/png;base64,${tinyPng.toString('base64')}`;
 assert(decodeImageBase64(b64)?.length === tinyPng.length, 'decodeImageBase64');
+
+const slipHandler = fs.readFileSync(
+  path.join(__dirname, '../src/shrimpLiffSlip.js'),
+  'utf8',
+);
+assert(
+  slipHandler.includes('verified.lineUserId'),
+  'shrimpLiffSlip uses verified.lineUserId from verifyLineLiffIdToken',
+);
+assert(
+  !slipHandler.includes('verified.sub'),
+  'shrimpLiffSlip must not read verified.sub (verifyLineLiffIdToken returns lineUserId)',
+);
 
 process.env.LINE_LIFF_SLIP_ID = '2010271574-SlipTest01';
 const url = getShrimpSlipLiffOpenUrl('BILL-001');

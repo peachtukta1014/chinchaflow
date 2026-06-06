@@ -26,6 +26,15 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-06 — LIFF ฝากสลิป: เซสชันหมดอายุตอนกดส่ง (ไม่เกี่ยว LINE Peach)
+
+- **ปัญหา/คำขอ:** หน้า `liff-slip.html` ล็อกอินได้ แต่กด「ส่งสลิป」ขึ้น「เซสชันหมดอายุ — ปิดแล้วเปิดใหม่」
+- **สาเหตุ:** `shrimpLiffSlip` อ่าน `verified.sub` แต่ `verifyLineLiffIdToken` คืน `lineUserId` → `invalid_id_token` ทุกคน (ไม่ใช่เพราะใช้บัญชี Peach)
+- **แก้แล้ว:** ใช้ `verified.lineUserId` เหมือน `shrimpLiffOrderSubmit` · regression test ใน `test-shrimp-liff-slip.js`
+- **ไฟล์/จุดสำคัญ:** `apps/webhook-core/src/shrimpLiffSlip.js`
+- **พฤติกรรมหลังแก้:** ส่งสลิปผ่าน LIFF บันทึกคิว `paymentSlipSubmissions` ได้ · **ต้อง deploy functions** (`shrimpLiffSlip`) ไม่ใช่แค่ hosting
+- **ถ้าพังอีก ให้เช็กก่อน:** `LINE_LOGIN_CHANNEL_ID` / `LINE_LIFF_ID` ใน functions env · ทางลัดส่งรูปในแชต OA ยังใช้ได้
+
 ### 2026-06-05 — LINE กลุ่ม: สองลูกค้าในข้อความเดียวรวมเป็นออเดอร์เดียว
 
 - **ปัญหา/คำขอ:** กลุ่ม LINE พิมพ์ 2 รายชื่อ (รูปแบบสั้น ปุ้ย กลาง 2 / จะเขียด กลาง 3) บอทรับออเดอร์รวมชื่อเดียว
