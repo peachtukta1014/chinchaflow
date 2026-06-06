@@ -752,6 +752,26 @@ export async function fsIncrementDebt(customerId, meta, delta) {
   throw new Error(`fsIncrementDebt HTTP ${first.status}`);
 }
 
+export function fsDocName(collection, docId) {
+  return `projects/${projectId}/databases/(default)/documents/${collection}/${docId}`;
+}
+
+/** Firestore :commit หลาย write พร้อมกัน — สำเร็จหรือล้มทั้งชุด */
+export async function fsCommitWrites(writes) {
+  if (!FS_BASE || !writes?.length) return;
+  const r = await fetch(`${FS_BASE}:commit`, {
+    method: 'POST',
+    headers: await fsAuthHeaders(),
+    body: JSON.stringify({ writes }),
+  });
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    throw new Error(
+      `fsCommitWrites HTTP ${r.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`,
+    );
+  }
+}
+
 /**
  * Atomic commit สำหรับ stockBatch หลายล็อตพร้อมกัน — ทั้งหมดสำเร็จหรือล้มพร้อมกัน
  * ป้องกันการตัดสต๊อกค้างกลางทาง (บางล็อตตัดแล้วแต่บางล็อตยังไม่ตัด)
@@ -771,7 +791,7 @@ export async function fsAtomicStockBatchCommit(patches) {
 
   const writes = unique.map((p) => ({
     update: {
-      name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
+      name: fsDocName('stockBatches', p.id),
       fields: {
         remainingLiveKg: stockKgFirestoreValue(
           p.remainingLiveKg,
@@ -787,17 +807,7 @@ export async function fsAtomicStockBatchCommit(patches) {
     },
     updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
   }));
-  const r = await fetch(`${FS_BASE}:commit`, {
-    method: 'POST',
-    headers: await fsAuthHeaders(),
-    body: JSON.stringify({ writes }),
-  });
-  if (!r.ok) {
-    const detail = await r.text().catch(() => '');
-    throw new Error(
-      `fsAtomicStockBatchCommit HTTP ${r.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`,
-    );
-  }
+  await fsCommitWrites(writes);
 }
 
 /** สลิปโอนจาก LINE ที่รอตรวจ */
