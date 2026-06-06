@@ -7,6 +7,11 @@ const {
   buildCustomerNameByLineUidMap,
   normalizeLineUserId,
 } = require('./shrimpLinePush');
+const {
+  BUILTIN_CUSTOMERS,
+  buildCustomerZoneCatalog,
+  groupOrdersByZone,
+} = require('./customerZone');
 
 const ORDER_WORD_RE = /(?:ออ[ร์]*เดอร?์?|ออเดอร์|order)/i;
 
@@ -186,6 +191,7 @@ function enrichOrdersWithLinkedCustomers(orders, uidMap) {
 
 async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK(), { familyGroup = false } = {}) {
   const uidMap = await buildCustomerNameByLineUidMap(db);
+  const zoneCatalog = familyGroup ? await buildCustomerZoneCatalog(db) : null;
   let snap;
   try {
     snap = await db
@@ -204,19 +210,19 @@ async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK(), { familyG
         .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate))),
       uidMap,
     );
-    return formatTodayOrdersReply(docs, dateKey, { familyGroup });
+    return formatTodayOrdersReply(docs, dateKey, { familyGroup, zoneCatalog });
   }
 
   const orders = enrichOrdersWithLinkedCustomers(
     snap.docs.map((d) => ({ id: d.id, ...d.data() })),
     uidMap,
   );
-  return formatTodayOrdersReply(orders, dateKey, { familyGroup });
+  return formatTodayOrdersReply(orders, dateKey, { familyGroup, zoneCatalog });
 }
 
-function formatTodayOrdersReply(orders, dateKey, { familyGroup = false } = {}) {
+function formatTodayOrdersReply(orders, dateKey, { familyGroup = false, zoneCatalog = null } = {}) {
   if (familyGroup) {
-    return formatTodayOrdersReplyFamily(orders, dateKey);
+    return formatTodayOrdersReplyFamily(orders, dateKey, zoneCatalog);
   }
   const overdue = orders.filter((o) => (o.deliveryDate || '') < dateKey);
   const dueToday = orders.filter((o) => (o.deliveryDate || '') === dateKey);
@@ -264,8 +270,9 @@ function formatTodayOrdersReply(orders, dateKey, { familyGroup = false } = {}) {
   return lines.join('\n');
 }
 
-function formatTodayOrdersReplyFamily(orders, dateKey) {
+function formatTodayOrdersReplyFamily(orders, dateKey, zoneCatalog) {
   const overdue = orders.filter((o) => (o.deliveryDate || '') < dateKey);
+  const catalog = zoneCatalog || BUILTIN_CUSTOMERS.map((c) => ({ ...c, zone: c.zone || 'อื่นๆ' }));
 
   if (orders.length === 0) {
     return `📦 ${formatDateThai(dateKey)}\nยังไม่มีออเดอร์รอส่งวันนี้`;
@@ -273,18 +280,22 @@ function formatTodayOrdersReplyFamily(orders, dateKey) {
 
   const headerParts = [`📦 ${orders.length} ออเดอร์`, formatDateThai(dateKey)];
   if (overdue.length > 0) headerParts.push(`⚠️ค้าง ${overdue.length}`);
-  const lines = [headerParts.join(' · ')];
+  const lines = [headerParts.join(' · '), ''];
 
-  orders.forEach((o, idx) => {
-    const late = (o.deliveryDate || '') < dateKey;
-    const lateNote = late ? ' ⚠️' : '';
-    lines.push(`${idx + 1} ${formatOrderCompactLine(o)}${lateNote}`);
-  });
+  for (const [zone, zoneOrders] of groupOrdersByZone(orders, catalog)) {
+    lines.push(`[${zone}]`);
+    zoneOrders.forEach((o) => {
+      const late = (o.deliveryDate || '') < dateKey;
+      const lateNote = late ? ' ⚠️' : '';
+      lines.push(`${formatOrderCompactLine(o)}${lateNote}`);
+    });
+    lines.push('');
+  }
 
   const totals = formatProductTotalsCompact(orders);
   if (totals) lines.push(`— ${totals} กก —`);
 
-  return lines.join('\n');
+  return lines.join('\n').trimEnd();
 }
 
 module.exports = {

@@ -39,8 +39,12 @@ assert(resolveNotifyTargets(config, oaOrder).size === 2, 'OA order keeps group +
 assert(!resolveNotifyTargets(config, groupOrder).has(groupId), 'group order drops group target');
 assert(resolveNotifyTargets(config, groupOrder).has(userId), 'group order keeps user target');
 
-const compact = formatShrimpOrderMessage(oaOrder, new Date('2026-06-06T10:00:00+07:00'), { compact: true });
+const compact = formatShrimpOrderMessage(oaOrder, new Date('2026-06-06T10:00:00+07:00'), {
+  compact: true,
+  zone: 'ป่าตอง',
+});
 assert(compact.startsWith('🦐 '), 'compact starts with shrimp emoji');
+assert(compact.includes('[ป่าตอง]'), 'compact includes zone label');
 assert(compact.includes('เจ๊เขียด เล็ก4'), 'compact customer + qty');
 assert(compact.includes('ส่ง'), 'compact has ship label');
 assert(!compact.includes('rawText'), 'compact no rawText');

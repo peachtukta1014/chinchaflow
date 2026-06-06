@@ -2,6 +2,7 @@ const { linePush } = require('./teaDailySummary');
 const { formatDateThai, deliveryDateKind } = require('./parseDeliveryDate');
 const { getShrimpLineConfig } = require('./shrimpLineConfig');
 const { formatOrderCompactLine } = require('./shrimpTodayOrdersSummary');
+const { buildCustomerZoneCatalog, resolveZoneForOrder } = require('./customerZone');
 
 function collectNotifyTargets(config) {
   const targets = new Set();
@@ -35,7 +36,7 @@ async function pushToTargets(targets, text, token) {
   return { sent: results.filter((r) => r.ok).length, targets: results };
 }
 
-function formatShrimpOrderMessage(data, now = new Date(), { compact = false } = {}) {
+function formatShrimpOrderMessage(data, now = new Date(), { compact = false, zone = '' } = {}) {
   if (compact) {
     const items = formatOrderCompactLine(data);
     const dateLabel = data.deliveryDate ? formatDateThai(data.deliveryDate) : '—';
@@ -43,7 +44,8 @@ function formatShrimpOrderMessage(data, now = new Date(), { compact = false } = 
     let ship = dateLabel;
     if (kind === 'today') ship = `วันนี้ ${dateLabel}`;
     else if (kind === 'tomorrow') ship = `พรุ่งนี้ ${dateLabel}`;
-    return `🦐 ${items} · ส่ง ${ship}`;
+    const zoneLabel = zone && zone !== 'อื่นๆ' ? `[${zone}] ` : '';
+    return `🦐 ${zoneLabel}${items} · ส่ง ${ship}`;
   }
 
   const name = data.customerName || 'ลูกค้า';
@@ -103,10 +105,12 @@ async function notifyShrimpLineOrder(db, orderData) {
     return { skipped: 'no_targets' };
   }
   const notifyGroupId = String(config.notifyGroupId || '').trim();
+  const zoneCatalog = await buildCustomerZoneCatalog(db);
+  const zone = resolveZoneForOrder(orderData, zoneCatalog);
   const textByTarget = new Map();
   for (const to of targets) {
     const compact = notifyGroupId && to === notifyGroupId;
-    textByTarget.set(to, formatShrimpOrderMessage(orderData, new Date(), { compact }));
+    textByTarget.set(to, formatShrimpOrderMessage(orderData, new Date(), { compact, zone }));
   }
   const results = [];
   for (const [to, text] of textByTarget) {

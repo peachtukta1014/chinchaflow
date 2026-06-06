@@ -68,4 +68,5 @@ module.exports = {
   collectCustomerSearchNames,
   customerMatchesName,
   exactCustomerNameMatch,
+  canonicalCustomerNameKey,
 };

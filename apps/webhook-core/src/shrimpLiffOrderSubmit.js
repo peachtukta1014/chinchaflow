@@ -246,6 +246,7 @@ async function submitLiffOrder(db, admin, body, verified) {
     source: 'liff',
     customerId: customer.id,
     explicitCustomerName: customerName,
+    explicitZone: customer.zone || null,
     autoLinkLineUid: false,
   });
 
