@@ -3,6 +3,7 @@ const { formatDateThai, deliveryDateKind } = require('./parseDeliveryDate');
 const { getShrimpLineConfig } = require('./shrimpLineConfig');
 const { formatOrderCompactLine } = require('./shrimpTodayOrdersSummary');
 const { buildCustomerZoneCatalog, resolveZoneForOrder } = require('./customerZone');
+const { normalizeLineUserId } = require('./lineUserId');
 
 function collectNotifyTargets(config) {
   const targets = new Set();
@@ -24,6 +25,14 @@ function resolveNotifyTargets(config, orderData) {
   if (orderData?.lineGroupId && notifyGroupId) {
     targets.delete(notifyGroupId);
   }
+  return targets;
+}
+
+/** แจ้งสลิป — ห้าม push ข้อความ staff ไปหาคนที่ส่งสลิป (ลูกค้า OA) */
+function resolveSlipNotifyTargets(config, slipData) {
+  const targets = collectNotifyTargets(config);
+  const submitter = normalizeLineUserId(slipData?.lineUserId);
+  if (submitter) targets.delete(submitter);
   return targets;
 }
 
@@ -187,7 +196,7 @@ async function notifyShrimpPaymentSlip(db, slipData, { submissionId = null } = {
   if (config.instantSlipNotify === false) return { skipped: 'disabled' };
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) return { skipped: 'no_token' };
-  const targets = collectNotifyTargets(config);
+  const targets = resolveSlipNotifyTargets(config, slipData);
   if (!targets.size) return { skipped: 'no_targets' };
   const text = formatShrimpPaymentSlipMessage(slipData);
   const result = await pushToTargets(targets, text, token);
@@ -241,6 +250,7 @@ async function notifyTeaRestock(db, restockData) {
 module.exports = {
   collectNotifyTargets,
   resolveNotifyTargets,
+  resolveSlipNotifyTargets,
   formatShrimpOrderMessage,
   formatShrimpPaymentSlipMessage,
   formatShrimpSaleDeleteRequestMessage,

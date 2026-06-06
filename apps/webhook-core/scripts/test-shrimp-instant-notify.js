@@ -2,6 +2,7 @@
 const {
   collectNotifyTargets,
   resolveNotifyTargets,
+  resolveSlipNotifyTargets,
   formatShrimpOrderMessage,
   notifyShrimpLineOrdersAfterSave,
 } = require('../src/instantLineNotify');
@@ -39,6 +40,13 @@ assert(collectNotifyTargets(config).size === 2, 'collect targets group + user');
 assert(resolveNotifyTargets(config, oaOrder).size === 2, 'OA order keeps group + user targets');
 assert(!resolveNotifyTargets(config, groupOrder).has(groupId), 'group order drops group target');
 assert(resolveNotifyTargets(config, groupOrder).has(userId), 'group order keeps user target');
+
+const customerUid = 'U0123456789abcdef0123456789abcdef';
+const slipConfig = { ...config, notifyUserIds: `${userId},${customerUid}` };
+const slipNoBill = { lineUserId: customerUid, customerName: 'เจ๊เขียด', status: 'pending' };
+assert(!resolveSlipNotifyTargets(slipConfig, slipNoBill).has(customerUid), 'slip notify drops submitter');
+assert(resolveSlipNotifyTargets(slipConfig, slipNoBill).has(userId), 'slip notify keeps staff user');
+assert(resolveSlipNotifyTargets(slipConfig, slipNoBill).has(groupId), 'slip notify keeps group');
 
 const compact = formatShrimpOrderMessage(oaOrder, new Date('2026-06-06T10:00:00+07:00'), {
   compact: true,
