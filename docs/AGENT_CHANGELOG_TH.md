@@ -26,6 +26,19 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-06 — กุ้ง: LIFF ฟอร์มสั่งกุ้ง — วันส่งตาม cutoff (branch cursor-พี่เซอperf-bill-slip-7240)
+
+- **ปัญหา/คำขอ:** ลูกค้าสั่ง LIFF ตอน 23:56 เลือก「วันนี้」= 6/6 → ระบบรับ 6/6 → ขึ้นค้างส่ง (เลยวันแล้ว) ทั้งที่จริงส่งวันถัดไป
+- **สาเหตุ:** LIFF ฟอร์ม `deliveryKey = todayKey()` ตายตัว ไม่ตรวจ cutoff · server ก็รับ date ที่ client ส่งมาเลย
+- **แก้แล้ว:**
+  - `shrimpLiffOrderSubmit`: `submitLiffOrder` clamp `deliveryDate >= minDelivery` (cutoff เดียวกับ LINE OA)
+  - `shrimpLiffOrderSubmit`: `getLiffContext` คืน `deliveryEndHour` ให้ frontend
+  - `LineOrderLiffApp`: `earliestDeliveryKey(endHour)` — วันนี้ก่อน cutoff, พรุ่งนี้หลัง cutoff
+  - ปุ่ม「วันนี้」เปลี่ยน label เป็น「พรุ่งนี้」+ แสดง note เตือนเมื่อเลยเวลา
+- **ไฟล์/จุดสำคัญ:** `shrimpLiffOrderSubmit.js`, `LineOrderLiffApp.jsx`
+- **พฤติกรรมหลังแก้:** สั่งหลัง 14:00 → ฟอร์มแสดง「พรุ่งนี้ (เร็วที่สุด)」· server clamp วันอัตโนมัติแม้ client ส่งผิด
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy **hosting + functions** ทั้งคู่ · `lineDefaultEndHour` ใน `config/shrimpLine`
+
 ### 2026-06-06 — กุ้ง: cache ภาพบิล + ปุ่มบันทึกรูปลงคลังภาพ iOS (branch cursor-พี่เซอperf-bill-slip-7240)
 
 - **ปัญหา/คำขอ:** เปิดบิลเดิมซ้ำยัง load ใหม่จาก Cloud Function · ปุ่ม「บันทึกรูป」ต้องแชร์แล้วเลือกบันทึกแทน
