@@ -1,6 +1,7 @@
 const { groupItemsByCustomer } = require('./parseLineOrder');
 const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
 const { isStaffLineUserId } = require('./shrimpStaffLineUids');
+const { notifyShrimpLineOrdersAfterSave } = require('./instantLineNotify');
 const {
   applySyncedCustomerNameToItems,
   resolveLineOrderCustomerName,
@@ -37,6 +38,7 @@ async function saveLineOrders(db, admin, {
   const groups = groupItemsByCustomer(normalizedItems);
   const batch = db.batch();
   const ts = admin.firestore.FieldValue.serverTimestamp();
+  const created = [];
 
   for (const [key, groupItems] of groups) {
     const parsedName = key === '__none__' ? null : key;
@@ -46,7 +48,7 @@ async function saveLineOrders(db, admin, {
       linkedCustomerName,
     });
     const ref = db.collection('lineOrders').doc();
-    batch.set(ref, {
+    const payload = {
       source,
       customerId: customerId || null,
       lineUserId: userId,
@@ -66,10 +68,22 @@ async function saveLineOrders(db, admin, {
       customerName,
       zone: explicitZone ? String(explicitZone).trim() : null,
       status: 'pending',
-      createdAt: ts,
-    });
+    };
+    batch.set(ref, { ...payload, createdAt: ts });
+    created.push({ id: ref.id, ...payload });
   }
   await batch.commit();
+
+  if (!groupId && created.length > 0) {
+    try {
+      const notify = await notifyShrimpLineOrdersAfterSave(db, created, { groupId });
+      if (notify.sent === 0 && notify.details?.some((d) => d.skipped)) {
+        console.log('saveLineOrders notify', notify.details);
+      }
+    } catch (err) {
+      console.error('saveLineOrders notify', err);
+    }
+  }
 
   const names = [];
   if (linkedCustomerName && !groupId) {

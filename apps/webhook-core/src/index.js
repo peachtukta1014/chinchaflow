@@ -575,9 +575,13 @@ exports.onShrimpLineOrderCreated = functions
   .onCreate(async (snap) => {
     try {
       const data = snap.data();
-      const result = await notifyShrimpLineOrder(db(), data);
+      if (data?.notifySentAt) {
+        console.log('onShrimpLineOrderCreated skip already_sent');
+        return;
+      }
+      const result = await notifyShrimpLineOrder(db(), { id: snap.id, ...data }, { orderId: snap.id });
       if (result.skipped) console.log('onShrimpLineOrderCreated', result.skipped);
-      else console.log('onShrimpLineOrderCreated sent', result.sent);
+      else console.log('onShrimpLineOrderCreated sent', result.sent, result.targets);
     } catch (err) {
       console.error('onShrimpLineOrderCreated', err);
     }
