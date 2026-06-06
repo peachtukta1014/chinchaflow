@@ -132,7 +132,27 @@ async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
 }
 
 /**
+ * ส่งบิลจ่ายแล้วให้ลูกค้าใน LINE ในพื้นหลัง — ไม่บล็อก UI
+ * อัปเดต paidBillPushedAt ใน slip เมื่อสำเร็จ
+ */
+function pushPaidBillToLineBackground(sale, customer, staffMember, slipId, receiverName) {
+  pushPaidBillToLine(sale, customer, receiverName)
+    .then((result) => {
+      if (result.pushed && slipId) {
+        fsPatch(`paymentSlipSubmissions/${slipId}`, {
+          paidBillPushedAt: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    })
+    .catch((e) => {
+      console.warn('pushPaidBillToLine background', e);
+    });
+}
+
+/**
  * ยืนยันสลิป — ปิดบิลเป็นโอน · ส่งบิลจ่ายแล้วให้ลูกค้า (ถ้ามี LINE)
+ *
+ * LINE push ทำงานพื้นหลัง (ไม่บล็อก UI) — ฟังก์ชันนี้คืนหลัง slip = confirmed
  */
 export async function confirmPaymentSlip({
   slip,
@@ -159,27 +179,17 @@ export async function confirmPaymentSlip({
   const priorStatus = claim.fresh?.status || slip.status || 'pending';
   let refreshed = sale;
   try {
-    if (sale.paymentType === 'installment' && remain > 0) {
-      await applyPaymentToSale(sale, remain);
-    } else {
-      await updateSalePayment(sale, 'transfer');
-    }
+    // โหลด customer พร้อมกับ update sale — ไม่รอกันเอง
+    const [, customer] = await Promise.all([
+      sale.paymentType === 'installment' && remain > 0
+        ? applyPaymentToSale(sale, remain)
+        : updateSalePayment(sale, 'transfer'),
+      sale.customerId
+        ? fsGetDoc(`customers/${sale.customerId}`).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
     refreshed = await fsGetDoc(`sales/${sale.id}`);
-    const customer = sale.customerId
-      ? await fsGetDoc(`customers/${sale.customerId}`).catch(() => null)
-      : null;
-
-    let pushResult = { pushed: false };
-    if (pushPaidBill) {
-      try {
-        const receiverName = staffMember?.displayName || staffMember?.email || '';
-        pushResult = await pushPaidBillToLine(refreshed || sale, customer, receiverName);
-      } catch (e) {
-        console.error('pushPaidBillToLine', e);
-        pushResult = { pushed: false, reason: e.message || 'push_failed' };
-      }
-    }
 
     await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
       status: 'confirmed',
@@ -189,10 +199,15 @@ export async function confirmPaymentSlip({
       confirmedAt: new Date().toISOString(),
       confirmedByUid: staffMember?.uid || '',
       confirmedByName: staffLabel,
-      ...(pushResult.pushed ? { paidBillPushedAt: new Date().toISOString() } : {}),
     });
 
-    return { sale: refreshed || sale, pushResult };
+    // ส่งบิล LINE ในพื้นหลัง — ไม่ block ผู้ใช้รอ
+    if (pushPaidBill) {
+      const receiverName = staffMember?.displayName || staffMember?.email || '';
+      pushPaidBillToLineBackground(refreshed || sale, customer, staffMember, slip.id, receiverName);
+    }
+
+    return { sale: refreshed || sale, pushResult: { pushed: false, reason: 'async' } };
   } catch (err) {
     if (priorStatus !== 'confirmed') {
       await fsPatch(`paymentSlipSubmissions/${slip.id}`, {

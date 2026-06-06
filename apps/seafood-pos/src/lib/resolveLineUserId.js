@@ -34,13 +34,36 @@ export function resolveLineUserIdSync(customer, bill) {
   return lineUidFromBillProps(customer, bill);
 }
 
+let _customerCache = null;
+let _customerCachedAt = 0;
+let _customerInFlight = null;
+const CUSTOMER_CACHE_TTL = 60_000;
+
+/**
+ * โหลด customers 300 รายการ พร้อม in-flight dedup + cache 1 นาที
+ * (หลายส่วนในแอปเรียกพร้อมกัน — ป้องกัน Firestore 300-doc read ซ้ำ)
+ */
 async function loadMergedCustomers() {
-  const docs = await fsListCollection('customers', 300);
-  const map = {};
-  for (const d of docs) {
-    if (d.id) map[d.id] = d;
+  const now = Date.now();
+  if (_customerCache && now - _customerCachedAt < CUSTOMER_CACHE_TTL) {
+    return _customerCache;
   }
-  return mergeCustomerLists(map);
+  if (_customerInFlight) return _customerInFlight;
+  _customerInFlight = (async () => {
+    try {
+      const docs = await fsListCollection('customers', 300);
+      const map = {};
+      for (const d of docs) {
+        if (d.id) map[d.id] = d;
+      }
+      _customerCache = mergeCustomerLists(map);
+      _customerCachedAt = Date.now();
+      return _customerCache;
+    } finally {
+      _customerInFlight = null;
+    }
+  })();
+  return _customerInFlight;
 }
 
 function findUidInCustomerList(allCustomers, name) {
