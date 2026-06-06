@@ -26,6 +26,17 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-06 — กุ้ง: cache ภาพบิล + ปุ่มบันทึกรูปลงคลังภาพ iOS (branch cursor-พี่เซอperf-bill-slip-7240)
+
+- **ปัญหา/คำขอ:** เปิดบิลเดิมซ้ำยัง load ใหม่จาก Cloud Function · ปุ่ม「บันทึกรูป」ต้องแชร์แล้วเลือกบันทึกแทน
+- **แก้แล้ว:**
+  - `shrimpBillApi`: cache blob ต่อ saleId TTL 5 นาที — เปิดบิลเดิมครั้งที่ 2+ โหลดทันที
+  - `generateBillImage`: `saveOrShareBillImage()` — iOS ใช้ `navigator.share({ files })` ให้ขึ้น share sheet「บันทึกภาพ」ตรงๆ
+  - `BillImageSheet`: ปุ่ม「บันทึกรูป」ใช้ saveOrShareBillImage แทน download link
+- **ไฟล์/จุดสำคัญ:** `shrimpBillApi.js`, `generateBillImage.js`, `BillImageSheet.jsx`
+- **พฤติกรรมหลังแก้:** เปิดบิลซ้ำ = instant · iOS กด「บันทึกรูป」ขึ้น share sheet เลือก「บันทึกภาพ」ได้เลย
+- **ถ้าพังอีก ให้เช็กก่อน:** iOS ต้องเป็น Safari >=15 / PWA จาก Safari จึงจะมี `navigator.canShare`; Android Chrome รองรับ · ถ้า share ล้ม fallback download ทำงาน
+
 ### 2026-06-06 — กุ้ง: ลด lag ยืนยันสลิป + เจนภาพบิล (branch cursor-พี่เซอperf-bill-slip-7240)
 
 - **ปัญหา/คำขอ:** กดยืนยันสลิปคืนลูกค้าช้า · เปิดภาพบิลฟอร์มจ่ายแล้วช้า · บิลเจนช้าทำทุก save หน่วงตาม
