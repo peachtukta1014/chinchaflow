@@ -866,3 +866,26 @@ export async function fsQuerySaleByBillNo(billNo) {
   });
   return docs[0] || null;
 }
+
+/** หาลูกค้าจาก LINE User ID (billing) — คืน { id, name } หรือ null */
+export async function fsQueryCustomerByLineUserId(lineUserId) {
+  const uid = String(lineUserId || '').trim();
+  if (!uid) return null;
+  try {
+    const docs = await fsRunQuery({
+      from: [{ collectionId: 'customers' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'lineUserId' },
+          op: 'EQUAL',
+          value: { stringValue: uid },
+        },
+      },
+      limit: 1,
+    });
+    if (docs.length > 0) return { id: docs[0].id, name: docs[0].name || '' };
+  } catch {
+    /* ไม่ทำให้ flow หลักพัง */
+  }
+  return null;
+}

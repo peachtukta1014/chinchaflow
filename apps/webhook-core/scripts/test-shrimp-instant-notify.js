@@ -41,6 +41,19 @@ assert(resolveNotifyTargets(config, oaOrder).size === 2, 'OA order keeps group +
 assert(!resolveNotifyTargets(config, groupOrder).has(groupId), 'group order drops group target');
 assert(resolveNotifyTargets(config, groupOrder).has(userId), 'group order keeps user target');
 
+// ป้องกัน UID ลูกค้าหลุดเข้า notifyUserIds — ออเดอร์ใหม่ต้องไม่กลับไปหาลูกค้าผู้สั่ง
+const customerHexUid = 'U0123456789abcdef0123456789abcde0';
+const configWithCustomerUid = { notifyGroupId: groupId, notifyUserIds: customerHexUid };
+const oaOrderFromCustomer = { ...oaOrder, lineUserId: customerHexUid };
+assert(
+  !resolveNotifyTargets(configWithCustomerUid, oaOrderFromCustomer).has(customerHexUid),
+  'orderer UID ถูกตัดออกจาก targets แม้จะอยู่ใน notifyUserIds',
+);
+assert(
+  resolveNotifyTargets(configWithCustomerUid, oaOrderFromCustomer).has(groupId),
+  'group ยังอยู่ใน targets หลังตัด orderer UID',
+);
+
 const customerUid = 'U0123456789abcdef0123456789abcdef';
 const slipConfig = { ...config, notifyUserIds: `${userId},${customerUid}` };
 const slipNoBill = { lineUserId: customerUid, customerName: 'เจ๊เขียด', status: 'pending' };

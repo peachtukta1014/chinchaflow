@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { fsGetDoc, fsQueryLineMessages, fsSetDoc } from '../lib/firestoreRest';
+import { fsGetDoc, fsQueryCustomerByLineUserId, fsQueryLineMessages, fsSetDoc } from '../lib/firestoreRest';
 import {
   mergeNotifyUserIds,
+  parseNotifyUserIds,
   pickLatestLineIds,
 } from '../lib/lineIds';
 import {
@@ -26,6 +27,7 @@ export default function ShrimpLineNotifySettings() {
   const [saving, setSaving] = useState(false);
   const [fetchBusy, setFetchBusy] = useState(null);
   const [flash, setFlash] = useState('');
+  const [customerWarnings, setCustomerWarnings] = useState({});
 
   useEffect(() => {
     fsGetDoc('config/shrimpLine')
@@ -39,6 +41,15 @@ export default function ShrimpLineNotifySettings() {
           lineDefaultEndHour: window.endHour,
         });
         setLoading(false);
+        // เช็กว่า notifyUserIds ที่บันทึกไว้มีลูกค้าอยู่ไหม
+        const ids = parseNotifyUserIds(merged.notifyUserIds || '');
+        ids.forEach((uid) => {
+          fsQueryCustomerByLineUserId(uid).then((customer) => {
+            if (customer) {
+              setCustomerWarnings((prev) => ({ ...prev, [uid]: customer.name || uid }));
+            }
+          }).catch(() => {});
+        });
       })
       .catch(() => setLoading(false));
   }, []);
@@ -60,16 +71,35 @@ export default function ShrimpLineNotifySettings() {
           setFlash('⚠️ ยังไม่เจอ User ID — ทักบอท OA ตรงๆ หรือพิมพ์ในกลุ่มก่อน');
           return;
         }
+        // เช็กก่อนว่า UID นี้เป็นลูกค้าไหม
+        const customer = await fsQueryCustomerByLineUserId(userId).catch(() => null);
+        if (customer) {
+          setCustomerWarnings((prev) => ({ ...prev, [userId]: customer.name || userId }));
+          setFlash(`⚠️ UID นี้เป็นลูกค้า "${customer.name || userId}" — ลูกค้าจะได้รับแจ้งเตือนทุกออเดอร์ กรุณาตรวจสอบก่อนบันทึก`);
+        } else {
+          setFlash('✅ ดึง User ID แล้ว');
+        }
         setForm((p) => ({ ...p, notifyUserIds: mergeNotifyUserIds(p.notifyUserIds, userId) }));
-        setFlash('✅ ดึง User ID แล้ว');
       }
-      setTimeout(() => setFlash(''), 2500);
+      setTimeout(() => setFlash(''), 6000);
     } catch (e) {
       console.error(e);
       setFlash('❌ ดึง ID ไม่สำเร็จ');
     } finally {
       setFetchBusy(null);
     }
+  };
+
+  const removeNotifyUserId = (uidToRemove) => {
+    setForm((p) => {
+      const ids = parseNotifyUserIds(p.notifyUserIds).filter((id) => id !== uidToRemove);
+      return { ...p, notifyUserIds: ids.join(', ') };
+    });
+    setCustomerWarnings((prev) => {
+      const next = { ...prev };
+      delete next[uidToRemove];
+      return next;
+    });
   };
 
   const save = async () => {
@@ -123,10 +153,45 @@ export default function ShrimpLineNotifySettings() {
       >
         {fetchBusy === 'group' ? 'กำลังดึง...' : 'ดึง Group ID จากข้อความล่าสุด'}
       </button>
-      <label className="text-[10px] font-bold text-slate-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
+      <label className="text-[10px] font-bold text-slate-500 block">
+        User ID เพิ่มเติม (แอดมิน/เจ้าของ — ไม่ใส่ UID ลูกค้า)
+      </label>
+      {parseNotifyUserIds(form.notifyUserIds || '').length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {parseNotifyUserIds(form.notifyUserIds || '').map((uid) => (
+            <span
+              key={uid}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono ${
+                customerWarnings[uid]
+                  ? 'bg-red-50 border border-red-300 text-red-700'
+                  : 'bg-slate-100 border border-slate-200 text-slate-700'
+              }`}
+            >
+              {customerWarnings[uid] ? (
+                <span>⚠️ {customerWarnings[uid]} ({uid.slice(0, 8)}…)</span>
+              ) : (
+                <span>{uid.slice(0, 10)}…</span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeNotifyUserId(uid)}
+                className="ml-0.5 text-slate-400 hover:text-red-500 font-bold leading-none"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {Object.keys(customerWarnings).length > 0 && (
+        <p className="text-[10px] font-bold text-red-600 bg-red-50 px-3 py-2 rounded-xl">
+          ⚠️ มี UID ลูกค้าอยู่ใน User ID เพิ่มเติม — ลูกค้าจะได้รับแจ้งเตือนทุกออเดอร์ใหม่
+          กรุณากดปุ่ม × เพื่อลบออก
+        </p>
+      )}
       <input
         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-mono outline-none"
-        placeholder="Uxxxxxxxx..."
+        placeholder="Uxxxxxxxx... (แอดมิน/เจ้าของเท่านั้น ไม่ใส่ลูกค้า)"
         value={form.notifyUserIds || ''}
         onChange={(e) => setForm((p) => ({ ...p, notifyUserIds: e.target.value }))}
       />
