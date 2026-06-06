@@ -138,7 +138,10 @@ export async function fsGetDoc(path) {
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  return docFieldsToModel(json.fields || {}, parts[parts.length - 1]);
+  return {
+    ...docFieldsToModel(json.fields || {}, parts[parts.length - 1]),
+    _updateTime: json.updateTime || null,
+  };
 }
 
 export async function fsPost(col, data) {
@@ -179,15 +182,31 @@ export async function fsSetShrimpUser(uid, data) {
   if (!r.ok) throw new Error(`shrimp_users/${uid} HTTP ${r.status}`);
 }
 
+export function isFirestoreFailedPreconditionError(status, errText = '') {
+  return status === 400 && /FAILED_PRECONDITION|failedPrecondition/i.test(errText);
+}
+
 export async function fsPatch(path, data) {
+  return fsPatchIf(path, data);
+}
+
+/** PATCH พร้อม optimistic lock — ล้มถ้า doc ถูกแก้ระหว่าง read/write */
+export async function fsPatchIf(path, data, { updateTime } = {}) {
   const fields = path.startsWith('stockBatches/') ? fsObjStockFields(data) : fsObj(data);
   const qs = Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-  const r = await fetch(`${FS_BASE}/${path}?${qs}`, {
+  const pre = updateTime ? `&currentDocument.updateTime=${encodeURIComponent(updateTime)}` : '';
+  const r = await fetch(`${FS_BASE}/${path}?${qs}${pre}`, {
     method: 'PATCH',
     headers: await fsAuthHeaders(),
     body: JSON.stringify({ fields }),
   });
-  if (!r.ok) throw new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    const err = new Error(`Firestore /${path} PATCH failed (HTTP ${r.status})`);
+    err.status = r.status;
+    err.detail = detail;
+    throw err;
+  }
 }
 
 /** สร้างเอกสารใหม่ใน collection (Firestore auto-ID) */

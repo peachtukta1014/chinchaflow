@@ -924,6 +924,10 @@ try {
   assert(rules.includes('paymentSlipSubmissions'), 'firestore.rules มี paymentSlipSubmissions');
   assert(rules.includes('shrimpAdminAlerts'), 'firestore.rules มี shrimpAdminAlerts');
   assert(rules.includes('!isManagerShrimp()'), 'firestore จำกัด manager แก้ลูกค้า');
+  assert(
+    /function canMutateShrimpOps\(\)[\s\S]*!isManagerShrimp\(\)/.test(rules),
+    'canMutateShrimpOps ตัด manager (read-only stock/sales/debt)',
+  );
   assert(rules.includes('lineBillPushes'), 'firestore.rules อ่าน lineBillPushes');
   assert(rules.includes("role == 'manager'"), 'firestore.rules รองรับ manager signup');
   assert(
@@ -1010,6 +1014,14 @@ try {
   assert(!isOpenSaleForSlip({ paymentType: 'transfer', remainingAmount: 0 }), 'closed transfer not open');
   const slipMod = requireWebhook('../../webhook-core/src/shrimpPaymentSlip.js');
   assert(slipMod.isOpenSale({ remainingAmount: 100 }), 'webhook isOpenSale');
+  const slipSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'), 'utf8');
+  assert(slipSrc.includes('findSlipByLineMessageId'), 'สลิป dedup ตาม lineMessageId');
+  assert(slipSrc.includes('duplicate: true'), 'สลิปซ้ำคืน submission เดิม');
+  const slipSvc = fs.readFileSync(path.join(root, 'src/services/paymentSlipService.js'), 'utf8');
+  assert(slipSvc.includes('claimPaymentSlipConfirmation'), 'ยืนยันสลิปมี CAS lock');
+  assert(slipSvc.includes('fsPatchIf'), 'ยืนยันสลิปใช้ optimistic lock');
+  const fsRestSlip = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
+  assert(fsRestSlip.includes('isFirestoreFailedPreconditionError'), 'firestoreRest จับ FAILED_PRECONDITION');
 } catch (e) {
   fail('paymentSlip', e);
 }

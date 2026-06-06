@@ -51,8 +51,9 @@ service cloud.firestore {
       return isApprovedShrimp() && shrimpUserData().role == 'staff';
     }
 
+    // แอดมิน + สตาฟ (ลูกมือ) — แมนเนเจอร์อ่านอย่างเดียว (สอดคล้อง UI)
     function canMutateShrimpOps() {
-      return isApprovedShrimp();
+      return isApprovedShrimp() && !isManagerShrimp();
     }
 
     function isChinchaBootstrapAdmin() {
