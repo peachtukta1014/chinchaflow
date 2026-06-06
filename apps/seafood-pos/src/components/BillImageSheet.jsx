@@ -4,6 +4,7 @@ import {
   downloadBillImageBlob,
   generateBillImage,
   revokeBillImageUrl,
+  saveOrShareBillImage,
 } from '../lib/generateBillImage';
 import {
   buildBillDataForCloud,
@@ -262,7 +263,7 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
             <button
               type="button"
               disabled={!blob || loading}
-              onClick={() => blob && downloadBillImageBlob(blob, bill?.billNo)}
+              onClick={() => blob && saveOrShareBillImage(blob, bill?.billNo)}
               className="flex-1 py-3 rounded-2xl bg-slate-800 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Download size={18} />

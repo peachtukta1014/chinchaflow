@@ -34,10 +34,31 @@ export async function buildBillDataForCloudResolved(bill, customer = {}) {
 }
 
 /**
- * สร้างภาพบิลบน Cloud
+ * Cache ภาพบิล (blob) ต่อ saleId — TTL 5 นาที
+ * เปิดบิลเดิมซ้ำในช่วงนั้น → ไม่ยิง Cloud Function ซ้ำ
+ */
+const _billBlobCache = new Map(); // saleId → { blob, cachedAt }
+const BILL_BLOB_CACHE_TTL = 5 * 60 * 1000;
+
+export function invalidateBillImageCache(saleId) {
+  if (saleId) _billBlobCache.delete(saleId);
+}
+
+/**
+ * สร้างภาพบิลบน Cloud (พร้อม in-memory blob cache ต่อ saleId)
  * @returns {Promise<{ blob: Blob, objectUrl: string }>}
  */
 export async function fetchShrimpBillImage(bill, customer = {}, options = {}) {
+  const cacheKey = bill?.id || bill?.saleId || null;
+  const now = Date.now();
+
+  if (cacheKey) {
+    const hit = _billBlobCache.get(cacheKey);
+    if (hit && now - hit.cachedAt < BILL_BLOB_CACHE_TTL) {
+      return { blob: hit.blob, objectUrl: URL.createObjectURL(hit.blob) };
+    }
+  }
+
   const billData = options.billData ?? await buildBillDataForCloudResolved(bill, customer);
   const r = await fetch(functionsBase('shrimpRenderBill'), {
     method: 'POST',
@@ -49,5 +70,10 @@ export async function fetchShrimpBillImage(bill, customer = {}, options = {}) {
     throw new Error(json.error || `สร้างภาพบิลไม่สำเร็จ (${r.status})`);
   }
   const blob = await r.blob();
+
+  if (cacheKey) {
+    _billBlobCache.set(cacheKey, { blob, cachedAt: now });
+  }
+
   return { blob, objectUrl: URL.createObjectURL(blob) };
 }

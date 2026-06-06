@@ -99,3 +99,28 @@ export function downloadBillImageBlob(blob, billNo = 'bill') {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/**
+ * บันทึกภาพบิลลงเครื่อง
+ * - iOS PWA: ใช้ navigator.share({ files }) → ผู้ใช้กด「บันทึกภาพ」ใน share sheet ตรงๆ
+ * - Android / Desktop: download ปกติ (บันทึกลง Downloads โดยตรง)
+ * @returns {{ method: 'share'|'download'|'cancelled', saved: boolean }}
+ */
+export async function saveOrShareBillImage(blob, billNo = 'bill') {
+  const safe = String(billNo).replace(/[^\w.-]+/g, '_');
+  const filename = `bill-${safe}.jpg`;
+  const file = new File([blob], filename, { type: 'image/jpeg' });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: `บิล ${billNo}` });
+      return { saved: true, method: 'share' };
+    } catch (e) {
+      if (e.name === 'AbortError') return { saved: false, method: 'cancelled' };
+      // navigator.share ล้มเหลว (เช่น desktop Chrome ไม่รองรับ files) → fallback
+    }
+  }
+
+  downloadBillImageBlob(blob, billNo);
+  return { saved: true, method: 'download' };
+}

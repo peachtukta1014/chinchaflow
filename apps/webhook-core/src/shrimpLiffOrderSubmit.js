@@ -180,7 +180,12 @@ async function getLiffContext(db, lineUserId) {
     throw err;
   }
 
-  const linked = await findCustomerByLineUserId(db, uid);
+  const [delivWindow, linked] = await Promise.all([
+    getShrimpLineDeliveryWindow(db),
+    findCustomerByLineUserId(db, uid),
+  ]);
+  const deliveryEndHour = delivWindow.endHour;
+
   if (linked?.id && linked?.name) {
     return {
       mode: 'short',
@@ -189,20 +194,25 @@ async function getLiffContext(db, lineUserId) {
         name: linked.name,
         zone: linked.zone || '',
       },
+      deliveryEndHour,
     };
   }
 
   const customers = await buildLiffCustomerCatalog(db);
-  return { mode: 'pick', customer: null, customers };
+  return { mode: 'pick', customer: null, customers, deliveryEndHour };
 }
 
 async function submitLiffOrder(db, admin, body, verified) {
   const lineUserId = verified.lineUserId;
   const rawDelivery = String(body.deliveryDate || '').trim();
+
+  const delivWindow = await getShrimpLineDeliveryWindow(db);
+  const minDelivery = defaultDeliveryDateKeyBangkok(new Date(), delivWindow);
+
   let deliveryDate = rawDelivery;
-  if (!deliveryDate) {
-    const window = await getShrimpLineDeliveryWindow(db);
-    deliveryDate = defaultDeliveryDateKeyBangkok(new Date(), window);
+  // ไม่ระบุวันส่ง หรือ ลูกค้าเลือกวันที่ผ่านไปแล้ว/ก่อน cutoff → ใช้ค่าเริ่มต้นตามเวลา
+  if (!deliveryDate || deliveryDate < minDelivery) {
+    deliveryDate = minDelivery;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
     const err = new Error('invalid_delivery_date');

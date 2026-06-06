@@ -66,6 +66,30 @@ function todayKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
 }
 
+function tomorrowKey() {
+  const t = todayKey();
+  const d = new Date(`${t}T12:00:00+07:00`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
+}
+
+/**
+ * วันส่งเร็วที่สุดตามเวลาปัจจุบัน + endHour (config shrimpLine.lineDefaultEndHour)
+ * ก่อน endHour → วันนี้ · หลัง endHour → พรุ่งนี้
+ */
+function earliestDeliveryKey(endHour = 14) {
+  const now = new Date();
+  const bkkHour = parseInt(
+    new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      hour12: false,
+      timeZone: 'Asia/Bangkok',
+    }).format(now),
+    10,
+  );
+  return bkkHour < endHour ? todayKey() : tomorrowKey();
+}
+
 function formatThaiDate(dateKey) {
   const d = new Date(`${dateKey}T12:00:00+07:00`);
   return d.toLocaleDateString('th-TH', {
@@ -255,7 +279,7 @@ function buildRiverPayload(sizes, activeSizes, deadSizes, activeDeadSizes) {
   return river;
 }
 
-function useOrderDraft() {
+function useOrderDraft(endHour = 14) {
   const [sizes, setSizes] = useState({ small: '', medium: '', large: '' });
   const [activeSizes, setActiveSizes] = useState({});
   const [deadOn, setDeadOn] = useState(false);
@@ -268,9 +292,15 @@ function useOrderDraft() {
   const [delivery, setDelivery] = useState('today');
   const [otherDate, setOtherDate] = useState('');
 
-  const deliveryKey = delivery === 'today' ? todayKey() : otherDate;
+  // วันส่งเร็วที่สุดตาม endHour — วันนี้ถ้าก่อน cutoff, พรุ่งนี้ถ้าหลัง
+  const earliest = earliestDeliveryKey(endHour);
+  const isEarliestToday = earliest === todayKey();
+
+  const deliveryKey = delivery === 'today' ? earliest : otherDate;
   const deliveryLabel =
-    delivery === 'today' ? `วันนี้ (${formatThaiDate(todayKey())})` : formatThaiDate(otherDate || todayKey());
+    delivery === 'today'
+      ? `${isEarliestToday ? 'วันนี้' : 'พรุ่งนี้ (เร็วที่สุด)'} (${formatThaiDate(earliest)})`
+      : formatThaiDate(otherDate || earliest);
 
   const summaryLines = useMemo(() => {
     const lines = [];
@@ -333,6 +363,8 @@ function useOrderDraft() {
     setOtherDate,
     deliveryKey,
     deliveryLabel,
+    earliest,
+    isEarliestToday,
     summaryLines,
     toggleSize,
     canProceed,
@@ -462,6 +494,8 @@ function OrderStep({
     otherDate,
     setOtherDate,
     deliveryLabel,
+    earliest,
+    isEarliestToday,
     summaryLines,
     toggleSize,
     canProceed,
@@ -573,6 +607,13 @@ function OrderStep({
           hintTh={T.deliveryDateHint.th}
           hintEn={T.deliveryDateHint.en}
         >
+          {!isEarliestToday && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-2 leading-snug">
+              เลยเวลารับออเดอร์วันนี้แล้ว — วันส่งเร็วที่สุดคือ <strong>พรุ่งนี้</strong>
+              {' · '}
+              Past today's cutoff — earliest delivery is <strong>tomorrow</strong>
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
             <button
               type="button"
@@ -583,7 +624,14 @@ function OrderStep({
                   : 'text-slate-500'
               }`}
             >
-              <Bilingual th={T.today.th} en={T.today.en} className="text-center" />
+              {isEarliestToday ? (
+                <Bilingual th={T.today.th} en={T.today.en} className="text-center" />
+              ) : (
+                <span className="block text-center leading-tight">
+                  <span className="block">พรุ่งนี้</span>
+                  <span className="block text-[10px] font-normal opacity-70">Tomorrow (earliest)</span>
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -603,7 +651,7 @@ function OrderStep({
                 type="date"
                 className={inputClass}
                 value={otherDate}
-                min={todayKey()}
+                min={earliest}
                 onChange={(e) => setOtherDate(e.target.value)}
               />
             </div>
@@ -771,7 +819,9 @@ export default function LineOrderLiffApp() {
   const [step, setStep] = useState('order');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const draft = useOrderDraft();
+
+  const endHour = session.context?.deliveryEndHour ?? 14;
+  const draft = useOrderDraft(endHour);
 
   const close = () => closeLiffWindow();
 
