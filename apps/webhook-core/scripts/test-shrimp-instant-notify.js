@@ -3,6 +3,7 @@ const {
   collectNotifyTargets,
   resolveNotifyTargets,
   formatShrimpOrderMessage,
+  notifyShrimpLineOrdersAfterSave,
 } = require('../src/instantLineNotify');
 
 function assert(cond, msg) {
@@ -54,5 +55,11 @@ const full = formatShrimpOrderMessage(oaOrder, new Date('2026-06-06T10:00:00+07:
 assert(full.includes('ออเดอร์ LINE ใหม่'), 'full header for user notify');
 assert(full.includes('เปิดแอปโกอ้วน'), 'full footer for user notify');
 
-console.log('\ncompact example:', compact);
-console.log('\nall shrimp instant notify tests passed\n');
+(async () => {
+  const skipped = await notifyShrimpLineOrdersAfterSave(null, [oaOrder], { groupId: 'Cgroup' });
+  assert(skipped.skipped === 'group_order', 'after-save skips group orders');
+  const empty = await notifyShrimpLineOrdersAfterSave(null, [], {});
+  assert(empty.skipped === 'empty', 'after-save skips empty');
+  console.log('\ncompact example:', compact);
+  console.log('\nall shrimp instant notify tests passed\n');
+})();

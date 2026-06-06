@@ -93,8 +93,13 @@ async function getTeaLineConfig(db) {
   return snap.exists ? snap.data() : {};
 }
 
-async function notifyShrimpLineOrder(db, orderData) {
+async function notifyShrimpLineOrder(db, orderData, { orderId = null } = {}) {
   if (!orderData || orderData.status !== 'pending') return { skipped: 'not_pending' };
+  const docId = orderId || orderData.id || null;
+  if (docId) {
+    const snap = await db.collection('lineOrders').doc(docId).get();
+    if (snap.exists && snap.data()?.notifySentAt) return { skipped: 'already_sent' };
+  }
   const config = await getShrimpLineConfig(db);
   if (config.instantOrderNotify === false) return { skipped: 'disabled' };
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -116,7 +121,33 @@ async function notifyShrimpLineOrder(db, orderData) {
   for (const [to, text] of textByTarget) {
     results.push({ to, ok: await linePush(to, text, token) });
   }
-  return { sent: results.filter((r) => r.ok).length, targets: results };
+  const sent = results.filter((r) => r.ok).length;
+  if (docId && sent > 0) {
+    try {
+      await db.collection('lineOrders').doc(docId).update({
+        notifySentAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('notifyShrimpLineOrder notifySentAt', err.message);
+    }
+  }
+  if (sent === 0) {
+    console.warn('notifyShrimpLineOrder push failed', docId, results);
+  }
+  return { sent, targets: results };
+}
+
+/** แจ้งทันทีหลังบันทึกออเดอร์ OA/LIFF — ไม่รอ Firestore trigger */
+async function notifyShrimpLineOrdersAfterSave(db, orders, { groupId = null } = {}) {
+  if (groupId || !orders?.length) return { sent: 0, skipped: groupId ? 'group_order' : 'empty' };
+  let totalSent = 0;
+  const details = [];
+  for (const order of orders) {
+    const result = await notifyShrimpLineOrder(db, order, { orderId: order.id });
+    details.push({ id: order.id, ...result });
+    if (result.sent) totalSent += result.sent;
+  }
+  return { sent: totalSent, details };
 }
 
 async function notifyTeaRestock(db, restockData) {
@@ -137,5 +168,6 @@ module.exports = {
   formatShrimpOrderMessage,
   formatTeaRestockMessage,
   notifyShrimpLineOrder,
+  notifyShrimpLineOrdersAfterSave,
   notifyTeaRestock,
 };

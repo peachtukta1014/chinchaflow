@@ -183,8 +183,13 @@ async function linePush(to, text, token) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
     });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      console.error('linePush failed', r.status, to, body.slice(0, 300));
+    }
     return r.ok;
-  } catch {
+  } catch (err) {
+    console.error('linePush error', to, err.message);
     return false;
   }
 }
