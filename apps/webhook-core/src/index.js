@@ -202,7 +202,9 @@ exports.lineWebhook = functions
         if (intent === 'today_orders') {
           try {
             const dateKey = todayBKK();
-            const summary = await buildShrimpTodayOrdersSummary(db(), dateKey);
+            const summary = await buildShrimpTodayOrdersSummary(db(), dateKey, {
+              familyGroup: isShrimpGroupChat(groupId),
+            });
             await lineReply(replyToken, summary, token);
           } catch (err) {
             console.error('shrimp today orders', err);

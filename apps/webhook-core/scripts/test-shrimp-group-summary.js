@@ -6,6 +6,7 @@ const {
   aggregateDailySales,
   buildShrimpSummaryMessage,
 } = require('../src/shrimpDailySummary');
+const { formatTodayOrdersReply } = require('../src/shrimpTodayOrdersSummary');
 const { classifyShrimpGroupKeyboard } = require('../src/shrimpGroupKeyboard');
 const { replyHelpCustomerThai } = require('../src/shrimpLineReply');
 
@@ -110,8 +111,43 @@ assert(familyMsg.includes('C=7.3KG'), 'family summary C line');
 assert(familyMsg.includes('รวม 10.3KG'), 'family summary total kg');
 assert(familyMsg.includes('฿9,290'), 'family summary money unchanged');
 assert(!familyMsg.includes('A ใหญ่'), 'family summary no inline size labels');
+assert(!familyMsg.includes('ชำระเงิน'), 'family summary no payment block');
+assert(!familyMsg.includes('จากบิลในแอป'), 'family summary no footer');
 
 const oaMsg = buildShrimpSummaryMessage(agg, '2026-06-05', { familyGroup: false });
 assert(oaMsg.includes('A ใหญ่ 0.0 · B กลาง 3.0'), 'non-group keeps inline grades');
+assert(oaMsg.includes('ชำระเงิน'), 'non-group keeps payment block');
+
+const sampleOrders = [
+  {
+    customerName: 'โอเล่',
+    deliveryDate: '2026-06-06',
+    items: [{ customerName: 'โอเล่', product: 'กุ้งเล็ก', qty: 2, unit: 'กก' }],
+    rawText: 'ออเดอร์ 6/6/69 โอเล่ เล็ก2 มุกอันดา เล็ก2',
+  },
+  {
+    customerName: 'เจ๊เขียด',
+    deliveryDate: '2026-06-06',
+    items: [{ customerName: 'เจ๊เขียด', product: 'กุ้งเล็ก', qty: 4, unit: 'กก' }],
+    rawText: 'LIFF: เจ๊เขียด · กุ้งเล็ก 4 กก',
+  },
+  {
+    customerName: 'มุกอันดา',
+    deliveryDate: '2026-06-06',
+    items: [{ customerName: 'มุกอันดา', product: 'กุ้งเล็ก', qty: 2, unit: 'กก' }],
+    rawText: 'ออเดอร์ 6/6/69',
+  },
+];
+const familyOrders = formatTodayOrdersReply(sampleOrders, '2026-06-06', { familyGroup: true });
+assert(familyOrders.includes('3 ออเดอร์'), 'family orders header count');
+assert(familyOrders.includes('1 โอเล่ เล็ก2'), 'family orders line 1 compact');
+assert(familyOrders.includes('2 เจ๊เขียด เล็ก4'), 'family orders line 2 compact');
+assert(familyOrders.includes('— เล็ก 8 กก —'), 'family orders total kg');
+assert(!familyOrders.includes('「'), 'family orders no rawText block');
+assert(!familyOrders.includes('จากออเดอร์ LINE'), 'family orders no footer');
+
+const oaOrders = formatTodayOrdersReply(sampleOrders, '2026-06-06', { familyGroup: false });
+assert(oaOrders.includes('โกอ้วน คลังซีฟู้ด'), 'non-group orders keeps full header');
+assert(oaOrders.includes('「'), 'non-group orders keeps rawText when linked');
 
 console.log('\nall shrimp group summary tests passed\n');
