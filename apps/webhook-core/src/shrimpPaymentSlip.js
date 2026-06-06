@@ -69,6 +69,19 @@ async function findSaleByBillNo(db, billNo) {
   return null;
 }
 
+/** กันสลิปซ้ำจาก LINE retry / webhook ส่ง message id เดิมซ้ำ */
+async function findSlipByLineMessageId(db, lineMessageId) {
+  const key = String(lineMessageId || '').trim();
+  if (!key) return null;
+  const snap = await db.collection('paymentSlipSubmissions')
+    .where('lineMessageId', '==', key)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
 /** บิลค้างล่าสุดที่เคย push ให้ UID นี้ */
 async function suggestBillForLineUser(db, lineUserId) {
   const uid = normalizeLineUserId(lineUserId);
@@ -129,6 +142,20 @@ async function recordPaymentSlipSubmission(db, admin, {
     const err = new Error('invalid_slip');
     err.code = 'invalid_slip';
     throw err;
+  }
+
+  if (lineMessageId) {
+    const existing = await findSlipByLineMessageId(db, lineMessageId);
+    if (existing) {
+      return {
+        ok: true,
+        duplicate: true,
+        imageUrl: existing.imageUrl,
+        submissionId: existing.id,
+        suggestedBillNo: existing.suggestedBillNo || existing.billNo || hintBill || null,
+        message: SLIP_RECEIVED_REPLY,
+      };
+    }
   }
 
   const { url: imageUrl } = await uploadSlipImage(admin, buffer, userId);
@@ -217,6 +244,7 @@ module.exports = {
   SLIP_RECEIVED_REPLY,
   processShrimpPaymentSlipImage,
   recordPaymentSlipSubmission,
+  findSlipByLineMessageId,
   suggestBillForLineUser,
   isOpenSale,
   saleRemaining,

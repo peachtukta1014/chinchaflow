@@ -1,9 +1,11 @@
 import {
   fsGetDoc,
   fsPatch,
+  fsPatchIf,
   fsQueryPendingPaymentSlips,
   fsQuerySaleByBillNo,
   fsQuerySalesByCustomer,
+  isFirestoreFailedPreconditionError,
 } from '../lib/firestoreRest';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
 import { buildBillDataForCloud } from '../lib/shrimpBillApi';
@@ -39,6 +41,64 @@ export async function loadOpenBillsForSlip(slip, sale) {
     if (saleRemainingAmount(sale) > 0) open.unshift(sale);
   }
   return open.length ? open : (sale ? [sale] : []);
+}
+
+
+const SLIP_CONFIRM_LOCK_MS = 5 * 60 * 1000;
+
+function isSlipConfirmLockStale(slip) {
+  if (!slip?.confirmingAt) return true;
+  const t = new Date(slip.confirmingAt).getTime();
+  return Number.isNaN(t) || Date.now() - t > SLIP_CONFIRM_LOCK_MS;
+}
+
+/** ล็อคสลิปก่อนปิดบิล — กันสองคนยืนยันพร้อมกัน */
+async function claimPaymentSlipConfirmation(slip, staffMember) {
+  const fresh = await fsGetDoc(`paymentSlipSubmissions/${slip.id}`);
+  if (!fresh) throw new Error('ไม่พบรายการสลิป');
+
+  const staffLabel = staffMember?.displayName || staffMember?.email || '';
+  const status = fresh.status || 'pending';
+
+  if (status === 'confirmed') {
+    return { fresh, alreadyConfirmed: true };
+  }
+  if (status === 'rejected') {
+    throw new Error('สลิปนี้ถูกปฏิเสธแล้ว');
+  }
+  if (status === 'confirming') {
+    if (!isSlipConfirmLockStale(fresh) && fresh.confirmingByName && fresh.confirmingByName !== staffLabel) {
+      throw new Error(`มี ${fresh.confirmingByName} กำลังยืนยันสลิปนี้อยู่ — รอสักครู่แล้วลองใหม่`);
+    }
+    return { fresh, alreadyConfirming: true };
+  }
+  if (status !== 'pending') {
+    throw new Error('สถานะสลิปไม่รองรับการยืนยัน');
+  }
+
+  const confirmingAt = new Date().toISOString();
+  try {
+    await fsPatchIf(`paymentSlipSubmissions/${slip.id}`, {
+      status: 'confirming',
+      confirmingAt,
+      confirmingByName: staffLabel,
+    }, { updateTime: fresh._updateTime });
+  } catch (err) {
+    if (isFirestoreFailedPreconditionError(err.status, err.detail)) {
+      const retry = await fsGetDoc(`paymentSlipSubmissions/${slip.id}`);
+      if (retry?.status === 'confirmed') return { fresh: retry, alreadyConfirmed: true };
+      if (retry?.status === 'confirming' && (isSlipConfirmLockStale(retry) || retry.confirmingByName === staffLabel)) {
+        return { fresh: retry, alreadyConfirming: true };
+      }
+      throw new Error('มีคนกำลังยืนยันสลิปนี้อยู่ — รีเฟรชแล้วลองใหม่');
+    }
+    throw err;
+  }
+
+  return {
+    fresh: { ...fresh, status: 'confirming', confirmingAt, confirmingByName: staffLabel },
+    claimed: true,
+  };
 }
 
 async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
@@ -86,18 +146,17 @@ export async function confirmPaymentSlip({
     throw new Error('บิลนี้ปิดแล้ว');
   }
 
-  const confirmingAt = new Date().toISOString();
   const staffLabel = staffMember?.displayName || staffMember?.email || '';
-  const priorStatus = slip.status || 'pending';
-
-  if (priorStatus !== 'confirmed') {
-    await fsPatch(`paymentSlipSubmissions/${slip.id}`, {
-      status: 'confirming',
-      confirmingAt,
-      confirmingByName: staffLabel,
-    });
+  const claim = await claimPaymentSlipConfirmation(slip, staffMember);
+  if (claim.alreadyConfirmed) {
+    const refreshed = await fsGetDoc(`sales/${sale.id}`);
+    return {
+      sale: refreshed || sale,
+      pushResult: { pushed: false, reason: 'already_confirmed' },
+    };
   }
 
+  const priorStatus = claim.fresh?.status || slip.status || 'pending';
   let refreshed = sale;
   try {
     if (sale.paymentType === 'installment' && remain > 0) {
