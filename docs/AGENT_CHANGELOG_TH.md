@@ -26,6 +26,18 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-06 — Hardening ความเสี่ยงทั้งหมด (PR #202–#205)
+
+- **ปัญหา/คำขอ:** code review พบ 7+ จุดเสี่ยง (Critical/High) ใน webhook + LINE + stock
+- **แก้แล้ว (รอบนี้):**
+  - #202: notify UID leak + hintBill TDZ + isFamilyGroup จาก config + webhook retry (completeLineEvent ก่อน lineReply) + _updateTime ใน fsListCollection/docFromRow สำหรับ FIFO optimistic lock
+  - #203: verifySignature fail-closed เมื่อไม่มี LINE_CHANNEL_SECRET
+  - #204: beginLineOrderDelivery ใช้ fsPatchIf + updateTime (CAS กัน 2 เครื่องสร้างบิลซ้ำ)
+  - #205: LIFF slip dedup ด้วย crypto.randomUUID() idempotency key
+- **ไฟล์/จุดสำคัญ:** `instantLineNotify.js`, `shrimpGroupKeyboard.js`, `index.js`, `shrimpPaymentSlip.js`, `firestoreRest.js`, `lineOrderService.js`, `shrimpLiffSlip.js`, `LineSlipLiffApp.jsx`
+- **พฤติกรรมหลังแก้:** ออเดอร์ LINE ไม่ซ้ำจาก retry · stock FIFO optimistic lock ทำงาน · บิลซ้ำ 2 เครื่องถูกกัน · LIFF slip dedup ทำงาน
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy **ทั้ง hosting + functions** · `LINE_CHANNEL_SECRET` ตั้งค่าใน Functions env
+
 ### 2026-06-06 — LIFF ฝากสลิป: เซสชันหมดอายุตอนกดส่ง (ไม่เกี่ยว LINE Peach)
 
 - **ปัญหา/คำขอ:** หน้า `liff-slip.html` ล็อกอินได้ แต่กด「ส่งสลิป」ขึ้น「เซสชันหมดอายุ — ปิดแล้วเปิดใหม่」
