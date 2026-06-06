@@ -19,6 +19,7 @@ import {
   canAccessShrimpMainTab,
   canAccessShrimpOverlay,
   getDefaultMainTabForMember,
+  canSeeShrimpLiveStockBar,
   getShrimpRoleLabel,
   isShrimpAdmin,
   isShrimpStaff,
@@ -94,6 +95,7 @@ export default function App() {
 
   const isAdmin = isShrimpAdmin(member);
   const isStaff = isShrimpStaff(member);
+  const showLiveStockBar = canSeeShrimpLiveStockBar(member);
 
   const goMainTab = useCallback((tab) => {
     if (member && !canAccessShrimpMainTab(member, tab)) return;
@@ -409,7 +411,7 @@ export default function App() {
         onRetrySync={runOfflineSync}
       />
 
-      {isAdmin && (
+      {showLiveStockBar && (
         <LiveStockStickyBar
           live={effectiveStock.live}
           dead={effectiveStock.dead}

@@ -31,6 +31,11 @@ export function isShrimpStaff(member) {
   return member?.role === 'staff';
 }
 
+/** แถบกุ้งคงเหลือด้านบน — แอดมิน + แมนเนเจอร์ (ไม่แสดงให้สตาฟลูกมือ) */
+export function canSeeShrimpLiveStockBar(member) {
+  return isShrimpAdmin(member) || isShrimpManager(member);
+}
+
 /** แท็บหลักที่สตาฟ (ลูกมือ/ส่งของ) เห็น */
 export const STAFF_MAIN_TABS = ['pos', 'orders'];
 

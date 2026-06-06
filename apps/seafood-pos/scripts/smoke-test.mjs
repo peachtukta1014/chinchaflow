@@ -871,6 +871,7 @@ try {
     isShrimpStaff,
     canAccessShrimpMainTab,
     canAccessShrimpOverlay,
+    canSeeShrimpLiveStockBar,
     getDefaultMainTabForMember,
     getNextShrimpRole,
   } = await import('../src/lib/shrimpRoles.js');
@@ -890,10 +891,13 @@ try {
   assert(getNextShrimpRole('admin') === 'manager', 'cycle role admin→manager');
   assert(getNextShrimpRole('manager') === 'staff', 'cycle role manager→staff');
   assert(getNextShrimpRole('staff') === 'admin', 'cycle role staff→admin');
+  const managerMember = { role: 'manager', email: 'mgr@example.com' };
+  assert(canSeeShrimpLiveStockBar(managerMember), 'manager เห็นแถบสต๊อก');
+  assert(!canSeeShrimpLiveStockBar(staffMember), 'staff ไม่เห็นแถบสต๊อก');
   const appSrc = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   assert(
-    appSrc.includes('isAdmin && (\n        <LiveStockStickyBar'),
-    'แถบสต๊อกด้านบนแสดงเฉพาะแอดมิน',
+    appSrc.includes('showLiveStockBar && (\n        <LiveStockStickyBar'),
+    'แถบสต๊อกด้านบนแสดงแอดมิน + แมนเนเจอร์',
   );
   assert(appSrc.includes('canAccessShrimpMainTab(member'), 'App จำกัดแท็บตาม role');
   assert(appSrc.includes('readOnly={isStaff}'), 'ลูกค้า read-only สำหรับสตาฟ');
