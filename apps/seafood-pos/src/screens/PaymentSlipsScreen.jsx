@@ -68,20 +68,13 @@ function SlipCard({ slip, member, onDone }) {
     if (!ok) return;
     setBusy(true);
     try {
-      const res = await confirmPaymentSlip({
+      await confirmPaymentSlip({
         slip,
         sale: selectedSale,
         staffMember: member,
         pushPaidBill: true,
       });
-      if (res.pushResult?.pushed) {
-        alert(`✅ ปิดบิล ${billLabel} แล้ว · ส่งใบจ่ายแล้วให้ลูกค้าใน LINE`);
-      } else {
-        alert(
-          `✅ ปิดบิล ${billLabel} แล้ว\n` +
-            `(ยังส่งบิลจ่ายแล้วใน LINE อัตโนมัติไม่ได้ — ส่งมือจากหน้าภาพบิลได้)`,
-        );
-      }
+      alert(`✅ ปิดบิล ${billLabel} แล้ว · กำลังส่งใบจ่ายแล้วให้ลูกค้าใน LINE`);
       onDone();
     } catch (e) {
       console.error(e);

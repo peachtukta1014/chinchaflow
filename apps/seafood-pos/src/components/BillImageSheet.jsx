@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Send, Share2, X } from 'lucide-react';
 import {
   downloadBillImageBlob,
@@ -31,80 +31,99 @@ export default function BillImageSheet({ bill, customer, staffName, onClose }) {
   const [pushBusy, setPushBusy] = useState(false);
   const [billCustomer, setBillCustomer] = useState(null);
 
+  // ref ให้ lookupLineUid เรียกได้ซ้ำโดยไม่ต้อง reset state ทั้งหมด
+  const billCustomerRef = useRef(null);
+
+  const applyUidDetails = useCallback((details) => {
+    setLineUserId(details.uid || '');
+    const billUid = details.billUid || '';
+    const profileUid = details.profileUid || details.uid || '';
+    setLineUidMeta({
+      billUid,
+      profileName: details.profileName || '',
+      profileLinked: isValidLineUserId(details.profileUid || details.uid),
+      uidMismatch: Boolean(
+        isValidLineUserId(billUid)
+        && isValidLineUserId(profileUid)
+        && billUid !== profileUid,
+      ),
+    });
+  }, []);
+
   useEffect(() => {
     if (!bill) return undefined;
     let cancelled = false;
     setLoading(true);
+    setLineUidLoading(true);
     setError(null);
     setBillCustomer(null);
+    billCustomerRef.current = null;
+
     const billForImage = {
       ...bill,
       recordedBy: bill?.recordedBy || staffName || '',
     };
-    const load = async () => {
+
+    const run = async () => {
+      // ขั้น 1: resolve ลูกค้าจากบิล (เร็ว — ส่วนใหญ่ 1 Firestore doc หรือ static list)
       const resolved = await resolveBillCustomer(billForImage, customer || {});
       if (cancelled) return;
       setBillCustomer(resolved);
+      billCustomerRef.current = resolved;
+
+      // ขั้น 2: โหลดภาพบิล + lookup LINE UID พร้อมกัน
       const billData = buildBillDataForCloud(billForImage, resolved);
-      try {
-        const { blob: b, objectUrl } = await fetchShrimpBillImage(
-          billForImage,
-          resolved,
-          { billData },
-        );
-        if (cancelled) {
-          revokeBillImageUrl(objectUrl);
-          return;
-        }
-        setBlob(b);
-        setPreviewUrl(objectUrl);
-      } catch (cloudErr) {
-        console.warn('fetchShrimpBillImage fallback', cloudErr);
-        const { blob: b, objectUrl } = await generateBillImage(billForImage, resolved);
-        if (cancelled) {
-          revokeBillImageUrl(objectUrl);
-          return;
-        }
-        setBlob(b);
-        setPreviewUrl(objectUrl);
+
+      const imagePromise = fetchShrimpBillImage(billForImage, resolved, { billData })
+        .catch(async (cloudErr) => {
+          console.warn('fetchShrimpBillImage fallback', cloudErr);
+          return generateBillImage(billForImage, resolved);
+        });
+
+      // resolveLineUserIdDetails ใช้ customer cache ภายใน — ไม่โหลด Firestore ซ้ำ
+      const uidPromise = resolveLineUserIdDetails(resolved, bill);
+
+      // รับภาพก่อน (ผู้ใช้มองเห็นทันที)
+      const { blob: b, objectUrl } = await imagePromise;
+      if (cancelled) {
+        revokeBillImageUrl(objectUrl);
+        return;
       }
+      setBlob(b);
+      setPreviewUrl(objectUrl);
+      setLoading(false);
+
+      // รับ UID (มักเสร็จก่อนหรือพร้อมกับภาพ เพราะใช้ cache)
+      const details = await uidPromise;
+      if (!cancelled) applyUidDetails(details);
     };
-    load()
+
+    run()
       .catch((e) => {
         if (!cancelled) setError(e.message || 'สร้างภาพไม่สำเร็จ');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setLineUidLoading(false);
+        }
       });
-    return () => { cancelled = true; };
-  }, [bill, customer, staffName]);
 
-  const lookupLineUid = React.useCallback(async () => {
+    return () => { cancelled = true; };
+  }, [bill, customer, staffName, applyUidDetails]);
+
+  const lookupLineUid = useCallback(async () => {
     setLineUidLoading(true);
     try {
-      const details = await resolveLineUserIdDetails(billCustomer || customer, bill);
-      setLineUserId(details.uid || '');
-      const billUid = details.billUid || '';
-      const profileUid = details.profileUid || details.uid || '';
-      setLineUidMeta({
-        billUid,
-        profileName: details.profileName || '',
-        profileLinked: isValidLineUserId(details.profileUid || details.uid),
-        uidMismatch: Boolean(
-          isValidLineUserId(billUid)
-          && isValidLineUserId(profileUid)
-          && billUid !== profileUid,
-        ),
-      });
+      const details = await resolveLineUserIdDetails(
+        billCustomerRef.current || customer,
+        bill,
+      );
+      applyUidDetails(details);
     } finally {
       setLineUidLoading(false);
     }
-  }, [customer, bill, billCustomer]);
-
-  useEffect(() => {
-    if (!bill) return undefined;
-    lookupLineUid();
-  }, [bill, lookupLineUid]);
+  }, [customer, bill, applyUidDetails]);
 
   useEffect(() => () => revokeBillImageUrl(previewUrl), [previewUrl]);
 
