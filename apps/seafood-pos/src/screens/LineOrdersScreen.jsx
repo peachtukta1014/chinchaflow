@@ -17,14 +17,14 @@ import {
   cancelLineOrder as cancelLineOrderService,
   beginLineOrderDelivery,
   markLineOrderDoneOnly,
+  markLineOrderStockDeducted,
   releaseLineOrderDelivery,
   saveLineOrderDelivery,
 } from '../services/lineOrderService';
+import { validateStockForSale } from '../services/salesService';
 import {
-  computeStockAfterSaleDeduction,
   deductStockForSale,
   getEffectiveStock,
-  restoreStockForSale,
 } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 import { useLineOrdersFeed } from '../hooks/useLineOrdersFeed';
@@ -146,21 +146,33 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       return;
     }
 
-    const avail = getEffectiveStock(stock, stockBatches);
-    let stockDeducted = false;
-    let postDeduction = null;
-    try {
-      postDeduction = computeStockAfterSaleDeduction(avail, liveKg, deadKg, stockBatches);
-      await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
-      stockDeducted = true;
+    const stockCheck = validateStockForSale(cartItems, stock, stockBatches);
+    if (!stockCheck.ok) {
+      await releaseLineOrderDelivery(order.id).catch(() => {});
+      alert(stockCheck.message);
+      setSavingId(null);
+      return;
+    }
 
-      const { salesId, billNo, recovered } = await saveLineOrderDelivery({
+    const avail = getEffectiveStock(stock, stockBatches);
+    let saleSaved = false;
+    let billNo = null;
+    try {
+      const deliveryResult = await saveLineOrderDelivery({
         order,
         cartItems,
         customer,
         total,
         recordedBy,
       });
+      saleSaved = true;
+      billNo = deliveryResult.billNo;
+      const { recovered, stockDeducted: alreadyDeducted } = deliveryResult;
+
+      if (!alreadyDeducted) {
+        await deductStockForSale(avail, liveKg, deadKg, updateMainStock, stockBatches);
+        await markLineOrderStockDeducted(order.id);
+      }
 
       setDeliverySheet(null);
       onSaleRecorded?.();
@@ -169,26 +181,14 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}${note}`);
     } catch (err) {
       console.error(err);
-      if (stockDeducted && postDeduction) {
-        try {
-          await restoreStockForSale(
-            postDeduction.stock,
-            liveKg,
-            deadKg,
-            updateMainStock,
-            postDeduction.batches,
-          );
-        } catch (restoreErr) {
-          console.error('restore stock after LINE save failed', restoreErr);
-          await releaseLineOrderDelivery(order.id).catch(() => {});
-          alert(
-            `${formatFirestoreSaveError(err)}\n\n⚠️ คืนสต๊อกอัตโนมัติไม่สำเร็จ — แจ้งแอดมินตรวจยอดคลัง`,
-          );
-          return;
-        }
+      if (saleSaved) {
+        alert(
+          `${formatFirestoreSaveError(err)}\n\n⚠️ บิล ${billNo || order.id} บันทึกแล้วแต่ตัดสต๊อกไม่สำเร็จ — แจ้งแอดมินตรวจยอดคลัง`,
+        );
+      } else {
+        await releaseLineOrderDelivery(order.id).catch(() => {});
+        alert(formatFirestoreSaveError(err));
       }
-      await releaseLineOrderDelivery(order.id).catch(() => {});
-      alert(formatFirestoreSaveError(err));
     } finally {
       setSavingId(null);
     }

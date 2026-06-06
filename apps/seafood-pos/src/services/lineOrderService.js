@@ -28,7 +28,7 @@ function isDeliveryLockStale(order) {
   return Number.isNaN(t) || Date.now() - t > DELIVERY_LOCK_MS;
 }
 
-/** ล็อคออเดอร์ก่อนตัดสต๊อก — กันสองเครื่องส่งซ้ำ */
+/** ล็อคออเดอร์ก่อนบันทึกบิล — กันสองเครื่องส่งซ้ำ */
 export async function beginLineOrderDelivery(orderId, recordedBy) {
   const fresh = await fsGetDoc(`lineOrders/${orderId}`);
   if (!fresh) throw new Error('ไม่พบออเดอร์ LINE นี้แล้ว');
@@ -50,6 +50,14 @@ export async function beginLineOrderDelivery(orderId, recordedBy) {
     deliveringBy: recordedBy || 'พนักงาน',
   });
   return { fresh: { ...fresh, status: 'delivering', deliveringAt: now, deliveringBy: recordedBy }, locked: true };
+}
+
+export async function markLineOrderStockDeducted(orderId) {
+  if (!orderId) return;
+  await fsPatch(`lineOrders/${orderId}`, {
+    stockDeducted: true,
+    stockDeductedAt: new Date().toISOString(),
+  });
 }
 
 export async function releaseLineOrderDelivery(orderId) {
@@ -205,6 +213,7 @@ export async function saveLineOrderDelivery({
       billNo: fresh.billNo,
       fulfilledItems: fresh.fulfilledItems || fulfilledItems,
       idempotent: true,
+      stockDeducted: !!fresh.stockDeducted,
     };
   }
 
@@ -224,7 +233,13 @@ export async function saveLineOrderDelivery({
     salesId = existingSale.id;
     billNo = billNo || existingSale.billNo || `LINE-${String(salesId).slice(-8)}`;
     await completeLineOrderPatch(order.id, { salesId, billNo, now, fulfilledItems });
-    return { salesId, billNo, fulfilledItems, recovered: true };
+    return {
+      salesId,
+      billNo,
+      fulfilledItems,
+      recovered: true,
+      stockDeducted: !!fresh.stockDeducted,
+    };
   }
 
   billNo = `LINE-${Date.now().toString().slice(-8)}`;
@@ -254,5 +269,5 @@ export async function saveLineOrderDelivery({
 
   await completeLineOrderPatch(order.id, { salesId, billNo, now, fulfilledItems });
 
-  return { salesId, billNo, fulfilledItems };
+  return { salesId, billNo, fulfilledItems, stockDeducted: false };
 }

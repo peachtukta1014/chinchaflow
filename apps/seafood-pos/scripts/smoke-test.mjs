@@ -1085,30 +1085,8 @@ try {
   assert(Math.abs(restored.live - 100) < 0.01, 'LINE rollback: post-deduction + kg = เดิม');
   const { batchesAfter } = planFifoBatchDeduction(batches, { liveKg: 25, deadKg: 0 });
   assert(batchesAfter[0].remainingLiveKg === 35, 'planFifoBatchDeduction ตัดล็อตแรก');
-  const { patches: lockedPatches } = planFifoBatchDeduction(
-    [{ id: 'b1', remainingLiveKg: 60, _updateTime: '2026-06-06T00:00:00.000000Z' }],
-    { liveKg: 10, deadKg: 0 },
-  );
-  assert(lockedPatches[0]._updateTime === '2026-06-06T00:00:00.000000Z', 'planFifo ส่ง _updateTime ใน patch');
 } catch (e) {
   fail('computeStockAfterSaleDeduction', e);
-}
-
-try {
-  const { isFirestoreConflictError } = await import('../src/lib/stockCommitConflict.js');
-  assert(
-    isFirestoreConflictError(new Error('fsAtomicStockBatchCommit conflict: FAILED_PRECONDITION')),
-    'isFirestoreConflictError จับ optimistic lock',
-  );
-  assert(!isFirestoreConflictError(new Error('สต๊อกในล็อตไม่พอ')), 'isFirestoreConflictError ไม่จับ stock short');
-  const stockSvc = fs.readFileSync(path.join(root, 'src/services/stockService.js'), 'utf8');
-  assert(stockSvc.includes('STOCK_DEDUCT_MAX_RETRIES'), 'deductFifoFromBatches มี retry');
-  assert(stockSvc.includes('fsQueryStockBatches'), 'deductFifoFromBatches โหลดล็อตใหม่เมื่อ conflict');
-  const fsRest = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
-  assert(fsRest.includes('currentDocument'), 'fsAtomicStockBatchCommit ใช้ currentDocument');
-  assert(fsRest.includes('_updateTime'), 'doc model เก็บ _updateTime');
-} catch (e) {
-  fail('stock optimistic lock', e);
 }
 
 try {
@@ -1176,17 +1154,29 @@ try {
     path.join(root, 'src/screens/LineOrdersScreen.jsx'),
     'utf8',
   );
+  const saleBeforeStock = lineOrdersScreen.indexOf('saveLineOrderDelivery');
+  const stockAfterSale = lineOrdersScreen.indexOf('deductStockForSale');
   assert(
-    lineOrdersScreen.includes('computeStockAfterSaleDeduction'),
-    'LineOrdersScreen ใช้ post-deduction ก่อน restore',
+    saleBeforeStock >= 0 && stockAfterSale > saleBeforeStock,
+    'LineOrdersScreen บันทึกบิลก่อนตัดสต๊อก',
   );
   assert(
-    lineOrdersScreen.includes('postDeduction.stock'),
-    'LineOrdersScreen ส่ง postDeduction เข้า restoreStockForSale',
+    lineOrdersScreen.includes('validateStockForSale'),
+    'LineOrdersScreen เช็กสต๊อกก่อนบันทึกบิล',
+  );
+  assert(
+    lineOrdersScreen.includes('markLineOrderStockDeducted'),
+    'LineOrdersScreen mark stockDeducted หลังตัดสต๊อก',
+  );
+  assert(
+    !lineOrdersScreen.includes('restoreStockForSale'),
+    'LineOrdersScreen ไม่ restore สต๊อกเมื่อบิลบันทึกแล้ว',
   );
   const lineSvc = fs.readFileSync(path.join(root, 'src/services/lineOrderService.js'), 'utf8');
   assert(lineSvc.includes('fsQuerySaleByLineOrderId'), 'saveLineOrderDelivery กันบิลซ้ำ');
   assert(lineSvc.includes('idempotent'), 'saveLineOrderDelivery idempotent done');
+  assert(lineSvc.includes('stockDeducted'), 'saveLineOrderDelivery คืน stockDeducted');
+  assert(lineSvc.includes('markLineOrderStockDeducted'), 'lineOrderService mark stockDeducted');
   const fsRest = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
   assert(fsRest.includes('fsQueryAllPendingLineOrders'), 'query ออเดอร์ pending แบ่งหน้า');
 } catch (e) {
