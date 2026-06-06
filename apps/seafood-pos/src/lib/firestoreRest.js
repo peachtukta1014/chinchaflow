@@ -4,7 +4,10 @@
 import { auth } from '../firebase';
 import { dateKeysBetween, saleDateKeyFromBill } from './date.js';
 import { sortSalesFifoAsc } from './saleFifo.js';
+import { isFirestoreConflictError } from './stockCommitConflict.js';
 import { FIREBASE_PROJECT_ID } from './viteEnv.js';
+
+export { isFirestoreConflictError };
 
 const projectId = FIREBASE_PROJECT_ID;
 export const FS_BASE = projectId
@@ -80,11 +83,12 @@ export function fsObjStockFields(data) {
   return fields;
 }
 
-function docFieldsToModel(fields, id) {
+function docFieldsToModel(fields, id, updateTime = null) {
   return {
     id,
     ...fromFsFields(fields),
     _fsKgTypes: fsKgTypesFromFields(fields),
+    ...(updateTime ? { _updateTime: updateTime } : {}),
   };
 }
 
@@ -93,6 +97,9 @@ export function formatFirestoreSaveError(err) {
   const msg = String(err?.message || err || '');
   if (/Invalid project ID/i.test(msg)) {
     return 'ตั้งค่า Firebase ผิด (project ID มีช่องว่าง/ขึ้นบรรทัดใหม่) — แจ้งแอดมินให้ deploy ใหม่';
+  }
+  if (/FAILED_PRECONDITION|fsAtomicStockBatchCommit conflict|สต๊อกถูกอัปเดตโดยเครื่องอื่น/i.test(msg)) {
+    return 'สต๊อกถูกอัปเดตพร้อมกัน — รีเฟรชแล้วลองอีกครั้ง';
   }
   if (/fsAtomicStockBatchCommit HTTP 400/i.test(msg)) {
     return 'ตัดสต๊อกไม่สำเร็จ — รีเฟรชหน้าแล้วลองอีกครั้ง (อย่ากดซ้ำถ้าไม่แน่ใจว่าสำเร็จ)';
@@ -125,7 +132,7 @@ export function fromFsVal(v) {
 
 function docFromRow(row) {
   const parts = row.document.name.split('/');
-  return docFieldsToModel(row.document.fields || {}, parts[parts.length - 1]);
+  return docFieldsToModel(row.document.fields || {}, parts[parts.length - 1], row.document.updateTime);
 }
 
 export function fromFsFields(fields) {
@@ -138,7 +145,7 @@ export async function fsGetDoc(path) {
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  return docFieldsToModel(json.fields || {}, parts[parts.length - 1]);
+  return docFieldsToModel(json.fields || {}, parts[parts.length - 1], json.updateTime);
 }
 
 export async function fsPost(col, data) {
@@ -453,7 +460,7 @@ export async function fsListCollection(col, pageSize = 200) {
     const json = await r.json();
     const docs = (json.documents || []).map((doc) => {
       const parts = doc.name.split('/');
-      return docFieldsToModel(doc.fields || {}, parts[parts.length - 1]);
+      return docFieldsToModel(doc.fields || {}, parts[parts.length - 1], doc.updateTime);
     });
     allDocs.push(...docs);
     pageToken = json.nextPageToken || null;
@@ -702,7 +709,8 @@ export async function fsIncrementDebt(customerId, meta, delta) {
 /**
  * Atomic commit สำหรับ stockBatch หลายล็อตพร้อมกัน — ทั้งหมดสำเร็จหรือล้มพร้อมกัน
  * ป้องกันการตัดสต๊อกค้างกลางทาง (บางล็อตตัดแล้วแต่บางล็อตยังไม่ตัด)
- * patches: [{ id, remainingLiveKg, remainingDeadKg }, ...]
+ * patches: [{ id, remainingLiveKg, remainingDeadKg, _updateTime? }, ...]
+ * _updateTime = optimistic lock จาก GET/list — กันสองเครื่องเขียนทับกัน
  */
 export async function fsAtomicStockBatchCommit(patches) {
   if (!FS_BASE || !patches?.length) return;
@@ -716,24 +724,30 @@ export async function fsAtomicStockBatchCommit(patches) {
   }
   const unique = [...byId.values()];
 
-  const writes = unique.map((p) => ({
-    update: {
-      name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
-      fields: {
-        remainingLiveKg: stockKgFirestoreValue(
-          p.remainingLiveKg,
-          'remainingLiveKg',
-          p._kgTypes || p._fsKgTypes,
-        ),
-        remainingDeadKg: stockKgFirestoreValue(
-          p.remainingDeadKg,
-          'remainingDeadKg',
-          p._kgTypes || p._fsKgTypes,
-        ),
+  const writes = unique.map((p) => {
+    const write = {
+      update: {
+        name: `projects/${projectId}/databases/(default)/documents/stockBatches/${p.id}`,
+        fields: {
+          remainingLiveKg: stockKgFirestoreValue(
+            p.remainingLiveKg,
+            'remainingLiveKg',
+            p._kgTypes || p._fsKgTypes,
+          ),
+          remainingDeadKg: stockKgFirestoreValue(
+            p.remainingDeadKg,
+            'remainingDeadKg',
+            p._kgTypes || p._fsKgTypes,
+          ),
+        },
       },
-    },
-    updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
-  }));
+      updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
+    };
+    if (p._updateTime) {
+      write.currentDocument = { updateTime: p._updateTime };
+    }
+    return write;
+  });
   const r = await fetch(`${FS_BASE}:commit`, {
     method: 'POST',
     headers: await fsAuthHeaders(),
@@ -741,6 +755,11 @@ export async function fsAtomicStockBatchCommit(patches) {
   });
   if (!r.ok) {
     const detail = await r.text().catch(() => '');
+    if (/FAILED_PRECONDITION/i.test(detail)) {
+      throw new Error(
+        'fsAtomicStockBatchCommit conflict: สต๊อกถูกอัปเดตโดยเครื่องอื่น (FAILED_PRECONDITION)',
+      );
+    }
     throw new Error(
       `fsAtomicStockBatchCommit HTTP ${r.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`,
     );

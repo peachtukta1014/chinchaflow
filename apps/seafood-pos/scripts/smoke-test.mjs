@@ -1085,8 +1085,30 @@ try {
   assert(Math.abs(restored.live - 100) < 0.01, 'LINE rollback: post-deduction + kg = เดิม');
   const { batchesAfter } = planFifoBatchDeduction(batches, { liveKg: 25, deadKg: 0 });
   assert(batchesAfter[0].remainingLiveKg === 35, 'planFifoBatchDeduction ตัดล็อตแรก');
+  const { patches: lockedPatches } = planFifoBatchDeduction(
+    [{ id: 'b1', remainingLiveKg: 60, _updateTime: '2026-06-06T00:00:00.000000Z' }],
+    { liveKg: 10, deadKg: 0 },
+  );
+  assert(lockedPatches[0]._updateTime === '2026-06-06T00:00:00.000000Z', 'planFifo ส่ง _updateTime ใน patch');
 } catch (e) {
   fail('computeStockAfterSaleDeduction', e);
+}
+
+try {
+  const { isFirestoreConflictError } = await import('../src/lib/stockCommitConflict.js');
+  assert(
+    isFirestoreConflictError(new Error('fsAtomicStockBatchCommit conflict: FAILED_PRECONDITION')),
+    'isFirestoreConflictError จับ optimistic lock',
+  );
+  assert(!isFirestoreConflictError(new Error('สต๊อกในล็อตไม่พอ')), 'isFirestoreConflictError ไม่จับ stock short');
+  const stockSvc = fs.readFileSync(path.join(root, 'src/services/stockService.js'), 'utf8');
+  assert(stockSvc.includes('STOCK_DEDUCT_MAX_RETRIES'), 'deductFifoFromBatches มี retry');
+  assert(stockSvc.includes('fsQueryStockBatches'), 'deductFifoFromBatches โหลดล็อตใหม่เมื่อ conflict');
+  const fsRest = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
+  assert(fsRest.includes('currentDocument'), 'fsAtomicStockBatchCommit ใช้ currentDocument');
+  assert(fsRest.includes('_updateTime'), 'doc model เก็บ _updateTime');
+} catch (e) {
+  fail('stock optimistic lock', e);
 }
 
 try {

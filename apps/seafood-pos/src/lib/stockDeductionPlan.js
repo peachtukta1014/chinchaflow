@@ -51,6 +51,7 @@ export function planFifoBatchDeduction(batches, { liveKg, deadKg }) {
         remainingLiveKg: normalizeStockValues(newLive, 0).live,
         remainingDeadKg: normalizeStockValues(0, newDead).dead,
         _kgTypes: b._fsKgTypes || {},
+        ...(b._updateTime ? { _updateTime: b._updateTime } : {}),
       };
       patches.push(patch);
       patchById[b.id] = patch;
