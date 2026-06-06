@@ -20,7 +20,7 @@ function decodeImageBase64(imageBase64) {
  */
 async function handleShrimpLiffSlipRequest(db, admin, body = {}) {
   const verified = await verifyLineLiffIdToken(body.idToken);
-  const lineUserId = normalizeLineUserId(verified.sub);
+  const lineUserId = normalizeLineUserId(verified.lineUserId);
   if (!lineUserId) {
     const err = new Error('invalid_id_token');
     err.code = 'invalid_id_token';
