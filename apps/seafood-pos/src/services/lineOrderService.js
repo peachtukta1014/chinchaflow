@@ -6,6 +6,7 @@ import {
   fsGetDoc,
   fsListCollection,
   fsPatch,
+  fsPatchIf,
   fsPost,
   fsQueryAllPendingLineOrders,
   fsQuerySaleByLineOrderId,
@@ -28,7 +29,11 @@ function isDeliveryLockStale(order) {
   return Number.isNaN(t) || Date.now() - t > DELIVERY_LOCK_MS;
 }
 
-/** ล็อคออเดอร์ก่อนบันทึกบิล — กันสองเครื่องส่งซ้ำ */
+/**
+ * ล็อคออเดอร์ก่อนบันทึกบิล — ใช้ optimistic lock (CAS via updateTime)
+ * ถ้า 2 เครื่องผ่าน pending check พร้อมกัน เครื่องที่สองจะได้ FAILED_PRECONDITION
+ * และ caller ต้อง reload + retry หรือแสดง error ให้ user
+ */
 export async function beginLineOrderDelivery(orderId, recordedBy) {
   const fresh = await fsGetDoc(`lineOrders/${orderId}`);
   if (!fresh) throw new Error('ไม่พบออเดอร์ LINE นี้แล้ว');
@@ -44,11 +49,18 @@ export async function beginLineOrderDelivery(orderId, recordedBy) {
   }
 
   const now = new Date().toISOString();
-  await fsPatch(`lineOrders/${orderId}`, {
-    status: 'delivering',
-    deliveringAt: now,
-    deliveringBy: recordedBy || 'พนักงาน',
-  });
+  try {
+    await fsPatchIf(
+      `lineOrders/${orderId}`,
+      { status: 'delivering', deliveringAt: now, deliveringBy: recordedBy || 'พนักงาน' },
+      { updateTime: fresh._updateTime },
+    );
+  } catch (err) {
+    if (err?.status === 400 || err?.status === 412 || /FAILED_PRECONDITION/i.test(err?.message)) {
+      throw new Error('ออเดอร์นี้ถูกอัปเดตจากเครื่องอื่น — กรุณารีเฟรชและลองใหม่');
+    }
+    throw err;
+  }
   return { fresh: { ...fresh, status: 'delivering', deliveringAt: now, deliveringBy: recordedBy }, locked: true };
 }
 
