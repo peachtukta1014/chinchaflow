@@ -1206,6 +1206,8 @@ try {
   assert(lineSvc.includes('idempotent'), 'saveLineOrderDelivery idempotent done');
   assert(lineSvc.includes('stockDeducted'), 'saveLineOrderDelivery คืน stockDeducted');
   assert(lineSvc.includes('markLineOrderStockDeducted'), 'lineOrderService mark stockDeducted');
+  assert(lineSvc.includes('fsPatchIf'), 'beginLineOrderDelivery ใช้ CAS lock (fsPatchIf)');
+  assert(lineSvc.includes('_updateTime'), 'beginLineOrderDelivery ส่ง updateTime precondition');
   const fsRest = fs.readFileSync(path.join(root, 'src/lib/firestoreRest.js'), 'utf8');
   assert(fsRest.includes('fsQueryAllPendingLineOrders'), 'query ออเดอร์ pending แบ่งหน้า');
 } catch (e) {
