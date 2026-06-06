@@ -26,6 +26,21 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-06 — กุ้ง: ลด lag ยืนยันสลิป + เจนภาพบิล (branch cursor-พี่เซอperf-bill-slip-7240)
+
+- **ปัญหา/คำขอ:** กดยืนยันสลิปคืนลูกค้าช้า · เปิดภาพบิลฟอร์มจ่ายแล้วช้า · บิลเจนช้าทำทุก save หน่วงตาม
+- **สาเหตุ:**
+  1. `confirmPaymentSlip` รอ Cloud Fn render bill + LINE push (~5-10s) ก่อน mark slip = confirmed
+  2. `BillImageSheet` โหลด 300 customers จาก Firestore 2 ครั้งแยก (image load + UID lookup)
+  3. ไม่มี cache สำหรับ `loadMergedCustomers` — ทุก open BillImageSheet โหลดซ้ำ
+- **แก้แล้ว:**
+  - `paymentSlipService`: mark slip `confirmed` ก่อน → คืน UI ทันที → push LINE ต่อในพื้นหลัง (`pushPaidBillToLineBackground`)
+  - `resolveLineUserId`: `loadMergedCustomers` มี in-flight dedup + cache 60s
+  - `BillImageSheet`: รวม 2 useEffect → resolve customer 1 ครั้ง → image + UID lookup ขนาน
+- **ไฟล์/จุดสำคัญ:** `paymentSlipService.js`, `PaymentSlipsScreen.jsx`, `resolveLineUserId.js`, `BillImageSheet.jsx`
+- **พฤติกรรมหลังแก้:** กดยืนยันสลิปกลับทันที (<2s) · เปิดภาพบิลรอแค่ Cloud Fn render · UID lookup เร็วขึ้นเพราะ cache
+- **ถ้าพังอีก ให้เช็กก่อน:** `pushPaidBillToLineBackground` log warn ใน console หาก push ล้ม (ไม่ error ผู้ใช้)
+
 ### 2026-06-06 — Hardening ความเสี่ยงทั้งหมด (PR #202–#205)
 
 - **ปัญหา/คำขอ:** code review พบ 7+ จุดเสี่ยง (Critical/High) ใน webhook + LINE + stock
