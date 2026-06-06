@@ -34,10 +34,13 @@ async function handleShrimpLiffSlipRequest(db, admin, body = {}) {
     throw err;
   }
 
+  // ใช้ idempotencyKey จาก client เป็น lineMessageId สำหรับ dedup
+  // กัน double-tap และ network retry สร้างสลิปซ้ำ
+  const idempotencyKey = String(body.idempotencyKey || '').trim().slice(0, 64) || null;
   const result = await recordPaymentSlipSubmission(db, admin, {
     lineUserId,
     buffer,
-    lineMessageId: null,
+    lineMessageId: idempotencyKey,
     source: 'liff_slip',
     billNoHint: body.billNo,
   });

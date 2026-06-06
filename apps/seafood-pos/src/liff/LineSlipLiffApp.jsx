@@ -22,6 +22,7 @@ export default function LineSlipLiffApp() {
   const billNo = useMemo(() => readBillNoFromUrl(), []);
   const inputRef = useRef(null);
   const [preview, setPreview] = useState(null);
+  const [submitKey, setSubmitKey] = useState(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +49,8 @@ export default function LineSlipLiffApp() {
     setError('');
     try {
       const dataUrl = await fileToDataUrl(file);
+      // สร้าง idempotency key ใหม่ทุกครั้งที่เลือกรูป — กัน double-tap + network retry
+      setSubmitKey(crypto.randomUUID());
       setPreview(dataUrl);
     } catch (err) {
       setError(err?.message || 'อ่านรูปไม่สำเร็จ');
@@ -67,6 +70,7 @@ export default function LineSlipLiffApp() {
         idToken: session.idToken,
         imageBase64: preview,
         billNo: billNo || undefined,
+        idempotencyKey: submitKey || undefined,
       });
       try {
         if (liff.isInClient() && result?.message) {
