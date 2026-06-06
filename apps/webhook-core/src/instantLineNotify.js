@@ -25,6 +25,10 @@ function resolveNotifyTargets(config, orderData) {
   if (orderData?.lineGroupId && notifyGroupId) {
     targets.delete(notifyGroupId);
   }
+  // ไม่ push แจ้งเตือนแอดมินกลับไปหาลูกค้าผู้สั่ง
+  // (ป้องกันกรณี UID ลูกค้าหลุดเข้า notifyUserIds โดยไม่ตั้งใจ)
+  const ordererUid = normalizeLineUserId(orderData?.lineUserId);
+  if (ordererUid) targets.delete(ordererUid);
   return targets;
 }
 
