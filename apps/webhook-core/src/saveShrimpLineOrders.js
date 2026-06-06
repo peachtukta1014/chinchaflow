@@ -19,6 +19,7 @@ async function saveLineOrders(db, admin, {
   source = 'line',
   customerId = null,
   explicitCustomerName = null,
+  explicitZone = null,
   autoLinkLineUid = true,
 }) {
   let linkedCustomerName = explicitCustomerName
@@ -63,6 +64,7 @@ async function saveLineOrders(db, admin, {
       })),
       deliveryDate,
       customerName,
+      zone: explicitZone ? String(explicitZone).trim() : null,
       status: 'pending',
       createdAt: ts,
     });

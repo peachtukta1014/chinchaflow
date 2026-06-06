@@ -138,10 +138,21 @@ const sampleOrders = [
     rawText: 'ออเดอร์ 6/6/69',
   },
 ];
-const familyOrders = formatTodayOrdersReply(sampleOrders, '2026-06-06', { familyGroup: true });
+const familyOrders = formatTodayOrdersReply(sampleOrders, '2026-06-06', {
+  familyGroup: true,
+  zoneCatalog: [
+    { id: 'c1', name: 'จ๊ะขียด', zone: 'ป่าตอง', aliases: ['เจ๊เขียด', 'เจ๊ขียด'] },
+    { id: 'c22', name: 'ร้าน โอเล่', zone: 'ราไวย์' },
+    { id: 'c26', name: 'ร้าน มุกอันดา', zone: 'ราไวย์' },
+  ],
+});
 assert(familyOrders.includes('3 ออเดอร์'), 'family orders header count');
-assert(familyOrders.includes('1 โอเล่ เล็ก2'), 'family orders line 1 compact');
-assert(familyOrders.includes('2 เจ๊เขียด เล็ก4'), 'family orders line 2 compact');
+assert(familyOrders.includes('[ป่าตอง]'), 'family orders patong zone');
+assert(familyOrders.includes('[ราไวย์]'), 'family orders rawai zone');
+assert(familyOrders.includes('เจ๊เขียด เล็ก4'), 'family orders patong line');
+assert(familyOrders.includes('โอเล่ เล็ก2'), 'family orders rawai line 1');
+assert(familyOrders.includes('มุกอันดา เล็ก2'), 'family orders rawai line 2');
+assert(!familyOrders.includes('1 โอเล่'), 'family orders no global numbering');
 assert(familyOrders.includes('— เล็ก 8 กก —'), 'family orders total kg');
 assert(!familyOrders.includes('「'), 'family orders no rawText block');
 assert(!familyOrders.includes('จากออเดอร์ LINE'), 'family orders no footer');
