@@ -1,7 +1,14 @@
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../firebase';
 import { dateKeyBangkok } from '../lib/date';
-import { fsPatch, fsPost, fsSetStockDoc, fsAtomicStockBatchCommit } from '../lib/firestoreRest';
+import {
+  fsPatch,
+  fsPost,
+  fsSetStockDoc,
+  fsAtomicStockBatchCommit,
+  fsQueryStockBatches,
+} from '../lib/firestoreRest';
+import { isFirestoreConflictError } from '../lib/stockCommitConflict';
 import { STOCK_LINE } from '../constants/stockLines';
 import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
 import {
@@ -25,11 +32,37 @@ function withTimeout(promise, ms = 10000) {
   ]);
 }
 
-/** ตัดคงเหลือทีละรายการในล็อต (วันเก่า → รายการเก่า) */
+const STOCK_DEDUCT_MAX_RETRIES = 3;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function batchPatchMeta(batch) {
+  return {
+    _kgTypes: batch._fsKgTypes || {},
+    ...(batch._updateTime ? { _updateTime: batch._updateTime } : {}),
+  };
+}
+
+/** ตัดคงเหลือทีละรายการในล็อต (วันเก่า → รายการเก่า) — retry เมื่อ conflict */
 export async function deductFifoFromBatches(batches, { liveKg, deadKg }) {
-  const { patches } = planFifoBatchDeduction(batches, { liveKg, deadKg });
-  await fsAtomicStockBatchCommit(patches);
-  return patches;
+  let attempt = 0;
+  while (true) {
+    const source = attempt === 0 ? batches : await fsQueryStockBatches();
+    const { patches } = planFifoBatchDeduction(source, { liveKg, deadKg });
+    try {
+      await fsAtomicStockBatchCommit(patches);
+      return patches;
+    } catch (err) {
+      if (attempt < STOCK_DEDUCT_MAX_RETRIES - 1 && isFirestoreConflictError(err)) {
+        attempt += 1;
+        await sleep(80 * attempt);
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /** กุ้งตายในบ่อ — ย้ายจากเป็น→ตายในล็อตเดียวกัน (FIFO วันเก่าก่อน) */
@@ -48,7 +81,7 @@ export async function transferLiveToDeadInBatches(batches, transferKg) {
       remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
       remainingDeadKg: normalizeStockValues(0, remDead + take).dead,
     };
-    patches.push({ id: b.id, ...next, _kgTypes: b._fsKgTypes || {} });
+    patches.push({ id: b.id, ...next, ...batchPatchMeta(b) });
     allocations.push({
       batchId: b.id,
       receiveDateKey: receiveDateKeyOf(b),
@@ -83,7 +116,7 @@ export async function deductSpoilageFromBatches(batches, lossKg) {
       id: b.id,
       remainingLiveKg: normalizeStockValues(remLive - take, 0).live,
       remainingDeadKg: remDead,
-      _kgTypes: b._fsKgTypes || {},
+      ...batchPatchMeta(b),
     });
     allocations.push({
       batchId: b.id,
@@ -135,7 +168,7 @@ async function deductDeadSpoilageFromBatches(batches, lossKg) {
       id: b.id,
       remainingLiveKg: remLive,
       remainingDeadKg: normalizeStockValues(0, remDead - take).dead,
-      _kgTypes: b._fsKgTypes || {},
+      ...batchPatchMeta(b),
     });
     allocations.push({
       batchId: b.id,
