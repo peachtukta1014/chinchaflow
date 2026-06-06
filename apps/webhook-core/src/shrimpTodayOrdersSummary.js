@@ -117,6 +117,40 @@ function formatItemsLines(items) {
     .join('\n');
 }
 
+function shortenProductLabel(product) {
+  return String(product || '—')
+    .replace(/^กุ้ง/, '')
+    .trim();
+}
+
+function formatOrderCompactLine(o) {
+  const items = o.items || [];
+  if (items.length === 0) {
+    return o.customerName || String(o.rawText || '—').slice(0, 36);
+  }
+  return items
+    .map((it) => {
+      const who = it.customerName ? `${it.customerName} ` : '';
+      const prod = shortenProductLabel(it.product);
+      const qty = it.qty ?? '';
+      return `${who}${prod}${qty}`.trim();
+    })
+    .join(' · ');
+}
+
+function formatProductTotalsCompact(orders) {
+  const totals = {};
+  for (const o of orders) {
+    for (const it of o.items || []) {
+      const key = shortenProductLabel(it.product);
+      totals[key] = (totals[key] || 0) + (parseFloat(it.qty) || 0);
+    }
+  }
+  return Object.entries(totals)
+    .map(([product, qty]) => `${product} ${qty}`)
+    .join(' · ');
+}
+
 function aggregateByProduct(orders) {
   const totals = {};
   for (const o of orders) {
@@ -150,7 +184,7 @@ function enrichOrdersWithLinkedCustomers(orders, uidMap) {
   });
 }
 
-async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK()) {
+async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK(), { familyGroup = false } = {}) {
   const uidMap = await buildCustomerNameByLineUidMap(db);
   let snap;
   try {
@@ -170,17 +204,20 @@ async function buildShrimpTodayOrdersSummary(db, dateKey = todayBKK()) {
         .sort((a, b) => String(a.deliveryDate).localeCompare(String(b.deliveryDate))),
       uidMap,
     );
-    return formatTodayOrdersReply(docs, dateKey);
+    return formatTodayOrdersReply(docs, dateKey, { familyGroup });
   }
 
   const orders = enrichOrdersWithLinkedCustomers(
     snap.docs.map((d) => ({ id: d.id, ...d.data() })),
     uidMap,
   );
-  return formatTodayOrdersReply(orders, dateKey);
+  return formatTodayOrdersReply(orders, dateKey, { familyGroup });
 }
 
-function formatTodayOrdersReply(orders, dateKey) {
+function formatTodayOrdersReply(orders, dateKey, { familyGroup = false } = {}) {
+  if (familyGroup) {
+    return formatTodayOrdersReplyFamily(orders, dateKey);
+  }
   const overdue = orders.filter((o) => (o.deliveryDate || '') < dateKey);
   const dueToday = orders.filter((o) => (o.deliveryDate || '') === dateKey);
 
@@ -227,8 +264,33 @@ function formatTodayOrdersReply(orders, dateKey) {
   return lines.join('\n');
 }
 
+function formatTodayOrdersReplyFamily(orders, dateKey) {
+  const overdue = orders.filter((o) => (o.deliveryDate || '') < dateKey);
+
+  if (orders.length === 0) {
+    return `📦 ${formatDateThai(dateKey)}\nยังไม่มีออเดอร์รอส่งวันนี้`;
+  }
+
+  const headerParts = [`📦 ${orders.length} ออเดอร์`, formatDateThai(dateKey)];
+  if (overdue.length > 0) headerParts.push(`⚠️ค้าง ${overdue.length}`);
+  const lines = [headerParts.join(' · ')];
+
+  orders.forEach((o, idx) => {
+    const late = (o.deliveryDate || '') < dateKey;
+    const lateNote = late ? ' ⚠️' : '';
+    lines.push(`${idx + 1} ${formatOrderCompactLine(o)}${lateNote}`);
+  });
+
+  const totals = formatProductTotalsCompact(orders);
+  if (totals) lines.push(`— ${totals} กก —`);
+
+  return lines.join('\n');
+}
+
 module.exports = {
   buildShrimpTodayOrdersSummary,
+  formatTodayOrdersReply,
+  formatOrderCompactLine,
   isShrimpTodayOrdersCommand,
   cancelLatestPendingOrderForUser,
 };

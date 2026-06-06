@@ -75,6 +75,9 @@ function formatGradeKgLines(s, { familyGroup = false } = {}) {
 
 function buildShrimpSummaryMessage(s, dateKey, { familyGroup = false } = {}) {
   if (s.billCount === 0) {
+    if (familyGroup) {
+      return `📊 ${dateKey}\nยังไม่มีบิลวันนี้`;
+    }
     return [
       '📊 สรุปยอดขายวันนี้ — โกอ้วน คลังซีฟู้ด',
       `📅 ${dateKey}`,
@@ -82,6 +85,17 @@ function buildShrimpSummaryMessage(s, dateKey, { familyGroup = false } = {}) {
       'ยังไม่มีบิลขายวันนี้ในระบบ',
       'บันทึกขายในแอปแท็บ "ขายของ"',
     ].join('\n');
+  }
+
+  if (familyGroup) {
+    const lines = [
+      `📊 ${dateKey} · ${formatMoney(s.revenueTotal)} · ${s.billCount} บิล`,
+      ...formatGradeKgLines(s, { familyGroup }),
+    ];
+    if (s.deadKg > 0) {
+      lines.push(`ตาย ${s.deadKg.toFixed(1)}KG (${formatMoney(s.deadRevenue)})`);
+    }
+    return lines.join('\n');
   }
 
   const lines = [
