@@ -68,7 +68,8 @@ function db() {
 
 // ── LINE signature verification ───────────────────────────────────────────────
 function verifySignature(rawBody, signature, secret) {
-  if (!secret) return true;
+  // fail-closed: ถ้าไม่มี secret แสดงว่า misconfigure → ปฏิเสธทันที
+  if (!secret) return false;
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
   return hash === signature;
 }
