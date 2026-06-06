@@ -1,7 +1,7 @@
 /**
  * ปิดล็อตกุ้ง — บันทึก P&L สุดท้าย + ยกยอดคงเหลือไปล็อตถัดไป
  *
- * flow:
+ * flow (atomic :commit เดียว):
  *  1. zeroes remaining kg on source lot batches
  *  2. creates a carry-forward batch in target lot (same avg cost)
  *  3. logs stockAdjustments type=lot_carry_forward
@@ -9,17 +9,23 @@
  */
 import { dateKeyBangkok } from '../lib/date';
 import {
-  fsPatch,
-  fsPost,
-  fsSetDoc,
+  fsCommitWrites,
+  fsDocName,
   fsGetDoc,
+  fsObj,
+  fsObjStockFields,
   fsRunQuery,
 } from '../lib/firestoreRest';
 import { batchesForLot } from '../lib/lotReport';
-import { receiveDateKeyOf, sortBatchesFifoOrder } from '../lib/stockBatchUtils';
+import { receiveDateKeyOf } from '../lib/stockBatchUtils';
 
 function kg(n) {
   return Math.max(0, parseFloat(n) || 0);
+}
+
+function newDocId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}${Math.random().toString(36).slice(2, 11)}`;
 }
 
 /**
@@ -44,38 +50,8 @@ export async function closeLotAndCarryForward({
   const carryLive = sourceBatches.reduce((s, b) => s + kg(b.remainingLiveKg ?? b.liveKg), 0);
   const carryDead = sourceBatches.reduce((s, b) => s + kg(b.remainingDeadKg ?? b.deadKg), 0);
   const hasCarry = carryLive > 0.001 || carryDead > 0.001;
+  const closedAt = new Date().toISOString();
 
-  // 1. zero out source batches
-  await Promise.all(
-    sourceBatches.map((b) =>
-      fsPatch(`stockBatches/${b.id}`, {
-        remainingLiveKg: 0,
-        remainingDeadKg: 0,
-      }),
-    ),
-  );
-
-  // 2. create carry-forward batch in target lot
-  if (hasCarry && targetLotDateKey) {
-    const avgCost = report.avgCostPerKg || 0;
-    await fsPost('stockBatches', {
-      receiveDateKey: targetLotDateKey,
-      purchaseDate: new Date().toISOString(),
-      liveKg: carryLive,
-      deadKg: carryDead,
-      remainingLiveKg: carryLive,
-      remainingDeadKg: carryDead,
-      costPerKg: avgCost,
-      transport: 0,
-      totalCost: Math.round((carryLive + carryDead) * avgCost * 100) / 100,
-      effectiveCostPerKg: avgCost,
-      note: `ยกยอดจากล็อต ${lotDateKey}`,
-      isCarryForward: true,
-      sourceReceiveDateKey: lotDateKey,
-    });
-  }
-
-  // 3. log adjustment
   const allocations = sourceBatches.map((b) => ({
     batchId: b.id,
     receiveDateKey: receiveDateKeyOf(b),
@@ -84,50 +60,99 @@ export async function closeLotAndCarryForward({
     deadTaken: kg(b.remainingDeadKg ?? b.deadKg),
   }));
 
-  await fsPost('stockAdjustments', {
-    type: 'lot_carry_forward',
-    dateKey: dateKeyBangkok(),
-    sourceLotDateKey: lotDateKey,
-    targetLotDateKey: targetLotDateKey || null,
-    carryLiveKg: carryLive,
-    carryDeadKg: carryDead,
-    weightKg: carryLive + carryDead,
-    note: `ปิดล็อต ${lotDateKey}${targetLotDateKey ? ` → ยกไป ${targetLotDateKey}` : ''}`,
-    recordedBy: closedBy,
-    allocations,
-    createdAt: new Date().toISOString(),
+  const writes = sourceBatches.map((b) => ({
+    update: {
+      name: fsDocName('stockBatches', b.id),
+      fields: fsObjStockFields({
+        remainingLiveKg: 0,
+        remainingDeadKg: 0,
+        _fsKgTypes: b._fsKgTypes || b._kgTypes,
+      }),
+    },
+    updateMask: { fieldPaths: ['remainingLiveKg', 'remainingDeadKg'] },
+  }));
+
+  if (hasCarry && targetLotDateKey) {
+    const avgCost = report.avgCostPerKg || 0;
+    writes.push({
+      update: {
+        name: fsDocName('stockBatches', newDocId()),
+        fields: fsObjStockFields({
+          receiveDateKey: targetLotDateKey,
+          purchaseDate: closedAt,
+          liveKg: carryLive,
+          deadKg: carryDead,
+          remainingLiveKg: carryLive,
+          remainingDeadKg: carryDead,
+          costPerKg: avgCost,
+          transport: 0,
+          totalCost: Math.round((carryLive + carryDead) * avgCost * 100) / 100,
+          effectiveCostPerKg: avgCost,
+          note: `ยกยอดจากล็อต ${lotDateKey}`,
+          isCarryForward: true,
+          sourceReceiveDateKey: lotDateKey,
+        }),
+      },
+      currentDocument: { exists: false },
+    });
+  }
+
+  writes.push({
+    update: {
+      name: fsDocName('stockAdjustments', newDocId()),
+      fields: fsObj({
+        type: 'lot_carry_forward',
+        dateKey: dateKeyBangkok(),
+        sourceLotDateKey: lotDateKey,
+        targetLotDateKey: targetLotDateKey || null,
+        carryLiveKg: carryLive,
+        carryDeadKg: carryDead,
+        weightKg: carryLive + carryDead,
+        note: `ปิดล็อต ${lotDateKey}${targetLotDateKey ? ` → ยกไป ${targetLotDateKey}` : ''}`,
+        recordedBy: closedBy,
+        allocations,
+        createdAt: closedAt,
+      }),
+    },
+    currentDocument: { exists: false },
   });
 
-  // 4. save P&L snapshot
-  await fsSetDoc(`lotSummaries/${lotDateKey}`, {
-    lotDateKey,
-    closedAt: new Date().toISOString(),
-    closedBy,
-    status: 'closed',
-    receivedLive: report.receivedLive,
-    receivedDead: report.receivedDead,
-    receivedTotalKg: report.receivedTotalKg,
-    totalCost: report.totalCost,
-    avgCostPerKg: report.avgCostPerKg,
-    soldLiveKg: report.soldLiveKg,
-    soldDeadKg: report.soldDeadKg,
-    soldTotalKg: report.soldTotalKg,
-    revenue: report.revenue,
-    cogsSold: report.cogsSold,
-    grossProfit: report.grossProfit,
-    marketExpensesBaht: report.marketExpensesBaht,
-    pondExpensesBaht: report.pondExpensesBaht,
-    miscExpensesBaht: report.miscExpensesBaht,
-    shrinkageKg: report.shrinkageKg,
-    shrinkageBaht: report.shrinkageBaht,
-    netLotProfit: report.netLotProfit,
-    liveLineNetBaht: report.liveLineNetBaht,
-    deadLineNetBaht: report.deadLineNetBaht,
-    carryLiveKg: carryLive,
-    carryDeadKg: carryDead,
-    targetLotDateKey: hasCarry && targetLotDateKey ? targetLotDateKey : null,
+  writes.push({
+    update: {
+      name: fsDocName('lotSummaries', lotDateKey),
+      fields: fsObj({
+        lotDateKey,
+        closedAt,
+        closedBy,
+        status: 'closed',
+        receivedLive: report.receivedLive,
+        receivedDead: report.receivedDead,
+        receivedTotalKg: report.receivedTotalKg,
+        totalCost: report.totalCost,
+        avgCostPerKg: report.avgCostPerKg,
+        soldLiveKg: report.soldLiveKg,
+        soldDeadKg: report.soldDeadKg,
+        soldTotalKg: report.soldTotalKg,
+        revenue: report.revenue,
+        cogsSold: report.cogsSold,
+        grossProfit: report.grossProfit,
+        marketExpensesBaht: report.marketExpensesBaht,
+        pondExpensesBaht: report.pondExpensesBaht,
+        miscExpensesBaht: report.miscExpensesBaht,
+        shrinkageKg: report.shrinkageKg,
+        shrinkageBaht: report.shrinkageBaht,
+        netLotProfit: report.netLotProfit,
+        liveLineNetBaht: report.liveLineNetBaht,
+        deadLineNetBaht: report.deadLineNetBaht,
+        carryLiveKg: carryLive,
+        carryDeadKg: carryDead,
+        targetLotDateKey: hasCarry && targetLotDateKey ? targetLotDateKey : null,
+      }),
+    },
+    currentDocument: { exists: false },
   });
 
+  await fsCommitWrites(writes);
   return { carryLive, carryDead };
 }
 

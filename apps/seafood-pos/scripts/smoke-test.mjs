@@ -971,6 +971,11 @@ try {
   const lotCloseSrc = fs.readFileSync(path.join(root, 'src/screens/LotCloseScreen.jsx'), 'utf8');
   assert(lotCloseSrc.includes("setSection('overview')"), 'LotCloseScreen มีแท็บภาพรวม');
   assert(lotCloseSrc.includes('LotPortfolioPanel'), 'LotCloseScreen โหลด LotPortfolioPanel');
+  const lotSvc = fs.readFileSync(path.join(root, 'src/services/lotCloseService.js'), 'utf8');
+  assert(lotSvc.includes('fsCommitWrites'), 'ปิดล็อตใช้ batch commit เดียว');
+  assert(lotSvc.includes('currentDocument: { exists: false }'), 'ปิดล็อตสร้าง doc ใหม่ใน commit');
+  assert(!lotSvc.includes('fsPatch('), 'ปิดล็อตไม่แยก fsPatch');
+  assert(!lotSvc.includes('fsPost('), 'ปิดล็อตไม่แยก fsPost');
 } catch (e) {
   fail('lotPortfolioStats', e);
 }
