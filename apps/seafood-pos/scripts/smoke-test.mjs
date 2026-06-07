@@ -896,12 +896,14 @@ try {
   assert(canAccessShrimpMainTab(staffMember, 'orders'), 'staff เข้า LINE');
   assert(!canAccessShrimpMainTab(staffMember, 'sales'), 'staff ไม่เข้ายอดขาย');
   assert(canAccessShrimpOverlay(staffMember, 'members'), 'staff ดูลูกค้า');
+  assert(canAccessShrimpOverlay(staffMember, 'my-profile'), 'staff แก้โปรไฟล์ตัวเองได้');
   assert(!canAccessShrimpOverlay(staffMember, 'stock'), 'staff ไม่เข้าคลัง');
   assert(getDefaultMainTabForMember(staffMember) === 'orders', 'staff default tab = LINE');
   assert(getNextShrimpRole('admin') === 'manager', 'cycle role admin→manager');
   assert(getNextShrimpRole('manager') === 'staff', 'cycle role manager→staff');
   assert(getNextShrimpRole('staff') === 'admin', 'cycle role staff→admin');
   const managerMember = { role: 'manager', email: 'mgr@example.com' };
+  assert(canAccessShrimpOverlay(managerMember, 'my-profile'), 'manager แก้โปรไฟล์ตัวเองได้');
   assert(canSeeShrimpLiveStockBar(managerMember), 'manager เห็นแถบสต๊อก');
   assert(!canSeeShrimpLiveStockBar(staffMember), 'staff ไม่เห็นแถบสต๊อก');
   const adminMember = { role: 'admin', email: 'a@b.com' };
@@ -920,6 +922,15 @@ try {
   assert(appSrc.includes('readOnly={!isAdmin}'), 'ลูกค้า read-only ยกเว้นแอดมิน');
   assert(appSrc.includes('fetchPendingPaymentSlips'), 'App โพลสลิปรอตรวจเพื่อแจ้งเตือน');
   assert(appSrc.includes('AdminAlertsBanner'), 'แอดมินเห็นแจ้งเตือนขอลบบิล');
+  assert(appSrc.includes('MyProfileScreen'), 'App มีหน้าโปรไฟล์สมาชิก');
+  assert(appSrc.includes('MemberAvatar'), 'App header แสดงรูปโปรไฟล์');
+  const profileSvc = fs.readFileSync(path.join(root, 'src/services/shrimpProfileService.js'), 'utf8');
+  assert(profileSvc.includes('changeShrimpMemberPassword'), 'shrimpProfileService เปลี่ยนรหัสผ่านได้');
+  assert(profileSvc.includes('uploadShrimpMemberPhoto'), 'shrimpProfileService อัปโหลดรูปได้');
+  const storageRules = fs.readFileSync(path.join(root, '../../storage.rules'), 'utf8');
+  assert(storageRules.includes('shrimpAvatars'), 'storage rules รองรับรูปโปรไฟล์กุ้ง');
+  const fsRules = fs.readFileSync(path.join(root, '../../firestore.rules'), 'utf8');
+  assert(fsRules.includes('request.resource.data.email == resource.data.email'), 'สมาชิกแก้ email เองไม่ได้');
   if (/\buseMemo\s*\(/.test(appSrc)) {
     assert(
       /import\s+React,\s*\{[^}]*\buseMemo\b/.test(appSrc),

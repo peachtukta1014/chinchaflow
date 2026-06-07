@@ -3,6 +3,7 @@ import { auth } from '../firebase';
 import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
 import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import { saveMemberLineUserId } from '../services/shrimpMemberLineService';
+import MemberAvatar from '../components/MemberAvatar';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
 import { getNextShrimpRole, getShrimpRoleLabel } from '../lib/shrimpRoles';
 
@@ -132,13 +133,25 @@ export default function AdminUsersScreen() {
         const deleting = busyId === u.id;
         return (
           <div key={u.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-            <div className="flex justify-between items-start mb-3">
-              <div className="min-w-0 flex-1">
+            <div className="flex justify-between items-start mb-3 gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <MemberAvatar
+                  name={u.name}
+                  email={u.email}
+                  photoUrl={u.photoUrl}
+                  size="sm"
+                  className="border-slate-200"
+                />
+                <div className="min-w-0">
                 <p className="font-bold text-slate-800 truncate">{u.name || '—'}</p>
                 <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                {u.phone && (
+                  <p className="text-[10px] text-slate-500 truncate">โทร {u.phone}</p>
+                )}
                 {isSelf && (
                   <p className="text-[10px] text-cyan-600 font-bold mt-0.5">บัญชีที่ล็อกอินอยู่</p>
                 )}
+                </div>
               </div>
               <div className="flex items-center gap-1 ml-2 shrink-0">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${

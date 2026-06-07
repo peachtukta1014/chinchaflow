@@ -26,6 +26,19 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-07 — กุ้ง: โปรไฟล์สมาชิก (รูป / ชื่อ / เบอร์ / รหัสผ่าน)
+
+- **ปัญหา/คำขอ:** สมาชิกอยากมีรูปโปรไฟล์ข้างชื่อ · แก้ชื่อเล่น เบอร์โทร · เปลี่ยนรหัสผ่านเอง (ไม่เปลี่ยนอีเมล)
+- **แก้แล้ว:**
+  - หน้า `MyProfileScreen` — ทุก role เข้าได้ (แตะรูป/ชื่อใน header)
+  - อัปโหลดรูป → Storage `shrimpAvatars/{uid}.jpg` + `shrimp_users.photoUrl`
+  - แก้ `name` / `phone` ใน Firestore · เปลี่ยนรหัสผ่านผ่าน Firebase Auth (ต้องใส่รหัสเดิม)
+  - `MemberAvatar` ใน header + รายชื่อสมาชิกแอป
+  - กฎ: สมาชิกแก้ doc ตัวเองได้แต่ห้ามเปลี่ยน `email` / `role` / `approved`
+- **ไฟล์/จุดสำคัญ:** `MyProfileScreen.jsx`, `shrimpProfileService.js`, `MemberAvatar.jsx`, `storage.rules`, `firestore.rules`
+- **พฤติกรรมหลังแก้:** แตะชื่อมุมซ้ายบน → โปรไฟล์ · อีเมลอ่านอย่างเดียว
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy **hosting + storage rules + firestore rules** · รูปไม่ขึ้น = เช็ก Storage permission
+
 ### 2026-06-07 — กุ้ง: pre-render บิล + เร่ง LIFF สลิป (branch cursor-พี่เซอperf-slip-prerender-f8e2)
 
 - **ปัญหา/คำขอ:** ส่งบิล LINE ช้า (render ตอน push) · LIFF ฝากสลิปช้า · กลัวแจ้งเตือนสลิปหลุดไปลูกค้าเหมือนรอบ #202
