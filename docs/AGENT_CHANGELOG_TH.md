@@ -26,6 +26,18 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-07 — กุ้ง: ล้างออเดอร์ LINE เก่า (เก็บ 300 รายการ)
+
+- **ปัญหา/คำขอ:** ออเดอร์ LINE ปิดสะสมใน Firestore · อยากลบเก่าออกจากคลังข้อมูล (ยอดขาย/รายปีไม่กระทบ)
+- **แก้แล้ว:**
+  - นโยบาย: เก็บออเดอร์ปิด (done/cancelled) ล่าสุด **300** รายการ · ไม่แตะ pending/delivering
+  - done ลบได้เฉพาะที่มี `salesId` หรือ `billNo` · cancelled ลบได้
+  - แอดมิน: แท็บสมาชิก → panel「ล้างออเดอร์ LINE เก่า」เช็กจำนวน + ลบ
+  - CLI: `node scripts/shrimp-line-orders-prune.mjs --dry-run` / `--confirm`
+- **ไฟล์/จุดสำคัญ:** `lineOrderRetention.js`, `lineOrderRetentionService.js`, `LineOrderRetentionPanel.jsx`, `scripts/shrimp-line-orders-prune.mjs`
+- **พฤติกรรมหลังแก้:** บอร์ดออเดอร์รอส่งยังเหมือนเดิม · บิลใน `sales` ไม่ถูกลบ · รายปี/Lot ไม่กระทบ
+- **ถ้าพังอีก ให้เช็กก่อน:** ต้อง login เป็น **admin** กุ้ง (firestore rules delete lineOrders) · CLI ต้อง `gcloud auth application-default login`
+
 ### 2026-06-07 — กุ้ง: โปรไฟล์สมาชิก (รูป / ชื่อ / เบอร์ / รหัสผ่าน)
 
 - **ปัญหา/คำขอ:** สมาชิกอยากมีรูปโปรไฟล์ข้างชื่อ · แก้ชื่อเล่น เบอร์โทร · เปลี่ยนรหัสผ่านเอง (ไม่เปลี่ยนอีเมล)

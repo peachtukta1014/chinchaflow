@@ -1238,6 +1238,32 @@ try {
   fail('LINE delivery hardening', e);
 }
 
+try {
+  const {
+    LINE_ORDER_RETENTION_KEEP,
+    isLineOrderSafeToDelete,
+    selectLineOrdersToPrune,
+  } = await import('../src/lib/lineOrderRetention.js');
+  assert(LINE_ORDER_RETENTION_KEEP === 300, 'LINE_ORDER_RETENTION_KEEP = 300');
+  const orders = [
+    { id: 'a', status: 'pending' },
+    { id: 'b', status: 'delivering' },
+    { id: 'c', status: 'done', salesId: 's1', completedAt: '2026-06-01T00:00:00.000Z' },
+    { id: 'd', status: 'cancelled', cancelledAt: '2026-06-02T00:00:00.000Z' },
+    { id: 'e', status: 'done', billNo: 'LINE-123', completedAt: '2026-05-01T00:00:00.000Z' },
+    { id: 'f', status: 'done', completedAt: '2026-04-01T00:00:00.000Z' },
+  ];
+  assert(!isLineOrderSafeToDelete(orders[0]), 'pending ไม่ลบ');
+  assert(!isLineOrderSafeToDelete(orders[5]), 'done ไม่มีบิล ไม่ลบ');
+  assert(isLineOrderSafeToDelete(orders[4]), 'done มี billNo ลบได้');
+  const pruned = selectLineOrdersToPrune(orders, 2);
+  assert(pruned.activeCount === 2, 'retention นับ active');
+  assert(pruned.deleteCandidates.length === 1, 'retention ลบเกินโควต้า');
+  assert(pruned.deleteCandidates[0].id === 'e', 'retention ลบเก่าสุดในโควต้าเกิน');
+} catch (e) {
+  fail('lineOrderRetention', e);
+}
+
 const assetsDir = path.join(root, 'public/bill-assets');
 for (const f of ['line-oa-qr.png']) {
   const p = path.join(assetsDir, f);
