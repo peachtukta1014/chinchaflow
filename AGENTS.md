@@ -168,3 +168,5 @@ Requires live Firebase + approved user in Firestore (`users/{uid}` with `approve
 - Restart Vite after changing `.env.local` (env is read at dev-server startup).
 - `npm install` at repo root installs all workspaces including `webhook-core` (large `firebase-functions` tree).
 - LINE push / webhook E2E needs deployed functions in `asia-southeast1`, not local `npm start` in `webhook-core`.
+- **Dashboard secret names must not contain spaces.** If env shows names like `VITE_FIREBASE_AUT H_DOMAIN` (value = next key name), re-save secrets in cursor.com → Dashboard with exact names from the table above, then start a new session. Until fixed, materialize `.env.local` from GitHub Actions secrets or production Hosting bundles (public client config).
+- **Both dev servers on 5173:** `dev:seafood` binds `0.0.0.0:5173` (IPv4); `dev:tea` may bind `::1:5173` (IPv6 only). Use `http://127.0.0.1:5173` for กุ้ง and `http://localhost:5173` (or `[::1]:5173`) for ชา — or stop one server and use the next free port.
