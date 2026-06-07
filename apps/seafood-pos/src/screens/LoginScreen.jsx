@@ -4,6 +4,7 @@ import { auth, isFirebaseReady } from '../firebase';
 import { getShrimpSignupRole, isBootstrapAdminEmail } from '../constants';
 import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
 import { FS_BASE, fsPatch, fsSetShrimpUser } from '../lib/firestoreRest';
+import { buildShrimpMember } from '../lib/shrimpMember';
 
 export default function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('');
@@ -31,7 +32,7 @@ export default function LoginScreen({ onLogin }) {
           approved: true,
           createdAt: new Date().toISOString(),
         });
-        onLogin({ uid: user.uid, name: name.trim(), email: em, role });
+        onLogin(buildShrimpMember(user.uid, { name: name.trim(), email: em, role }, em));
       } else {
         const em = email.trim().toLowerCase();
         const { user } = await signInWithEmailAndPassword(auth, em, password);
@@ -48,11 +49,23 @@ export default function LoginScreen({ onLogin }) {
         const isBootstrap = isBootstrapAdminEmail(em);
         if (isBootstrap && !approved) {
           await fsPatch(`shrimp_users/${user.uid}`, { role: 'admin', approved: true });
-          onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role: 'admin' });
+          onLogin(buildShrimpMember(user.uid, {
+            name: f.name?.stringValue,
+            email: em,
+            role: 'admin',
+            phone: f.phone?.stringValue,
+            photoUrl: f.photoUrl?.stringValue,
+          }, em));
           return;
         }
         if (!approved) { await signOut(auth); setMode('pending'); return; }
-        onLogin({ uid: user.uid, name: f.name?.stringValue || 'สมาชิก', email: em, role });
+        onLogin(buildShrimpMember(user.uid, {
+          name: f.name?.stringValue,
+          email: em,
+          role,
+          phone: f.phone?.stringValue,
+          photoUrl: f.photoUrl?.stringValue,
+        }, em));
       }
     } catch (e) {
       const c = e.code || '';

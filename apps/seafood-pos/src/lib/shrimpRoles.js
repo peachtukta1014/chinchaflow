@@ -55,7 +55,10 @@ export function canRequestShrimpSaleDelete(member) {
 export const STAFF_MAIN_TABS = ['pos', 'orders'];
 
 /** หน้าทับที่สตาฟเข้าได้ (ดูที่อยู่/เบอร์ลูกค้า) */
-export const STAFF_OVERLAY_TABS = ['members'];
+export const STAFF_OVERLAY_TABS = ['members', 'my-profile'];
+
+/** ทุกคนแก้โปรไฟล์ตัวเองได้ */
+export const MEMBER_PROFILE_TAB = 'my-profile';
 
 export function canAccessShrimpMainTab(member, tabId) {
   if (!member) return false;
@@ -65,6 +68,7 @@ export function canAccessShrimpMainTab(member, tabId) {
 
 export function canAccessShrimpOverlay(member, tabId) {
   if (!member) return false;
+  if (tabId === MEMBER_PROFILE_TAB) return true;
   if (isShrimpAdmin(member)) return true;
   if (isShrimpStaff(member)) return STAFF_OVERLAY_TABS.includes(tabId);
   return tabId !== 'admin-users' && tabId !== 'admin-products' && tabId !== 'lot-close';

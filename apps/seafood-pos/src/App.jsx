@@ -29,6 +29,7 @@ import { getAppBuildLabel } from './lib/appBuildInfo';
 import { FIREBASE_PROJECT_ID } from './lib/viteEnv.js';
 import { useIntervalWhen } from './lib/useIntervalWhen';
 import NavButton from './components/NavButton';
+import MemberAvatar from './components/MemberAvatar';
 import AppHeaderMenu from './components/AppHeaderMenu';
 import HeaderQuickLinks from './components/HeaderQuickLinks';
 import LineTabIcon from './components/LineTabIcon';
@@ -44,7 +45,7 @@ import { stockLineFull } from './constants/stockLines';
 import { isNetworkOnline, subscribeNetworkStatus } from './lib/networkStatus';
 import { refreshPendingSummary, syncPendingSales } from './lib/offlineSaleQueue';
 import { syncLineDeliveryWindowFromFirestore } from './lib/syncLineDeliveryWindow';
-import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
+import { CreditsStrip } from '@chincha/app-credits';
 
 const SalesHubScreen = lazy(() => import('./screens/SalesHubScreen'));
 const InventoryScreen = lazy(() => import('./screens/InventoryScreen'));
@@ -54,12 +55,14 @@ const AdminUsersScreen = lazy(() => import('./screens/AdminUsersScreen'));
 const ProductSettingsScreen = lazy(() => import('./screens/ProductSettingsScreen'));
 const LotCloseScreen = lazy(() => import('./screens/LotCloseScreen'));
 const ExpensesScreen = lazy(() => import('./screens/ExpensesScreen'));
+const MyProfileScreen = lazy(() => import('./screens/MyProfileScreen'));
 
 const MAIN_TABS = new Set(['pos', 'sales', 'orders', 'expenses']);
 
 const OVERLAY_TITLES = {
   stock: 'รับเข้า / คลัง',
   members: 'รายชื่อลูกค้า',
+  'my-profile': 'โปรไฟล์ของฉัน',
   'admin-users': 'สมาชิกแอป',
   'admin-products': 'ตั้งค่าราคากุ้ง',
   'lot-close': 'สรุป / ชั่งปิดล็อต',
@@ -350,6 +353,10 @@ export default function App() {
     bumpSalesAndStock();
   }, [bumpSalesAndStock]);
 
+  const onProfileUpdated = useCallback((next) => {
+    setMember((prev) => (prev ? { ...prev, ...next } : prev));
+  }, []);
+
   if (member === undefined) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -393,8 +400,18 @@ export default function App() {
           </div>
         ) : (
           <div className="px-4 pt-6 pb-3 flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <img src="/logo.jpg" alt="KOSEAFOOD" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
+            <button
+              type="button"
+              onClick={() => openOverlay('my-profile')}
+              className="flex items-center gap-3 min-w-0 text-left active:opacity-80"
+              title="โปรไฟล์ของฉัน"
+            >
+              <MemberAvatar
+                name={member.name}
+                email={member.email}
+                photoUrl={member.photoUrl}
+                size="md"
+              />
               <div className="min-w-0">
                 <p className="text-sm font-black text-white leading-none">โกอ้วน คลังซีฟู้ด</p>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
@@ -410,7 +427,7 @@ export default function App() {
                   </p>
                 )}
               </div>
-            </div>
+            </button>
             <div className="flex items-center gap-2 shrink-0">
               <AppHeaderMenu
                 isAdmin={isAdmin}
@@ -536,6 +553,12 @@ export default function App() {
         {activeTab === 'members' && canAccessShrimpOverlay(member, 'members') && (
           <Suspense fallback={<TabLoading />}>
             <MembersScreen isAdmin={isAdmin} readOnly={!isAdmin} />
+          </Suspense>
+        )}
+
+        {activeTab === 'my-profile' && canAccessShrimpOverlay(member, 'my-profile') && (
+          <Suspense fallback={<TabLoading />}>
+            <MyProfileScreen member={member} onProfileUpdated={onProfileUpdated} />
           </Suspense>
         )}
 

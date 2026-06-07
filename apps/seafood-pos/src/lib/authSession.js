@@ -2,6 +2,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { isBootstrapAdminEmail } from '../constants';
 import { fsGetDoc, fsPatch } from './firestoreRest';
+import { buildShrimpMember } from './shrimpMember';
 
 /**
  * Restore an approved shrimp_users session from Firebase Auth.
@@ -28,12 +29,7 @@ export function subscribeShrimpMember(onMember) {
       }
 
       if (profile?.approved === true) {
-        onMember({
-          uid: user.uid,
-          name: profile.name || 'สมาชิก',
-          email: em,
-          role: profile.role || 'staff',
-        });
+        onMember(buildShrimpMember(user.uid, profile, em));
       }
     } catch {
       /* transient — LoginScreen or a later auth event may recover */
