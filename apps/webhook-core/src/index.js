@@ -380,6 +380,7 @@ exports.shrimpPushBill = functions
         paymentType: body.paymentType,
         remainingAmount: body.remainingAmount,
         total: body.total,
+        saleId: body.saleId || body.billData?.saleId || null,
       });
       res.json(result);
     } catch (err) {
@@ -445,6 +446,44 @@ exports.shrimpRenderBill = functions
     } catch (err) {
       console.error('shrimpRenderBill', err);
       res.status(500).json({ error: err.message || 'render_failed' });
+    }
+  });
+
+// ── Pre-render ภาพบิลเก็บ cache (Bearer Firebase ID token) ───────────────────
+exports.shrimpPreRenderBill = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    if (req.method === 'GET') {
+      res.status(200).json({ ok: true, hint: 'POST { saleId, billData }' });
+      return;
+    }
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const authHeader = req.headers.authorization || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!idToken) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      await verifyShrimpStaff(db(), decoded.uid);
+
+      const saleId = String(req.body?.saleId || req.body?.billData?.saleId || '').trim();
+      const billData = req.body?.billData;
+      if (!saleId || !billData || typeof billData !== 'object') {
+        res.status(400).json({ error: 'saleId_and_billData_required' });
+        return;
+      }
+      const { preRenderBillForSale } = require('./shrimpBillPreRender');
+      const result = await preRenderBillForSale(db(), admin, saleId, billData);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error('shrimpPreRenderBill', err);
+      res.status(500).json({ error: err.message || 'prerender_failed' });
     }
   });
 

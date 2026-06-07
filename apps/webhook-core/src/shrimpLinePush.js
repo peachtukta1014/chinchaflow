@@ -1,5 +1,9 @@
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 const { getShrimpSlipLiffOpenUrl } = require('./provisionShrimpLiff');
+const {
+  resolveCachedBillImageUrl,
+  preRenderBillForSale,
+} = require('./shrimpBillPreRender');
 const { customerMatchesName } = require('./customerNameAliases');
 const { LINE_UID_RE, normalizeLineUserId } = require('./lineUserId');
 const {
@@ -220,6 +224,7 @@ async function pushShrimpBillToCustomer(db, admin, {
   paymentType,
   remainingAmount,
   total,
+  saleId = null,
 }) {
   const to = normalizeLineUserId(lineUserId);
   if (!LINE_UID_RE.test(to)) {
@@ -235,12 +240,7 @@ async function pushShrimpBillToCustomer(db, admin, {
     throw err;
   }
 
-  let buffer;
-  let contentType = 'image/jpeg';
   if (billData && typeof billData === 'object') {
-    const { renderShrimpBillJpeg } = require('./shrimpBillRender');
-    buffer = await renderShrimpBillJpeg(billData);
-    contentType = 'image/png';
     billNo = billNo || billData.billNo;
     customerName = customerName || billData.customerName;
     total = total ?? billData.totalAmount;
@@ -248,17 +248,8 @@ async function pushShrimpBillToCustomer(db, admin, {
     if (remainingAmount == null && billData.creditTransfer?.unpaidAmount != null) {
       remainingAmount = billData.creditTransfer.unpaidAmount;
     }
-  } else {
-    const raw = String(imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
-    buffer = Buffer.from(raw, 'base64');
-    if (!buffer.length || buffer.length > 9 * 1024 * 1024) {
-      const err = new Error('invalid_image');
-      err.code = 'invalid_image';
-      throw err;
-    }
   }
 
-  const { url } = await uploadBillImage(admin, buffer, billNo, contentType);
   const paidNote = lineBillPaymentNote(paymentType);
   const creditHint = lineBillUnpaidHint(paymentType, remainingAmount, total, billNo);
   const thankYou = lineBillPaidThankYouCaption(paymentType, remainingAmount, total);
@@ -272,6 +263,45 @@ async function pushShrimpBillToCustomer(db, admin, {
   ]
     .filter(Boolean)
     .join('\n');
+
+  const resolvedSaleId = saleId || billData?.saleId || null;
+  let url = null;
+
+  if (billData && resolvedSaleId) {
+    url = await resolveCachedBillImageUrl(db, resolvedSaleId, billData);
+  }
+
+  if (!url) {
+    let buffer;
+    let contentType = 'image/jpeg';
+    if (billData && typeof billData === 'object') {
+      const { renderShrimpBillJpeg } = require('./shrimpBillRender');
+      buffer = await renderShrimpBillJpeg(billData);
+      contentType = 'image/png';
+    } else {
+      const raw = String(imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
+      buffer = Buffer.from(raw, 'base64');
+      if (!buffer.length || buffer.length > 9 * 1024 * 1024) {
+        const err = new Error('invalid_image');
+        err.code = 'invalid_image';
+        throw err;
+      }
+    }
+
+    if (resolvedSaleId && billData) {
+      try {
+        const cached = await preRenderBillForSale(db, admin, resolvedSaleId, billData);
+        url = cached.url;
+      } catch (err) {
+        console.warn('pushShrimpBill preRender fallback', err.message);
+        const uploaded = await uploadBillImage(admin, buffer, billNo, contentType);
+        url = uploaded.url;
+      }
+    } else {
+      const uploaded = await uploadBillImage(admin, buffer, billNo, contentType);
+      url = uploaded.url;
+    }
+  }
 
   const push = await linePushImage(to, url, token, caption);
   if (!push.ok) {

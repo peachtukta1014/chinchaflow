@@ -41,6 +41,7 @@ export async function pushBillToLineCustomer({
     ? {
       lineUserId,
       billData,
+      saleId: billData.saleId || null,
       billNo: billNo || billData.billNo,
       customerName: customerName || billData.customerName,
       paymentType: paymentType || billData.paymentType,

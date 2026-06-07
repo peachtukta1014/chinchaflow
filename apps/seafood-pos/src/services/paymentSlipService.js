@@ -8,7 +8,11 @@ import {
   isFirestoreFailedPreconditionError,
 } from '../lib/firestoreRest';
 import { pushBillToLineCustomer } from '../lib/linePushBill';
-import { buildBillDataForCloud } from '../lib/shrimpBillApi';
+import {
+  buildBillDataForCloud,
+  invalidateBillImageCache,
+  requestShrimpBillPreRender,
+} from '../lib/shrimpBillApi';
 import { isValidLineUserId } from '../lib/lineUserId';
 import { saleRemainingAmount } from '../lib/paymentSlipOpenSale';
 import { resolveLineUserId } from '../lib/resolveLineUserId';
@@ -119,9 +123,18 @@ async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
     moneyReceiverName: receiver,
     confirmedByName: receiver,
   };
+  const billData = buildBillDataForCloud(paidSale, customer || {});
+  if (sale?.id) {
+    invalidateBillImageCache(sale.id);
+    try {
+      await requestShrimpBillPreRender(sale.id, billData);
+    } catch (e) {
+      console.warn('preRender paid bill', e);
+    }
+  }
   await pushBillToLineCustomer({
     lineUserId,
-    billData: buildBillDataForCloud(paidSale, customer || {}),
+    billData,
     billNo: paidSale.billNo,
     customerName: paidSale.customerName,
     paymentType: 'transfer',

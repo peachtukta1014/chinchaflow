@@ -3,7 +3,6 @@ const {
   findCustomerNameByLineUserId,
 } = require('./shrimpLinePush');
 const { lineReply } = require('./teaDailySummary');
-const { notifyShrimpPaymentSlip } = require('./instantLineNotify');
 
 const LINE_CONTENT_URL = 'https://api-data.line.me/v2/bot/message';
 
@@ -130,6 +129,23 @@ async function suggestBillForLineUser(db, lineUserId) {
 /**
  * บันทึกสลิปจาก buffer (แชตรูป / LIFF อัปโหลด)
  */
+async function resolveSuggestedBill(db, userId, hintBill) {
+  if (hintBill) {
+    const sale = await findSaleByBillNo(db, hintBill);
+    if (sale) {
+      return {
+        billNo: hintBill,
+        saleId: sale.id,
+        customerName: sale.customerName || null,
+        remainingAmount: saleRemaining(sale) || parseFloat(sale.total) || 0,
+        total: parseFloat(sale.total) || 0,
+      };
+    }
+    return { billNo: hintBill, saleId: null, customerName: null };
+  }
+  return suggestBillForLineUser(db, userId);
+}
+
 async function recordPaymentSlipSubmission(db, admin, {
   lineUserId,
   buffer,
@@ -143,6 +159,8 @@ async function recordPaymentSlipSubmission(db, admin, {
     err.code = 'invalid_slip';
     throw err;
   }
+
+  const hintBill = String(billNoHint || '').trim();
 
   if (lineMessageId) {
     const existing = await findSlipByLineMessageId(db, lineMessageId);
@@ -158,24 +176,22 @@ async function recordPaymentSlipSubmission(db, admin, {
     }
   }
 
-  const { url: imageUrl } = await uploadSlipImage(admin, buffer, userId);
-  const customerName = await findCustomerNameByLineUserId(db, userId);
-  let suggested = await suggestBillForLineUser(db, userId);
-  const hintBill = String(billNoHint || '').trim();
-  if (hintBill) {
-    const sale = await findSaleByBillNo(db, hintBill);
-    if (sale) {
-      suggested = {
-        billNo: hintBill,
-        saleId: sale.id,
-        customerName: sale.customerName || suggested?.customerName || null,
-        remainingAmount: saleRemaining(sale) || parseFloat(sale.total) || 0,
-        total: parseFloat(sale.total) || 0,
-      };
-    } else if (!suggested) {
-      suggested = { billNo: hintBill, saleId: null, customerName: null };
-    }
-  }
+  const uploadPromise = uploadSlipImage(admin, buffer, userId);
+  const metaPromise = hintBill
+    ? resolveSuggestedBill(db, userId, hintBill).then(async (suggested) => {
+      const customerName = suggested?.customerName
+        || await findCustomerNameByLineUserId(db, userId);
+      return { suggested, customerName };
+    })
+    : Promise.all([
+      findCustomerNameByLineUserId(db, userId),
+      suggestBillForLineUser(db, userId),
+    ]).then(([customerName, suggested]) => ({ suggested, customerName }));
+
+  const [{ url: imageUrl }, { suggested, customerName }] = await Promise.all([
+    uploadPromise,
+    metaPromise,
+  ]);
 
   const slipPayload = {
     status: 'pending',
@@ -194,12 +210,7 @@ async function recordPaymentSlipSubmission(db, admin, {
   };
   const docRef = await db.collection('paymentSlipSubmissions').add(slipPayload);
 
-  try {
-    const notify = await notifyShrimpPaymentSlip(db, slipPayload, { submissionId: docRef.id });
-    if (notify.skipped) console.log('recordPaymentSlip notify', notify.skipped);
-  } catch (err) {
-    console.warn('recordPaymentSlip notify', err.message);
-  }
+  // แจ้งกลุ่ม staff ผ่าน onShrimpPaymentSlipCreated (resolveSlipNotifyTargets กันส่งไปหาลูกค้า)
 
   return {
     ok: true,

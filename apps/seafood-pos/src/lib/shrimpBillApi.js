@@ -44,6 +44,45 @@ export function invalidateBillImageCache(saleId) {
   if (saleId) _billBlobCache.delete(saleId);
 }
 
+/** พื้นหลัง — วาดบิลเก็บ cache บน Cloud ก่อนส่ง LINE */
+export async function requestShrimpBillPreRender(saleId, billData) {
+  const id = String(saleId || billData?.saleId || '').trim();
+  if (!id || !billData) return null;
+  const r = await fetch(functionsBase('shrimpPreRenderBill'), {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ saleId: id, billData: { ...billData, saleId: id } }),
+  });
+  if (!r.ok) {
+    const json = await r.json().catch(() => ({}));
+    throw new Error(json.error || `pre-render failed (${r.status})`);
+  }
+  return r.json();
+}
+
+/**
+ * กระตุ้น pre-render หลังบันทึกบิล — ไม่บล็อก UI
+ * @param {object|string} saleOrId บิลหรือ saleId
+ * @param {object} [customer]
+ */
+export function scheduleShrimpBillPreRender(saleOrId, customer = {}) {
+  void (async () => {
+    try {
+      let sale = saleOrId;
+      if (typeof saleOrId === 'string') {
+        const { fsGetDoc } = await import('./firestoreRest');
+        sale = await fsGetDoc(`sales/${saleOrId}`);
+        if (sale && !sale.id) sale.id = saleOrId;
+      }
+      if (!sale?.id) return;
+      const billData = await buildBillDataForCloudResolved(sale, customer);
+      await requestShrimpBillPreRender(sale.id, billData);
+    } catch (e) {
+      console.warn('scheduleShrimpBillPreRender', e);
+    }
+  })();
+}
+
 /**
  * สร้างภาพบิลบน Cloud (พร้อม in-memory blob cache ต่อ saleId)
  * @returns {Promise<{ blob: Blob, objectUrl: string }>}

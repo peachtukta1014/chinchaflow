@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import liff from '@line/liff';
+import { compressImageFile } from '../lib/compressImage';
 import { useLiffSlipSession } from './useLiffSlipSession';
 import { submitLiffSlip } from './liffSlipApi';
 
@@ -48,7 +49,8 @@ export default function LineSlipLiffApp() {
     }
     setError('');
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const compressed = await compressImageFile(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.82 });
+      const dataUrl = await fileToDataUrl(compressed);
       // สร้าง idempotency key ใหม่ทุกครั้งที่เลือกรูป — กัน double-tap + network retry
       setSubmitKey(crypto.randomUUID());
       setPreview(dataUrl);
@@ -72,16 +74,13 @@ export default function LineSlipLiffApp() {
         billNo: billNo || undefined,
         idempotencyKey: submitKey || undefined,
       });
-      try {
-        if (liff.isInClient() && result?.message) {
-          await liff.sendMessages([{ type: 'text', text: result.message }]);
-        }
-      } catch {
-        /* optional */
-      }
       setDone(true);
+      // ข้อความยืนยันในแชต LINE — ไม่บล็อก UI (ลูกค้าที่ไม่ได้ส่งผ่านลิงก์บิลยังต้องเห็นในแชต)
+      if (liff.isInClient() && result?.message) {
+        void liff.sendMessages([{ type: 'text', text: result.message }]).catch(() => {});
+      }
       if (liff.isInClient()) {
-        setTimeout(() => liff.closeWindow(), 1200);
+        setTimeout(() => liff.closeWindow(), 500);
       }
     } catch (err) {
       setError(err?.message || 'ส่งสลิปไม่สำเร็จ');

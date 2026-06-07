@@ -186,11 +186,12 @@ export async function saveBillWithCart({
 
   // Step 2: อัป stock summary + เขียนบิล
   // Saga compensation: ถ้า write ล้มเหลว → คืนสต๊อกที่ตัดไป ป้องกัน "สต๊อกหาย แต่ไม่มีบิล"
+  let saleId;
   try {
-    await Promise.all([
-      updateMainStock(newLive, newDead),
-      persistSaleBill({ billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey }),
-    ]);
+    await updateMainStock(newLive, newDead);
+    saleId = await persistSaleBill({
+      billData, cartItems, remain, selectedCustomer, customer, billNo, dateKey,
+    });
   } catch (writeErr) {
     // ส่ง post-deduction stock เพื่อให้ restoreStockForSale คำนวณถูก:
     // nextLive = newLive + liveKg = avail.live (กลับไปก่อนตัด)
@@ -205,7 +206,7 @@ export async function saveBillWithCart({
     throw new Error(`บันทึกบิลไม่สำเร็จ — คืนสต๊อกแล้ว กรุณาลองใหม่ (${writeErr.message})`);
   }
 
-  return { ok: true, billData, total, remain, liveKg, deadKg };
+  return { ok: true, billData, saleId, total, remain, liveKg, deadKg };
 }
 
 /** บันทึกบิลขาย + ลูกหนี้ (ไม่ตัดสต๊อก — เรียก updateMainStock จากนอก) */
@@ -221,7 +222,7 @@ export async function persistSaleBill({
   if (!isFirebaseReady) throw new Error('Firebase config ไม่ครบ — บันทึกบิลไม่ได้');
   const now = new Date().toISOString();
 
-  await withTimeout(fsPost('sales', {
+  const saleId = await withTimeout(fsPost('sales', {
     ...billData,
     dateKey,
     items: cartItems.map((i) => ({
@@ -246,6 +247,8 @@ export async function persistSaleBill({
       lastUpdated: now,
     }, remain));
   }
+
+  return saleId;
 }
 
 export function saleStockKg(sale) {

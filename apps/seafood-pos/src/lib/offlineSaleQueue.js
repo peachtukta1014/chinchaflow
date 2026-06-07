@@ -13,6 +13,7 @@ import {
   saveBillWithCart,
   validateStockForSale,
 } from '../services/salesService.js';
+import { scheduleShrimpBillPreRender } from './shrimpBillApi.js';
 
 export { countActionablePending, OFFLINE_QUEUE_STATUSES, sumPendingStockKg } from './offlineQueueUtils.js';
 
@@ -210,6 +211,9 @@ export async function syncPendingSales({
       await idbDelete(row.id);
       synced += 1;
       onItemSynced?.(result.billData);
+      if (result.saleId) {
+        scheduleShrimpBillPreRender({ ...result.billData, id: result.saleId }, customer);
+      }
     } catch (err) {
       failed += 1;
       const msg = String(err?.message || err || 'sync failed');
