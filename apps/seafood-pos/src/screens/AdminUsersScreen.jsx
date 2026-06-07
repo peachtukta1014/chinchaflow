@@ -4,6 +4,7 @@ import { fsDelete, fsPatch, fsRunQuery } from '../lib/firestoreRest';
 import { isValidLineUserId, normalizeLineUserId } from '../lib/lineUserId';
 import { saveMemberLineUserId } from '../services/shrimpMemberLineService';
 import MemberAvatar from '../components/MemberAvatar';
+import LineOrderRetentionPanel from '../components/LineOrderRetentionPanel';
 import ShrimpLineNotifySettings from '../components/ShrimpLineNotifySettings';
 import { getNextShrimpRole, getShrimpRoleLabel } from '../lib/shrimpRoles';
 
@@ -120,6 +121,7 @@ export default function AdminUsersScreen() {
   return (
     <div className="px-4 pt-4 pb-8 space-y-3">
       <ShrimpLineNotifySettings />
+      <LineOrderRetentionPanel />
       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-2">
         จัดการสมาชิก ({users.length} คน)
       </p>
