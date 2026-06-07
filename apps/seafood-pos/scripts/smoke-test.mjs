@@ -275,11 +275,18 @@ try {
   assert(Buffer.isBuffer(png) && png.length > 8000, 'server Satori bill render');
   const whBill = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   assert(whBill.includes('shrimpRenderBill'), 'shrimpRenderBill function');
+  assert(whBill.includes('shrimpPreRenderBill'), 'shrimpPreRenderBill function');
   assert(whBill.includes('billData'), 'shrimpPushBill accepts billData');
   const linePush = fs.readFileSync(path.join(root, 'src/lib/linePushBill.js'), 'utf8');
   assert(linePush.includes('billData'), 'client linePushBill billData path');
+  assert(linePush.includes('saleId'), 'client linePushBill passes saleId');
   const billApi = fs.readFileSync(path.join(root, 'src/lib/shrimpBillApi.js'), 'utf8');
   assert(billApi.includes('shrimpRenderBill'), 'shrimpBillApi calls render endpoint');
+  assert(billApi.includes('scheduleShrimpBillPreRender'), 'shrimpBillApi schedules bill pre-render');
+  const billPreRender = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillPreRender.js'), 'utf8');
+  assert(billPreRender.includes('preRenderBillForSale'), 'shrimpBillPreRender caches bill image');
+  const linePushWh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpLinePush.js'), 'utf8');
+  assert(linePushWh.includes('resolveCachedBillImageUrl'), 'shrimpLinePush uses cached bill image');
   assert(billApi.includes('buildBillDataForCloudResolved'), 'cloud bill resolves customer profile');
   const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillRender.js'), 'utf8');
   assert(!renderSrc.includes('📞'), 'server bill header must not use emoji (Satori tofu)');
@@ -1017,6 +1024,8 @@ try {
   const slipSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'), 'utf8');
   assert(slipSrc.includes('findSlipByLineMessageId'), 'สลิป dedup ตาม lineMessageId');
   assert(slipSrc.includes('duplicate: true'), 'สลิปซ้ำคืน submission เดิม');
+  assert(slipSrc.includes('resolveSuggestedBill'), 'shrimpPaymentSlip uses resolveSuggestedBill');
+  assert(!slipSrc.includes('notifyShrimpPaymentSlip('), 'shrimpPaymentSlip ไม่ inline-notify (ใช้ trigger เท่านั้น)');
   const slipSvc = fs.readFileSync(path.join(root, 'src/services/paymentSlipService.js'), 'utf8');
   assert(slipSvc.includes('claimPaymentSlipConfirmation'), 'ยืนยันสลิปมี CAS lock');
   assert(slipSvc.includes('fsPatchIf'), 'ยืนยันสลิปใช้ optimistic lock');
@@ -1080,6 +1089,10 @@ try {
   const slipSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSlipSession.js'), 'utf8');
   assert(slipSession.includes('VITE_LIFF_SLIP_ID'), 'slip session uses VITE_LIFF_SLIP_ID');
   assert(!slipSession.includes('VITE_LIFF_ID ||'), 'slip session must not fallback to order LIFF ID');
+  const slipLiff = fs.readFileSync(path.join(root, 'src/liff/LineSlipLiffApp.jsx'), 'utf8');
+  assert(slipLiff.includes('compressImageFile'), 'LineSlipLiffApp compresses slip before upload');
+  assert(slipLiff.includes('liff.sendMessages'), 'LineSlipLiffApp confirms slip in customer chat');
+  assert(slipLiff.includes('liff.closeWindow'), 'LineSlipLiffApp closes after submit');
   const verifyMod = requireWebhook('../../webhook-core/src/verifyLineLiffToken.js');
   const prevLiff = process.env.LINE_LIFF_ID;
   const prevLoginCh = process.env.LINE_LOGIN_CHANNEL_ID;

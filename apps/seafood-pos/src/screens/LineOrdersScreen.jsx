@@ -28,6 +28,7 @@ import {
 } from '../services/stockService';
 import { LineDeliveryConfirmSheet } from './LineDeliveryConfirmSheet';
 import { useLineOrdersFeed } from '../hooks/useLineOrdersFeed';
+import { scheduleShrimpBillPreRender } from '../lib/shrimpBillApi';
 
 export default function LineOrdersScreen({ user, stock, stockBatches = [], updateMainStock, onSaleRecorded, onOrderDone }) {
   const { orders, loading } = useLineOrdersFeed(true);
@@ -177,6 +178,9 @@ export default function LineOrdersScreen({ user, stock, stockBatches = [], updat
       setDeliverySheet(null);
       onSaleRecorded?.();
       onOrderDone?.();
+      if (deliveryResult.salesId) {
+        scheduleShrimpBillPreRender(deliveryResult.salesId, customer);
+      }
       const note = recovered ? '\n(ซิงก์สถานะออเดอร์จากบิลเดิม)' : '';
       alert(`บันทึกยอดขายแล้ว\nบิล ${billNo} · ฿${total.toLocaleString()}${note}`);
     } catch (err) {

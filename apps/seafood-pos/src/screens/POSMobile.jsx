@@ -13,6 +13,7 @@ import { useVoice } from '../hooks/useVoice';
 import { subscribeCustomers, mergeCustomerLists } from '../services/customerService';
 import { formatFirestoreSaveError } from '../lib/firestoreRest';
 import { saveBillWithCartOrQueue } from '../lib/offlineSaleQueue';
+import { scheduleShrimpBillPreRender } from '../lib/shrimpBillApi';
 import { isNetworkOnline } from '../lib/networkStatus';
 import { buildPreviewBill } from '../lib/buildPreviewBill';
 import BillImageSheet from '../components/BillImageSheet';
@@ -168,11 +169,14 @@ export default function POSMobile({
         alert(result.message);
         return;
       }
-      const { billData, total, remain, queued } = result;
+      const { billData, saleId, total, remain, queued } = result;
       if (queued) {
         onBillQueued?.(billData);
       } else {
         onSaveBill(billData);
+        if (saleId) {
+          scheduleShrimpBillPreRender({ ...billData, id: saleId }, customer);
+        }
       }
       const payLabel = PAY.find(p => p.id === paymentType)?.label || paymentType;
       const offlineNote = queued

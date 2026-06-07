@@ -26,6 +26,19 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-07 — กุ้ง: pre-render บิล + เร่ง LIFF สลิป (branch cursor-พี่เซอperf-slip-prerender-f8e2)
+
+- **ปัญหา/คำขอ:** ส่งบิล LINE ช้า (render ตอน push) · LIFF ฝากสลิปช้า · กลัวแจ้งเตือนสลิปหลุดไปลูกค้าเหมือนรอบ #202
+- **แก้แล้ว:**
+  - `shrimpBillPreRender` + HTTP `shrimpPreRenderBill` — เจนภาพบิลเก็บ `billImageUrl`/`billImageKey` บน `sales/{id}` หลัง save
+  - Client `scheduleShrimpBillPreRender` หลังออกบิล (POS / LINE delivery / offline sync) · `shrimpLinePush` ใช้ cache ก่อน render ใหม่
+  - LIFF สลิป: `compressImageFile` ก่อนอัปโหลด · `liff.sendMessages` fire-and-forget · ปิดหน้าต่าง 500ms
+  - `shrimpPaymentSlip`: แก้ `hintBill` TDZ · parallel upload+metadata · **ลบ inline notify** — แจ้ง staff ผ่าน `onShrimpPaymentSlipCreated` + `resolveSlipNotifyTargets` เท่านั้น
+  - ยืนยันสลิป: invalidate cache + pre-render บิลชำระแล้วก่อน LINE push
+- **ไฟล์/จุดสำคัญ:** `shrimpBillPreRender.js`, `shrimpLinePush.js`, `shrimpPaymentSlip.js`, `LineSlipLiffApp.jsx`, `shrimpBillApi.js`, `paymentSlipService.js`
+- **พฤติกรรมหลังแก้:** ส่งบิล LINE เร็วขึ้นเมื่อมี cache · สลิป LIFF ตอบเร็วขึ้น · แจ้งเตือนสลิปไปกลุ่ม staff ไม่ไป UID ผู้ส่งสลิป
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy **functions + hosting** ทั้งคู่ · ถ้าแจ้งเตือนซ้ำ = เช็กว่า `recordPaymentSlipSubmission` ไม่เรียก `notifyShrimpPaymentSlip` อีก · cache บิลผิด = ดู `billImageKey` บน sale doc
+
 ### 2026-06-06 — กุ้ง: LIFF ฟอร์มสั่งกุ้ง — วันส่งตาม cutoff (branch cursor-พี่เซอperf-bill-slip-7240)
 
 - **ปัญหา/คำขอ:** ลูกค้าสั่ง LIFF ตอน 23:56 เลือก「วันนี้」= 6/6 → ระบบรับ 6/6 → ขึ้นค้างส่ง (เลยวันแล้ว) ทั้งที่จริงส่งวันถัดไป

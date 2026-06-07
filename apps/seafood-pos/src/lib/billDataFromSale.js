@@ -130,6 +130,7 @@ export function saleToBillData(bill, customer = {}) {
   const delivererName = billDelivererName(bill, customer);
 
   return {
+    saleId: bill.id || bill.saleId || '',
     bookNo: bill.bookNo || '',
     billNo: bill.billNo || '',
     customerName: bill.customerName || customer.name || '',
