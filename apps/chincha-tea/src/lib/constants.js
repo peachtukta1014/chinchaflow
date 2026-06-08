@@ -12,6 +12,11 @@ export function isBootstrapAdminEmail(email) {
   return BOOTSTRAP_ADMIN_EMAILS.some((e) => e.toLowerCase() === em);
 }
 
+/** role ตอนสมัครครั้งแรก — แอดมิน bootstrap เท่านั้นที่ได้ admin ทันที */
+export function getTeaSignupRole(email) {
+  return isBootstrapAdminEmail(email) ? 'admin' : 'staff';
+}
+
 /** ค่าแรงพนักงานต่อวันที่มาทำงาน (บาท) */
 export const STAFF_DAILY_WAGE = 400;
 
