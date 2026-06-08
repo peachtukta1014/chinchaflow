@@ -8,17 +8,30 @@ import { auth, storage } from '../firebase';
 import { compressImageFile } from '../lib/compressImage';
 import { fsPatch } from '../lib/firestoreRest';
 
+function profileError(code) {
+  const err = new Error(code);
+  err.code = code;
+  return err;
+}
+
 function requireAuthUser() {
   const user = auth?.currentUser;
-  if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  if (!user) throw profileError('profileNotAuthed');
   return user;
 }
 
+/** ต่อ cache-bust หลังอัปโหลด — path เดิม browser อาจโชว์รูปเก่า */
+function withPhotoCacheBust(url) {
+  if (!url) return url;
+  const base = url.split('?')[0];
+  return `${base}?v=${Date.now()}`;
+}
+
 export async function uploadTeaMemberPhoto(uid, file) {
-  if (!file) throw new Error('เลือกรูปก่อน');
-  if (!storage) throw new Error('Storage ยังไม่พร้อม');
+  if (!file) throw profileError('profilePickPhoto');
+  if (!storage) throw profileError('profileStorageNotReady');
   const user = requireAuthUser();
-  if (user.uid !== uid) throw new Error('อัปโหลดได้เฉพาะรูปของตัวเอง');
+  if (user.uid !== uid) throw profileError('profileUploadOwnOnly');
 
   const compressed = await compressImageFile(file, {
     maxWidth: 800,
@@ -28,9 +41,10 @@ export async function uploadTeaMemberPhoto(uid, file) {
   const path = `teaAvatars/${uid}.jpg`;
   const r = stRef(storage, path);
   await uploadBytes(r, compressed, { contentType: 'image/jpeg' });
-  const photoUrl = await getDownloadURL(r);
+  const rawUrl = await getDownloadURL(r);
+  const photoUrl = withPhotoCacheBust(rawUrl);
   await fsPatch(`users/${uid}`, {
-    photoUrl,
+    photoUrl: rawUrl,
     photoUpdatedAt: new Date().toISOString(),
   });
   return photoUrl;
@@ -38,12 +52,12 @@ export async function uploadTeaMemberPhoto(uid, file) {
 
 export async function updateTeaMemberProfile(uid, { name, phone }) {
   const user = requireAuthUser();
-  if (user.uid !== uid) throw new Error('แก้ได้เฉพาะโปรไฟล์ของตัวเอง');
+  if (user.uid !== uid) throw profileError('profileUploadOwnOnly');
 
   const trimmedName = String(name || '').trim();
-  if (trimmedName.length < 1) throw new Error('กรุณากรอกชื่อเล่น');
+  if (trimmedName.length < 1) throw profileError('profileNameRequired');
   const phoneDigits = String(phone || '').replace(/\D/g, '');
-  if (phone && phoneDigits.length < 9) throw new Error('เบอร์โทรไม่ถูกต้อง');
+  if (phone && phoneDigits.length < 9) throw profileError('profilePhoneInvalid');
 
   await fsPatch(`users/${uid}`, {
     name: trimmedName,
@@ -56,10 +70,10 @@ export async function updateTeaMemberProfile(uid, { name, phone }) {
 export async function changeTeaMemberPassword({ currentPassword, newPassword }) {
   const user = requireAuthUser();
   const email = user.email;
-  if (!email) throw new Error('บัญชีนี้ไม่มีอีเมล');
-  if (!currentPassword) throw new Error('กรุณาใส่รหัสผ่านเดิม');
+  if (!email) throw profileError('profileNoEmail');
+  if (!currentPassword) throw profileError('profileNeedCurrentPassword');
   if (!newPassword || newPassword.length < 6) {
-    throw new Error('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+    throw profileError('profileNewPasswordShort');
   }
 
   const cred = EmailAuthProvider.credential(email, currentPassword);

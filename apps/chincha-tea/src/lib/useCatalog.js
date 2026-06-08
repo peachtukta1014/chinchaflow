@@ -3,8 +3,8 @@ import { DEFAULT_MENU, DEFAULT_TOPPINGS } from './constants';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import { fsQueryProducts, fsQueryToppings } from './firestoreRest';
 
-const CATALOG_CACHE_KEY = 'catalog:products+toppings';
-const CATALOG_TTL_MS = 5 * 60 * 1000;
+export const CATALOG_CACHE_KEY = 'catalog:products+toppings';
+export const CATALOG_TTL_MS = 5 * 60 * 1000;
 
 export function useCatalog(enabled) {
   const [menuItems, setMenuItems] = useState(DEFAULT_MENU);

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import MemberAvatar from '../components/MemberAvatar';
+import { displayMemberPhotoUrl } from '../lib/memberAvatar';
 import { getTeaRoleLabel } from '../lib/teaRoles';
 import {
   changeTeaMemberPassword,
@@ -7,22 +8,43 @@ import {
   uploadTeaMemberPhoto,
 } from '../services/teaProfileService';
 
+function SectionFeedback({ message, error }) {
+  if (!message && !error) return null;
+  return (
+    <p className={`text-center text-sm font-bold ${error ? 'text-red-600' : 'text-emerald-600'}`}>
+      {error || message}
+    </p>
+  );
+}
+
+function resolveProfileError(err, t, fallbackKey) {
+  const code = err?.code || err?.message || '';
+  if (code.startsWith('profile')) {
+    const translated = t(code);
+    if (translated !== code) return translated;
+  }
+  const fb = String(err?.code || '');
+  if (fb.includes('wrong-password') || fb.includes('invalid-credential')) {
+    return t('profileWrongPassword');
+  }
+  if (fb.includes('weak-password')) return t('profileWeakPassword');
+  return err?.message || t(fallbackKey);
+}
+
 export default function MyProfileScreen({ member, onProfileUpdated, t }) {
   const fileRef = useRef(null);
   const [name, setName] = useState(member?.name || '');
   const [phone, setPhone] = useState(member?.phone || '');
-  const [photoUrl, setPhotoUrl] = useState(member?.photoUrl || '');
+  const [photoUrl, setPhotoUrl] = useState(
+    () => displayMemberPhotoUrl(member?.photoUrl, member?.photoUpdatedAt),
+  );
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-
-  const clearFeedback = () => {
-    setMessage('');
-    setError('');
-  };
+  const [photoFeedback, setPhotoFeedback] = useState({ message: '', error: '' });
+  const [profileFeedback, setProfileFeedback] = useState({ message: '', error: '' });
+  const [passwordFeedback, setPasswordFeedback] = useState({ message: '', error: '' });
 
   const onPickPhoto = () => fileRef.current?.click();
 
@@ -30,42 +52,52 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    clearFeedback();
+    setPhotoFeedback({ message: '', error: '' });
     setBusy('photo');
     try {
       const url = await uploadTeaMemberPhoto(member.uid, file);
       setPhotoUrl(url);
-      setMessage(t('profilePhotoUpdated'));
-      onProfileUpdated?.({ ...member, photoUrl: url });
+      setPhotoFeedback({ message: t('profilePhotoUpdated'), error: '' });
+      onProfileUpdated?.({
+        ...member,
+        photoUrl: url.split('?')[0],
+        photoUpdatedAt: new Date().toISOString(),
+      });
     } catch (err) {
-      setError(err?.message || t('profilePhotoFailed'));
+      setPhotoFeedback({
+        message: '',
+        error: resolveProfileError(err, t, 'profilePhotoFailed'),
+      });
     } finally {
       setBusy('');
     }
   };
 
   const onSaveProfile = async () => {
-    clearFeedback();
+    setProfileFeedback({ message: '', error: '' });
     setBusy('profile');
     try {
       const updated = await updateTeaMemberProfile(member.uid, { name, phone });
-      setMessage(t('profileSaved'));
+      setProfileFeedback({ message: t('profileSaved'), error: '' });
       onProfileUpdated?.({
         ...member,
         name: updated.name,
         phone: updated.phone,
       });
     } catch (err) {
-      setError(err?.message || t('profileSaveFailed'));
+      setProfileFeedback({
+        message: '',
+        error: resolveProfileError(err, t, 'profileSaveFailed'),
+      });
     } finally {
       setBusy('');
     }
   };
 
   const onChangePassword = async () => {
-    clearFeedback();
+    setPasswordFeedback({ message: '', error: '' });
     if (newPassword !== confirmPassword) {
-      setError(t('profilePasswordMismatch'));
+      setPasswordFeedback({ message: '', error: t('profilePasswordMismatch') });
       return;
     }
     setBusy('password');
@@ -74,16 +106,12 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setMessage(t('profilePasswordChanged'));
+      setPasswordFeedback({ message: t('profilePasswordChanged'), error: '' });
     } catch (err) {
-      const code = err?.code || '';
-      if (code.includes('wrong-password') || code.includes('invalid-credential')) {
-        setError(t('profileWrongPassword'));
-      } else if (code.includes('weak-password')) {
-        setError(t('profileWeakPassword'));
-      } else {
-        setError(err?.message || t('profilePasswordFailed'));
-      }
+      setPasswordFeedback({
+        message: '',
+        error: resolveProfileError(err, t, 'profilePasswordFailed'),
+      });
     } finally {
       setBusy('');
     }
@@ -118,6 +146,7 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
           className="hidden"
           onChange={onPhotoFile}
         />
+        <SectionFeedback {...photoFeedback} />
         <div>
           <p className="font-black text-amber-900">{name || t('profileMember')}</p>
           <p className="text-xs text-amber-700 mt-0.5">{member?.email}</p>
@@ -166,6 +195,7 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
         >
           {busy === 'profile' ? t('profileSaving') : t('profileSave')}
         </button>
+        <SectionFeedback {...profileFeedback} />
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 space-y-3">
@@ -201,14 +231,8 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
         >
           {busy === 'password' ? t('profileChangingPassword') : t('profileChangePasswordBtn')}
         </button>
+        <SectionFeedback {...passwordFeedback} />
       </div>
-
-      {message && (
-        <p className="text-center text-sm font-bold text-emerald-600">{message}</p>
-      )}
-      {error && (
-        <p className="text-center text-sm font-bold text-red-600">{error}</p>
-      )}
     </div>
   );
 }
