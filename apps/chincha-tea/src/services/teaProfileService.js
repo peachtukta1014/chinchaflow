@@ -6,6 +6,7 @@ import {
 import { getDownloadURL, ref as stRef, uploadBytes } from 'firebase/storage';
 import { auth, storage } from '../firebase';
 import { compressImageFile } from '../lib/compressImage';
+import { appendPhotoCacheBust } from '../lib/memberAvatar';
 import { fsPatch } from '../lib/firestoreRest';
 
 function profileError(code) {
@@ -18,13 +19,6 @@ function requireAuthUser() {
   const user = auth?.currentUser;
   if (!user) throw profileError('profileNotAuthed');
   return user;
-}
-
-/** ต่อ cache-bust หลังอัปโหลด — path เดิม browser อาจโชว์รูปเก่า */
-function withPhotoCacheBust(url) {
-  if (!url) return url;
-  const base = url.split('?')[0];
-  return `${base}?v=${Date.now()}`;
 }
 
 export async function uploadTeaMemberPhoto(uid, file) {
@@ -41,13 +35,13 @@ export async function uploadTeaMemberPhoto(uid, file) {
   const path = `teaAvatars/${uid}.jpg`;
   const r = stRef(storage, path);
   await uploadBytes(r, compressed, { contentType: 'image/jpeg' });
-  const rawUrl = await getDownloadURL(r);
-  const photoUrl = withPhotoCacheBust(rawUrl);
+  const photoUrl = await getDownloadURL(r);
+  const photoUpdatedAt = new Date().toISOString();
   await fsPatch(`users/${uid}`, {
-    photoUrl: rawUrl,
-    photoUpdatedAt: new Date().toISOString(),
+    photoUrl,
+    photoUpdatedAt,
   });
-  return photoUrl;
+  return appendPhotoCacheBust(photoUrl, photoUpdatedAt);
 }
 
 export async function updateTeaMemberProfile(uid, { name, phone }) {

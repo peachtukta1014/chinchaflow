@@ -27,8 +27,8 @@ function TabButton({ id, label, icon, active, badge, onSelect, size = 'compact' 
     <button
       type="button"
       onClick={() => onSelect(id)}
-      className={`relative flex flex-col items-center justify-center gap-0.5 rounded-2xl font-bold transition-all ${
-        isPrimary ? 'py-3 px-2 min-h-[52px]' : 'py-2 px-2.5 min-w-[56px] min-h-[44px]'
+      className={`relative flex flex-col items-center justify-center gap-0.5 rounded-xl font-bold transition-all ${
+        isPrimary ? 'py-2 px-2 min-h-[44px]' : 'py-1.5 px-2 min-w-[52px] min-h-[38px]'
       } ${active ? 'text-white shadow-md' : 'text-stone-600 bg-white/80 border border-stone-200/90'}`}
       style={active ? { background: 'linear-gradient(145deg, #3d1f0f 0%, #5a2d14 100%)' } : {}}
     >
@@ -53,13 +53,13 @@ export default function TabNav({ groups, activeTab, onSelect, badges = {} }) {
   const otherGroups = groups.filter((g) => g.layout !== 'primary');
 
   return (
-    <nav className="z-10 shrink-0 px-3 pt-2 pb-2 space-y-2" style={{ background: '#fdf6f0' }}>
+    <nav className="z-10 shrink-0 px-3 pt-1 pb-1.5 space-y-1.5" style={{ background: '#fdf6f0' }}>
       {primaryGroup && (
         <section aria-label={primaryGroup.label}>
-          <p className="text-[9px] font-black uppercase tracking-wider text-amber-900/50 px-1 mb-1.5">
+          <p className="text-[8px] font-black uppercase tracking-wider text-amber-900/50 px-1 mb-1">
             {primaryGroup.label}
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {primaryGroup.tabs.map((tab) => (
               <TabButton
                 key={tab.id}
@@ -75,7 +75,7 @@ export default function TabNav({ groups, activeTab, onSelect, badges = {} }) {
       )}
 
       {otherGroups.length > 0 && (
-        <section className="rounded-2xl border border-amber-900/10 bg-white/50 px-2 py-2">
+        <section className="rounded-xl border border-amber-900/10 bg-white/50 px-1.5 py-1.5">
           <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
             {otherGroups.map((group, gi) => (
               <div key={group.id} className="flex items-stretch gap-1.5 shrink-0">

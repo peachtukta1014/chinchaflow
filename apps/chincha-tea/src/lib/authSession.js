@@ -46,12 +46,6 @@ export function subscribeTeaMember(onMember, onPending) {
       return;
     }
 
-    const cached = readCachedMember(user.uid);
-    if (cached) {
-      onPending?.(false);
-      onMember(cached);
-    }
-
     try {
       const profile = await fsGetDoc(`users/${user.uid}`);
       if (!profile || profile.approved !== true) {
@@ -65,7 +59,11 @@ export function subscribeTeaMember(onMember, onPending) {
       onPending?.(false);
       onMember(member);
     } catch {
-      if (!cached) {
+      const cached = readCachedMember(user.uid);
+      if (cached) {
+        onPending?.(false);
+        onMember(cached);
+      } else {
         onPending?.(false);
         onMember(null);
       }
