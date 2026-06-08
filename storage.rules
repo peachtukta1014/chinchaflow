@@ -35,6 +35,15 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // รูปโปรไฟล์สมาชิกชา — อัปโหลดได้เฉพาะไฟล์ของตัวเอง
+    match /teaAvatars/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && fileName == request.auth.uid + '.jpg'
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -88,7 +88,8 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isOwner(uid)
           && request.resource.data.role == resource.data.role
-          && request.resource.data.approved == resource.data.approved)
+          && request.resource.data.approved == resource.data.approved
+          && request.resource.data.email == resource.data.email)
         || (isOwner(uid) && isTeaBootstrapAdmin()
           && request.resource.data.role == 'admin'
           && request.resource.data.approved == true);
