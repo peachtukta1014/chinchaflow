@@ -159,6 +159,10 @@ npm run dev:seafood  # seafood-pos → 5173 with --host 0.0.0.0
 
 If port 5173 is busy, Vite picks the next port; check the Vite banner in the terminal.
 
+`dev:tea` binds to IPv6 loopback (`::1`) only — `curl http://127.0.0.1:5173` may fail; use `http://[::1]:5173/` or a browser. `dev:seafood` uses `--host 0.0.0.0` and is reachable on `127.0.0.1`.
+
+On Cloud Agent boot, `.cursor/environment.json` runs `scripts/materialize-cloud-env.sh` after `npm install` to write both `apps/*/.env.local` files when Dashboard secrets are set.
+
 ### Full E2E (login, orders, Firestore)
 
 Requires live Firebase + approved user in Firestore (`users/{uid}` with `approved: true`). Bootstrap admin email for tea is documented in `apps/chincha-tea/src/lib/constants.js` (`BOOTSTRAP_ADMIN_EMAIL`). Use your own credentials (Cloud Agent Secrets or local `.env.local`); do not commit `.env.local`.
