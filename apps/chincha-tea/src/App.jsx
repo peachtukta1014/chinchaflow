@@ -19,6 +19,7 @@ import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
+import { DashboardTab } from './screens/DashboardTab';
 import StaffGuidePanel from './components/StaffGuidePanel';
 import StaffLangNudge from './components/StaffLangNudge';
 import MyProfileScreen from './screens/MyProfileScreen';
@@ -40,6 +41,7 @@ export default function App() {
   const [payType, setPayType] = useState('cash');
   const [pendingRestocks, setPendingRestocks] = useState(0);
   const prevPendingRestocksRef = useRef(null);
+  const tabBootstrappedRef = useRef(false);
 
   const isAuthed = member && member.approved === true;
   const { menuItems, toppingsList, refreshCatalog } = useCatalog(!!isAuthed);
@@ -58,6 +60,15 @@ export default function App() {
     }
     return subscribeTeaMember(setMember, setAuthPending);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthed || tabBootstrappedRef.current) return;
+    if (member.role === 'admin') {
+      setTab('dashboard');
+      setLastTab('dashboard');
+    }
+    tabBootstrappedRef.current = true;
+  }, [isAuthed, member?.role]);
 
   useEffect(() => {
     if (!isAuthed) return;
@@ -216,6 +227,14 @@ export default function App() {
       )}
 
       <main className="flex-1 overflow-y-auto z-10" style={{ scrollbarWidth: 'none' }}>
+        {tab === 'dashboard' && isAdmin && (
+          <DashboardTab
+            t={t}
+            todayKey={todayKey}
+            pendingRestocks={pendingRestocks}
+            onNavigate={setTab}
+          />
+        )}
         {tab === 'order' && (
           <OrderTab
             menuItems={menuItems}
@@ -285,7 +304,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && (
+      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && tab !== 'dashboard' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { dateKeyBangkok, STAFF_SHIFT_DEFAULTS, shiftDateKey, STAFF_DAILY_WAGE } from '../lib/constants';
+import { dateKeyBangkok, STAFF_SHIFT_DEFAULTS, shiftDateKey } from '../lib/constants';
 import {
   dayOfMonth,
   formatBiweeklyPeriodLabel,
@@ -11,26 +11,32 @@ import {
 import {
   getAttendanceForDate,
   getPeriodAttendanceSummary,
-  getPrimaryAttendanceStaff,
   isStaffPresentOnDate,
+  listAttendanceStaff,
   setStaffPresent,
 } from '../lib/staffAttendanceService';
+import { getStaffDailyWage } from '../lib/staffWage';
 
 export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
   const [period, setPeriod] = useState(() => getBiweeklyPeriodForDate(todayKey));
   const [markDateKey, setMarkDateKey] = useState(todayKey);
-  const [staff, setStaff] = useState(null);
-  const [staffIssue, setStaffIssue] = useState(null);
-  const [periodRow, setPeriodRow] = useState(null);
+  const [staffList, setStaffList] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [periodSummary, setPeriodSummary] = useState([]);
   const [dayPresent, setDayPresent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState('');
 
+  const selectedStaff = staffList.find((s) => s.id === selectedStaffId) || null;
+  const periodRow = periodSummary.find((x) => x.staffUid === selectedStaffId) || null;
+
   const periodDates = useMemo(
     () => listDateKeysInRange(period.startKey, period.endKey),
     [period.startKey, period.endKey],
   );
+
+  const periodTotalWage = periodSummary.reduce((s, r) => s + (r.wage || 0), 0);
 
   const clampMarkDate = useCallback(
     (dk) => {
@@ -48,32 +54,28 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
 
   const refresh = useCallback(async ({ force = false } = {}) => {
     try {
-      const resolved = await getPrimaryAttendanceStaff({ force });
-      const s = resolved?.staff ?? null;
-      setStaff(s);
-      if (!s) {
-        setPeriodRow(null);
+      const list = await listAttendanceStaff({ force });
+      setStaffList(list);
+      setSelectedStaffId((prev) => {
+        if (prev && list.some((s) => s.id === prev)) return prev;
+        return list[0]?.id || '';
+      });
+      if (!list.length) {
+        setPeriodSummary([]);
         setDayPresent(false);
         return;
       }
-      const [summary, dayRows] = await Promise.all([
-        getPeriodAttendanceSummary(period.startKey, period.endKey, { force }),
-        getAttendanceForDate(markDateKey),
-      ]);
-      const row = summary.find((x) => x.staffUid === s.id) || {
-        staffUid: s.id,
-        staffName: s.name || 'พนักงาน',
-        workDays: [],
-        days: 0,
-        wage: 0,
-        periodDays: periodDates.length,
-      };
-      setPeriodRow(row);
-      setDayPresent(isStaffPresentOnDate(s.id, dayRows));
+      const summary = await getPeriodAttendanceSummary(period.startKey, period.endKey, { force });
+      setPeriodSummary(summary);
+      const dayRows = await getAttendanceForDate(markDateKey);
+      const sid = selectedStaffId && list.some((s) => s.id === selectedStaffId)
+        ? selectedStaffId
+        : list[0]?.id;
+      setDayPresent(sid ? isStaffPresentOnDate(sid, dayRows) : false);
     } catch (e) {
       console.error(e);
     }
-  }, [period.startKey, period.endKey, markDateKey, periodDates.length]);
+  }, [period.startKey, period.endKey, markDateKey, selectedStaffId]);
 
   useEffect(() => {
     let active = true;
@@ -84,15 +86,22 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
     return () => { active = false; };
   }, [refresh]);
 
+  useEffect(() => {
+    if (!selectedStaffId) return;
+    getAttendanceForDate(markDateKey)
+      .then((rows) => setDayPresent(isStaffPresentOnDate(selectedStaffId, rows)))
+      .catch(() => {});
+  }, [markDateKey, selectedStaffId]);
+
   const toggleDay = async (checked) => {
-    if (!staff || member?.role !== 'admin') return;
+    if (!selectedStaff || member?.role !== 'admin') return;
     setBusy(true);
     setFlash('');
     try {
       await setStaffPresent({
         dateKey: markDateKey,
-        staffUid: staff.id,
-        staffName: staff.name || 'พนักงาน',
+        staffUid: selectedStaff.id,
+        staffName: selectedStaff.name || 'พนักงาน',
         present: checked,
         markedBy: member?.name || member?.email,
         markedByUid: member?.uid || member?.id,
@@ -111,23 +120,10 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
   const workDaySet = new Set(periodRow?.workDays || []);
   const isTodayMark = markDateKey === todayKey;
   const canMarkDay = markDateKey <= todayKey;
+  const staffRate = selectedStaff ? getStaffDailyWage(selectedStaff) : 0;
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
-      {staff && (
-        <div className="rounded-3xl p-4 text-white shadow-lg border border-violet-900/20" style={{ background: 'linear-gradient(145deg, #4c1d95 0%, #3d1f0f 100%)' }}>
-          <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider">{t('payrollStaffCard')}</p>
-          <p className="text-xl font-black text-white mt-1">{staff.name}</p>
-          <p className="text-violet-200/90 text-xs mt-0.5">{staff.email}</p>
-          <p className="text-[10px] text-amber-200/90 mt-2 leading-relaxed">
-            {t('payrollShiftHint')
-              .replace('{checkIn}', STAFF_SHIFT_DEFAULTS.shiftCheckIn)
-              .replace('{close}', STAFF_SHIFT_DEFAULTS.storeClose)}
-          </p>
-          <p className="text-[10px] text-violet-200/70 mt-1">฿{STAFF_DAILY_WAGE}/{t('staffAttendancePerDay')}</p>
-        </div>
-      )}
-
       <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-violet-200 shadow-sm">
         <button
           type="button"
@@ -141,7 +137,6 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
             {formatBiweeklyPeriodLabel(period, lang)}
           </p>
           <p className="text-[10px] text-stone-400">{t('payrollPeriodHint')}</p>
-          <p className="text-[10px] text-violet-600/80 mt-0.5">{t('payrollAdminOnlyHint')}</p>
         </div>
         <button
           type="button"
@@ -152,119 +147,150 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
         </button>
       </div>
 
-      {!staff && !loading && (
+      {!staffList.length && !loading && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 leading-relaxed">
           <p className="font-bold">{t('payrollNoStaffTitle')}</p>
           <p className="mt-2">{t('payrollNoStaffHint')}</p>
         </div>
       )}
 
-      {staff && (
+      {staffList.length > 0 && (
         <>
           <div className="bg-white rounded-3xl p-4 border border-violet-200 shadow-sm">
-            <div className="flex justify-between items-start gap-2 mb-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase text-stone-400">{t('payrollPeriodTotal')}</p>
-                <p className="text-3xl font-black text-violet-900 mt-0.5">
-                  ฿{(periodRow?.wage || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-black text-stone-800">{periodRow?.days || 0}</p>
-                <p className="text-[10px] text-stone-500">
-                  / {periodRow?.periodDays || periodDates.length} {t('staffAttendanceDaysUnit')}
-                </p>
-              </div>
-            </div>
-            <p className="text-[10px] text-stone-400 text-center">
-              {(periodRow?.days || 0)} × ฿{STAFF_DAILY_WAGE} = ฿{(periodRow?.wage || 0).toLocaleString()}
-            </p>
+            <p className="text-[10px] font-bold uppercase text-stone-400 mb-2">{t('payrollPeriodTotal')}</p>
+            <p className="text-3xl font-black text-violet-900">฿{periodTotalWage.toLocaleString()}</p>
+            <p className="text-[10px] text-stone-400 mt-1">{t('payrollAdminOnlyHint')}</p>
           </div>
 
-          <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-sm space-y-3">
-            <p className="font-bold text-stone-500 text-[10px] uppercase">{t('payrollWorkDaysTitle')}</p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {periodDates.map((dk) => {
-                const worked = workDaySet.has(dk);
-                const selected = dk === markDateKey;
-                const future = dk > todayKey;
-                return (
+          <div className="space-y-2">
+            {periodSummary.map((row) => (
+              <button
+                key={row.staffUid}
+                type="button"
+                onClick={() => setSelectedStaffId(row.staffUid)}
+                className={`w-full text-left rounded-2xl p-3 border-2 transition-all ${
+                  row.staffUid === selectedStaffId
+                    ? 'border-violet-500 bg-violet-50'
+                    : 'border-stone-100 bg-white'
+                }`}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <p className="font-black text-stone-800">{row.staffName}</p>
+                    <p className="text-[10px] text-stone-500">
+                      ฿{row.dailyWage}/{t('staffAttendancePerDay')} · {row.days} {t('staffAttendanceDaysUnit')}
+                    </p>
+                  </div>
+                  <p className="font-black text-violet-800">฿{row.wage.toLocaleString()}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {selectedStaff && (
+            <>
+              <div className="rounded-3xl p-4 text-white shadow-lg border border-violet-900/20" style={{ background: 'linear-gradient(145deg, #4c1d95 0%, #3d1f0f 100%)' }}>
+                <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider">{t('payrollStaffCard')}</p>
+                <p className="text-xl font-black text-white mt-1">{selectedStaff.name}</p>
+                <p className="text-violet-200/90 text-xs mt-0.5">{selectedStaff.email}</p>
+                <p className="text-[10px] text-amber-200/90 mt-2 leading-relaxed">
+                  {t('payrollShiftHint')
+                    .replace('{checkIn}', STAFF_SHIFT_DEFAULTS.shiftCheckIn)
+                    .replace('{close}', STAFF_SHIFT_DEFAULTS.storeClose)}
+                </p>
+                <p className="text-[10px] text-violet-200/70 mt-1">
+                  ฿{staffRate}/{t('staffAttendancePerDay')}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-sm space-y-3">
+                <p className="font-bold text-stone-500 text-[10px] uppercase">{t('payrollWorkDaysTitle')}</p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {periodDates.map((dk) => {
+                    const worked = workDaySet.has(dk);
+                    const selected = dk === markDateKey;
+                    const future = dk > todayKey;
+                    return (
+                      <button
+                        key={dk}
+                        type="button"
+                        disabled={future}
+                        onClick={() => !future && setMarkDateKey(dk)}
+                        className={`relative flex flex-col items-center py-2 rounded-xl border-2 text-[10px] font-bold transition-all ${
+                          future
+                            ? 'opacity-30 border-stone-100 bg-stone-50 text-stone-300'
+                            : worked
+                              ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                              : 'border-stone-100 bg-stone-50 text-stone-400'
+                        } ${selected ? 'ring-2 ring-violet-500 ring-offset-1' : ''}`}
+                      >
+                        <span className="text-[8px] opacity-70">{weekdayShort(dk, lang)}</span>
+                        <span className="text-sm font-black">{dayOfMonth(dk)}</span>
+                        {worked && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {periodRow?.workDays?.length > 0 ? (
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    <span className="font-bold text-emerald-700">{t('payrollWorkedList')} </span>
+                    {formatWorkDaysList(periodRow.workDays, lang)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-stone-400 text-center">{t('payrollNoWorkDays')}</p>
+                )}
+              </div>
+
+              <div className="bg-white rounded-3xl p-4 border border-violet-200 shadow-sm space-y-3">
+                <p className="font-bold text-stone-500 text-[10px] uppercase">
+                  {t('payrollMarkDay')} · {formatDayLabel(markDateKey, lang)}
+                  {isTodayMark && (
+                    <span className="ml-1 text-emerald-600 normal-case">({t('todayLabel')})</span>
+                  )}
+                </p>
+                {!canMarkDay && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">{t('payrollFutureDay')}</p>
+                )}
+                {flash && (
+                  <p className={`text-center text-xs font-bold py-1.5 rounded-xl ${flash.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                    {flash}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={busy || !canMarkDay}
+                  onClick={() => toggleDay(!dayPresent)}
+                  className={`w-full py-4 rounded-2xl font-black text-base transition-all ${
+                    dayPresent
+                      ? 'bg-violet-600 text-white shadow-md'
+                      : 'bg-stone-100 text-stone-600 border-2 border-dashed border-stone-300'
+                  } disabled:opacity-50`}
+                >
+                  {busy ? '⏳' : dayPresent
+                    ? `✓ ${t('payrollPresentOn').replace('{rate}', String(staffRate))}`
+                    : t('payrollAbsentOn')}
+                </button>
+                <div className="flex gap-2">
                   <button
-                    key={dk}
                     type="button"
-                    disabled={future}
-                    onClick={() => !future && setMarkDateKey(dk)}
-                    className={`relative flex flex-col items-center py-2 rounded-xl border-2 text-[10px] font-bold transition-all ${
-                      future
-                        ? 'opacity-30 border-stone-100 bg-stone-50 text-stone-300'
-                        : worked
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
-                          : 'border-stone-100 bg-stone-50 text-stone-400'
-                    } ${selected ? 'ring-2 ring-violet-500 ring-offset-1' : ''}`}
+                    disabled={markDateKey <= period.startKey}
+                    onClick={() => setMarkDateKey(clampMarkDate(shiftDateKey(markDateKey, -1)))}
+                    className="flex-1 py-2 rounded-xl bg-stone-100 font-bold text-stone-600 text-sm disabled:opacity-30"
                   >
-                    <span className="text-[8px] opacity-70">{weekdayShort(dk, lang)}</span>
-                    <span className="text-sm font-black">{dayOfMonth(dk)}</span>
-                    {worked && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                    ‹ {t('payrollPrevDay')}
                   </button>
-                );
-              })}
-            </div>
-            {periodRow?.workDays?.length > 0 ? (
-              <p className="text-xs text-stone-600 leading-relaxed">
-                <span className="font-bold text-emerald-700">{t('payrollWorkedList')} </span>
-                {formatWorkDaysList(periodRow.workDays, lang)}
-              </p>
-            ) : (
-              <p className="text-xs text-stone-400 text-center">{t('payrollNoWorkDays')}</p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-3xl p-4 border border-violet-200 shadow-sm space-y-3">
-            <p className="font-bold text-stone-500 text-[10px] uppercase">
-              {t('payrollMarkDay')} · {formatDayLabel(markDateKey, lang)}
-              {isTodayMark && (
-                <span className="ml-1 text-emerald-600 normal-case">({t('todayLabel')})</span>
-              )}
-            </p>
-            {!canMarkDay && (
-              <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">{t('payrollFutureDay')}</p>
-            )}
-            {flash && (
-              <p className={`text-center text-xs font-bold py-1.5 rounded-xl ${flash.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                {flash}
-              </p>
-            )}
-            <button
-              type="button"
-              disabled={busy || !canMarkDay}
-              onClick={() => toggleDay(!dayPresent)}
-              className={`w-full py-4 rounded-2xl font-black text-base transition-all ${
-                dayPresent
-                  ? 'bg-violet-600 text-white shadow-md'
-                  : 'bg-stone-100 text-stone-600 border-2 border-dashed border-stone-300'
-              } disabled:opacity-50`}
-            >
-              {busy ? '⏳' : dayPresent ? `✓ ${t('payrollPresentOn')}` : t('payrollAbsentOn')}
-            </button>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={markDateKey <= period.startKey}
-                onClick={() => setMarkDateKey(clampMarkDate(shiftDateKey(markDateKey, -1)))}
-                className="flex-1 py-2 rounded-xl bg-stone-100 font-bold text-stone-600 text-sm disabled:opacity-30"
-              >
-                ‹ {t('payrollPrevDay')}
-              </button>
-              <button
-                type="button"
-                disabled={markDateKey >= clampMarkDate(period.endKey) || markDateKey >= todayKey}
-                onClick={() => setMarkDateKey(clampMarkDate(shiftDateKey(markDateKey, 1)))}
-                className="flex-1 py-2 rounded-xl bg-stone-100 font-bold text-stone-600 text-sm disabled:opacity-30"
-              >
-                {t('payrollNextDay')} ›
-              </button>
-            </div>
-          </div>
+                  <button
+                    type="button"
+                    disabled={markDateKey >= clampMarkDate(period.endKey) || markDateKey >= todayKey}
+                    onClick={() => setMarkDateKey(clampMarkDate(shiftDateKey(markDateKey, 1)))}
+                    className="flex-1 py-2 rounded-xl bg-stone-100 font-bold text-stone-600 text-sm disabled:opacity-30"
+                  >
+                    {t('payrollNextDay')} ›
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 

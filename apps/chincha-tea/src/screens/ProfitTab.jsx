@@ -9,7 +9,8 @@ import {
   fsQueryStaffAttendanceByDate,
 } from '../lib/firestoreRest';
 import { restockPurchaseTotal } from '../lib/restockService';
-import { getPrimaryAttendanceStaff } from '../lib/staffAttendanceService';
+import { listAttendanceStaff } from '../lib/staffAttendanceService';
+import { wageMapFromStaffList } from '../lib/staffWage';
 import { pushTeaLineSummary } from '../lib/lineNotify';
 
 function Money({ n, className = '' }) {
@@ -39,37 +40,29 @@ function LedgerRow({ label, amount, negative, detail }) {
 export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKey }) {
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [primaryStaffUid, setPrimaryStaffUid] = useState(null);
-  const [primaryStaffName, setPrimaryStaffName] = useState(null);
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
 
   const isToday = viewDateKey === todayKey;
 
-  useEffect(() => {
-    getPrimaryAttendanceStaff().then((r) => {
-      setPrimaryStaffUid(r?.staff?.id ?? null);
-      setPrimaryStaffName(r?.staff?.name ?? null);
-    });
-  }, []);
-
   const loadLedger = useCallback(async () => {
     setLoading(true);
     try {
-      const [orders, expenses, restocks, attendance] = await Promise.all([
+      const [orders, expenses, restocks, attendance, staffList] = await Promise.all([
         fsQueryOrders(viewDateKey),
         fsQueryExpenses(viewDateKey),
         fsQueryRestocksByDate(viewDateKey),
         fsQueryStaffAttendanceByDate(viewDateKey),
+        listAttendanceStaff(),
       ]);
+      const wageMap = wageMapFromStaffList(staffList);
       setLedger(
         computeDayLedger({
           orders,
           expenses,
           restocks,
           attendance,
-          primaryStaffUid,
-          primaryStaffName,
+          wageMap,
         }),
       );
     } catch (e) {
@@ -77,7 +70,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
       setLedger(null);
     }
     setLoading(false);
-  }, [viewDateKey, primaryStaffUid, primaryStaffName]);
+  }, [viewDateKey]);
 
   useEffect(() => {
     loadLedger();
@@ -222,20 +215,26 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
           <div className="bg-amber-50 rounded-3xl p-4 border border-amber-200">
             <p className="font-bold text-amber-900 text-[10px] uppercase mb-2">{t('profitWageTicketTitle')}</p>
             <p className="text-xs text-amber-800/90 mb-3 leading-relaxed">{t('profitWageTicketHint')}</p>
-            <div className="bg-white rounded-2xl p-3 border border-amber-100">
-              <div className="flex justify-between items-center text-sm">
-                <div>
-                  <p className="font-bold text-stone-800">{ledger.staffName || t('payrollNoStaffTitle')}</p>
-                  <p className="text-[10px] text-stone-500">
-                    {ledger.staffPresent ? t('profitStaffPresent') : t('profitStaffAbsent')}
-                    {' · '}
-                    ฿{ledger.wageRate}/{t('staffAttendancePerDay')}
-                  </p>
-                </div>
-                <span className={`text-lg font-black ${ledger.staffPresent ? 'text-amber-800' : 'text-stone-300'}`}>
-                  {ledger.staffPresent ? <Money n={ledger.wageCost} /> : '—'}
-                </span>
+            {ledger.staffWageRows?.length > 0 ? (
+              <div className="space-y-2">
+                {ledger.staffWageRows.map((row) => (
+                  <div key={row.staffUid} className="bg-white rounded-2xl p-3 border border-amber-100 flex justify-between items-center text-sm">
+                    <div>
+                      <p className="font-bold text-stone-800">{row.staffName}</p>
+                      <p className="text-[10px] text-stone-500">
+                        {t('profitStaffPresent')} · ฿{row.wageRate}/{t('staffAttendancePerDay')}
+                      </p>
+                    </div>
+                    <span className="text-lg font-black text-amber-800"><Money n={row.wage} /></span>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <p className="text-xs text-stone-500 text-center py-2">{t('profitStaffAbsent')}</p>
+            )}
+            <div className="flex justify-between items-center mt-3 pt-2 border-t border-amber-100 text-sm">
+              <span className="font-bold text-amber-900">{t('staffAttendanceMonthTotal')}</span>
+              <span className="font-black text-amber-800"><Money n={ledger.wageCost} /></span>
             </div>
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-amber-200/80 text-sm">
               <span className="font-bold text-amber-900">{t('profitAfterWageTitle')}</span>

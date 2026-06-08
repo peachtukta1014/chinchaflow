@@ -31,6 +31,7 @@ import {
 } from '../lib/productService';
 import { cachedFetch } from '../lib/fetchCache';
 import { invalidateAttendanceStaffCache } from '../lib/staffAttendanceService';
+import { getStaffDailyWage } from '../lib/staffWage';
 import { CATALOG_CACHE_KEY, CATALOG_TTL_MS } from '../lib/useCatalog';
 import MemberAvatar from '../components/MemberAvatar';
 import { displayMemberPhotoUrl } from '../lib/memberAvatar';
@@ -103,7 +104,9 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   const updateUser = async (uid, patch) => {
     await fsPatch(`users/${uid}`, patch);
     setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, ...patch } : u)));
-    if (patch.role != null || patch.approved != null) invalidateAttendanceStaffCache();
+    if (patch.role != null || patch.approved != null || patch.dailyWage != null) {
+      invalidateAttendanceStaffCache();
+    }
     showFlash('✅ อัปเดตสมาชิกแล้ว');
   };
 
@@ -249,12 +252,14 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
 
 function MembersSection({ users, t, onUpdate, onDelete }) {
   const selfId = auth?.currentUser?.uid;
+  const [wageDraft, setWageDraft] = useState({});
 
   return (
     <div className="space-y-2">
       {users.length === 0 && <p className="text-stone-400 text-sm text-center py-6">ยังไม่มีผู้ใช้</p>}
       {users.map((u) => {
         const isSelf = u.id === selfId;
+        const wageVal = wageDraft[u.id] ?? String(getStaffDailyWage(u));
         return (
           <div key={u.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm">
             <div className="flex justify-between items-start gap-3">
@@ -278,6 +283,40 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
                 </p>
               </div>
             </div>
+            {u.role === 'staff' && u.approved && (
+              <div className="mt-3 flex items-end gap-2">
+                <label className="flex-1 text-[10px] font-bold text-stone-500">
+                  {t('staffDailyWage')}
+                  <input
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    value={wageVal}
+                    onChange={(e) => setWageDraft((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                    className="mt-1 w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-amber-500"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = parseInt(String(wageVal).replace(/\D/g, ''), 10);
+                    if (!n || n < 1) {
+                      alert(t('staffDailyWageInvalid'));
+                      return;
+                    }
+                    onUpdate(u.id, { dailyWage: n });
+                    setWageDraft((prev) => {
+                      const next = { ...prev };
+                      delete next[u.id];
+                      return next;
+                    });
+                  }}
+                  className="shrink-0 px-3 py-2 rounded-xl bg-amber-800 text-white text-xs font-bold"
+                >
+                  {t('staffDailyWageSave')}
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 mt-3">
               {!u.approved && (
                 <button
