@@ -1,4 +1,4 @@
-import { PRIMARY_STAFF, STAFF_DAILY_WAGE } from './constants';
+import { STAFF_DAILY_WAGE } from './constants';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from './restockService';
 
 /**
@@ -32,7 +32,7 @@ export function primaryStaffWageForDay(attendanceRows = [], staffUid) {
 }
 
 /**
- * @param {{ orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], primaryStaffUid?: string }} input
+ * @param {{ orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], primaryStaffUid?: string, primaryStaffName?: string }} input
  */
 export function computeDayLedger({
   orders = [],
@@ -40,6 +40,7 @@ export function computeDayLedger({
   restocks = [],
   attendance = [],
   primaryStaffUid,
+  primaryStaffName,
 }) {
   const revenue = sumOrderRevenue(orders);
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
@@ -51,6 +52,8 @@ export function computeDayLedger({
   const staffUid = primaryStaffUid || null;
   const { present: staffPresent, wage: wageCost } = primaryStaffWageForDay(attendance, staffUid);
   const afterWage = operatingProfit - wageCost;
+  const attendanceName = attendance.find((r) => r.staffUid === staffUid && r.present)?.staffName;
+  const staffName = primaryStaffName || attendanceName || null;
 
   return {
     ...revenue,
@@ -62,7 +65,7 @@ export function computeDayLedger({
     staffPresent,
     wageCost,
     wageRate: STAFF_DAILY_WAGE,
-    staffName: PRIMARY_STAFF.displayName,
+    staffName,
     afterWage,
   };
 }

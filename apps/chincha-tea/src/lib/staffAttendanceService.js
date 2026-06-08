@@ -1,4 +1,4 @@
-import { isPrimaryStaffEmail, PRIMARY_STAFF, STAFF_DAILY_WAGE } from './constants';
+import { STAFF_DAILY_WAGE } from './constants';
 import { listDateKeysInRange } from './payrollPeriod';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import {
@@ -33,30 +33,14 @@ export async function listAttendanceStaff({ force = false } = {}) {
     STAFF_LIST_TTL_MS,
   );
   const staff = users.filter((u) => u.approved === true && u.role === 'staff');
-  return staff.sort((a, b) => {
-    const aPrimary = isPrimaryStaffEmail(a.email) ? 0 : 1;
-    const bPrimary = isPrimaryStaffEmail(b.email) ? 0 : 1;
-    if (aPrimary !== bPrimary) return aPrimary - bPrimary;
-    return (a.name || '').localeCompare(b.name || '', 'th');
-  });
+  return staff.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
 }
 
-/** พนักงานหลักร้าน (2004@chincha.pos) หรือคนแรกในรายการเวร */
+/** พนักงานคนแรกในรายการที่อนุมัติแล้ว (ร้านมีพนักงานหลักคนเดียวต่อครั้ง) */
 export async function getPrimaryAttendanceStaff(options) {
   const list = await listAttendanceStaff(options);
-  const fromList = list.find((u) => isPrimaryStaffEmail(u.email)) || list[0];
-  if (fromList) return { staff: fromList, issue: null };
-  return resolvePrimaryStaffIssue();
-}
-
-/** บัญชีมีในระบบแต่ยังลงเวรไม่ได้ (role / อนุมัติ) */
-export async function resolvePrimaryStaffIssue() {
-  const users = await cachedFetch(STAFF_LIST_CACHE_KEY, fsQueryUsers, STAFF_LIST_TTL_MS);
-  const u = users.find((x) => isPrimaryStaffEmail(x.email));
-  if (!u) return { staff: null, issue: 'not_registered' };
-  if (u.approved !== true) return { staff: null, issue: 'not_approved', profile: u };
-  if (u.role !== 'staff') return { staff: null, issue: 'wrong_role', profile: u };
-  return { staff: null, issue: 'unknown', profile: u };
+  if (list[0]) return { staff: list[0], issue: null };
+  return { staff: null, issue: 'no_staff' };
 }
 
 export function invalidateAttendanceStaffCache() {
@@ -122,7 +106,7 @@ export async function ensurePrimaryStaffPresentOnSale({ dateKey }) {
   await setStaffPresent({
     dateKey,
     staffUid: staff.id,
-    staffName: staff.name || PRIMARY_STAFF.displayName,
+    staffName: staff.name || 'พนักงาน',
     present: true,
     markedBy: 'ระบบ (ยอดขายแรกของวัน)',
     markedByUid: '',

@@ -40,6 +40,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [primaryStaffUid, setPrimaryStaffUid] = useState(null);
+  const [primaryStaffName, setPrimaryStaffName] = useState(null);
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
 
@@ -48,6 +49,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
   useEffect(() => {
     getPrimaryAttendanceStaff().then((r) => {
       setPrimaryStaffUid(r?.staff?.id ?? null);
+      setPrimaryStaffName(r?.staff?.name ?? null);
     });
   }, []);
 
@@ -67,6 +69,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
           restocks,
           attendance,
           primaryStaffUid,
+          primaryStaffName,
         }),
       );
     } catch (e) {
@@ -74,7 +77,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
       setLedger(null);
     }
     setLoading(false);
-  }, [viewDateKey, primaryStaffUid]);
+  }, [viewDateKey, primaryStaffUid, primaryStaffName]);
 
   useEffect(() => {
     loadLedger();
@@ -222,7 +225,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
             <div className="bg-white rounded-2xl p-3 border border-amber-100">
               <div className="flex justify-between items-center text-sm">
                 <div>
-                  <p className="font-bold text-stone-800">{ledger.staffName}</p>
+                  <p className="font-bold text-stone-800">{ledger.staffName || t('payrollNoStaffTitle')}</p>
                   <p className="text-[10px] text-stone-500">
                     {ledger.staffPresent ? t('profitStaffPresent') : t('profitStaffAbsent')}
                     {' · '}
