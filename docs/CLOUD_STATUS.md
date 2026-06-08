@@ -4,10 +4,8 @@
 
 ถ้าบน GitHub repo ยังเห็นลิงก์ `*.vercel.app` ด้านบน หรือ environment ชื่อ Preview / Production จาก Vercel:
 
-1. GitHub repo → **Settings** → **Actions** → **General** → **Workflow permissions** → เลือก **Read and write permissions** → Save
-2. GitHub → **Actions** → **Disconnect Vercel from GitHub** → **Run workflow** (ล้าง homepage + environments บน repo)
-   - ถ้า workflow แดง **404 / Not Found**: PAT ใน `ADMIN_TOKEN` **ไม่ได้ผูก repo `chinchaflow`** หรือไม่มี Administration — สร้าง Fine-grained token ใหม่ (เฉพาะ repo นี้) แล้วอัปเดต secret
-   - **มือถือไม่รอ workflow:** หน้า repo → **About** (ไอคอนเฟือง) → ลบช่อง Website → Save
+1. หน้า repo → **About** (ไอคอนเฟือง) → ลบช่อง Website (`*.vercel.app`) → Save
+2. GitHub repo → **Settings** → **Environments** → ลบ environment ชื่อ Preview / Production จาก Vercel (ถ้ายังมี)
 3. [vercel.com](https://vercel.com) → โปรเจกต์ที่ผูก repo นี้ → **Settings → Git → Disconnect** (หรือลบโปรเจกต์)
 4. GitHub → **Settings** (บัญชี) → **Integrations** → **Vercel** → เอา `chinchaflow` ออกจากสิทธิ์ (ถ้ายังติด)
 

@@ -149,16 +149,6 @@ Cloud Agent รัน `scripts/materialize-cloud-env.sh` หลัง `npm insta
 - อีเมล `peachtukta1014@gmail.com` เป็น **bootstrap admin** ในแอปกุ้ง (อนุมัติทันทีเมื่อสมัคร/ล็อกอินครั้งแรก)
 - อย่าใส่รหัสผ่านใน Slack / ใน PR / ใน repo
 
-### Secret สำหรับจัดการ GitHub repo (ทางเลือก)
-
-| Secret (Dashboard หรือ GitHub repo Secrets) | ใช้ทำอะไร |
-|-------------------------------------------|-----------|
-| `ADMIN_TOKEN` | PAT แก้ homepage / ลบ deployment environments (workflow `disconnect-vercel-github.yml`) |
-
-สร้าง PAT: GitHub → Settings → Developer settings → Fine-grained token → repo `chinchaflow` → **Administration: Read and write** (หรือ classic token scope `repo` เต็ม)
-
-ใส่ได้ทั้ง **GitHub repo Secrets** (ให้ Actions ใช้) และ **Cursor Dashboard Secrets** (ให้ Cloud Agent ใช้ `gh` หลังเปิด session ใหม่)
-
 บนเครื่องตัวเอง: คัดลอก `.env.example` → `apps/seafood-pos/.env.local` แล้วเติมค่าจาก Firebase Console → Project settings → Your apps (Web app กุ้ง)
 
 ---
