@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { dateKeyBangkok, PRIMARY_STAFF, shiftDateKey, STAFF_DAILY_WAGE } from '../lib/constants';
+import { dateKeyBangkok, STAFF_SHIFT_DEFAULTS, shiftDateKey, STAFF_DAILY_WAGE } from '../lib/constants';
 import {
   dayOfMonth,
   formatBiweeklyPeriodLabel,
@@ -51,7 +51,6 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
       const resolved = await getPrimaryAttendanceStaff({ force });
       const s = resolved?.staff ?? null;
       setStaff(s);
-      setStaffIssue(resolved?.issue ?? null);
       if (!s) {
         setPeriodRow(null);
         setDayPresent(false);
@@ -63,7 +62,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
       ]);
       const row = summary.find((x) => x.staffUid === s.id) || {
         staffUid: s.id,
-        staffName: s.name || PRIMARY_STAFF.displayName,
+        staffName: s.name || 'พนักงาน',
         workDays: [],
         days: 0,
         wage: 0,
@@ -93,7 +92,7 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
       await setStaffPresent({
         dateKey: markDateKey,
         staffUid: staff.id,
-        staffName: staff.name || PRIMARY_STAFF.displayName,
+        staffName: staff.name || 'พนักงาน',
         present: checked,
         markedBy: member?.name || member?.email,
         markedByUid: member?.uid || member?.id,
@@ -109,25 +108,25 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
     setBusy(false);
   };
 
-  const staffLabel = staff?.name || PRIMARY_STAFF.displayName;
-  const staffEmail = staff?.email || PRIMARY_STAFF.email;
   const workDaySet = new Set(periodRow?.workDays || []);
   const isTodayMark = markDateKey === todayKey;
   const canMarkDay = markDateKey <= todayKey;
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
-      <div className="rounded-3xl p-4 text-white shadow-lg border border-violet-900/20" style={{ background: 'linear-gradient(145deg, #4c1d95 0%, #3d1f0f 100%)' }}>
-        <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider">{t('payrollStaffCard')}</p>
-        <p className="text-xl font-black text-white mt-1">{staffLabel}</p>
-        <p className="text-violet-200/90 text-xs mt-0.5">{staffEmail}</p>
-        <p className="text-[10px] text-amber-200/90 mt-2 leading-relaxed">
-          {t('payrollShiftHint')
-            .replace('{checkIn}', PRIMARY_STAFF.shiftCheckIn)
-            .replace('{close}', PRIMARY_STAFF.storeClose)}
-        </p>
-        <p className="text-[10px] text-violet-200/70 mt-1">฿{STAFF_DAILY_WAGE}/{t('staffAttendancePerDay')}</p>
-      </div>
+      {staff && (
+        <div className="rounded-3xl p-4 text-white shadow-lg border border-violet-900/20" style={{ background: 'linear-gradient(145deg, #4c1d95 0%, #3d1f0f 100%)' }}>
+          <p className="text-violet-200 text-[10px] font-bold uppercase tracking-wider">{t('payrollStaffCard')}</p>
+          <p className="text-xl font-black text-white mt-1">{staff.name}</p>
+          <p className="text-violet-200/90 text-xs mt-0.5">{staff.email}</p>
+          <p className="text-[10px] text-amber-200/90 mt-2 leading-relaxed">
+            {t('payrollShiftHint')
+              .replace('{checkIn}', STAFF_SHIFT_DEFAULTS.shiftCheckIn)
+              .replace('{close}', STAFF_SHIFT_DEFAULTS.storeClose)}
+          </p>
+          <p className="text-[10px] text-violet-200/70 mt-1">฿{STAFF_DAILY_WAGE}/{t('staffAttendancePerDay')}</p>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-violet-200 shadow-sm">
         <button
@@ -154,16 +153,9 @@ export function PayrollTab({ member, t, lang, todayKey = dateKeyBangkok() }) {
       </div>
 
       {!staff && !loading && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 leading-relaxed space-y-2">
-          <p className="font-bold">{staffIssue === 'wrong_role' ? t('payrollWrongRoleTitle') : t('payrollNoStaffTitle')}</p>
-          <p>
-            {staffIssue === 'not_approved' && t('payrollNotApprovedHint')}
-            {staffIssue === 'wrong_role' && t('payrollWrongRoleHint')}
-            {(!staffIssue || staffIssue === 'not_registered' || staffIssue === 'unknown') && t('payrollNoStaffHint').replace('{email}', PRIMARY_STAFF.email)}
-          </p>
-          <p className="text-[10px] text-stone-500">
-            {PRIMARY_STAFF.displayName} · {PRIMARY_STAFF.email}
-          </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900 leading-relaxed">
+          <p className="font-bold">{t('payrollNoStaffTitle')}</p>
+          <p className="mt-2">{t('payrollNoStaffHint')}</p>
         </div>
       )}
 

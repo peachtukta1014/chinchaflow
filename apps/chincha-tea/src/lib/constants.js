@@ -12,20 +12,19 @@ export function isBootstrapAdminEmail(email) {
   return BOOTSTRAP_ADMIN_EMAILS.some((e) => e.toLowerCase() === em);
 }
 
+/** role ตอนสมัครครั้งแรก — แอดมิน bootstrap เท่านั้นที่ได้ admin ทันที */
+export function getTeaSignupRole(email) {
+  return isBootstrapAdminEmail(email) ? 'admin' : 'staff';
+}
+
 /** ค่าแรงพนักงานต่อวันที่มาทำงาน (บาท) */
 export const STAFF_DAILY_WAGE = 400;
 
-/** พนักงานหลักร้านชา (คนเดียว) — ใช้เรียงรายการและข้อความในแท็บตัดวัน */
-export const PRIMARY_STAFF = {
-  displayName: 'Aung Tun Latt',
-  email: '2004@chincha.pos',
+/** กะงานร้านชา — แสดงในแท็บตัดวัน (ไม่ผูกชื่อพนักงานคนใดคนหนึ่ง) */
+export const STAFF_SHIFT_DEFAULTS = {
   shiftCheckIn: '07:00–08:00',
   storeClose: '19:00',
 };
-
-export function isPrimaryStaffEmail(email) {
-  return (email || '').trim().toLowerCase() === PRIMARY_STAFF.email.toLowerCase();
-}
 
 /** หมวดเครื่องดื่ม — ร้านชงชา · กาแฟ · ผลไม้ปั่น (ไม่ใช่คาเฟ่) */
 export const DRINK_CATEGORIES = [
