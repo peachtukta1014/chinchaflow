@@ -2,6 +2,7 @@ import { listDateKeysInRange } from './payrollPeriod';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import {
   fsDelete,
+  fsListCollection,
   fsQueryStaffAttendanceByDate,
   fsQueryStaffAttendanceForMonth,
   fsQueryUsers,
@@ -43,6 +44,49 @@ export async function getPrimaryAttendanceStaff(options) {
 
 export function invalidateAttendanceStaffCache() {
   invalidateCache(STAFF_LIST_CACHE_KEY);
+}
+
+export async function listAllStaffAttendance() {
+  return fsListCollection('dailyStaffAttendance', 500);
+}
+
+/** ลบเวรทั้งหมดของพนักงานคนนี้ (ตอนลบสมาชิก) */
+export async function deleteStaffAttendanceForUid(staffUid) {
+  if (!staffUid) return { deleted: 0 };
+  const rows = await listAllStaffAttendance();
+  const mine = rows.filter((r) => r.staffUid === staffUid);
+  for (const r of mine) {
+    await fsDelete(`dailyStaffAttendance/${r.id}`);
+  }
+  invalidateCache(MONTH_CACHE_PREFIX);
+  return { deleted: mine.length };
+}
+
+/** เวรที่ staffUid ไม่มีใน users ที่อนุมัติแล้ว role พนักงาน */
+export async function previewOrphanedAttendance() {
+  const [users, rows] = await Promise.all([fsQueryUsers(), listAllStaffAttendance()]);
+  const validUids = new Set(
+    users.filter((u) => u.approved === true && u.role === 'staff').map((u) => u.id),
+  );
+  const orphans = rows.filter((r) => r.present && r.staffUid && !validUids.has(r.staffUid));
+  return { orphans, validStaffCount: validUids.size };
+}
+
+export async function pruneOrphanedAttendance() {
+  const { orphans } = await previewOrphanedAttendance();
+  let deleted = 0;
+  let errors = 0;
+  for (const r of orphans) {
+    try {
+      await fsDelete(`dailyStaffAttendance/${r.id}`);
+      deleted += 1;
+    } catch (e) {
+      console.error('prune attendance failed', r.id, e);
+      errors += 1;
+    }
+  }
+  if (deleted > 0) invalidateCache(MONTH_CACHE_PREFIX);
+  return { deleted, errors, orphans };
 }
 
 export async function getAttendanceForDate(dateKey) {
@@ -138,15 +182,10 @@ export async function getPeriodAttendanceSummary(startKey, endKey, { force = fal
     });
   }
   for (const r of inRange) {
-    const cur = byStaff.get(r.staffUid) || {
-      staffUid: r.staffUid,
-      staffName: r.staffName || 'พนักงาน',
-      workDays: [],
-      dailyWage: wageForUid(wageMap, r.staffUid),
-    };
+    const cur = byStaff.get(r.staffUid);
+    if (!cur) continue;
     if (!cur.workDays.includes(r.dateKey)) cur.workDays.push(r.dateKey);
     if (r.staffName) cur.staffName = r.staffName;
-    byStaff.set(r.staffUid, cur);
   }
   const periodDays = listDateKeysInRange(startKey, endKey).length;
   return [...byStaff.values()]
@@ -189,15 +228,10 @@ export async function getMonthlyAttendanceSummary(yearMonth, { force = false } =
   }
   for (const r of rows) {
     if (!r.present || !r.staffUid) continue;
-    const cur = byStaff.get(r.staffUid) || {
-      staffUid: r.staffUid,
-      staffName: r.staffName || 'พนักงาน',
-      days: 0,
-      dailyWage: wageForUid(wageMap, r.staffUid),
-    };
+    const cur = byStaff.get(r.staffUid);
+    if (!cur) continue;
     cur.days += 1;
     if (r.staffName) cur.staffName = r.staffName;
-    byStaff.set(r.staffUid, cur);
   }
   return [...byStaff.values()]
     .map((s) => ({

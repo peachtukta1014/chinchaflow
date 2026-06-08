@@ -30,6 +30,7 @@ export function staffWagesForDay(attendanceRows = [], wageMap = new Map()) {
   const byUid = new Map();
   for (const r of attendanceRows) {
     if (!r.present || !r.staffUid) continue;
+    if (wageMap.size > 0 && !wageMap.has(r.staffUid)) continue;
     if (byUid.has(r.staffUid)) continue;
     const rate = wageForUid(wageMap, r.staffUid);
     byUid.set(r.staffUid, {

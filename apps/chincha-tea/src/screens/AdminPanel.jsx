@@ -30,7 +30,11 @@ import {
   updateProductPrice,
 } from '../lib/productService';
 import { cachedFetch } from '../lib/fetchCache';
-import { invalidateAttendanceStaffCache } from '../lib/staffAttendanceService';
+import { StaffAttendanceCleanupPanel } from '../components/StaffAttendanceCleanupPanel';
+import {
+  deleteStaffAttendanceForUid,
+  invalidateAttendanceStaffCache,
+} from '../lib/staffAttendanceService';
 import { getStaffDailyWage } from '../lib/staffWage';
 import { CATALOG_CACHE_KEY, CATALOG_TTL_MS } from '../lib/useCatalog';
 import MemberAvatar from '../components/MemberAvatar';
@@ -127,6 +131,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
       .replace('{email}', u.email || '—');
     if (!window.confirm(msg)) return;
     try {
+      await deleteStaffAttendanceForUid(u.id);
       await fsDelete(`users/${u.id}`);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
       invalidateAttendanceStaffCache();
@@ -255,7 +260,8 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
   const [wageDraft, setWageDraft] = useState({});
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <StaffAttendanceCleanupPanel t={t} />
       {users.length === 0 && <p className="text-stone-400 text-sm text-center py-6">ยังไม่มีผู้ใช้</p>}
       {users.map((u) => {
         const isSelf = u.id === selfId;
