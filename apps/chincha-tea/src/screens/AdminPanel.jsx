@@ -29,7 +29,11 @@ import {
   saveTopping,
   updateProductPrice,
 } from '../lib/productService';
+import { cachedFetch } from '../lib/fetchCache';
 import { invalidateAttendanceStaffCache } from '../lib/staffAttendanceService';
+import { CATALOG_CACHE_KEY, CATALOG_TTL_MS } from '../lib/useCatalog';
+import MemberAvatar from '../components/MemberAvatar';
+import { displayMemberPhotoUrl } from '../lib/memberAvatar';
 import { FIREBASE_PROJECT_ID } from '../lib/viteEnv.js';
 import { SegmentedTabBar } from '../components/TabNav';
 
@@ -58,7 +62,11 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
 
   const refreshCatalogSection = useCallback(async () => {
     try {
-      const [p, tp] = await Promise.all([fsQueryProducts(), fsQueryToppings()]);
+      const [p, tp] = await cachedFetch(
+        CATALOG_CACHE_KEY,
+        () => Promise.all([fsQueryProducts(), fsQueryToppings()]),
+        CATALOG_TTL_MS,
+      );
       setProducts(p);
       setToppings(tp);
     } catch (e) {
@@ -249,8 +257,14 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
         const isSelf = u.id === selfId;
         return (
           <div key={u.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm">
-            <div className="flex justify-between items-start gap-2">
-              <div className="min-w-0">
+            <div className="flex justify-between items-start gap-3">
+              <MemberAvatar
+                name={u.name}
+                email={u.email}
+                photoUrl={displayMemberPhotoUrl(u.photoUrl, u.photoUpdatedAt)}
+                size="md"
+              />
+              <div className="min-w-0 flex-1">
                 <p className="font-black text-stone-800">{u.name || '—'}</p>
                 <p className="text-xs text-stone-400 truncate">{u.email}</p>
                 {isSelf && (

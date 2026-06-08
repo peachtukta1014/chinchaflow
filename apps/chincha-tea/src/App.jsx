@@ -5,7 +5,7 @@ import { fsQueryOrders } from './lib/firestoreRest';
 import { dateKeyBangkok } from './lib/constants';
 import { useLang } from './lib/i18n';
 import { useCatalog } from './lib/useCatalog';
-import { subscribeTeaMember } from './lib/authSession';
+import { clearTeaMemberCache, subscribeTeaMember } from './lib/authSession';
 import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
 import TabNav from './components/TabNav';
@@ -121,6 +121,7 @@ export default function App() {
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
     if (auth) await signOut(auth);
+    clearTeaMemberCache();
     setMember(null);
     setCart([]);
   };

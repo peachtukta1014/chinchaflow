@@ -14,8 +14,11 @@ function scaleDimensions(w, h, maxW, maxH) {
 /**
  * บีบรูปก่อนอัปโหลด — ลดขนาดไฟล์ อัปโหลดเร็ว เก็บ Storage ถูกลง
  */
+const MAX_DECODE_BYTES = 15 * 1024 * 1024;
+
 export async function compressImageFile(file, options = {}) {
   if (!file?.type?.startsWith('image/')) return file;
+  if (file.size > MAX_DECODE_BYTES) return file;
 
   const opts = { ...DEFAULTS, ...options };
   if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') {

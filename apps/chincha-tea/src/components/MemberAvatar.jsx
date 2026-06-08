@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { memberAvatarInitials } from '../lib/memberAvatar';
 
 const SIZES = {
@@ -18,13 +18,19 @@ export default function MemberAvatar({
 }) {
   const box = SIZES[size] || SIZES.md;
   const initials = memberAvatarInitials(name, email);
+  const [imgFailed, setImgFailed] = useState(false);
 
-  if (photoUrl) {
+  useEffect(() => {
+    setImgFailed(false);
+  }, [photoUrl]);
+
+  if (photoUrl && !imgFailed) {
     return (
       <img
         src={photoUrl}
         alt={name || 'โปรไฟล์'}
         className={`${box} rounded-full object-cover border-2 border-amber-300 shrink-0 bg-amber-100 ${className}`}
+        onError={() => setImgFailed(true)}
       />
     );
   }

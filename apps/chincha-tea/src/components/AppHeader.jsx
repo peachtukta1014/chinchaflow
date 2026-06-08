@@ -1,6 +1,7 @@
 import { CreditsStrip } from '@chincha/app-credits';
 import { hardReloadApp } from '../lib/reloadApp';
 import { getAppBuildLabel } from '../lib/appBuildInfo';
+import { displayMemberPhotoUrl } from '../lib/memberAvatar';
 import MemberAvatar from './MemberAvatar';
 
 export default function AppHeader({
@@ -47,7 +48,7 @@ export default function AppHeader({
             <MemberAvatar
               name={member?.name}
               email={member?.email}
-              photoUrl={member?.photoUrl}
+              photoUrl={displayMemberPhotoUrl(member?.photoUrl, member?.photoUpdatedAt)}
               size="sm"
             />
           )}
