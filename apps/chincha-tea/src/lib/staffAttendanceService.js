@@ -1,4 +1,3 @@
-import { STAFF_DAILY_WAGE } from './constants';
 import { listDateKeysInRange } from './payrollPeriod';
 import { cachedFetch, invalidateCache } from './fetchCache';
 import {
@@ -8,13 +7,12 @@ import {
   fsQueryUsers,
   fsUpsertDoc,
 } from './firestoreRest';
+import { getStaffDailyWage, wageForUid, wageMapFromStaffList } from './staffWage';
 
 const STAFF_LIST_CACHE_KEY = 'attendance:staff-list';
 const STAFF_LIST_TTL_MS = 10 * 60 * 1000;
 const MONTH_CACHE_PREFIX = 'attendance:month:';
 const MONTH_TTL_MS = 2 * 60 * 1000;
-
-export { STAFF_DAILY_WAGE };
 
 export function attendanceDocId(dateKey, staffUid) {
   return `${dateKey}_${staffUid}`;
@@ -115,8 +113,10 @@ export async function ensurePrimaryStaffPresentOnSale({ dateKey }) {
   return { ok: true, skipped: false };
 }
 
-/** สรุปเวรในรอบ 15 วัน — รวมรายการวันที่มาทำงานต่อคน */
+/** สรุปเวรในรอบ 15 วัน — รวมรายการวันที่มาทำงานต่อคน (อัตราค่าแรงต่อคน) */
 export async function getPeriodAttendanceSummary(startKey, endKey, { force = false } = {}) {
+  const staffList = await listAttendanceStaff({ force });
+  const wageMap = wageMapFromStaffList(staffList);
   const yearMonth = startKey.slice(0, 7);
   const cacheKey = `${MONTH_CACHE_PREFIX}${yearMonth}`;
   if (force) invalidateCache(cacheKey);
@@ -129,11 +129,20 @@ export async function getPeriodAttendanceSummary(startKey, endKey, { force = fal
     (r) => r.present && r.staffUid && r.dateKey >= startKey && r.dateKey <= endKey,
   );
   const byStaff = new Map();
+  for (const s of staffList) {
+    byStaff.set(s.id, {
+      staffUid: s.id,
+      staffName: s.name || 'พนักงาน',
+      workDays: [],
+      dailyWage: getStaffDailyWage(s),
+    });
+  }
   for (const r of inRange) {
     const cur = byStaff.get(r.staffUid) || {
       staffUid: r.staffUid,
       staffName: r.staffName || 'พนักงาน',
       workDays: [],
+      dailyWage: wageForUid(wageMap, r.staffUid),
     };
     if (!cur.workDays.includes(r.dateKey)) cur.workDays.push(r.dateKey);
     if (r.staffName) cur.staffName = r.staffName;
@@ -144,12 +153,14 @@ export async function getPeriodAttendanceSummary(startKey, endKey, { force = fal
     .map((s) => {
       const workDays = [...s.workDays].sort();
       const days = workDays.length;
+      const rate = s.dailyWage ?? wageForUid(wageMap, s.staffUid);
       return {
         staffUid: s.staffUid,
         staffName: s.staffName,
         workDays,
         days,
-        wage: days * STAFF_DAILY_WAGE,
+        dailyWage: rate,
+        wage: days * rate,
       };
     })
     .sort((a, b) => a.staffName.localeCompare(b.staffName, 'th'))
@@ -158,6 +169,8 @@ export async function getPeriodAttendanceSummary(startKey, endKey, { force = fal
 
 /** สรุปจำนวนวันทำงานต่อคนในเดือน YYYY-MM */
 export async function getMonthlyAttendanceSummary(yearMonth, { force = false } = {}) {
+  const staffList = await listAttendanceStaff({ force });
+  const wageMap = wageMapFromStaffList(staffList);
   const cacheKey = `${MONTH_CACHE_PREFIX}${yearMonth}`;
   if (force) invalidateCache(cacheKey);
   const rows = await cachedFetch(
@@ -166,12 +179,21 @@ export async function getMonthlyAttendanceSummary(yearMonth, { force = false } =
     MONTH_TTL_MS,
   );
   const byStaff = new Map();
+  for (const s of staffList) {
+    byStaff.set(s.id, {
+      staffUid: s.id,
+      staffName: s.name || 'พนักงาน',
+      days: 0,
+      dailyWage: getStaffDailyWage(s),
+    });
+  }
   for (const r of rows) {
     if (!r.present || !r.staffUid) continue;
     const cur = byStaff.get(r.staffUid) || {
       staffUid: r.staffUid,
       staffName: r.staffName || 'พนักงาน',
       days: 0,
+      dailyWage: wageForUid(wageMap, r.staffUid),
     };
     cur.days += 1;
     if (r.staffName) cur.staffName = r.staffName;
@@ -180,7 +202,8 @@ export async function getMonthlyAttendanceSummary(yearMonth, { force = false } =
   return [...byStaff.values()]
     .map((s) => ({
       ...s,
-      wage: s.days * STAFF_DAILY_WAGE,
+      wage: s.days * (s.dailyWage ?? wageForUid(wageMap, s.staffUid)),
     }))
+    .filter((s) => s.days > 0)
     .sort((a, b) => a.staffName.localeCompare(b.staffName, 'th'));
 }

@@ -1,17 +1,17 @@
 /**
  * โครงแท็บหลัก — จัดตามความสำคัญการใช้งาน
  *
- * กลุ่ม sales (ขายรายวัน): ใช้บ่อยสุด → แถวใหญ่ 2 ปุ่ม
- * กลุ่ม daily (ร้าน/สรุป): ปิดวัน · สั่งของ
- * กลุ่ม system (แอดมิน): จัดการสมาชิก/สินค้า/LINE
- *
- * แท็บ "ตัดวัน" (payroll) — เตรียมไว้ในกลุ่ม daily สำหรับแอดมิน (ยังไม่เปิดใช้)
+ * พนักงาน: ขาย · ร้าน · สินค้า
+ * แอดมิน: ภาพรวม (dashboard) · ขาย · ร้าน · บัญชี/ตัดวัน/จัดการ
  */
 
-/** @typedef {'order'|'history'|'summary'|'restock'|'admin'|'catalog'|'payroll'|'profit'} AppTabId */
+/** @typedef {'order'|'history'|'summary'|'restock'|'admin'|'catalog'|'payroll'|'profit'|'dashboard'} AppTabId */
 
 /** @type {Record<string, { d: string }>} */
 export const TAB_ICONS = {
+  dashboard: {
+    d: 'M4 4h7v9H4V4zm9 0h7v5h-7V4zM4 15h7v5H4v-5zm9 3h7v2h-7v-2',
+  },
   order: {
     d: 'M8 2h8l1 4h3v2h-1l-1.5 14H6.5L5 8H4V6h3l1-4zm2 6v8m4-8v8',
   },
@@ -38,8 +38,6 @@ export const TAB_ICONS = {
   },
 };
 
-const PAYROLL_TAB_ENABLED = true;
-
 /**
  * @param {boolean} isAdmin
  * @param {(key: string) => string} t
@@ -50,39 +48,44 @@ export function getAppNavGroups(isAdmin, t) {
     { id: 'history', label: t('historyTabShort'), icon: 'history' },
   ];
 
-  const dailyTabs = [
-    { id: 'restock', label: t('restockTabShort'), icon: 'restock' },
+  const shopTabs = [
     { id: 'summary', label: t('summaryTabShort'), icon: 'summary' },
-  ];
-
-  if (isAdmin && PAYROLL_TAB_ENABLED) {
-    dailyTabs.push({ id: 'profit', label: t('profitTabShort'), icon: 'profit' });
-    dailyTabs.push({ id: 'payroll', label: t('payrollTabShort'), icon: 'payroll' });
-  }
-
-  /** @type {{ id: string, label: string, tabs: typeof salesTabs, layout?: 'primary'|'compact' }[]} */
-  const groups = [
-    { id: 'sales', label: t('navGroupSales'), tabs: salesTabs, layout: 'primary' },
-    { id: 'daily', label: t('navGroupDaily'), tabs: dailyTabs, layout: 'compact' },
+    { id: 'restock', label: t('restockTabShort'), icon: 'restock' },
   ];
 
   if (isAdmin) {
-    groups.push({
-      id: 'system',
-      label: t('navGroupSystem'),
-      tabs: [{ id: 'admin', label: t('adminTabShort'), icon: 'admin' }],
-      layout: 'compact',
-    });
-  } else {
-    groups.push({
+    return [
+      {
+        id: 'overview',
+        label: t('navGroupOverview'),
+        tabs: [{ id: 'dashboard', label: t('dashboardTabShort'), icon: 'dashboard' }],
+        layout: 'primary',
+      },
+      { id: 'sales', label: t('navGroupSales'), tabs: salesTabs, layout: 'primary' },
+      { id: 'shop', label: t('navGroupDaily'), tabs: shopTabs, layout: 'compact' },
+      {
+        id: 'admin',
+        label: t('navGroupAdmin'),
+        tabs: [
+          { id: 'profit', label: t('profitTabShort'), icon: 'profit' },
+          { id: 'payroll', label: t('payrollTabShort'), icon: 'payroll' },
+          { id: 'admin', label: t('adminTabShort'), icon: 'admin' },
+        ],
+        layout: 'compact',
+      },
+    ];
+  }
+
+  return [
+    { id: 'sales', label: t('navGroupSales'), tabs: salesTabs, layout: 'primary' },
+    { id: 'shop', label: t('navGroupDaily'), tabs: shopTabs, layout: 'compact' },
+    {
       id: 'system',
       label: t('navGroupSystem'),
       tabs: [{ id: 'catalog', label: t('catalogTabShort'), icon: 'catalog' }],
       layout: 'compact',
-    });
-  }
-
-  return groups;
+    },
+  ];
 }
 
 /** @param {typeof getAppNavGroups extends (...args: any) => infer R ? R : never} groups */

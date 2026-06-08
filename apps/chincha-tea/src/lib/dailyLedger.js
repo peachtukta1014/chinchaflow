@@ -1,10 +1,11 @@
 import { STAFF_DAILY_WAGE } from './constants';
+import { wageForUid } from './staffWage';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from './restockService';
 
 /**
  * สรุปบัญชีรายวัน — สูตรเดียวกับ LINE (`teaDailySummary.aggregateDay`)
  * กำไรหลัก = ยอดขาย − ค่าใช้จ่าย − ซื้อของ (ไม่หักค่าแรง)
- * ค่าแรงลูกน้อง (คนเดียว) แสดงแยก แล้วสรุปหลังหักอีกชั้น
+ * ค่าแรงพนักงานแต่ละคน (อัตราจาก users.dailyWage) แสดงแยก แล้วสรุปหลังหักอีกชั้น
  */
 
 export function sumOrderRevenue(orders = []) {
@@ -24,21 +25,42 @@ export function sumOrderRevenue(orders = []) {
   };
 }
 
-/** ค่าแรงพนักงานหลักร้าน — มาทำงานวันนั้น = 1 × อัตรา */
-export function primaryStaffWageForDay(attendanceRows = [], staffUid) {
-  if (!staffUid) return { present: false, wage: 0 };
+/** ค่าแรงรวมวันนี้ — แต่ละคนที่มาทำงาน × อัตราของตัวเอง */
+export function staffWagesForDay(attendanceRows = [], wageMap = new Map()) {
+  const byUid = new Map();
+  for (const r of attendanceRows) {
+    if (!r.present || !r.staffUid) continue;
+    if (byUid.has(r.staffUid)) continue;
+    const rate = wageForUid(wageMap, r.staffUid);
+    byUid.set(r.staffUid, {
+      staffUid: r.staffUid,
+      staffName: r.staffName || 'พนักงาน',
+      wage: rate,
+      wageRate: rate,
+    });
+  }
+  const staffWageRows = [...byUid.values()];
+  const wageCost = staffWageRows.reduce((s, x) => s + x.wage, 0);
+  return { staffWageRows, wageCost };
+}
+
+/** @deprecated ใช้ staffWagesForDay — คงไว้สำหรับ primary staff เดิม */
+export function primaryStaffWageForDay(attendanceRows = [], staffUid, wageMap = new Map()) {
+  if (!staffUid) return { present: false, wage: 0, wageRate: STAFF_DAILY_WAGE };
   const present = attendanceRows.some((r) => r.staffUid === staffUid && r.present === true);
-  return { present, wage: present ? STAFF_DAILY_WAGE : 0 };
+  const wageRate = wageForUid(wageMap, staffUid);
+  return { present, wage: present ? wageRate : 0, wageRate };
 }
 
 /**
- * @param {{ orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], primaryStaffUid?: string, primaryStaffName?: string }} input
+ * @param {{ orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], wageMap?: Map, primaryStaffUid?: string, primaryStaffName?: string }} input
  */
 export function computeDayLedger({
   orders = [],
   expenses = [],
   restocks = [],
   attendance = [],
+  wageMap = new Map(),
   primaryStaffUid,
   primaryStaffName,
 }) {
@@ -49,11 +71,14 @@ export function computeDayLedger({
 
   const operatingProfit = revenue.totalSales - totalExpenses - totalRestockPurchased;
 
-  const staffUid = primaryStaffUid || null;
-  const { present: staffPresent, wage: wageCost } = primaryStaffWageForDay(attendance, staffUid);
+  const { staffWageRows, wageCost } = staffWagesForDay(attendance, wageMap);
   const afterWage = operatingProfit - wageCost;
-  const attendanceName = attendance.find((r) => r.staffUid === staffUid && r.present)?.staffName;
-  const staffName = primaryStaffName || attendanceName || null;
+
+  const staffUid = primaryStaffUid || staffWageRows[0]?.staffUid || null;
+  const primaryRow = staffWageRows.find((r) => r.staffUid === staffUid) || staffWageRows[0];
+  const staffPresent = !!primaryRow;
+  const staffName = primaryStaffName || primaryRow?.staffName || null;
+  const wageRate = primaryRow?.wageRate ?? STAFF_DAILY_WAGE;
 
   return {
     ...revenue,
@@ -63,8 +88,9 @@ export function computeDayLedger({
     purchasedRestocks,
     operatingProfit,
     staffPresent,
+    staffWageRows,
     wageCost,
-    wageRate: STAFF_DAILY_WAGE,
+    wageRate,
     staffName,
     afterWage,
   };

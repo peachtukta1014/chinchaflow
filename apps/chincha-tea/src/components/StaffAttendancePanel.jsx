@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { STAFF_DAILY_WAGE } from '../lib/constants';
 import {
   getAttendanceForDate,
   getMonthlyAttendanceSummary,
@@ -8,6 +7,7 @@ import {
   setStaffPresent,
   yearMonthFromDateKey,
 } from '../lib/staffAttendanceService';
+import { getStaffDailyWage } from '../lib/staffWage';
 
 export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
   const [staffList, setStaffList] = useState([]);
@@ -75,6 +75,9 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
   };
 
   const presentToday = dayRows.filter((r) => r.present).length;
+  const todayWageTotal = staffList.reduce((sum, s) => (
+    isStaffPresentOnDate(s.id, dayRows) ? sum + getStaffDailyWage(s) : sum
+  ), 0);
   const monthTotalWage = monthSummary.reduce((s, x) => s + x.wage, 0);
 
   if (loading && !staffList.length) {
@@ -98,7 +101,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
     <div className="bg-white rounded-3xl p-4 shadow-sm border border-violet-200 space-y-3">
       <div>
         <p className="font-bold text-stone-500 text-[10px] uppercase">👷 {t('staffAttendanceTitle')}</p>
-        <p className="text-[10px] text-stone-400 mt-1">{t('staffAttendanceHint')} (฿{STAFF_DAILY_WAGE}/{t('staffAttendancePerDay')})</p>
+        <p className="text-[10px] text-stone-400 mt-1">{t('staffAttendanceHint')}</p>
       </div>
 
       {flash && (
@@ -110,6 +113,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
       <div className="space-y-2">
         {staffList.map((s) => {
           const on = isStaffPresentOnDate(s.id, dayRows);
+          const rate = getStaffDailyWage(s);
           return (
             <label
               key={s.id}
@@ -124,7 +128,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
               />
               <span className="flex-1 font-bold text-sm text-stone-800">{s.name || s.email}</span>
               {on && (
-                <span className="text-xs font-bold text-violet-700">฿{STAFF_DAILY_WAGE}</span>
+                <span className="text-xs font-bold text-violet-700">฿{rate}</span>
               )}
             </label>
           );
@@ -133,7 +137,7 @@ export function StaffAttendancePanel({ viewDateKey, member, t, isAdmin }) {
 
       {isAdmin && (
         <p className="text-xs text-stone-500 text-center">
-          {t('staffAttendanceDayCount')} {presentToday} {t('staffAttendanceDaysUnit')} · ฿{(presentToday * STAFF_DAILY_WAGE).toLocaleString()}
+          {t('staffAttendanceDayCount')} {presentToday} {t('staffAttendanceDaysUnit')} · ฿{todayWageTotal.toLocaleString()}
         </p>
       )}
 
