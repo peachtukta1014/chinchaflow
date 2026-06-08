@@ -114,7 +114,9 @@ chincha/
 
 โปรเจกต์นี้ **ไม่มีไฟล์ `.login`** — ใช้ Secrets แทน
 
-### Secrets สำหรับแอปกุ้ง (`apps/seafood-pos`)
+### Secrets สำหรับ Firebase (ทั้งชา + กุ้ง)
+
+ใส่ใน **[cursor.com/dashboard](https://cursor.com/dashboard) → Cloud Agents → Secrets** — ชื่อต้องตรงตาราง (คัดลอกจาก GitHub repo → Settings → Secrets ได้)
 
 | Secret (ชื่อใน Dashboard) | ใช้ทำอะไร |
 |---------------------------|-----------|
@@ -124,21 +126,27 @@ chincha/
 | `VITE_FIREBASE_PROJECT_ID` | `chincha-eeed6` |
 | `VITE_FIREBASE_STORAGE_BUCKET` | bucket โปรเจกต์ |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | จาก Firebase Console |
-| `VITE_FIREBASE_APP_ID` | **ของกุ้ง** (คนละตัวกับชา — ดู GitHub `VITE_FIREBASE_APP_ID_SHRIMP`) |
+| `VITE_FIREBASE_APP_ID_SHRIMP` | **ของกุ้ง** → map เป็น `VITE_FIREBASE_APP_ID` ใน `apps/seafood-pos/.env.local` |
+| `VITE_FIREBASE_APP_ID_TEA` | **ของชา** → map เป็น `VITE_FIREBASE_APP_ID` ใน `apps/chincha-tea/.env.local` |
 
 ค่าตัวอย่างชื่อตัวแปรอยู่ที่ `apps/seafood-pos/.env.example` (ไม่มีค่าจริง)
 
+หลังเพิ่ม/แก้ Secrets แล้ว **เริ่ม agent session ใหม่** — session เก่าไม่เห็นค่าใหม่
+
+Cloud Agent รัน `scripts/materialize-cloud-env.sh` หลัง `npm install` (ดู `.cursor/environment.json`) เพื่อสร้าง `apps/*/.env.local` อัตโนมัติ — อย่า commit `.env.local`
+
 ### ล็อกอินแอดมินให้ agent อ่าน Firestore (ทางเลือก)
 
-ถ้าต้องการให้ Cloud Agent **ล็อกอินเป็นแอดมิน** (เช่น ดูรายชื่อ `shrimp_users`) เพิ่มใน Secrets **บน Dashboard เท่านั้น**:
+ถ้าต้องการให้ Cloud Agent **ล็อกอินเป็นแอดมิน** (E2E / อ่าน Firestore) เพิ่มใน Secrets **บน Dashboard เท่านั้น**:
 
-| Secret | ตัวอย่าง |
-|--------|----------|
-| `SHRIMP_AGENT_EMAIL` | `peachtukta1014@gmail.com` |
-| `SHRIMP_AGENT_PASSWORD` | รหัสผ่าน Firebase Auth ของบัญชีนั้น |
+| Secret | แอป | ตัวอย่าง |
+|--------|-----|----------|
+| `SHRIMP_AGENT_EMAIL` | กุ้ง | `peachtukta1014@gmail.com` |
+| `SHRIMP_AGENT_PASSWORD` | กุ้ง | รหัสผ่าน Firebase Auth |
+| `TEA_AGENT_EMAIL` | ชา | `gmc-peach@chincha.pos` หรือ `peachtukta1014@gmail.com` |
+| `TEA_AGENT_PASSWORD` | ชา | รหัสผ่าน Firebase Auth |
 
 - อีเมล `peachtukta1014@gmail.com` เป็น **bootstrap admin** ในแอปกุ้ง (อนุมัติทันทีเมื่อสมัคร/ล็อกอินครั้งแรก)
-- หลังเพิ่ม Secrets แล้ว **เริ่ม agent session ใหม่** (secret ไม่ติด session เก่า)
 - อย่าใส่รหัสผ่านใน Slack / ใน PR / ใน repo
 
 ### Secret สำหรับจัดการ GitHub repo (ทางเลือก)
