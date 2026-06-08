@@ -21,6 +21,7 @@ import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
 import StaffGuidePanel from './components/StaffGuidePanel';
 import StaffLangNudge from './components/StaffLangNudge';
+import MyProfileScreen from './screens/MyProfileScreen';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
@@ -30,6 +31,7 @@ export default function App() {
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
   const [tab, setTab] = useState('order');
+  const [lastTab, setLastTab] = useState('order');
   const [cart, setCart] = useState([]);
   const [modalItem, setModalItem] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -103,6 +105,19 @@ export default function App() {
     prevPendingRestocksRef.current = pendingRestocks;
   }, [isAuthed, member?.role, pendingRestocks]);
 
+  const openProfile = useCallback(() => {
+    setLastTab((prev) => (tab === 'my-profile' ? prev : tab));
+    setTab('my-profile');
+  }, [tab]);
+
+  const goBackFromProfile = useCallback(() => {
+    setTab(lastTab);
+  }, [lastTab]);
+
+  const onProfileUpdated = useCallback((next) => {
+    setMember((prev) => (prev ? { ...prev, ...next } : prev));
+  }, []);
+
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
     if (auth) await signOut(auth);
@@ -161,12 +176,22 @@ export default function App() {
 
   const isAdmin = member.role === 'admin';
   const navGroups = getAppNavGroups(isAdmin, t);
+  const isProfileTab = tab === 'my-profile';
 
   return (
     <div className="max-w-md mx-auto h-screen flex flex-col relative overflow-hidden" style={{ background: '#fdf6f0' }}>
       <div className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]" style={{ backgroundImage: 'url(/chincha-logo.jpg)', backgroundSize: '110px', backgroundRepeat: 'repeat' }} />
 
-      <AppHeader member={member} lang={lang} setLang={setLang} onLogout={handleLogout} t={t} />
+      <AppHeader
+        member={member}
+        lang={lang}
+        setLang={setLang}
+        onLogout={handleLogout}
+        onOpenProfile={openProfile}
+        profileMode={isProfileTab}
+        onBackFromProfile={goBackFromProfile}
+        t={t}
+      />
 
       {member?.role === 'staff' && (
         <>
@@ -175,17 +200,19 @@ export default function App() {
         </>
       )}
 
-      <TabNav
-        groups={navGroups}
-        activeTab={tab}
-        badges={isAdmin ? { restock: pendingRestocks } : {}}
-        onSelect={(id) => {
-          setTab(id);
-          if (id === 'admin' || id === 'catalog') refreshCatalog();
-          if (id === 'history' || id === 'summary' || id === 'profit') refreshOrders();
-          if (id === 'restock' && isAdmin) refreshPendingRestocks();
-        }}
-      />
+      {!isProfileTab && (
+        <TabNav
+          groups={navGroups}
+          activeTab={tab}
+          badges={isAdmin ? { restock: pendingRestocks } : {}}
+          onSelect={(id) => {
+            setTab(id);
+            if (id === 'admin' || id === 'catalog') refreshCatalog();
+            if (id === 'history' || id === 'summary' || id === 'profit') refreshOrders();
+            if (id === 'restock' && isAdmin) refreshPendingRestocks();
+          }}
+        />
+      )}
 
       <main className="flex-1 overflow-y-auto z-10" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
@@ -252,9 +279,12 @@ export default function App() {
         {tab === 'catalog' && !isAdmin && (
           <AdminPanel catalogOnly t={t} lang={lang} menuItems={menuItems} onCatalogChanged={refreshCatalog} />
         )}
+        {isProfileTab && (
+          <MyProfileScreen member={member} onProfileUpdated={onProfileUpdated} t={t} />
+        )}
       </main>
 
-      {cart.length > 0 && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && (
+      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"
