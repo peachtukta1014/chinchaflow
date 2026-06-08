@@ -1244,7 +1244,7 @@ try {
     isLineOrderSafeToDelete,
     selectLineOrdersToPrune,
   } = await import('../src/lib/lineOrderRetention.js');
-  assert(LINE_ORDER_RETENTION_KEEP === 300, 'LINE_ORDER_RETENTION_KEEP = 300');
+  assert(LINE_ORDER_RETENTION_KEEP === 100, 'LINE_ORDER_RETENTION_KEEP = 100');
   const orders = [
     { id: 'a', status: 'pending' },
     { id: 'b', status: 'delivering' },

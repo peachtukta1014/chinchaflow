@@ -1,5 +1,5 @@
 /** จำนวนออเดอร์ปิด (done/cancelled) ที่เก็บไว้ — เก่ากว่านี้ลบได้ถ้าปลอดภัย */
-export const LINE_ORDER_RETENTION_KEEP = 300;
+export const LINE_ORDER_RETENTION_KEEP = 100;
 
 const CLOSED_STATUSES = new Set(['done', 'cancelled']);
 const ACTIVE_STATUSES = new Set(['pending', 'delivering']);
