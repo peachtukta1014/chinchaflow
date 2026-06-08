@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MemberAvatar from '../components/MemberAvatar';
-import { displayMemberPhotoUrl } from '../lib/memberAvatar';
+import { displayMemberPhotoUrl, stripPhotoCacheBust } from '../lib/memberAvatar';
 import { getTeaRoleLabel } from '../lib/teaRoles';
 import {
   changeTeaMemberPassword,
@@ -46,6 +46,12 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
   const [profileFeedback, setProfileFeedback] = useState({ message: '', error: '' });
   const [passwordFeedback, setPasswordFeedback] = useState({ message: '', error: '' });
 
+  useEffect(() => {
+    setName(member?.name || '');
+    setPhone(member?.phone || '');
+    setPhotoUrl(displayMemberPhotoUrl(member?.photoUrl, member?.photoUpdatedAt));
+  }, [member?.name, member?.phone, member?.photoUrl, member?.photoUpdatedAt]);
+
   const onPickPhoto = () => fileRef.current?.click();
 
   const onPhotoFile = async (e) => {
@@ -56,12 +62,13 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
     setBusy('photo');
     try {
       const url = await uploadTeaMemberPhoto(member.uid, file);
+      const photoUpdatedAt = new Date().toISOString();
       setPhotoUrl(url);
       setPhotoFeedback({ message: t('profilePhotoUpdated'), error: '' });
       onProfileUpdated?.({
         ...member,
-        photoUrl: url.split('?')[0],
-        photoUpdatedAt: new Date().toISOString(),
+        photoUrl: stripPhotoCacheBust(url),
+        photoUpdatedAt,
       });
     } catch (err) {
       setPhotoFeedback({
@@ -118,8 +125,8 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
   };
 
   return (
-    <div className="px-4 pt-4 pb-10 space-y-4">
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-amber-200 flex flex-col items-center text-center gap-3">
+    <div className="px-4 pt-2 pb-10 space-y-3">
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 flex flex-col items-center text-center gap-2">
         <button
           type="button"
           onClick={onPickPhoto}
@@ -127,10 +134,11 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
           className="relative active:scale-95 disabled:opacity-60"
         >
           <MemberAvatar
+            key={photoUrl || 'no-photo'}
             name={name}
             email={member?.email}
             photoUrl={photoUrl}
-            size="xl"
+            size="lg"
           />
           <span
             className="absolute -bottom-1 -right-1 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"

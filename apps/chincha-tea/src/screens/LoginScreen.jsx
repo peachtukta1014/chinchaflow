@@ -108,9 +108,10 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       const profile = await loadOrCreateProfile(cred.user.uid, em);
       if (profile.approved !== true) {
         setPending(true);
+        setError('');
         return;
       }
-      onAuthed(profile);
+      onAuthed({ uid: cred.user.uid, ...profile });
     } catch (e) {
       const code = e?.code || '';
       const key = authErrorKey(code);
