@@ -111,7 +111,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
     if (patch.role != null || patch.approved != null || patch.dailyWage != null) {
       invalidateAttendanceStaffCache();
     }
-    showFlash('✅ อัปเดตสมาชิกแล้ว');
+    showFlash(t('memberUpdated'));
   };
 
   const deleteUser = async (u) => {
@@ -234,6 +234,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
           importBusy={importBusy}
           onImportMenu={importMenuHandler}
           t={t}
+          lang={lang}
           onSaveProduct={saveProductHandler}
           onSaveTopping={saveToppingHandler}
           onQuickPrice={quickPriceHandler}
@@ -262,7 +263,7 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
   return (
     <div className="space-y-3">
       <StaffAttendanceCleanupPanel t={t} />
-      {users.length === 0 && <p className="text-stone-400 text-sm text-center py-6">ยังไม่มีผู้ใช้</p>}
+      {users.length === 0 && <p className="text-stone-400 text-sm text-center py-6">{t('noMembers')}</p>}
       {users.map((u) => {
         const isSelf = u.id === selfId;
         const wageVal = wageDraft[u.id] ?? String(getStaffDailyWage(u));
@@ -283,7 +284,7 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
                 )}
                 <p className="text-[10px] mt-1">
                   <span className={`px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {u.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                    {u.approved ? t('approvedYes') : t('approvedNo')}
                   </span>
                   <span className="ml-2 text-stone-500">{u.role === 'admin' ? t('roleAdmin') : t('roleStaff')}</span>
                 </p>
@@ -363,6 +364,7 @@ function ProductsSection({
   importBusy,
   onImportMenu,
   t,
+  lang = 'th',
   onSaveProduct,
   onSaveTopping,
   onQuickPrice,
@@ -488,7 +490,7 @@ function ProductsSection({
       })}
 
       <div className="flex justify-between items-center pt-2">
-        <p className="font-black text-stone-700 text-sm">ท็อปปิ้ง</p>
+        <p className="font-black text-stone-700 text-sm">{t('toppings')}</p>
         <button
           type="button"
           onClick={() => setTopForm({ ...emptyTopping(), _new: true })}
@@ -515,6 +517,7 @@ function ProductsSection({
           form={prodForm}
           isNew={!!prodForm._new}
           t={t}
+          lang={lang}
           onClose={() => setProdForm(null)}
           onSave={(f) => onSaveProduct(f, prodForm._new ? null : prodForm.id).then(() => setProdForm(null))}
         />
@@ -532,7 +535,7 @@ function ProductsSection({
   );
 }
 
-function ProductFormModal({ form, isNew, t, onClose, onSave }) {
+function ProductFormModal({ form, isNew, t, lang = 'th', onClose, onSave }) {
   const [f, setF] = useState(form);
   return (
     <ModalShell title={isNew ? t('addProduct') : t('editProduct')} onClose={onClose}>
@@ -554,7 +557,11 @@ function ProductFormModal({ form, isNew, t, onClose, onSave }) {
         <input className="field" type="tel" inputMode="numeric" value={f.basePrice} onChange={(e) => setF({ ...f, basePrice: e.target.value.replace(/\D/g, '') })} />
         <label className="text-[10px] font-bold text-stone-500">{t('categoryLabel')}</label>
         <select className="field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>
-          {DRINK_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          {DRINK_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {lang === 'my' ? (c.labelMy || c.label) : c.label}
+            </option>
+          ))}
         </select>
         <input className="field" placeholder={t('tagPlaceholder')} value={f.tag || ''} onChange={(e) => setF({ ...f, tag: e.target.value })} />
         <input className="field" placeholder="emoji" value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} />
@@ -571,9 +578,9 @@ function ProductFormModal({ form, isNew, t, onClose, onSave }) {
 function ToppingFormModal({ form, isNew, t, onClose, onSave }) {
   const [f, setF] = useState(form);
   return (
-    <ModalShell title={isNew ? t('addTopping') : t('editProduct')} onClose={onClose}>
-      <input className="field" placeholder="ชื่อท็อปปิ้ง" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
-      <input className="field" type="number" placeholder="ราคา" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
+    <ModalShell title={isNew ? t('addTopping') : t('edit')} onClose={onClose}>
+      <input className="field" placeholder={t('toppingName')} value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
+      <input className="field" type="number" placeholder={t('priceLabel')} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
       <button type="button" onClick={() => onSave(f)} className="w-full py-3 mt-2 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
     </ModalShell>
   );
@@ -668,9 +675,9 @@ function OrderEditModal({ order, t, onClose, onSave }) {
   return (
     <ModalShell title={t('editOrder')} onClose={onClose}>
       <p className="text-xs text-stone-400 mb-3">ID: {order.id}</p>
-      <label className="text-xs font-bold text-stone-500">ยอดรวม (฿)</label>
+      <label className="text-xs font-bold text-stone-500">{t('total')} (฿)</label>
       <input className="field" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
-      <label className="text-xs font-bold text-stone-500 mt-2 block">การชำระ</label>
+      <label className="text-xs font-bold text-stone-500 mt-2 block">{t('cash')}/{t('transfer')}</label>
       <div className="flex gap-2 mb-3">
         {[['cash', t('cash')], ['transfer', t('transfer')]].map(([v, label]) => (
           <button key={v} type="button" onClick={() => setPayType(v)} className={`flex-1 py-2 rounded-xl font-bold text-sm border-2 ${payType === v ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}>{label}</button>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { SIZES } from '../lib/constants';
+import { ICE_OPTIONS, SIZES, SWEET_OPTIONS } from '../lib/constants';
 import { menuDisplayName, toppingDisplayLabel, toppingDisplaySub } from '../lib/displayNames';
 
 export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) {
   const [selectedSize, setSelectedSize] = useState(SIZES[0]);
+  const [selectedSweet, setSelectedSweet] = useState(SWEET_OPTIONS[4]);
+  const [selectedIce, setSelectedIce] = useState(ICE_OPTIONS[2]);
   const [selectedToppings, setSelectedToppings] = useState([]);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
@@ -23,7 +25,7 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-md rounded-t-[2rem] p-6 space-y-5"
+        className="bg-white w-full max-w-md rounded-t-[2rem] p-6 space-y-4 max-h-[90vh] overflow-y-auto"
         style={{ paddingBottom: 'max(1.5rem,env(safe-area-inset-bottom))' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -41,6 +43,7 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
           </div>
           <button type="button" onClick={onClose} className="text-stone-300 text-3xl">×</button>
         </div>
+
         <div>
           <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">{t('size')}</p>
           <div className="flex gap-2">
@@ -49,7 +52,7 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
                 key={s.id}
                 type="button"
                 onClick={() => setSelectedSize(s)}
-                className={`flex-1 py-3 rounded-2xl font-black text-sm border-2 ${selectedSize.id === s.id ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
+                className={`flex-1 py-2.5 rounded-2xl font-black text-sm border-2 ${selectedSize.id === s.id ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
                 style={selectedSize.id === s.id ? { background: '#3d1f0f' } : {}}
               >
                 {s.label}
@@ -57,6 +60,41 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
             ))}
           </div>
         </div>
+
+        <div>
+          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">{t('sweet')}</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {SWEET_OPTIONS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedSweet(s)}
+                className={`px-3 py-2 rounded-xl font-bold text-xs border-2 ${selectedSweet.id === s.id ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
+                style={selectedSweet.id === s.id ? { background: '#c87941' } : {}}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">{t('ice')}</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {ICE_OPTIONS.map((ic) => (
+              <button
+                key={ic.id}
+                type="button"
+                onClick={() => setSelectedIce(ic)}
+                className={`px-3 py-2 rounded-xl font-bold text-xs border-2 ${selectedIce.id === ic.id ? 'text-white border-transparent' : 'text-stone-500 border-stone-200'}`}
+                style={selectedIce.id === ic.id ? { background: '#4a7a8a' } : {}}
+              >
+                {t(ic.labelKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <p className="text-[11px] font-bold text-stone-400 mb-2 uppercase">{t('toppings')}</p>
           <div className="grid grid-cols-2 gap-2">
@@ -79,11 +117,13 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
             })}
           </div>
         </div>
+
         <div className="flex items-center gap-4 ml-auto justify-end">
           <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-10 h-10 rounded-full bg-stone-100 font-bold">−</button>
           <span className="text-2xl font-black w-8 text-center">{qty}</span>
           <button type="button" onClick={() => setQty((q) => q + 1)} className="w-10 h-10 rounded-full text-white font-bold" style={{ background: '#3d1f0f' }}>+</button>
         </div>
+
         <input
           type="text"
           value={note}
@@ -91,6 +131,7 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
           placeholder={t('note')}
           className="w-full p-3 bg-stone-50 border border-stone-200 rounded-2xl text-sm outline-none"
         />
+
         <button
           type="button"
           onClick={() => onAdd({
@@ -98,6 +139,8 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
             emoji: item.emoji,
             nameSnapshot: name,
             size: selectedSize.label,
+            sweet: selectedSweet.label,
+            ice: selectedIce.id,
             toppings: selectedToppings,
             price: unitPrice,
             qty,
