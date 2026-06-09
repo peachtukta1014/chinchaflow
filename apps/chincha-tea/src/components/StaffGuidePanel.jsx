@@ -9,6 +9,7 @@ export default function StaffGuidePanel({ t, lang }) {
     { icon: '🛒', text: t('staffGuideOrder') },
     { icon: '📋', text: t('staffGuideHistory') },
     { icon: '📊', text: t('staffGuideSummary') },
+    { icon: '💸', text: t('staffGuideExpenses') },
     { icon: '📦', text: t('staffGuideRestock') },
     { icon: '☕', text: t('staffGuideCatalog') },
   ];
