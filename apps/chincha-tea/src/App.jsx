@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from './firebase';
-import { fsQueryOrders } from './lib/firestoreRest';
+import { fsQueryOrders, fsPatch } from './lib/firestoreRest';
 import { dateKeyBangkok } from './lib/constants';
 import { useLang } from './lib/i18n';
 import { useCatalog } from './lib/useCatalog';
@@ -80,6 +80,23 @@ export default function App() {
     tabBootstrappedRef.current = true;
   }, [isAuthed, member?.role]);
 
+  // ภาษา: sync กับ Firestore เมื่อ login + migration staff 'th' → 'my'
+  useEffect(() => {
+    if (!member?.uid) return;
+    const storedLang = localStorage.getItem('chincha-lang');
+    if (member.preferredLang) {
+      // cross-device: ดึงค่าจาก Firestore เป็น source of truth
+      setLang(member.preferredLang);
+      return;
+    }
+    // migration: staff ที่ยังเก็บ 'th' เก่าค้างใน localStorage → รีเซ็ตเป็น 'my'
+    if (member.role === 'staff' && (!storedLang || storedLang === 'th')) {
+      setLang('my');
+      fsPatch(`users/${member.uid}`, { preferredLang: 'my' }).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member?.uid]);
+
   useEffect(() => {
     if (!isAuthed) return;
     if (tab === 'history' || tab === 'summary' || tab === 'profit') refreshOrders();
@@ -125,6 +142,14 @@ export default function App() {
     }
     prevPendingRestocksRef.current = pendingRestocks;
   }, [isAuthed, member?.role, pendingRestocks]);
+
+  // เปลี่ยนภาษา: บันทึก localStorage + Firestore (cross-device sync)
+  const handleSetLang = useCallback((l) => {
+    setLang(l);
+    if (member?.uid) {
+      fsPatch(`users/${member.uid}`, { preferredLang: l }).catch(() => {});
+    }
+  }, [member?.uid, setLang]);
 
   const openProfile = useCallback(() => {
     setLastTab((prev) => (tab === 'my-profile' ? prev : tab));
@@ -220,7 +245,7 @@ export default function App() {
       <AppHeader
         member={member}
         lang={lang}
-        setLang={setLang}
+        setLang={handleSetLang}
         onLogout={handleLogout}
         onOpenProfile={openProfile}
         profileMode={isProfileTab}
@@ -230,7 +255,7 @@ export default function App() {
 
       {member?.role === 'staff' && (
         <>
-          <StaffLangNudge lang={lang} setLang={setLang} t={t} />
+          <StaffLangNudge lang={lang} setLang={handleSetLang} t={t} />
           <StaffGuidePanel t={t} lang={lang} />
         </>
       )}
