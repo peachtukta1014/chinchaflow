@@ -12,7 +12,7 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
 
   const onVoiceFinal = useCallback((text) => {
     const lines = parseTeaVoice(text, menuItems, toppingsList);
-    const cartLines = voiceLinesToCart(lines, t);
+    const cartLines = voiceLinesToCart(lines, t, lang);
 
     if (cartLines.length > 0) {
       cartLines.forEach((line) => onAddToCart(line));

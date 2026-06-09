@@ -6,6 +6,7 @@ import { formatDateKeyLabel } from '../lib/localeFormat';
 import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestoreRest';
 import { pushTeaLineSummary } from '../lib/lineNotify';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from '../lib/restockService';
+import { menuDisplayName } from '../lib/displayNames';
 
 export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
   const [expenses, setExpenses] = useState([]);
@@ -44,7 +45,8 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
 
   const labelForKey = (key) => {
     const m = menuItems.find((x) => x.key === key || x.id === key);
-    return m?.nameTh || t(key) || key;
+    if (m) return menuDisplayName(m, lang, t);
+    return t(key) || key;
   };
 
   const sendLineSummary = useCallback(async () => {

@@ -207,11 +207,13 @@ export function parseTeaVoice(rawText, menuItems, toppingsList) {
   return lines;
 }
 
-export function voiceLinesToCart(lines, t) {
+export function voiceLinesToCart(lines, t, lang = 'th') {
   return lines.map((line) => ({
     key: line.menuItem.key || line.menuItem.id,
     emoji: line.menuItem.emoji || '☕',
-    nameSnapshot: line.menuItem.nameTh || t(line.menuItem.key) || line.menuItem.nameEn,
+    nameSnapshot: lang === 'my'
+      ? (line.menuItem.nameMy || MENU_KEY_MY[line.menuItem.key] || line.menuItem.nameTh || t(line.menuItem.key) || line.menuItem.nameEn)
+      : (line.menuItem.nameTh || t(line.menuItem.key) || line.menuItem.nameEn),
     size: line.size.label,
     sweet: line.sweetLabel,
     ice: line.iceId,

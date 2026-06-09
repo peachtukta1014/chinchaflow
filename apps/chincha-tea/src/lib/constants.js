@@ -31,7 +31,7 @@ export const DRINK_CATEGORIES = [
   { id: 'milk-tea', label: 'ชานม/ชงชา', labelMy: 'လက်ဖက်နို့', labelEn: 'MILK TEA', accent: '#c87941', accentBg: '#fff5eb', emoji: '🧋' },
   { id: 'clear-tea', label: 'ชาชง', labelMy: 'လက်ဖက်ရည်ချို', labelEn: 'BREWED TEA', accent: '#4a7a5a', accentBg: '#edf7f0', emoji: '🍵' },
   { id: 'coffee', label: 'กาแฟ', labelMy: 'ကော်ဖီ', labelEn: 'COFFEE', accent: '#8b5a2b', accentBg: '#faf3eb', emoji: '☕' },
-  { id: 'blended', label: 'ผลไม้สดปั่น', labelMy: '်သီးဖျော်ပါး', labelEn: 'FRUIT SMOOTHIE', accent: '#b94a6a', accentBg: '#fdeef2', emoji: '🍓' },
+  { id: 'blended', label: 'ผลไม้สดปั่น', labelMy: 'သီးဖျော်ပါး', labelEn: 'FRUIT SMOOTHIE', accent: '#b94a6a', accentBg: '#fdeef2', emoji: '🍓' },
 ];
 
 export const DEFAULT_MENU = [

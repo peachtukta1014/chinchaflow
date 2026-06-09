@@ -233,7 +233,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
               <p className="text-xs text-stone-500 text-center py-2">{t('profitStaffAbsent')}</p>
             )}
             <div className="flex justify-between items-center mt-3 pt-2 border-t border-amber-100 text-sm">
-              <span className="font-bold text-amber-900">{t('staffAttendanceMonthTotal')}</span>
+              <span className="font-bold text-amber-900">{t('dashboardTodayWage')}</span>
               <span className="font-black text-amber-800"><Money n={ledger.wageCost} /></span>
             </div>
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-amber-200/80 text-sm">
