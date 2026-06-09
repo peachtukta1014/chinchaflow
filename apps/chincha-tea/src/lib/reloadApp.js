@@ -12,6 +12,7 @@ export async function hardReloadApp() {
   } catch (e) {
     console.warn('hardReloadApp', e);
   }
+  window.scrollTo(0, 0);
   const url = new URL(window.location.href);
   url.searchParams.set('_', String(Date.now()));
   window.location.replace(url.toString());

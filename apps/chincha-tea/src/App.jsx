@@ -27,6 +27,7 @@ import MyProfileScreen from './screens/MyProfileScreen';
 import { fetchPendingRestockCount, invalidatePendingRestockCache } from './lib/restockNotifyService';
 import { setAppIconBadge } from './lib/appBadge';
 import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
+import { useAppShellChrome } from './lib/useAppShellChrome';
 
 export default function App() {
   const { lang, setLang, t } = useLang();
@@ -45,6 +46,14 @@ export default function App() {
   const tabBootstrappedRef = useRef(false);
 
   const isAuthed = member && member.approved === true;
+  const appShell = !fbReady
+    ? 'login'
+    : member === undefined
+      ? 'loading'
+      : !isAuthed
+        ? 'login'
+        : 'app';
+  useAppShellChrome(appShell);
   const { menuItems, toppingsList, refreshCatalog } = useCatalog(!!isAuthed);
   const todayKey = dateKeyBangkok();
   const [viewDateKey, setViewDateKey] = useState(todayKey);
@@ -169,7 +178,11 @@ export default function App() {
 
   if (member === undefined && fbReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#3d1f0f' }}>
+      <div
+        key="shell-loading"
+        className="fixed inset-0 z-[200] flex items-center justify-center"
+        style={{ background: '#3d1f0f', isolation: 'isolate' }}
+      >
         <p className="text-amber-300 text-sm">{t('loading')}</p>
       </div>
     );
@@ -178,6 +191,7 @@ export default function App() {
   if (!isAuthed) {
     return (
       <LoginScreen
+        key="shell-login"
         onAuthed={(profile) => { setAuthPending(false); setMember(profile); }}
         lang={lang}
         setLang={setLang}
@@ -192,8 +206,16 @@ export default function App() {
   const isProfileTab = tab === 'my-profile';
 
   return (
-    <div className="max-w-md mx-auto h-screen flex flex-col relative overflow-hidden" style={{ background: '#fdf6f0' }}>
-      <div className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]" style={{ backgroundImage: 'url(/chincha-logo.jpg)', backgroundSize: '110px', backgroundRepeat: 'repeat' }} />
+    <div
+      key="shell-app"
+      className="max-w-md mx-auto h-[100dvh] flex flex-col relative overflow-hidden isolate"
+      style={{ background: '#fdf6f0' }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
+        style={{ backgroundImage: 'url(/chincha-logo.jpg)', backgroundSize: '110px', backgroundRepeat: 'repeat' }}
+        aria-hidden
+      />
 
       <AppHeader
         member={member}
@@ -227,7 +249,7 @@ export default function App() {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto z-10" style={{ scrollbarWidth: 'none' }}>
+      <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0]" style={{ scrollbarWidth: 'none' }}>
         {tab === 'dashboard' && isAdmin && (
           <DashboardTab
             t={t}
@@ -347,7 +369,6 @@ export default function App() {
       />
 
       <style>{`
-        body { background: #fdf6f0; }
         ::-webkit-scrollbar { display: none; }
         @keyframes ripple-anim { from { transform:scale(0); opacity:0.5; } to { transform:scale(4); opacity:0; } }
         .ripple-span { animation: ripple-anim 0.5s ease-out forwards; }
