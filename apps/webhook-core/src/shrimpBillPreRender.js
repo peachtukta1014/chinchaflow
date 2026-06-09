@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 /**
  * Pre-render ภาพบิลเก็บ Storage + sales.billImageUrl — ลดเวลา shrimpPushBill
  */
@@ -10,10 +12,13 @@ function billRenderCacheKey(billData) {
   return `${pt}|${unpaid}|${total}|${recv}`;
 }
 
-async function uploadCachedBillImage(admin, buffer, saleId) {
+async function uploadCachedBillImage(admin, buffer, saleId, key = '') {
   const bucket = admin.storage().bucket();
   const safeId = String(saleId).replace(/[^\w-]+/g, '_').slice(0, 64);
-  const path = `lineBills/cache/${safeId}.png`;
+  const hash = crypto.createHash('sha1').update(String(key || Date.now())).digest('hex').slice(0, 12);
+  // LINE caches image URLs aggressively. Include the render key in the object path
+  // so a credit bill and the later paid bill never share the same image URL.
+  const path = `lineBills/cache/${safeId}_${hash}.png`;
   const file = bucket.file(path);
   await file.save(buffer, {
     metadata: { contentType: 'image/png', cacheControl: 'public, max-age=86400' },
@@ -47,7 +52,7 @@ async function preRenderBillForSale(db, admin, saleId, billData) {
 
   const { renderShrimpBillJpeg } = require('./shrimpBillRender');
   const buffer = await renderShrimpBillJpeg(billData);
-  const url = await uploadCachedBillImage(admin, buffer, id);
+  const url = await uploadCachedBillImage(admin, buffer, id, key);
   await db.collection('sales').doc(id).set({
     billImageUrl: url,
     billImageKey: key,

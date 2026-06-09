@@ -1036,6 +1036,8 @@ try {
   assert(slipSrc.includes('findSlipByLineMessageId'), 'สลิป dedup ตาม lineMessageId');
   assert(slipSrc.includes('duplicate: true'), 'สลิปซ้ำคืน submission เดิม');
   assert(slipSrc.includes('resolveSuggestedBill'), 'shrimpPaymentSlip uses resolveSuggestedBill');
+  assert(slipSrc.includes('allowGroup'), 'รูปสลิปในกลุ่มครอบครัวถูก allow เฉพาะกลุ่มที่ตั้งค่า');
+  assert(slipSrc.includes('staff_group_image'), 'ไม่ตีรูปจากพนักงานในกลุ่มเป็นสลิปลูกค้า');
   assert(!slipSrc.includes('notifyShrimpPaymentSlip('), 'shrimpPaymentSlip ไม่ inline-notify (ใช้ trigger เท่านั้น)');
   const slipSvc = fs.readFileSync(path.join(root, 'src/services/paymentSlipService.js'), 'utf8');
   assert(slipSvc.includes('claimPaymentSlipConfirmation'), 'ยืนยันสลิปมี CAS lock');
@@ -1051,6 +1053,7 @@ try {
   assert(hub.includes('PaymentSlipsScreen'), 'SalesHub มีแท็บสลิป');
   const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   assert(wh.includes('processShrimpPaymentSlipImage'), 'lineWebhook รับรูปสลิป');
+  assert(wh.includes('allowGroup: Boolean(groupId && isShrimpGroupChat(groupId))'), 'lineWebhook รับรูปสลิปจากกลุ่มครอบครัว');
   assert(wh.includes('onShrimpPaymentSlipCreated'), 'trigger แจ้งสลิป');
   assert(wh.includes('onShrimpAdminAlertCreated'), 'trigger แจ้งขอลบบิล');
   const notify = requireWebhook('../../webhook-core/src/instantLineNotify.js');
@@ -1068,6 +1071,9 @@ try {
   );
   assert(!slipTargets.has(customerUid), 'แจ้งสลิปไม่ push ไปหาคนส่งสลิป');
   assert(slipTargets.has(staffUid), 'แจ้งสลิปยัง push staff');
+  const preRenderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillPreRender.js'), 'utf8');
+  assert(preRenderSrc.includes("createHash('sha1')"), 'cache ภาพบิลใช้ URL แยกตามสถานะจ่าย/ค้าง');
+  assert(preRenderSrc.includes('${safeId}_${hash}.png'), 'บิลค้างและบิลจ่ายแล้วไม่ใช้ storage URL เดิม');
 } catch (e) {
   fail('paymentSlip UI', e);
 }
