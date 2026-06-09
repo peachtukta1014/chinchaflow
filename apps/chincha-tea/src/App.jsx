@@ -83,7 +83,13 @@ export default function App() {
   // ภาษา: sync กับ Firestore เมื่อ login + migration staff 'th' → 'my'
   useEffect(() => {
     if (!member?.uid) return;
-    const storedLang = localStorage.getItem('chincha-lang');
+    let storedLang = null;
+    try {
+      storedLang = window.localStorage?.getItem('chincha-lang') ?? null;
+    } catch {
+      // Android WebView/old browsers may block localStorage; keep the main UI alive.
+      storedLang = null;
+    }
     if (member.preferredLang) {
       // cross-device: ดึงค่าจาก Firestore เป็น source of truth
       setLang(member.preferredLang);
@@ -233,7 +239,7 @@ export default function App() {
   return (
     <div
       key="shell-app"
-      className="max-w-md mx-auto h-[100dvh] flex flex-col relative overflow-hidden isolate"
+      className="max-w-md mx-auto h-screen h-[100dvh] flex flex-col relative overflow-hidden isolate"
       style={{ background: '#fdf6f0' }}
     >
       <div
@@ -394,6 +400,11 @@ export default function App() {
       />
 
       <style>{`
+        html, body {
+          -webkit-text-size-adjust: 100%;
+          -moz-text-size-adjust: 100%;
+          text-size-adjust: 100%;
+        }
         ::-webkit-scrollbar { display: none; }
         @keyframes ripple-anim { from { transform:scale(0); opacity:0.5; } to { transform:scale(4); opacity:0; } }
         .ripple-span { animation: ripple-anim 0.5s ease-out forwards; }
