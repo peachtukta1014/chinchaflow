@@ -1,8 +1,18 @@
 import { useState } from 'react';
 
+const GUIDE_OPEN_KEY = 'chincha-staff-guide-open';
+
 /** คำอธิบายแท็บเป็นภาษาพม่า — สำหรับพนักงานที่อ่านไทยไม่ถนัด */
 export default function StaffGuidePanel({ t, lang }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => {
+    try {
+      const stored = localStorage.getItem(GUIDE_OPEN_KEY);
+      return stored === null ? true : stored !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
   if (lang !== 'my') return null;
 
   const rows = [
@@ -14,11 +24,19 @@ export default function StaffGuidePanel({ t, lang }) {
     { icon: '☕', text: t('staffGuideCatalog') },
   ];
 
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try { localStorage.setItem(GUIDE_OPEN_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   return (
     <div className="z-10 shrink-0 mx-4 mt-1 rounded-2xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-white overflow-hidden shadow-sm">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="w-full px-3 py-2.5 flex items-center justify-between text-left"
       >
         <span className="text-[11px] font-black text-amber-950 leading-snug">
@@ -34,9 +52,6 @@ export default function StaffGuidePanel({ t, lang }) {
               <span>{r.text}</span>
             </li>
           ))}
-          <li className="text-[10px] text-amber-800/80 pt-1 border-t border-amber-100">
-            {t('staffGuideLangHint')}
-          </li>
         </ul>
       )}
     </div>
