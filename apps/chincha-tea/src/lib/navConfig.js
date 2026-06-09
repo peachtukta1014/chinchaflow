@@ -5,7 +5,7 @@
  * แอดมิน: ภาพรวม (dashboard) · ขาย · ร้าน · บัญชี/ตัดวัน/จัดการ
  */
 
-/** @typedef {'order'|'history'|'summary'|'restock'|'admin'|'catalog'|'payroll'|'profit'|'dashboard'} AppTabId */
+/** @typedef {'order'|'history'|'summary'|'restock'|'expenses'|'admin'|'catalog'|'payroll'|'profit'|'dashboard'} AppTabId */
 
 /** @type {Record<string, { d: string }>} */
 export const TAB_ICONS = {
@@ -23,6 +23,9 @@ export const TAB_ICONS = {
   },
   restock: {
     d: 'M3 7h18l-2 12H5L3 7zm4-4h10l1 4H6l1-4z',
+  },
+  expenses: {
+    d: 'M3 10h18v10H3V10zm2-6h14l1 4H4l1-4zm4 8h6v2H8v-2z',
   },
   admin: {
     d: 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zm8.5-3.5a8.5 8.5 0 01-.17 1.69l2.12 1.65-2 3.46-2.53-1a8.6 8.6 0 01-2.93 1.7l-.39 2.7H9.4l-.39-2.7a8.6 8.6 0 01-2.93-1.7l-2.53 1-2-3.46 2.12-1.65A8.5 8.5 0 013.5 12c0-.58.06-1.15.17-1.69L1.55 8.66l2-3.46 2.53 1a8.6 8.6 0 012.93-1.7L7.4 1.8h9.2l.39 2.7a8.6 8.6 0 012.93 1.7l2.53-1 2 3.46-2.12 1.65c.11.54.17 1.11.17 1.69z',
@@ -50,6 +53,7 @@ export function getAppNavGroups(isAdmin, t) {
 
   const shopTabs = [
     { id: 'summary', label: t('summaryTabShort'), icon: 'summary' },
+    { id: 'expenses', label: t('expensesTabShort'), icon: 'expenses' },
     { id: 'restock', label: t('restockTabShort'), icon: 'restock' },
   ];
 

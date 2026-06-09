@@ -15,6 +15,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
 import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
+import { ExpensesTab } from './screens/ExpensesTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
@@ -273,6 +274,15 @@ export default function App() {
             isAdmin={isAdmin}
           />
         )}
+        {tab === 'expenses' && (
+          <ExpensesTab
+            member={member}
+            t={t}
+            lang={lang}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+          />
+        )}
         {tab === 'restock' && (
           <RestockTab
             member={member}
@@ -304,7 +314,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && tab !== 'dashboard' && (
+      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && tab !== 'dashboard' && tab !== 'expenses' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"
