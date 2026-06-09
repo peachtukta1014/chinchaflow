@@ -141,8 +141,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   if (pending) {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center p-8 text-center"
-        style={{ background: 'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)' }}
+        className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 text-center"
+        style={{ background: 'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)', isolation: 'isolate' }}
       >
         <div className="text-6xl mb-6">⏳</div>
         <h2 className="text-2xl font-black text-amber-300 mb-3">{t('pendingTitle')}</h2>
@@ -164,8 +164,8 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center p-6 pb-8 max-w-md mx-auto relative overflow-hidden"
-      style={{ background: 'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)' }}
+      className="fixed inset-0 z-[200] flex flex-col items-center p-6 pb-8 max-w-md mx-auto left-0 right-0 overflow-y-auto overscroll-none"
+      style={{ background: 'linear-gradient(160deg,#3d1f0f 0%,#6b3a2a 60%,#3d1f0f 100%)', isolation: 'isolate' }}
     >
       <div
         className="absolute inset-0 opacity-[0.06]"
