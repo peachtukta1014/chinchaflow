@@ -121,7 +121,12 @@ exports.lineWebhook = functions
         if (!(await claimLineEvent(db(), event))) continue;
         try {
           if (!admin.apps.length) admin.initializeApp();
-          await processShrimpPaymentSlipImage(db(), admin, { event, token });
+          const groupId = event.source?.groupId || event.source?.roomId || null;
+          await processShrimpPaymentSlipImage(db(), admin, {
+            event,
+            token,
+            allowGroup: Boolean(groupId && isShrimpGroupChat(groupId)),
+          });
           await completeLineEvent(db(), event);
         } catch (err) {
           await releaseLineEvent(db(), event);

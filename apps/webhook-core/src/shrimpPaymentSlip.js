@@ -3,6 +3,7 @@ const {
   findCustomerNameByLineUserId,
 } = require('./shrimpLinePush');
 const { lineReply } = require('./teaDailySummary');
+const { isStaffLineUserId } = require('./shrimpStaffLineUids');
 
 const LINE_CONTENT_URL = 'https://api-data.line.me/v2/bot/message';
 
@@ -152,6 +153,7 @@ async function recordPaymentSlipSubmission(db, admin, {
   lineMessageId = null,
   source = 'line_chat',
   billNoHint = null,
+  lineGroupId = null,
 }) {
   const userId = normalizeLineUserId(lineUserId);
   if (!userId || !buffer?.length) {
@@ -199,6 +201,7 @@ async function recordPaymentSlipSubmission(db, admin, {
     lineMessageId,
     imageUrl,
     source,
+    lineGroupId: lineGroupId || null,
     customerName: customerName || suggested?.customerName || null,
     suggestedBillNo: suggested?.billNo || hintBill || null,
     suggestedSaleId: suggested?.saleId || null,
@@ -222,12 +225,16 @@ async function recordPaymentSlipSubmission(db, admin, {
 }
 
 /**
- * รับรูปสลิปจากลูกค้าในแชต 1:1 — เก็บคิวรอพนักงานยืนยันในแอป
+ * รับรูปสลิปจากลูกค้าในแชต 1:1 / กลุ่มครอบครัว — เก็บคิวรอพนักงานยืนยันในแอป
  */
-async function processShrimpPaymentSlipImage(db, admin, { event, token }) {
+async function processShrimpPaymentSlipImage(db, admin, { event, token, allowGroup = false }) {
   const userId = normalizeLineUserId(event.source?.userId);
   const groupId = event.source?.groupId || event.source?.roomId || null;
-  if (!userId || groupId) return { skipped: true };
+  if (!userId) return { skipped: true };
+  if (groupId && !allowGroup) return { skipped: 'group_not_allowed' };
+  if (groupId && await isStaffLineUserId(db, userId)) {
+    return { skipped: 'staff_group_image' };
+  }
 
   const messageId = event.message?.id;
   const buffer = await downloadLineMessageContent(messageId, token);
@@ -244,7 +251,8 @@ async function processShrimpPaymentSlipImage(db, admin, { event, token }) {
     lineUserId: userId,
     buffer,
     lineMessageId: messageId || null,
-    source: 'line_chat',
+    source: groupId ? 'line_group' : 'line_chat',
+    lineGroupId: groupId || null,
   });
 
   await lineReply(event.replyToken, SLIP_RECEIVED_REPLY, token);
