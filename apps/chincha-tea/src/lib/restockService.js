@@ -41,15 +41,26 @@ export async function removeRestockLine(req, lineIndex) {
   return { ...req, items };
 }
 
-export async function markRestockPurchased(id, { purchaseTotal, purchasedBy }) {
+export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, purchasedBy }) {
   const amount = Math.round(Number(purchaseTotal));
   if (!amount || amount <= 0) throw new Error('invalid amount');
   const now = new Date().toISOString();
-  await fsPatch(`restocks/${id}`, {
+  const cleanItems = Array.isArray(purchaseItems)
+    ? purchaseItems.map((item) => ({
+      name: item.name,
+      qty: Math.max(1, Number(item.qty) || 1),
+      status: item.status || 'out',
+      unitPrice: Math.max(0, Math.round(Number(item.unitPrice) || 0)),
+      lineTotal: Math.max(0, Math.round(Number(item.lineTotal) || 0)),
+    }))
+    : undefined;
+  const patch = {
     purchaseStatus: 'purchased',
     purchaseTotal: amount,
+    purchaseItems: cleanItems,
     purchasedAt: now,
     purchasedBy: purchasedBy || '—',
-  });
-  return { purchaseStatus: 'purchased', purchaseTotal: amount, purchasedAt: now, purchasedBy };
+  };
+  await fsPatch(`restocks/${id}`, patch);
+  return patch;
 }
