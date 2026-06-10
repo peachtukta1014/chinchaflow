@@ -460,6 +460,59 @@ try {
 }
 
 try {
+  const router = requireWebhook('../../webhook-core/src/shrimpLineWebhookRouter.js');
+  const directCtx = router.classifyShrimpLineContext({
+    source: { type: 'user', userId: 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1' },
+  });
+  const groupCtx = router.classifyShrimpLineContext({
+    source: {
+      type: 'group',
+      groupId: 'Caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
+      userId: 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2',
+    },
+  });
+  const roomCtx = router.classifyShrimpLineContext({
+    source: {
+      type: 'room',
+      roomId: 'Raaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1',
+      userId: 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2',
+    },
+  });
+  assert(directCtx.kind === 'direct', 'LINE router classify direct');
+  assert(groupCtx.kind === 'group' && groupCtx.chatId === groupCtx.groupId, 'LINE router classify group');
+  assert(roomCtx.kind === 'group' && roomCtx.chatId === roomCtx.roomId, 'LINE router classify room as group flow');
+  assert(typeof router.handleShrimpLineWebhookEvent === 'function', 'LINE webhook has router entrypoint');
+
+  const indexSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
+  const routerSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpLineWebhookRouter.js'),
+    'utf8',
+  );
+  const directSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    'utf8',
+  );
+  const groupSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    'utf8',
+  );
+  const slipSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'),
+    'utf8',
+  );
+  assert(indexSrc.includes('handleShrimpLineWebhookEvent'), 'lineWebhook forwards to shrimp router');
+  assert(routerSrc.includes('handleShrimpDirectLineEvent'), 'router แยก direct handler');
+  assert(routerSrc.includes('handleShrimpGroupLineEvent'), 'router แยก group handler');
+  assert(groupSrc.includes('GROUP_ALLOWED_TEXT_INTENTS'), 'group flow allowlist text intents');
+  assert(groupSrc.includes('allowGroup: Boolean(context.chatId && isShrimpGroupChat(context.chatId))'), 'group image uses group guard');
+  assert(slipSrc.includes('group_image_without_open_bill'), 'group image without open bill is guarded');
+  assert(directSrc.includes('allowGroup: false'), 'direct image ไม่เปิด group guard');
+  assert(!directSrc.includes('group_image_without_open_bill'), 'direct image ไม่ถูกบังคับด้วย group_image_without_open_bill');
+} catch (e) {
+  fail('shrimpLineWebhookRouter', e);
+}
+
+try {
   const link = requireWebhook('../../webhook-core/src/shrimpLineCustomerLink.js');
   assert(link.isLinkCustomerCommand('ผูกไอดีลูกค้า'), 'คำสั่งผูกไอดีลูกค้า');
   assert(link.parseLinkCustomerShopName('ผูกไอดีลูกค้า ตาจุ้ย') === 'ตาจุ้ย', 'ชื่อร้านหลังคำสั่ง');
@@ -468,9 +521,16 @@ try {
   assert(norm.Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1?.source === 'link_cmd', 'pendingLinkByUid normalize');
   const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
   assert(intent.classifyShrimpLineMessage('ผูกไอดีลูกค้า', null) === 'link_customer', 'intent link_customer');
-  const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
-  assert(wh.includes("intent === 'link_customer'"), 'webhook link_customer handler');
-  assert(wh.includes("source: 'shrimp'"), 'webhook log line_messages');
+  const directWh = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    'utf8',
+  );
+  const groupWh = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    'utf8',
+  );
+  assert(directWh.includes("intent === 'link_customer'"), 'direct webhook link_customer handler');
+  assert(directWh.includes("source: 'shrimp'") && groupWh.includes("source: 'shrimp'"), 'webhook log line_messages');
   const linkSrc = fs.readFileSync(
     path.join(root, '../../apps/webhook-core/src/shrimpLineCustomerLink.js'),
     'utf8',
@@ -1057,8 +1117,17 @@ try {
   const hub = fs.readFileSync(path.join(root, 'src/screens/SalesHubScreen.jsx'), 'utf8');
   assert(hub.includes('PaymentSlipsScreen'), 'SalesHub มีแท็บสลิป');
   const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
-  assert(wh.includes('processShrimpPaymentSlipImage'), 'lineWebhook รับรูปสลิป');
-  assert(wh.includes('allowGroup: Boolean(groupId && isShrimpGroupChat(groupId))'), 'lineWebhook รับรูปสลิปจากกลุ่มครอบครัว');
+  const directWh = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    'utf8',
+  );
+  const groupWh = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    'utf8',
+  );
+  assert(directWh.includes('processShrimpPaymentSlipImage'), 'direct webhook รับรูปสลิป');
+  assert(groupWh.includes('processShrimpPaymentSlipImage'), 'group webhook รับรูปสลิป');
+  assert(groupWh.includes('allowGroup: Boolean(context.chatId && isShrimpGroupChat(context.chatId))'), 'group webhook รับรูปสลิปจากกลุ่มครอบครัว');
   assert(wh.includes('onShrimpPaymentSlipCreated'), 'trigger แจ้งสลิป');
   assert(wh.includes('onShrimpAdminAlertCreated'), 'trigger แจ้งขอลบบิล');
   const notify = requireWebhook('../../webhook-core/src/instantLineNotify.js');
@@ -1093,9 +1162,12 @@ try {
   const flex = msg.buildLiffOrderFlex('1234567890-AbcdEfgh');
   assert(flex.type === 'flex', 'flex message type');
   assert(flex.contents.footer.contents[0].action.uri.includes('liff.line.me'), 'flex LIFF uri');
-  const wh2 = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
-  assert(wh2.includes("intent === 'open_liff'"), 'webhook open_liff handler');
-  assert(wh2.includes("event.type === 'follow'"), 'webhook follow welcome');
+  const wh2 = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    'utf8',
+  );
+  assert(wh2.includes("intent === 'open_liff'"), 'direct webhook open_liff handler');
+  assert(wh2.includes("event.type === 'follow'"), 'direct webhook follow welcome');
   const liffSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSession.js'), 'utf8');
   assert(liffSession.includes('ko-seafood'), 'LIFF prod host guard');
   const liffCopy = fs.readFileSync(path.join(root, 'src/liff/liffCopy.js'), 'utf8');

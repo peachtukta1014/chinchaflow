@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-10 — กุ้ง: แยก LINE webhook direct/group router
+
+- **ปัญหา/คำขอ:** `lineWebhook` กุ้งรวมทุก flow ไว้ใน `index.js` ทำให้แยกพฤติกรรมแชตตรงกับกลุ่มยาก และเสี่ยงตอบ help/LIFF ในกลุ่มเหมือนแชตตรง
+- **แก้แล้ว:** คง export Cloud Function ชื่อ `lineWebhook` เดิม แต่ลดหน้าที่เหลือ verify signature, loop events, dedup/redelivery แล้วส่งเข้า `shrimpLineWebhookRouter`; แยก direct flow ไป `shrimpDirectLineWebhook.js` และ group/room flow ไป `shrimpGroupLineWebhook.js`
+- **ไฟล์/จุดสำคัญ:** `apps/webhook-core/src/index.js`, `apps/webhook-core/src/shrimpLineWebhookRouter.js`, `apps/webhook-core/src/shrimpDirectLineWebhook.js`, `apps/webhook-core/src/shrimpGroupLineWebhook.js`, `apps/seafood-pos/scripts/smoke-test.mjs`, `docs/ARCHITECTURE_TH.md`
+- **พฤติกรรมหลังแก้:** แชตตรงยังรับ follow/help/LIFF/cancel/สลิป/ออเดอร์ได้เหมือนเดิม; กลุ่ม/room รับเฉพาะรูปสลิปผ่าน group guard, summary/today_orders, และข้อความออเดอร์ ไม่ตอบ help/LIFF แบบ direct
+- **ถ้าพังอีก ให้เช็กก่อน:** ดู router classify จาก `event.source.type` + `groupId`/`roomId` · รูปในกลุ่มต้องมีบิลค้างเปิด ไม่งั้น skip `group_image_without_open_bill` · LINE Console ยังยิง function `lineWebhook` ชื่อเดิม
+
 ### 2026-06-10 — กุ้ง: กัน LINE กลุ่มรับรูปทั่วไปเป็นสลิป
 
 - **ปัญหา/คำขอ:** บอทในกลุ่มครอบครัวตอบ “รับสลิปแล้วครับ” แม้รูปที่ส่งไม่ใช่สลิป เช่น รูปอะไหล่/ของอื่น
