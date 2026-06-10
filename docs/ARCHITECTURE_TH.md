@@ -93,6 +93,7 @@ flowchart TB
 | `customers`, `productSettings/shrimp` | ลูกค้าและราคาสินค้า · `lineUserId` (billing) + `lineContacts[]` (billing/order หลาย UID ต่อร้าน) |
 | `config/shrimpLine` | แจ้งเตือนออเดอร์ LINE + ช่วงเวลา「ไม่ระบุวันส่ง」(เริ่ม/สิ้นสุดรอบ ชม.) |
 | `lineOrders` | ออเดอร์จาก LINE (วันส่ง, สถานะ) |
+| `paymentSlipSubmissions` | คิวสลิปลูกค้ารอตรวจจาก LINE OA / LIFF / กลุ่มครอบครัวกุ้ง; รูปในกลุ่มจะบันทึกเฉพาะเมื่อผู้ส่งมีบริบทบิลค้างเปิดอยู่ เพื่อกันรูปทั่วไปถูกตอบรับเป็นสลิป |
 
 นอกจากนี้มีฐานข้อมูลชื่อ **`chincha`** (กฎใน `firestore-chincha.rules`) สำหรับข้อมูลรูปแบบเก่า — สคริปต์ `tea:db-reset` สามารถล้างฐานนี้ได้เมื่อข้อมูลค้าง
 
@@ -138,7 +139,7 @@ flowchart TB
 
 | ฟังก์ชัน | หน้าที่ |
 |---------|--------|
-| `lineWebhook` | บอท LINE กุ้ง — แยกข้อความสั่งซื้อภาษาไทย → `lineOrders`, ตอบยืนยัน |
+| `lineWebhook` | บอท LINE กุ้ง — แยกข้อความสั่งซื้อภาษาไทย → `lineOrders`, รับรูปสลิปจาก OA/LIFF/กลุ่มครอบครัวแบบมี guard บิลค้าง → `paymentSlipSubmissions`, ตอบยืนยัน |
 | `lineWebhookTea` | บอท LINE ชา — คำสั่ง `สรุป` / `help` (ไม่รับออเดอร์ลูกค้า) |
 | `teaPushSummary` | HTTP POST สำหรับแอดมิน — ส่งสรุปยอดวันนั้นไปกลุ่ม LINE ที่ตั้งไว้ |
 

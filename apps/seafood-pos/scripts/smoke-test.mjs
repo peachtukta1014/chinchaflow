@@ -1032,12 +1032,17 @@ try {
   assert(!isOpenSaleForSlip({ paymentType: 'transfer', remainingAmount: 0 }), 'closed transfer not open');
   const slipMod = requireWebhook('../../webhook-core/src/shrimpPaymentSlip.js');
   assert(slipMod.isOpenSale({ remainingAmount: 100 }), 'webhook isOpenSale');
+  assert(slipMod.isSuggestedOpenBillForSlip({ saleId: 's1', billNo: 'B1', remainingAmount: 100 }), 'group slip needs open bill context');
+  assert(!slipMod.isSuggestedOpenBillForSlip(null), 'group random image without bill context is ignored');
+  assert(!slipMod.isSuggestedOpenBillForSlip({ saleId: 's1', billNo: 'B1', remainingAmount: 0, total: 5200 }), 'group closed bill image is ignored');
   const slipSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'), 'utf8');
   assert(slipSrc.includes('findSlipByLineMessageId'), 'สลิป dedup ตาม lineMessageId');
   assert(slipSrc.includes('duplicate: true'), 'สลิปซ้ำคืน submission เดิม');
   assert(slipSrc.includes('resolveSuggestedBill'), 'shrimpPaymentSlip uses resolveSuggestedBill');
   assert(slipSrc.includes('allowGroup'), 'รูปสลิปในกลุ่มครอบครัวถูก allow เฉพาะกลุ่มที่ตั้งค่า');
   assert(slipSrc.includes('staff_group_image'), 'ไม่ตีรูปจากพนักงานในกลุ่มเป็นสลิปลูกค้า');
+  assert(slipSrc.includes('group_image_without_open_bill'), 'ไม่รับรูปทั่วไปในกลุ่มถ้าไม่มีบิลค้างของผู้ส่ง');
+  assert(slipSrc.includes('requireOpenBillContext: Boolean(groupId)'), 'รูปกลุ่มต้องมีบริบทบิลค้างก่อนบันทึกสลิป');
   assert(!slipSrc.includes('notifyShrimpPaymentSlip('), 'shrimpPaymentSlip ไม่ inline-notify (ใช้ trigger เท่านั้น)');
   const slipSvc = fs.readFileSync(path.join(root, 'src/services/paymentSlipService.js'), 'utf8');
   assert(slipSvc.includes('claimPaymentSlipConfirmation'), 'ยืนยันสลิปมี CAS lock');

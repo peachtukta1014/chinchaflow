@@ -147,6 +147,19 @@ async function resolveSuggestedBill(db, userId, hintBill) {
   return suggestBillForLineUser(db, userId);
 }
 
+function isSuggestedOpenBillForSlip(suggested) {
+  if (!suggested?.saleId || !suggested?.billNo) return false;
+  const remaining = parseFloat(suggested.remainingAmount) || 0;
+  return remaining > 0;
+}
+
+async function resolveSlipMeta(db, userId, hintBill, initialSuggested = null) {
+  const suggested = initialSuggested || await resolveSuggestedBill(db, userId, hintBill);
+  const customerName = suggested?.customerName
+    || await findCustomerNameByLineUserId(db, userId);
+  return { suggested, customerName };
+}
+
 async function recordPaymentSlipSubmission(db, admin, {
   lineUserId,
   buffer,
@@ -154,6 +167,8 @@ async function recordPaymentSlipSubmission(db, admin, {
   source = 'line_chat',
   billNoHint = null,
   lineGroupId = null,
+  requireOpenBillContext = false,
+  initialSuggestedBill = null,
 }) {
   const userId = normalizeLineUserId(lineUserId);
   if (!userId || !buffer?.length) {
@@ -178,22 +193,28 @@ async function recordPaymentSlipSubmission(db, admin, {
     }
   }
 
-  const uploadPromise = uploadSlipImage(admin, buffer, userId);
-  const metaPromise = hintBill
-    ? resolveSuggestedBill(db, userId, hintBill).then(async (suggested) => {
-      const customerName = suggested?.customerName
-        || await findCustomerNameByLineUserId(db, userId);
-      return { suggested, customerName };
-    })
-    : Promise.all([
-      findCustomerNameByLineUserId(db, userId),
-      suggestBillForLineUser(db, userId),
-    ]).then(([customerName, suggested]) => ({ suggested, customerName }));
+  const metaPromise = resolveSlipMeta(db, userId, hintBill, initialSuggestedBill);
 
-  const [{ url: imageUrl }, { suggested, customerName }] = await Promise.all([
-    uploadPromise,
-    metaPromise,
-  ]);
+  let suggested;
+  let customerName;
+  let imageUrl;
+  if (requireOpenBillContext) {
+    ({ suggested, customerName } = await metaPromise);
+    if (!isSuggestedOpenBillForSlip(suggested)) {
+      return {
+        skipped: 'group_image_without_open_bill',
+        message: null,
+      };
+    }
+    ({ url: imageUrl } = await uploadSlipImage(admin, buffer, userId));
+  } else {
+    const [upload, meta] = await Promise.all([
+      uploadSlipImage(admin, buffer, userId),
+      metaPromise,
+    ]);
+    imageUrl = upload.url;
+    ({ suggested, customerName } = meta);
+  }
 
   const slipPayload = {
     status: 'pending',
@@ -236,6 +257,11 @@ async function processShrimpPaymentSlipImage(db, admin, { event, token, allowGro
     return { skipped: 'staff_group_image' };
   }
 
+  const initialSuggestedBill = groupId ? await suggestBillForLineUser(db, userId) : null;
+  if (groupId && !isSuggestedOpenBillForSlip(initialSuggestedBill)) {
+    return { skipped: 'group_image_without_open_bill' };
+  }
+
   const messageId = event.message?.id;
   const buffer = await downloadLineMessageContent(messageId, token);
   if (!buffer) {
@@ -253,7 +279,11 @@ async function processShrimpPaymentSlipImage(db, admin, { event, token, allowGro
     lineMessageId: messageId || null,
     source: groupId ? 'line_group' : 'line_chat',
     lineGroupId: groupId || null,
+    requireOpenBillContext: Boolean(groupId),
+    initialSuggestedBill,
   });
+
+  if (result?.skipped) return result;
 
   await lineReply(event.replyToken, SLIP_RECEIVED_REPLY, token);
   return result;
@@ -267,4 +297,5 @@ module.exports = {
   suggestBillForLineUser,
   isOpenSale,
   saleRemaining,
+  isSuggestedOpenBillForSlip,
 };
