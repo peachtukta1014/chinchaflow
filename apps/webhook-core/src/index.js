@@ -22,44 +22,19 @@ const {
   getTeaLineConfig,
 } = require('./teaDailySummary');
 const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
-const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
-const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
-const { processShrimpLinkCustomer } = require('./shrimpLineCustomerLink');
-const { getLineOrderSession, clearSessionForCancel } = require('./lineOrderSession');
-const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
-const { isShrimpGroupChat } = require('./shrimpGroupKeyboard');
-const { detectMessageLang } = require('./orderMessageLang');
-const { replyHelpCustomerThai, replyHelpCustomerEnglish, replyCancelFail } = require('./shrimpLineReply');
-const {
-  buildShrimpTodayOrdersSummary,
-  cancelLatestPendingOrderForUser,
-} = require('./shrimpTodayOrdersSummary');
+const { handleShrimpLineWebhookEvent } = require('./shrimpLineWebhookRouter');
 const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
 } = require('./shrimpLinePush');
 const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
 const { handleShrimpLiffSlipRequest } = require('./shrimpLiffSlip');
-const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 const {
   notifyShrimpLineOrder,
   notifyShrimpPaymentSlip,
   notifyShrimpSaleDeleteRequest,
   notifyTeaRestock,
 } = require('./instantLineNotify');
-const {
-  getShrimpLiffId,
-  buildLiffOrderFlex,
-  buildLiffWelcomeFlex,
-  replyLiffNotReadyText,
-  lineReplyMessages,
-} = require('./shrimpLiffMessaging');
-
-function isShrimpDirectChat(event) {
-  return event.source?.type === 'user'
-    && !event.source?.groupId
-    && !event.source?.roomId;
-}
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -79,195 +54,34 @@ exports.lineWebhook = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     try {
-    if (req.method === 'GET') { res.status(200).send('ok'); return; }
-    if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+      if (req.method === 'GET') { res.status(200).send('ok'); return; }
+      if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
-    const rawBody   = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
-    const signature = req.headers['x-line-signature'] || '';
-    if (!verifySignature(rawBody, signature, process.env.LINE_CHANNEL_SECRET)) {
-      res.status(401).send('Invalid signature'); return;
-    }
-
-    const events = req.body.events || [];
-    const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-
-    for (const event of events) {
-      if (event.type === 'follow' && isShrimpDirectChat(event)) {
-        if (event.deliveryContext?.isRedelivery) continue;
-        if (!(await claimLineEvent(db(), event))) continue;
-        try {
-          const liffId = getShrimpLiffId();
-          const replyToken = event.replyToken;
-          if (liffId && replyToken) {
-            await lineReplyMessages(replyToken, buildLiffWelcomeFlex(liffId), token);
-          } else if (replyToken) {
-            await lineReply(
-              replyToken,
-              'สวัสดีครับ 🦐 โกอ้วน คลังซีฟู้ด\nพิมพ์สั่งในแชทได้เลย หรือพิมพ์ ฟอร์ม เมื่อเปิดใช้ฟอร์มสั่งแล้ว',
-              token,
-            );
-          }
-          await completeLineEvent(db(), event);
-        } catch (err) {
-          await releaseLineEvent(db(), event);
-          console.error('shrimp follow', err);
-        }
-        continue;
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
+      const signature = req.headers['x-line-signature'] || '';
+      if (!verifySignature(rawBody, signature, process.env.LINE_CHANNEL_SECRET)) {
+        res.status(401).send('Invalid signature'); return;
       }
 
-      if (event.type !== 'message') continue;
-      if (event.message.type === 'image') {
+      const events = req.body.events || [];
+      const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+
+      for (const event of events) {
+        if (event.type !== 'follow' && event.type !== 'message') continue;
         if (event.deliveryContext?.isRedelivery) continue;
         if (!(await claimLineEvent(db(), event))) continue;
+
         try {
           if (!admin.apps.length) admin.initializeApp();
-          const groupId = event.source?.groupId || event.source?.roomId || null;
-          await processShrimpPaymentSlipImage(db(), admin, {
-            event,
-            token,
-            allowGroup: Boolean(groupId && isShrimpGroupChat(groupId)),
-          });
+          await handleShrimpLineWebhookEvent(db(), admin, { event, token });
           await completeLineEvent(db(), event);
         } catch (err) {
           await releaseLineEvent(db(), event);
-          console.error('shrimp payment slip image', err);
+          throw err;
         }
-        continue;
       }
-      if (event.message.type !== 'text') continue;
-      if (event.deliveryContext?.isRedelivery) continue;
-      if (!(await claimLineEvent(db(), event))) continue;
 
-      try {
-        const text       = event.message.text.trim();
-        const userId     = event.source.userId;
-        const groupId    = event.source.groupId || event.source.roomId || null;
-        const replyToken = event.replyToken;
-        if (!admin.apps.length) admin.initializeApp();
-        const ts = admin.firestore.FieldValue.serverTimestamp();
-        db().collection('line_messages').add({
-          userId,
-          groupId,
-          text,
-          source: 'shrimp',
-          createdAt: ts,
-        }).catch((e) => console.warn('line_messages log', e));
-
-        const session = await getLineOrderSession(db(), groupId, userId);
-        const intent = classifyShrimpLineMessage(text, session, { groupId });
-
-        if (intent === 'ignore') {
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'help') {
-          await lineReply(replyToken, replyHelpCustomerThai(), token);
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'help_en') {
-          await lineReply(replyToken, replyHelpCustomerEnglish(), token);
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'open_liff') {
-          const lang = detectMessageLang(text);
-          if (!isShrimpDirectChat(event)) {
-            await lineReply(
-              replyToken,
-              lang === 'en'
-                ? 'Order form works in direct chat with our LINE OA only.'
-                : 'ฟอร์มสั่งใช้ในแชตตรงกับร้าน (LINE OA) เท่านั้นครับ — ในกลุ่มพิมพ์สั่งได้ตามปกติ',
-              token,
-            );
-          } else {
-            const liffId = getShrimpLiffId();
-            if (liffId) {
-              await lineReplyMessages(replyToken, [buildLiffOrderFlex(liffId)], token);
-            } else {
-              await lineReply(replyToken, replyLiffNotReadyText(lang), token);
-            }
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'summary') {
-          try {
-            const dateKey = todayBKK();
-            const summary = await buildShrimpSummaryForDate(db(), dateKey, {
-              familyGroup: isShrimpGroupChat(groupId),
-            });
-            await lineReply(replyToken, summary, token);
-          } catch (err) {
-            console.error('shrimp summary', err);
-            await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่ครับ', token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'today_orders') {
-          try {
-            const dateKey = todayBKK();
-            const summary = await buildShrimpTodayOrdersSummary(db(), dateKey, {
-              familyGroup: isShrimpGroupChat(groupId),
-            });
-            await lineReply(replyToken, summary, token);
-          } catch (err) {
-            console.error('shrimp today orders', err);
-            await lineReply(replyToken, '⚠️ ดึงรายการออเดอร์ไม่สำเร็จ ลองใหม่ครับ', token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'link_customer') {
-          try {
-            const { reply } = await processShrimpLinkCustomer(db(), admin, {
-              text,
-              userId,
-              groupId,
-              session,
-              serverTimestamp: ts,
-            });
-            await lineReply(replyToken, reply, token);
-          } catch (err) {
-            console.error('shrimp link customer', err);
-            await lineReply(replyToken, '⚠️ ผูกไอดีไม่สำเร็จ ลองใหม่หรือติดต่อร้านครับ', token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (intent === 'cancel_order') {
-          try {
-            const { message } = await cancelLatestPendingOrderForUser(db(), userId);
-            // เคลียร์ session ค้างหลังยกเลิก — fire-and-forget ไม่บล็อก reply
-            clearSessionForCancel(db(), session.id, admin.firestore.FieldValue.serverTimestamp())
-              .catch((e) => console.warn('clearSessionForCancel', e));
-            await lineReply(replyToken, message, token);
-          } catch (err) {
-            console.error('shrimp cancel order', err);
-            await lineReply(replyToken, replyCancelFail(detectMessageLang(text)), token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        const result = await processShrimpLineOrder(db(), admin, { text, userId, groupId });
-        await lineReply(replyToken, result.reply, token);
-        await completeLineEvent(db(), event);
-      } catch (err) {
-        await releaseLineEvent(db(), event);
-        throw err;
-      }
-    }
-
-    res.status(200).json({ status: 'ok' });
+      res.status(200).json({ status: 'ok' });
     } catch (err) {
       console.error('lineWebhook', err);
       res.status(500).json({ error: 'internal' });

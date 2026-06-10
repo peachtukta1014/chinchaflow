@@ -139,9 +139,16 @@ flowchart TB
 
 | ฟังก์ชัน | หน้าที่ |
 |---------|--------|
-| `lineWebhook` | บอท LINE กุ้ง — แยกข้อความสั่งซื้อภาษาไทย → `lineOrders`, รับรูปสลิปจาก OA/LIFF/กลุ่มครอบครัวแบบมี guard บิลค้าง → `paymentSlipSubmissions`, ตอบยืนยัน |
+| `lineWebhook` | บอท LINE กุ้ง — entrypoint เดิมสำหรับ LINE Console; ทำแค่ verify signature, dedup event พื้นฐาน แล้วส่งเข้า router แยก direct/group |
 | `lineWebhookTea` | บอท LINE ชา — คำสั่ง `สรุป` / `help` (ไม่รับออเดอร์ลูกค้า) |
 | `teaPushSummary` | HTTP POST สำหรับแอดมิน — ส่งสรุปยอดวันนั้นไปกลุ่ม LINE ที่ตั้งไว้ |
+
+LINE กุ้งแยกบริบทใน `apps/webhook-core/src/` ดังนี้:
+
+- `index.js` export Cloud Function ชื่อเดิม `lineWebhook` เพื่อไม่ต้องเปลี่ยน LINE Console/secret/deploy config และคุมเฉพาะ signature, loop events, redelivery/dedup (`webhookDedup`)
+- `shrimpLineWebhookRouter.js` อ่าน `event.source.type`, `groupId`, `roomId` แล้ว route เป็น `direct` หรือ `group`
+- `shrimpDirectLineWebhook.js` รวม flow แชตตรง LINE OA: follow welcome, รูปสลิป direct, help, LIFF order form, cancel, ข้อความสั่งกุ้ง และผูก UID ลูกค้า
+- `shrimpGroupLineWebhook.js` รวม flow กลุ่ม/room: รูปสลิปต้องผ่าน guard กลุ่ม (ต้องเป็นกลุ่มที่อนุญาต + มีบิลค้างเปิด), คำสั่ง `summary`/`today_orders`, และข้อความสั่งกุ้งในกลุ่ม; ไม่ตอบ help/LIFF/cancel แบบแชตตรงเพื่อไม่รบกวนบทสนทนากลุ่ม
 
 `apps/webhook-core-scheduled`:
 
