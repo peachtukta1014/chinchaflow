@@ -39,7 +39,7 @@ function initFirebaseApp() {
     }
   }
 
-  if (apps.length > 0) return apps[0];
+  // ต้องมี [DEFAULT] app เสมอ เพราะ currentUser.getIdToken() และ Cloud Function call บางจุดอ้าง default app
   return initializeApp(firebaseConfig);
 }
 
@@ -68,7 +68,11 @@ export async function getFirebaseIdToken(forceRefresh = false) {
   if (!fbReady) {
     throw new Error('Firebase ยังไม่พร้อม — กดปุ่มรีเฟรชที่มุมขวาบนแล้วลองใหม่');
   }
-  const authInst = getAuthInstance();
+  const app = initFirebaseApp();
+  if (!app) {
+    throw new Error('Firebase ยังไม่พร้อม — กดปุ่มรีเฟรชที่มุมขวาบนแล้วลองใหม่');
+  }
+  const authInst = getAuth(app);
   if (!authInst?.currentUser) {
     throw new Error('กรุณาเข้าสู่ระบบใหม่');
   }

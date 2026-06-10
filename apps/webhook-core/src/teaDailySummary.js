@@ -55,8 +55,15 @@ function aggregateDay({ orders, expenses, restocks }) {
     const by = req.purchasedBy || req.createdBy || '';
     if (bought) {
       totalRestockPurchased += Math.round(Number(req.purchaseTotal));
-      const names = (req.items || []).map((it) => it.name).filter(Boolean).join(', ') || 'รายการ';
-      restockPurchasedLines.push(`• ${names} ${formatMoney(req.purchaseTotal)}${by ? ` — ${by}` : ''}`);
+      const pricedItems = Array.isArray(req.purchaseItems)
+        ? req.purchaseItems
+          .filter((it) => it && Number(it.lineTotal) > 0)
+          .map((it) => `${it.name || 'รายการ'} ${formatMoney(it.lineTotal)}${Number(it.unitPrice) > 0 ? ` (${formatMoney(it.unitPrice)}/ชิ้น)` : ''}`)
+        : [];
+      const names = pricedItems.length
+        ? pricedItems.join(', ')
+        : ((req.items || []).map((it) => it.name).filter(Boolean).join(', ') || 'รายการ');
+      restockPurchasedLines.push(`• ${names} รวม ${formatMoney(req.purchaseTotal)}${by ? ` — ${by}` : ''}`);
     }
     for (const it of req.items || []) {
       const st = STATUS_LABEL[it.status] || it.status || '';

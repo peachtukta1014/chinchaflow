@@ -20,9 +20,9 @@ export function canManageRestock(req, member) {
   return Boolean(req?.uid && req.uid === member.uid);
 }
 
-/** แอดมินหรือเจ้าของรายการ — บันทึกยอดซื้อจริง */
+/** เฉพาะแอดมินเท่านั้น — บันทึก/แก้ราคาทุนซื้อเข้า */
 export function canMarkRestockPurchased(req, member) {
-  return canManageRestock(req, member);
+  return Boolean(req?.id && member?.role === 'admin');
 }
 
 export async function deleteRestockRequest(id) {
