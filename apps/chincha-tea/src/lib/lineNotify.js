@@ -1,4 +1,4 @@
-import { fbReady, getFirebaseIdToken } from '../firebase';
+import { fbReady, getFirebaseIdToken, isFirebaseAppInitError } from '../firebase';
 import { FIREBASE_PROJECT_ID, viteEnv } from './viteEnv.js';
 
 const projectId = FIREBASE_PROJECT_ID;
@@ -10,7 +10,15 @@ export async function pushTeaLineSummary(dateKey) {
   }
   if (!projectId) throw new Error('VITE_FIREBASE_PROJECT_ID ไม่ได้ตั้งค่า');
 
-  const idToken = await getFirebaseIdToken();
+  let idToken;
+  try {
+    idToken = await getFirebaseIdToken(true);
+  } catch (e) {
+    if (isFirebaseAppInitError(e?.message, e?.code)) {
+      throw new Error('เวอร์ชันแอปเก่า — กดปุ่มรีเฟรชที่หัวแอป แล้วเข้าสู่ระบบใหม่');
+    }
+    throw e;
+  }
   const url = `https://${region}-${projectId}.cloudfunctions.net/teaPushSummary`;
   const r = await fetch(url, {
     method: 'POST',
@@ -31,6 +39,9 @@ export async function pushTeaLineSummary(dateKey) {
     }
     if (json.error === 'unauthorized') {
       throw new Error('กรุณาออกจากระบบแล้วเข้าใหม่');
+    }
+    if (json.error === 'line_push_failed') {
+      throw new Error('ส่ง LINE ไม่สำเร็จ — เช็กว่า Group ID ถูกต้องและบอทอยู่ในกลุ่มแล้ว');
     }
     throw new Error(json.error || json.hint || `HTTP ${r.status}`);
   }

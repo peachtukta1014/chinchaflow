@@ -674,9 +674,14 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                   <div className="min-w-0">
                     <p className="text-[10px] text-stone-400">{req.createdBy || '—'} · {(req.items || []).length} {t('items')}</p>
                     {purchased ? (
-                      <p className="text-[10px] font-bold text-emerald-600">
-                        ✓ {t('restockPurchased')} · ฿{restockPurchaseTotal(req).toLocaleString()}
-                      </p>
+                      <>
+                        <p className="text-[10px] font-bold text-emerald-600">
+                          ✓ {t('restockPurchased')} · ฿{restockPurchaseTotal(req).toLocaleString()}
+                        </p>
+                        {!isAdmin && req.purchaseItems?.some((line) => Number(line?.lineTotal) > 0) && (
+                          <p className="text-[10px] font-bold text-stone-400">{t('purchasePriceViewOnly')}</p>
+                        )}
+                      </>
                     ) : (
                       <p className="text-[10px] font-bold text-amber-600">{t('restockPending')}</p>
                     )}
@@ -762,16 +767,20 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                     </div>
                   </div>
                 )}
-                {(req.items || []).map((it, i) => (
-                  <div key={i} className="flex items-center gap-1 text-xs text-stone-600">
+                {(req.items || []).map((it, i) => {
+                  const purchasedLine = req.purchaseItems?.[i];
+                  const unitPrice = Number(purchasedLine?.unitPrice || 0);
+                  const lineTotal = Number(purchasedLine?.lineTotal || 0);
+                  return (
+                  <div key={i} className="flex items-start gap-1 text-xs text-stone-600">
                     <p className="flex-1 min-w-0">
                       <RestockItemName name={it.name} lang={lang} /> ×{it.qty}
                       <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
                       </span>
-                      {purchased && req.purchaseItems?.[i]?.lineTotal > 0 && (
-                        <span className="ml-1 text-[10px] font-black text-emerald-700">
-                          ฿{Number(req.purchaseItems[i].lineTotal).toLocaleString()}
+                      {purchased && lineTotal > 0 && (
+                        <span className="block text-[10px] font-black text-emerald-700">
+                          ฿{lineTotal.toLocaleString()}{unitPrice > 0 ? ` · ฿${unitPrice.toLocaleString()}/${t('restockUnitShort')}` : ''}
                         </span>
                       )}
                     </p>
@@ -787,7 +796,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                       </button>
                     )}
                   </div>
-                ))}
+                );})}
               </div>
             );})}
           </div>

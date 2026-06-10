@@ -26,6 +26,14 @@
 
 ## ประวัติ (ใหม่สุดอยู่บน)
 
+### 2026-06-10 — ชา: ล็อกราคาทุนสั่งของให้แอดมิน + แก้ส่งสรุป LINE จากแอป
+
+- **ปัญหา/คำขอ:** แท็บสั่งของต้องใส่ราคาทุนรายชนิดเพื่อคำนวณต้นทุน แต่ให้เฉพาะ role แอดมินแก้/บันทึกได้; พนักงานดูราคาได้แต่ห้ามแก้ และปุ่มส่งสรุป LINE จากแอปขึ้น error Firebase default app / ส่งไม่ชัดเมื่อ Group ID มีปัญหา
+- **แก้แล้ว:** ปุ่ม「ซื้อแล้ว」และการบันทึกราคาทุนเหลือเฉพาะแอดมิน, เพิ่ม Firestore rule กันพนักงานแก้ฟิลด์ราคาทุนโดยตรง, แสดงราคาทุนรายบรรทัดให้พนักงานดูอย่างเดียว, บังคับ Firebase client ใช้ default app ก่อนขอ ID token, และให้ Cloud Function แจ้ง `line_push_failed` เมื่อ push เข้า LINE ไม่สำเร็จ
+- **ไฟล์/จุดสำคัญ:** `apps/chincha-tea/src/screens/RestockTab.jsx`, `apps/chincha-tea/src/lib/restockService.js`, `apps/chincha-tea/src/firebase.js`, `apps/chincha-tea/src/lib/lineNotify.js`, `apps/webhook-core/src/index.js`, `apps/webhook-core/src/teaDailySummary.js`, `firestore.rules`
+- **พฤติกรรมหลังแก้:** แอดมินใส่ราคา/ชิ้นในแท็บสั่งของแล้วระบบรวมยอดซื้อเข้า; พนักงานเห็นราคาที่บันทึกแล้วแต่ไม่มีช่อง/ปุ่มบันทึกต้นทุน; ส่งสรุป LINE จะบอกให้รีเฟรชถ้า app เก่า หรือบอกเช็ก Group ID/บอทถ้า LINE push ล้มเหลว
+- **ถ้าพังอีก ให้เช็กก่อน:** ต้อง deploy hosting + functions + rules; เช็ก `config/teaLine.notifyGroupId`, LINE OA อยู่ในกลุ่ม, และ env `LINE_TEA_CHANNEL_ACCESS_TOKEN`
+
 ### 2026-06-10 — กุ้ง: แยก LINE webhook direct/group router
 
 - **ปัญหา/คำขอ:** `lineWebhook` กุ้งรวมทุก flow ไว้ใน `index.js` ทำให้แยกพฤติกรรมแชตตรงกับกลุ่มยาก และเสี่ยงตอบ help/LIFF ในกลุ่มเหมือนแชตตรง

@@ -424,8 +424,17 @@ exports.teaPushSummary = functions
         });
         return;
       }
+      const sent = results.filter((r) => r.ok).length;
+      if (sent === 0) {
+        res.status(502).json({
+          error: 'line_push_failed',
+          hint: 'เช็กว่า Group ID ถูกต้อง และ LINE OA ถูกเชิญเข้ากลุ่มแล้ว',
+          targets: results,
+        });
+        return;
+      }
 
-      res.json({ ok: true, dateKey, sent: results.filter((r) => r.ok).length, targets: results });
+      res.json({ ok: true, dateKey, sent, targets: results });
     } catch (err) {
       console.error('teaPushSummary', err);
       res.status(500).json({ error: err.message || 'failed' });

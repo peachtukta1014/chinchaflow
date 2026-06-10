@@ -142,7 +142,20 @@ service cloud.firestore {
       allow create: if isApproved()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.items is list;
-      allow update, delete: if isAdmin()
+      // ราคาทุน/สถานะซื้อแล้วแก้ได้เฉพาะแอดมิน; พนักงานแก้ได้แค่รายการที่ตัวเองส่ง
+      allow update: if isAdmin()
+        || (
+          isApproved()
+          && resource.data.uid == request.auth.uid
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'purchaseStatus',
+            'purchaseTotal',
+            'purchaseItems',
+            'purchasedAt',
+            'purchasedBy',
+          ])
+        );
+      allow delete: if isAdmin()
         || (isApproved() && resource.data.uid == request.auth.uid);
     }
 
