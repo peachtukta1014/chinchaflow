@@ -61,6 +61,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [deletingId, setDeletingId] = useState(null);
   const [purchaseEditId, setPurchaseEditId] = useState(null);
   const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [purchaseLinePrices, setPurchaseLinePrices] = useState({});
   const [manageCatalog, setManageCatalog] = useState(false);
   const [catalogSaving, setCatalogSaving] = useState(false);
   const [nameEditId, setNameEditId] = useState(null);
@@ -342,8 +343,38 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     setDeletingId(null);
   };
 
+  const purchaseLinesFor = (req) => (req.items || []).map((item, index) => {
+    const qty = Math.max(1, Number(item.qty) || 1);
+    const raw = purchaseLinePrices[`${req.id}:${index}`] || '';
+    const unitPrice = parseInt(String(raw).replace(/\D/g, ''), 10) || 0;
+    return { ...item, qty, unitPrice, lineTotal: unitPrice * qty };
+  });
+
+  const purchaseLineTotalFor = (req) => purchaseLinesFor(req).reduce((sum, line) => sum + line.lineTotal, 0);
+
+  const startPurchaseEdit = (req) => {
+    const draft = {};
+    (req.items || []).forEach((item, index) => {
+      const saved = req.purchaseItems?.[index];
+      const amount = Number(saved?.unitPrice ?? item.purchaseUnitPrice ?? 0);
+      if (amount > 0) draft[`${req.id}:${index}`] = String(Math.round(amount));
+    });
+    setPurchaseLinePrices(draft);
+    setPurchaseAmount(String(restockPurchaseTotal(req) || ''));
+    setPurchaseEditId(req.id);
+  };
+
+  const closePurchaseEdit = () => {
+    setPurchaseEditId(null);
+    setPurchaseAmount('');
+    setPurchaseLinePrices({});
+  };
+
   const handleSavePurchase = async (req) => {
-    const amount = parseInt(purchaseAmount.replace(/\D/g, ''), 10);
+    const lineItems = purchaseLinesFor(req);
+    const lineTotal = lineItems.reduce((sum, line) => sum + line.lineTotal, 0);
+    const manualAmount = parseInt(purchaseAmount.replace(/\D/g, ''), 10) || 0;
+    const amount = lineTotal || manualAmount;
     if (!amount || amount <= 0) {
       alert(t('restockPurchaseInvalid'));
       return;
@@ -352,12 +383,12 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     try {
       const patch = await markRestockPurchased(req.id, {
         purchaseTotal: amount,
+        purchaseItems: lineItems,
         purchasedBy: member?.name || '—',
       });
       setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
       notifyRestockChange();
-      setPurchaseEditId(null);
-      setPurchaseAmount('');
+      closePurchaseEdit();
       setFlash(t('restockPurchaseSaved'));
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
@@ -655,7 +686,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => { setPurchaseEditId(req.id); setPurchaseAmount(''); }}
+                        onClick={() => startPurchaseEdit(req)}
                         className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg active:scale-95 disabled:opacity-50"
                       >
                         {t('markPurchased')}
@@ -674,32 +705,61 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                   </div>
                 </div>
                 {editing && (
-                  <div className="flex gap-2 mb-2">
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      value={purchaseAmount}
-                      onChange={(e) => setPurchaseAmount(e.target.value.replace(/\D/g, ''))}
-                      placeholder={t('purchaseAmountPlaceholder')}
-                      className="flex-1 px-3 py-2 rounded-xl border-2 border-emerald-200 text-sm font-bold outline-none"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleSavePurchase(req)}
-                      className="px-3 py-2 rounded-xl font-black text-white text-xs shrink-0"
-                      style={{ background: '#1a8f4c' }}
-                    >
-                      {t('savePurchase')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setPurchaseEditId(null); setPurchaseAmount(''); }}
-                      className="px-2 py-2 text-stone-400 text-xs font-bold"
-                    >
-                      ✕
-                    </button>
+                  <div className="mb-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-2 space-y-2">
+                    <p className="text-[10px] font-black text-emerald-800">{t('purchaseLinePriceTitle')}</p>
+                    {(req.items || []).map((line, i) => {
+                      const key = `${req.id}:${i}`;
+                      const qty = Math.max(1, Number(line.qty) || 1);
+                      const unit = parseInt(String(purchaseLinePrices[key] || '').replace(/\D/g, ''), 10) || 0;
+                      return (
+                        <div key={key} className="grid grid-cols-[1fr_92px] gap-2 items-center">
+                          <p className="text-[11px] font-bold text-stone-700 min-w-0">
+                            <RestockItemName name={line.name} lang={lang} />
+                            <span className="ml-1 text-stone-400">×{qty}</span>
+                            {unit > 0 && <span className="block text-[10px] text-emerald-700">= ฿{(unit * qty).toLocaleString()}</span>}
+                          </p>
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            value={purchaseLinePrices[key] || ''}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              setPurchaseLinePrices((prev) => ({ ...prev, [key]: value }));
+                            }}
+                            placeholder={t('unitPricePlaceholder')}
+                            className="w-full px-2 py-2 rounded-xl border-2 border-emerald-200 text-sm font-bold outline-none bg-white"
+                          />
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={purchaseLineTotalFor(req) ? String(purchaseLineTotalFor(req)) : purchaseAmount}
+                        onChange={(e) => setPurchaseAmount(e.target.value.replace(/\D/g, ''))}
+                        placeholder={t('purchaseAmountPlaceholder')}
+                        disabled={purchaseLineTotalFor(req) > 0}
+                        className="flex-1 px-3 py-2 rounded-xl border-2 border-emerald-200 text-sm font-black outline-none bg-white disabled:bg-emerald-100 disabled:text-emerald-800"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleSavePurchase(req)}
+                        className="px-3 py-2 rounded-xl font-black text-white text-xs shrink-0"
+                        style={{ background: '#1a8f4c' }}
+                      >
+                        {t('savePurchase')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closePurchaseEdit}
+                        className="px-2 py-2 text-stone-400 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 )}
                 {(req.items || []).map((it, i) => (
@@ -709,6 +769,11 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                       <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
                       </span>
+                      {purchased && req.purchaseItems?.[i]?.lineTotal > 0 && (
+                        <span className="ml-1 text-[10px] font-black text-emerald-700">
+                          ฿{Number(req.purchaseItems[i].lineTotal).toLocaleString()}
+                        </span>
+                      )}
                     </p>
                     {canDel && !purchased && (
                       <button
