@@ -102,6 +102,17 @@ function amountLabel(value) {
   return `${sign}฿${Math.abs(n).toLocaleString()}`;
 }
 
+function getCupStockStatus(remaining) {
+  const count = Math.max(0, Math.round(Number(remaining) || 0));
+  if (count <= 20) {
+    return { labelKey: 'cupStockStatusCritical', tone: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500', panel: 'from-red-600 to-red-500' };
+  }
+  if (count <= 50) {
+    return { labelKey: 'cupStockStatusLow', tone: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-400', panel: 'from-amber-500 to-orange-400' };
+  }
+  return { labelKey: 'cupStockStatusNormal', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', panel: 'from-emerald-600 to-teal-500' };
+}
+
 async function loadCupStock(dateKey) {
   return fsGetDoc(`dailyCupStocks/${dateKey}`);
 }
@@ -414,6 +425,12 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     setEntryDateKey(expense.dateKey || viewDateKey);
   };
 
+  const addRefillCups = (amount) => {
+    setCupForm((prev) => ({ ...prev, refillCups: String(intValue(prev.refillCups) + amount), remainingCups: '' }));
+  };
+
+  const cupStockStatus = getCupStockStatus(remainingCups);
+
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
       {!compactHeader && <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 shadow-sm">
@@ -451,19 +468,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
           </div>
 
           <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-4">
-            <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-black text-amber-800">{t('expenseSummaryTitle')}</p>
-                <button type="button" onClick={fillFromSummary} disabled={!summaryText.trim()} className="px-3 py-1.5 rounded-full bg-white text-[11px] font-black text-amber-800 border border-amber-200 disabled:opacity-40">{t('expenseFillFromSummary')}</button>
-              </div>
-              <textarea value={summaryText} onChange={(e) => setSummaryText(e.target.value)} placeholder={t('expenseSummaryPlaceholder')} rows={3} className="w-full px-3 py-3 rounded-2xl border-2 border-amber-100 bg-white text-sm font-semibold outline-none focus:border-amber-300 resize-none" />
-            </div>
+            <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full min-h-12 px-4 py-3 rounded-2xl border-2 border-stone-200 text-base font-black outline-none focus:border-amber-300" />
 
-            <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-black outline-none focus:border-amber-300" />
-
-            <section className="space-y-2">
-              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('moneyGroupTitle')}</p>
-              <div className="grid grid-cols-2 gap-2">
+            <SectionCard title={t('moneyGroupTitle')}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label={t('dailyCash')} value={dayForm.cashAmount} onChange={(v) => setDayForm((p) => ({ ...p, cashAmount: digits(v) }))} />
                 <Field label={t('dailyTransfer')} value={dayForm.transferAmount} onChange={(v) => setDayForm((p) => ({ ...p, transferAmount: digits(v) }))} />
                 <Field label={t('manualBulkTotal')} value={dayForm.manualBulkTotal} onChange={(v) => setDayForm((p) => ({ ...p, manualBulkTotal: digits(v) }))} />
@@ -471,28 +479,38 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
                 <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
               </div>
               {bulkSummary.count > 0 && <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-2xl px-3 py-2">{t('bulkEntrySummaryHint').replace('{count}', String(bulkSummary.count)).replace('{total}', amountLabel(bulkSummary.manualBulkTotal)).replace('{cups}', String(bulkSummary.manualCupsSold))}</p>}
-            </section>
+            </SectionCard>
 
-            <section className="space-y-2">
-              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('cupCountGroupTitle')}</p>
-              <div className="grid grid-cols-2 gap-2">
+            <SectionCard title={t('cupCountGroupTitle')}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ReadBox label={t('autoCupsSold')} value={`${autoCupsSold.toLocaleString()} ${t('cupUnit')}`} />
                 <Field label={t('manualCupsSold')} value={dayForm.manualCupsSold} onChange={(v) => setDayForm((p) => ({ ...p, manualCupsSold: digits(v) }))} suffix={t('cupUnit')} />
                 <ReadBox label={t('finalCupsSold')} value={`${finalCupsSold.toLocaleString()} ${t('cupUnit')}`} />
               </div>
               <p className="text-[11px] text-stone-500 bg-stone-50 rounded-2xl px-3 py-2">{t('finalCupsHint')}</p>
-            </section>
+            </SectionCard>
 
-            <section className="space-y-2">
-              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('cupStockGroupTitle')}</p>
-              <div className="grid grid-cols-2 gap-2">
+            <SectionCard title={t('cupStockGroupTitle')}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label={t('cupOpening')} value={cupForm.openingCups} onChange={(v) => setCupForm((p) => ({ ...p, openingCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
                 <Field label={t('cupRefill')} value={cupForm.refillCups} onChange={(v) => setCupForm((p) => ({ ...p, refillCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
                 <ReadBox label={t('finalCupsSold')} value={`${finalCupsSold.toLocaleString()} ${t('cupPieceUnit')}`} />
                 <ReadBox label={t('cupNetRemaining')} value={`${autoRemainingCups.toLocaleString()} ${t('cupPieceUnit')}`} />
               </div>
+              <div className={`flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-black ${getCupStockStatus(autoRemainingCups).tone}`}>
+                <span className={`h-2.5 w-2.5 rounded-full ${getCupStockStatus(autoRemainingCups).dot}`} />
+                {t(getCupStockStatus(autoRemainingCups).labelKey)} · {autoRemainingCups.toLocaleString()} {t('cupPieceUnit')}
+              </div>
               <p className="text-[11px] text-stone-500 bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-2">{t('cupNetFormula')}</p>
-            </section>
+            </SectionCard>
+
+            <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black text-amber-800">{t('expenseSummaryTitle')}</p>
+                <button type="button" onClick={fillFromSummary} disabled={!summaryText.trim()} className="min-h-11 px-4 rounded-2xl bg-white text-[11px] font-black text-amber-800 border border-amber-200 disabled:opacity-40 active:scale-95">{t('expenseFillFromSummary')}</button>
+              </div>
+              <textarea value={summaryText} onChange={(e) => setSummaryText(e.target.value)} placeholder={t('expenseSummaryPlaceholder')} rows={3} className="w-full px-3 py-3 rounded-2xl border-2 border-amber-100 bg-white text-sm font-semibold outline-none focus:border-amber-300 resize-none" />
+            </div>
 
             <textarea value={dayForm.note} onChange={(e) => setDayForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('dailyNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
 
@@ -502,7 +520,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
               <SummaryRow label={t('dailyAllSummary')} value={amountLabel(dailyNetTotal)} strong tone={dailyNetTotal >= 0 ? 'text-emerald-700' : 'text-red-600'} />
             </div>
 
-            <button type="button" onClick={saveDaySummary} disabled={saving || !entryDateKey} className="w-full py-3 rounded-2xl font-black text-white text-sm disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('expenseSaveSummaryBtn')}</button>
+            <button type="button" onClick={saveDaySummary} disabled={saving || !entryDateKey} className="w-full min-h-14 py-4 rounded-2xl font-black text-white text-base disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('expenseSaveSummaryBtn')}</button>
             <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
             <p className="text-[11px] text-stone-400 leading-relaxed">{t('liveSalesHint').replace('{sales}', amountLabel(liveRevenue.totalSales)).replace('{cups}', String(liveRevenue.totalCups))}</p>
           </div>
@@ -510,24 +528,39 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       )}
 
       {mode === 'cups' && (
-        <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-3">
-          <div className="rounded-3xl p-5 text-white" style={{ background: '#3d1f0f' }}>
-            <p className="text-amber-500 text-xs font-black">{t('cupStockTitle')}</p>
-            <p className="text-4xl font-black text-amber-200 mt-2">{remainingCups.toLocaleString()}</p>
-            <p className="text-amber-700 text-xs">{t('cupRemaining')}</p>
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-4">
+          <div className={`rounded-3xl p-5 text-white bg-gradient-to-br ${cupStockStatus.panel}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-white/80 text-xs font-black">{t('cupStockTitle')}</p>
+                <p className="text-5xl font-black text-white mt-2">{remainingCups.toLocaleString()}</p>
+                <p className="text-white/80 text-xs">{t('cupRemaining')}</p>
+              </div>
+              <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black bg-white/95 ${cupStockStatus.tone}`}>
+                <span className={`h-2.5 w-2.5 rounded-full ${cupStockStatus.dot}`} />
+                {t(cupStockStatus.labelKey)}
+              </span>
+            </div>
           </div>
-          <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-black outline-none focus:border-amber-300" />
-          <div className="grid grid-cols-2 gap-2">
-            <Field label={t('cupOpening')} value={cupForm.openingCups} onChange={(v) => setCupForm((p) => ({ ...p, openingCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
-            <Field label={t('cupRefill')} value={cupForm.refillCups} onChange={(v) => setCupForm((p) => ({ ...p, refillCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
+          <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full min-h-12 px-4 py-3 rounded-2xl border-2 border-stone-200 text-base font-black outline-none focus:border-amber-300" />
+          <SectionCard title={t('cupQuickFillTitle')} hint={t('cupQuickFillHint')}>
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 20, 30, 50].map((amount) => (
+                <button key={amount} type="button" onClick={() => addRefillCups(amount)} className="min-h-14 rounded-2xl bg-amber-50 border-2 border-amber-100 text-lg font-black text-amber-900 active:scale-95">+{amount}</button>
+              ))}
+            </div>
+            <Field label={t('cupRefill')} value={cupForm.refillCups} onChange={(v) => setCupForm((p) => ({ ...p, refillCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} large />
+          </SectionCard>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label={t('cupOpening')} value={cupForm.openingCups} onChange={(v) => setCupForm((p) => ({ ...p, openingCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} large />
             <ReadBox label={t('cupTodayTotal')} value={`${refillTodayTotal.toLocaleString()} ${t('cupPieceUnit')}`} />
             <ReadBox label={t('dailyCupsSold')} value={`${cupsSold.toLocaleString()} ${t('cupUnit')}`} />
+            <Field label={t('cupRemainingEdit')} value={cupForm.remainingCups} onChange={(v) => setCupForm((p) => ({ ...p, remainingCups: digits(v) }))} placeholder={`${autoRemainingCups} ${t('cupPieceUnit')}`} suffix={t('cupPieceUnit')} large />
           </div>
-          <Field label={t('cupRemainingEdit')} value={cupForm.remainingCups} onChange={(v) => setCupForm((p) => ({ ...p, remainingCups: digits(v) }))} placeholder={`${autoRemainingCups} ${t('cupPieceUnit')}`} suffix={t('cupPieceUnit')} />
           <textarea value={cupForm.note} onChange={(e) => setCupForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('cupNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
           <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
           <p className="text-[11px] text-stone-500 bg-amber-50 border border-amber-100 rounded-2xl p-3 leading-relaxed">{t('cupCarryHint')}</p>
-          <button type="button" onClick={saveCupStock} disabled={saving || !entryDateKey} className="w-full py-3 rounded-2xl font-black text-white text-sm disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('cupSaveBtn')}</button>
+          <button type="button" onClick={saveCupStock} disabled={saving || !entryDateKey} className="w-full min-h-14 py-4 rounded-2xl font-black text-white text-base disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('cupSaveBtn')}</button>
         </div>
       )}
 
@@ -579,12 +612,24 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   );
 }
 
-function Field({ label, value, onChange, suffix = 'บาท', disabled = false, placeholder = '' }) {
+function SectionCard({ title, hint = '', children }) {
+  return (
+    <section className="rounded-3xl border border-stone-200 bg-stone-50/60 p-3 space-y-3">
+      <div>
+        <p className="text-xs font-black text-stone-600 uppercase tracking-wide">{title}</p>
+        {hint && <p className="text-[11px] font-bold text-stone-400 mt-0.5">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, value, onChange, suffix = 'บาท', disabled = false, placeholder = '', large = false }) {
   return (
     <label className="block">
       <span className="block text-[11px] font-black text-stone-500 mb-1">{label}</span>
-      <div className={`flex items-center rounded-2xl border-2 ${disabled ? 'bg-stone-100 border-stone-100' : 'bg-white border-stone-200 focus-within:border-amber-300'}`}>
-        <input value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} placeholder={placeholder} inputMode="numeric" className="min-w-0 flex-1 bg-transparent px-3 py-3 text-lg font-black text-stone-800 outline-none disabled:text-stone-500" />
+      <div className={`flex min-h-14 items-center rounded-2xl border-2 ${disabled ? 'bg-stone-100 border-stone-100' : 'bg-white border-stone-200 focus-within:border-amber-300'}`}>
+        <input value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} placeholder={placeholder} inputMode="numeric" className={`min-w-0 flex-1 bg-transparent px-3 py-3 ${large ? 'text-3xl text-center' : 'text-xl'} font-black text-stone-800 outline-none disabled:text-stone-500`} />
         <span className="pr-3 text-xs font-bold text-stone-400">{suffix}</span>
       </div>
     </label>
@@ -593,9 +638,9 @@ function Field({ label, value, onChange, suffix = 'บาท', disabled = false,
 
 function ReadBox({ label, value }) {
   return (
-    <div className="rounded-2xl bg-stone-50 border border-stone-100 p-3">
+    <div className="min-h-14 rounded-2xl bg-stone-50 border border-stone-100 p-3">
       <p className="text-[11px] font-black text-stone-500 mb-1">{label}</p>
-      <p className="text-lg font-black text-stone-800">{value}</p>
+      <p className="text-xl font-black text-stone-800">{value}</p>
     </div>
   );
 }
