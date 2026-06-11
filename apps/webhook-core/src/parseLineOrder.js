@@ -217,14 +217,14 @@ function parseShrimpNatural(line) {
 function parseGluedOrderLine(line) {
   const normalized = normalizeOrderText(line);
   const items = [];
-  const segmentRe = /([฀-๿0-9A-Za-z][฀-๿0-9A-Za-z\s]*?)?\s*(กุ้ง\s*(?:ใหญ่|กลาง|เล็ก|ตาย)|กุ้ง(?:ใหญ่|กลาง|เล็ก|ตาย))\s*([\d.]+)\s*(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)/gi;
+  const segmentRe = /([฀-๿0-9A-Za-z][฀-๿0-9A-Za-z\s]*?)?\s*(กุ้ง\s*(?:ใหญ่|กลาง|เล็ก|ตาย)|กุ้ง(?:ใหญ่|กลาง|เล็ก|ตาย))\s*([\d.]+)\s*(กก\.?|กิโลกรัม|กิโล|โล|kg|บาท|฿)?/gi;
   let m;
   while ((m = segmentRe.exec(normalized)) !== null) {
     let customerName = (m[1] || '').trim().replace(/\s+/g, '') || null;
     if (customerName && /^(สั่ง|จอง|order)$/i.test(customerName)) customerName = null;
     const size = (m[2].match(/(ใหญ่|กลาง|เล็ก|ตาย)/i) || [])[0];
     const product = /ตาย/.test(m[2]) ? 'กุ้งตาย' : `กุ้ง${size || 'เล็ก'}`;
-    pushItem(items, product, parseFloat(m[3]), m[4], customerName);
+    pushItem(items, product, parseFloat(m[3]), m[4] || 'กก', customerName);
   }
   return items;
 }
