@@ -12,14 +12,16 @@ import {
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
 import { sumOrderRevenue } from '../lib/dailyLedger';
+import { sumBulkEntries } from '../lib/bulkEntryService';
 import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
 
 const EMPTY_DAY = {
   cashAmount: '',
   transferAmount: '',
   storefrontExpense: '',
+  manualBulkTotal: '',
   cashChangeRemaining: '',
-  cupsSold: '',
+  manualCupsSold: '',
   note: '',
 };
 
@@ -87,7 +89,8 @@ function parseSummaryText(text) {
     cashAmount: parseNumberAfter(compact, ['เงินสด', 'สด', 'cash']),
     transferAmount: parseNumberAfter(compact, ['เงินโอน', 'โอน', 'transfer']),
     storefrontExpense: parseNumberAfter(compact, ['จ่ายออกหน้าร้าน', 'จ่ายออก', 'จ่าย', 'ค่าใช้จ่าย', 'รายจ่าย']),
-    cupsSold: parseNumberAfter(compact, ['จำนวนแก้วขายได้', 'แก้วขายได้', 'ขายได้.*?แก้ว', 'แก้ว']),
+    manualBulkTotal: parseNumberAfter(compact, ['ยอดเหมา', 'ยอดรวม', 'ขายเหมา', 'manual', 'รวม']),
+    manualCupsSold: parseNumberAfter(compact, ['จำนวนแก้วขายได้', 'แก้วขายได้', 'ขายได้.*?แก้ว', 'แก้ว']),
     totalSales: parseNumberAfter(compact, ['ยอดขาย', 'ขายได้', 'รวม']),
     note: raw,
   };
@@ -109,8 +112,11 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   const transferAmount = moneyValue(form.transferAmount);
   const cashChangeRemaining = moneyValue(form.cashChangeRemaining);
   const storefrontExpense = moneyValue(form.storefrontExpense);
-  const cupsSold = intValue(form.cupsSold);
-  const totalSales = cashAmount + transferAmount;
+  const manualBulkTotal = moneyValue(form.manualBulkTotal);
+  const autoCupsSold = intValue(form.autoCupsSold);
+  const manualCupsSold = intValue(form.manualCupsSold);
+  const finalCupsSold = manualCupsSold || autoCupsSold;
+  const totalSales = cashAmount + transferAmount + manualBulkTotal;
   const payload = {
     dateKey,
     type: 'dailySummary',
@@ -118,10 +124,22 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
     description: storefrontExpense > 0 ? 'จ่ายจากเงินร้านตามสรุปวัน' : 'สรุปยอดขายปิดวัน',
     amount: storefrontExpense,
     cashAmount,
+    cash_amount: cashAmount,
     transferAmount,
+    transfer_amount: transferAmount,
     storefrontExpense,
+    expense_amount: storefrontExpense,
     cashChangeRemaining,
-    cupsSold,
+    cash_change_remaining: cashChangeRemaining,
+    manualBulkTotal,
+    manual_bulk_total: manualBulkTotal,
+    autoCupsSold,
+    auto_cups_sold: autoCupsSold,
+    manualCupsSold,
+    manual_cups_sold: manualCupsSold,
+    finalCupsSold,
+    final_cups_sold: finalCupsSold,
+    cupsSold: finalCupsSold,
     totalSales,
     totalRestockPurchased: 0,
     manualRestockPurchased: 0,
@@ -135,7 +153,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   };
   if (existing?.id) {
     await fsPatch(`dailyExpenses/${existing.id}`, payload);
-    await writeHistoryLog({ action: 'dailySummary.update', collection: 'dailyExpenses', docId: existing.id, refPath: `dailyExpenses/${existing.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, storefrontExpense, cashChangeRemaining, cupsSold } });
+    await writeHistoryLog({ action: 'dailySummary.update', collection: 'dailyExpenses', docId: existing.id, refPath: `dailyExpenses/${existing.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, manualBulkTotal, storefrontExpense, cashChangeRemaining, autoCupsSold, manualCupsSold, finalCupsSold } });
     return existing.id;
   }
   const created = await fsPost('dailyExpenses', {
@@ -144,7 +162,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
     createdByUid: member?.uid || '',
     createdAt: now,
   });
-  await writeHistoryLog({ action: 'dailySummary.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, storefrontExpense, cashChangeRemaining, cupsSold } });
+  await writeHistoryLog({ action: 'dailySummary.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, manualBulkTotal, storefrontExpense, cashChangeRemaining, autoCupsSold, manualCupsSold, finalCupsSold } });
   return created.id;
 }
 
@@ -166,22 +184,28 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
   const todayKey = dateKeyBangkok();
   const isToday = viewDateKey === todayKey;
-  const manualExpenses = useMemo(() => expenses.filter((e) => e.type !== 'dailySummary'), [expenses]);
+  const bulkEntries = useMemo(() => expenses.filter((e) => e.type === 'bulkEntry'), [expenses]);
+  const manualExpenses = useMemo(() => expenses.filter((e) => e.type !== 'dailySummary' && e.type !== 'bulkEntry'), [expenses]);
   const dailySummary = useMemo(() => expenses.find((e) => e.type === 'dailySummary'), [expenses]);
   const manualExpenseTotal = useMemo(() => manualExpenses.reduce((s, e) => s + (e.amount || 0), 0), [manualExpenses]);
   const restockPurchased = useMemo(() => sumPurchasedRestocks(restocks), [restocks]);
   const liveRevenue = useMemo(() => sumOrderRevenue(orders), [orders]);
+  const bulkSummary = useMemo(() => sumBulkEntries(bulkEntries), [bulkEntries]);
   const cashAmount = moneyValue(dayForm.cashAmount);
   const transferAmount = moneyValue(dayForm.transferAmount);
-  const totalSales = cashAmount + transferAmount;
+  const manualBulkTotal = moneyValue(dayForm.manualBulkTotal);
+  const totalSales = cashAmount + transferAmount + manualBulkTotal;
   const storefrontExpense = moneyValue(dayForm.storefrontExpense);
   const cashChangeRemaining = moneyValue(dayForm.cashChangeRemaining);
-  const cupsSold = intValue(dayForm.cupsSold);
+  const autoCupsSold = liveRevenue.totalCups;
+  const manualCupsSold = intValue(dayForm.manualCupsSold);
+  const finalCupsSold = manualCupsSold || autoCupsSold;
+  const cupsSold = finalCupsSold;
   const dailyNetTotal = totalSales - storefrontExpense;
   const openingCups = intValue(cupForm.openingCups);
   const refillCups = intValue(cupForm.refillCups);
   const refillTodayTotal = openingCups + refillCups;
-  const autoRemainingCups = Math.max(0, refillTodayTotal - cupsSold);
+  const autoRemainingCups = Math.max(0, refillTodayTotal - finalCupsSold);
   const remainingCups = cupForm.remainingCups === '' ? autoRemainingCups : intValue(cupForm.remainingCups);
   const isEditing = Boolean(editingExpense?.id);
 
@@ -203,19 +227,22 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     setCupDoc(cups);
     const summary = expenseRows.find((e) => e.type === 'dailySummary');
     const revenue = sumOrderRevenue(orderRows);
+    const loadedBulkSummary = sumBulkEntries(expenseRows.filter((e) => e.type === 'bulkEntry'));
     const savedStorefrontExpense = summary ? (summary.storefrontExpense || summary.amount || 0) : 0;
     setDayForm(summary ? {
       cashAmount: summary.cashAmount ? String(summary.cashAmount) : '',
       transferAmount: summary.transferAmount ? String(summary.transferAmount) : '',
       storefrontExpense: savedStorefrontExpense ? String(savedStorefrontExpense) : '',
+      manualBulkTotal: summary.manualBulkTotal || summary.manual_bulk_total ? String(summary.manualBulkTotal || summary.manual_bulk_total) : (loadedBulkSummary.manualBulkTotal ? String(loadedBulkSummary.manualBulkTotal) : ''),
       cashChangeRemaining: summary.cashChangeRemaining ? String(summary.cashChangeRemaining) : '',
-      cupsSold: summary.cupsSold ? String(summary.cupsSold) : '',
+      manualCupsSold: summary.manualCupsSold || summary.manual_cups_sold ? String(summary.manualCupsSold || summary.manual_cups_sold) : (loadedBulkSummary.manualCupsSold ? String(loadedBulkSummary.manualCupsSold) : ''),
       note: summary.note || '',
     } : {
       ...EMPTY_DAY,
       cashAmount: revenue.cashTotal ? String(revenue.cashTotal) : '',
       transferAmount: revenue.transferTotal ? String(revenue.transferTotal) : '',
-      cupsSold: revenue.totalCups ? String(revenue.totalCups) : '',
+      manualBulkTotal: loadedBulkSummary.manualBulkTotal ? String(loadedBulkSummary.manualBulkTotal) : '',
+      manualCupsSold: loadedBulkSummary.manualCupsSold ? String(loadedBulkSummary.manualCupsSold) : '',
     });
     setCupForm(cups ? {
       openingCups: cups.openingCups ? String(cups.openingCups) : '',
@@ -245,7 +272,8 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       cashAmount: parsed.cashAmount ? String(parsed.cashAmount) : prev.cashAmount,
       transferAmount: parsed.transferAmount ? String(parsed.transferAmount) : prev.transferAmount,
       storefrontExpense: parsed.storefrontExpense ? String(parsed.storefrontExpense) : prev.storefrontExpense,
-      cupsSold: parsed.cupsSold ? String(parsed.cupsSold) : prev.cupsSold,
+      manualBulkTotal: parsed.manualBulkTotal ? String(parsed.manualBulkTotal) : prev.manualBulkTotal,
+      manualCupsSold: parsed.manualCupsSold ? String(parsed.manualCupsSold) : prev.manualCupsSold,
       note: parsed.note || prev.note,
     }));
   };
@@ -261,9 +289,28 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       await saveDailySummaryExpense({
         existing: targetDailySummary,
         dateKey: targetDateKey,
-        form: dayForm,
+        form: { ...dayForm, autoCupsSold },
         member,
         rawSummary: summaryText.trim(),
+      });
+      await fsUpsertDoc('dailyCupStocks', targetDateKey, {
+        dateKey: targetDateKey,
+        openingCups,
+        refillCups,
+        refillTodayTotal,
+        cupsSold: finalCupsSold,
+        autoCupsSold,
+        manualCupsSold,
+        finalCupsSold,
+        remainingCups: autoRemainingCups,
+        note: cupForm.note || dayForm.note || '',
+        updatedBy: member?.name || 'ชินชา',
+        updatedByUid: member?.uid || '',
+        ...staffSnapshot(member),
+        updatedAt: new Date().toISOString(),
+        createdBy: cupDoc?.createdBy || member?.name || 'ชินชา',
+        createdByUid: cupDoc?.createdByUid || member?.uid || '',
+        createdAt: cupDoc?.createdAt || new Date().toISOString(),
       });
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
@@ -285,7 +332,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         openingCups,
         refillCups,
         refillTodayTotal,
-        cupsSold,
+        cupsSold: finalCupsSold,
+        autoCupsSold,
+        manualCupsSold,
+        finalCupsSold,
         remainingCups,
         note: cupForm.note || '',
         updatedBy: member?.name || 'ชินชา',
@@ -296,7 +346,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         createdByUid: cupDoc?.createdByUid || member?.uid || '',
         createdAt: cupDoc?.createdAt || new Date().toISOString(),
       });
-      await writeHistoryLog({ action: 'cupStock.upsert', collection: 'dailyCupStocks', docId: targetDateKey, refPath: `dailyCupStocks/${targetDateKey}`, dateKey: targetDateKey, member, summary: { openingCups, refillCups, cupsSold, remainingCups } });
+      await writeHistoryLog({ action: 'cupStock.upsert', collection: 'dailyCupStocks', docId: targetDateKey, refPath: `dailyCupStocks/${targetDateKey}`, dateKey: targetDateKey, member, summary: { openingCups, refillCups, autoCupsSold, manualCupsSold, finalCupsSold, remainingCups } });
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
       showFlash(t('cupStockSaved'));
@@ -390,38 +440,65 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       {mode === 'summary' && (
         <div className="space-y-3">
           <div className="rounded-3xl p-5 text-white shadow-lg" style={{ background: '#3d1f0f' }}>
-            <p className="text-amber-500 text-xs font-black">{t('dailySummaryTitle')}</p>
+            <p className="text-amber-500 text-xs font-black">{t('closingOnePageTitle')}</p>
             <p className="text-4xl font-black text-amber-200 mt-2">{amountLabel(totalSales)}</p>
             <p className="text-amber-700 text-xs">{t('dailySalesTotal')}</p>
             <div className="grid grid-cols-3 gap-2 mt-4 text-center">
               <div className="rounded-2xl bg-white/10 p-2"><p className="text-[10px] text-amber-200">{t('cash')}</p><p className="font-black">{amountLabel(cashAmount)}</p></div>
               <div className="rounded-2xl bg-white/10 p-2"><p className="text-[10px] text-amber-200">{t('transfer')}</p><p className="font-black">{amountLabel(transferAmount)}</p></div>
-              <div className="rounded-2xl bg-white/10 p-2"><p className="text-[10px] text-amber-200">{t('cupUnit')}</p><p className="font-black">{cupsSold}</p></div>
+              <div className="rounded-2xl bg-white/10 p-2"><p className="text-[10px] text-amber-200">{t('finalCupsSold')}</p><p className="font-black">{finalCupsSold}</p></div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-3">
+          <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-4">
             <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-black text-amber-800">{t('expenseSummaryTitle')}</p>
                 <button type="button" onClick={fillFromSummary} disabled={!summaryText.trim()} className="px-3 py-1.5 rounded-full bg-white text-[11px] font-black text-amber-800 border border-amber-200 disabled:opacity-40">{t('expenseFillFromSummary')}</button>
               </div>
-              <textarea value={summaryText} onChange={(e) => setSummaryText(e.target.value)} placeholder={t('expenseSummaryPlaceholder')} rows={4} className="w-full px-3 py-3 rounded-2xl border-2 border-amber-100 bg-white text-sm font-semibold outline-none focus:border-amber-300 resize-none" />
+              <textarea value={summaryText} onChange={(e) => setSummaryText(e.target.value)} placeholder={t('expenseSummaryPlaceholder')} rows={3} className="w-full px-3 py-3 rounded-2xl border-2 border-amber-100 bg-white text-sm font-semibold outline-none focus:border-amber-300 resize-none" />
             </div>
 
             <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-black outline-none focus:border-amber-300" />
-            <div className="grid grid-cols-2 gap-2">
-              <Field label={t('dailyCash')} value={dayForm.cashAmount} onChange={(v) => setDayForm((p) => ({ ...p, cashAmount: digits(v) }))} />
-              <Field label={t('dailyTransfer')} value={dayForm.transferAmount} onChange={(v) => setDayForm((p) => ({ ...p, transferAmount: digits(v) }))} />
-              <Field label={t('dailyStoreExpense')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
-              <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
-              <Field label={t('dailyCupsSold')} value={dayForm.cupsSold} onChange={(v) => setDayForm((p) => ({ ...p, cupsSold: digits(v) }))} suffix={t('cupUnit')} />
-            </div>
+
+            <section className="space-y-2">
+              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('moneyGroupTitle')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label={t('dailyCash')} value={dayForm.cashAmount} onChange={(v) => setDayForm((p) => ({ ...p, cashAmount: digits(v) }))} />
+                <Field label={t('dailyTransfer')} value={dayForm.transferAmount} onChange={(v) => setDayForm((p) => ({ ...p, transferAmount: digits(v) }))} />
+                <Field label={t('manualBulkTotal')} value={dayForm.manualBulkTotal} onChange={(v) => setDayForm((p) => ({ ...p, manualBulkTotal: digits(v) }))} />
+                <Field label={t('expenseAmount')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
+                <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
+              </div>
+              {bulkSummary.count > 0 && <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-2xl px-3 py-2">{t('bulkEntrySummaryHint').replace('{count}', String(bulkSummary.count)).replace('{total}', amountLabel(bulkSummary.manualBulkTotal)).replace('{cups}', String(bulkSummary.manualCupsSold))}</p>}
+            </section>
+
+            <section className="space-y-2">
+              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('cupCountGroupTitle')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <ReadBox label={t('autoCupsSold')} value={`${autoCupsSold.toLocaleString()} ${t('cupUnit')}`} />
+                <Field label={t('manualCupsSold')} value={dayForm.manualCupsSold} onChange={(v) => setDayForm((p) => ({ ...p, manualCupsSold: digits(v) }))} suffix={t('cupUnit')} />
+                <ReadBox label={t('finalCupsSold')} value={`${finalCupsSold.toLocaleString()} ${t('cupUnit')}`} />
+              </div>
+              <p className="text-[11px] text-stone-500 bg-stone-50 rounded-2xl px-3 py-2">{t('finalCupsHint')}</p>
+            </section>
+
+            <section className="space-y-2">
+              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{t('cupStockGroupTitle')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label={t('cupOpening')} value={cupForm.openingCups} onChange={(v) => setCupForm((p) => ({ ...p, openingCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
+                <Field label={t('cupRefill')} value={cupForm.refillCups} onChange={(v) => setCupForm((p) => ({ ...p, refillCups: digits(v), remainingCups: '' }))} suffix={t('cupPieceUnit')} />
+                <ReadBox label={t('finalCupsSold')} value={`${finalCupsSold.toLocaleString()} ${t('cupPieceUnit')}`} />
+                <ReadBox label={t('cupNetRemaining')} value={`${autoRemainingCups.toLocaleString()} ${t('cupPieceUnit')}`} />
+              </div>
+              <p className="text-[11px] text-stone-500 bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-2">{t('cupNetFormula')}</p>
+            </section>
+
             <textarea value={dayForm.note} onChange={(e) => setDayForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('dailyNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
 
             <div className="rounded-2xl bg-stone-50 p-3 space-y-1 text-sm">
               <SummaryRow label={t('dailySalesTotal')} value={amountLabel(totalSales)} strong />
-              <SummaryRow label={t('dailyStoreExpense')} value={`−${amountLabel(storefrontExpense)}`} tone="text-red-600" />
+              <SummaryRow label={t('expenseAmount')} value={`−${amountLabel(storefrontExpense)}`} tone="text-red-600" />
               <SummaryRow label={t('dailyAllSummary')} value={amountLabel(dailyNetTotal)} strong tone={dailyNetTotal >= 0 ? 'text-emerald-700' : 'text-red-600'} />
             </div>
 
