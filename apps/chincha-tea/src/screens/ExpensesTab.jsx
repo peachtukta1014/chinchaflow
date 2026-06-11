@@ -12,11 +12,13 @@ import {
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
 import { sumOrderRevenue } from '../lib/dailyLedger';
+import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
 
 const EMPTY_DAY = {
   cashAmount: '',
   transferAmount: '',
   storefrontExpense: '',
+  cashChangeRemaining: '',
   cupsSold: '',
   manualRestockPurchased: '',
   note: '',
@@ -118,6 +120,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, restockPurchas
     cashAmount,
     transferAmount,
     storefrontExpense,
+    cashChangeRemaining,
     cupsSold,
     totalSales,
     totalRestockPurchased,
@@ -127,10 +130,12 @@ async function saveDailySummaryExpense({ existing, dateKey, form, restockPurchas
     rawSummary: rawSummary || undefined,
     updatedBy: member?.name || 'ชินชา',
     updatedByUid: member?.uid || '',
+    ...staffSnapshot(member),
     updatedAt: now,
   };
   if (existing?.id) {
     await fsPatch(`dailyExpenses/${existing.id}`, payload);
+    await writeHistoryLog({ action: 'dailySummary.update', collection: 'dailyExpenses', docId: existing.id, refPath: `dailyExpenses/${existing.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, cashChangeRemaining, cupsSold } });
     return existing.id;
   }
   const created = await fsPost('dailyExpenses', {
@@ -139,15 +144,16 @@ async function saveDailySummaryExpense({ existing, dateKey, form, restockPurchas
     createdByUid: member?.uid || '',
     createdAt: now,
   });
+  await writeHistoryLog({ action: 'dailySummary.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, cashChangeRemaining, cupsSold } });
   return created.id;
 }
 
-export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey }) {
+export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey, allowedModes = ['summary', 'cups', 'manual'], defaultMode = 'summary', compactHeader = false }) {
   const [expenses, setExpenses] = useState([]);
   const [orders, setOrders] = useState([]);
   const [restocks, setRestocks] = useState([]);
   const [entryDateKey, setEntryDateKey] = useState(viewDateKey);
-  const [mode, setMode] = useState('summary');
+  const [mode, setMode] = useState(defaultMode);
   const [dayForm, setDayForm] = useState(EMPTY_DAY);
   const [cupForm, setCupForm] = useState(EMPTY_CUPS);
   const [summaryText, setSummaryText] = useState('');
@@ -169,6 +175,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   const transferAmount = moneyValue(dayForm.transferAmount);
   const storefrontExpense = moneyValue(dayForm.storefrontExpense);
   const totalSales = cashAmount + transferAmount;
+  const cashChangeRemaining = moneyValue(dayForm.cashChangeRemaining);
   const cupsSold = intValue(dayForm.cupsSold);
   const restockTotal = restockPurchased || moneyValue(dayForm.manualRestockPurchased);
   const dailyNetTotal = totalSales - storefrontExpense - restockTotal;
@@ -201,6 +208,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       cashAmount: summary.cashAmount ? String(summary.cashAmount) : '',
       transferAmount: summary.transferAmount ? String(summary.transferAmount) : '',
       storefrontExpense: summary.storefrontExpense ? String(summary.storefrontExpense) : '',
+      cashChangeRemaining: summary.cashChangeRemaining ? String(summary.cashChangeRemaining) : '',
       cupsSold: summary.cupsSold ? String(summary.cupsSold) : '',
       manualRestockPurchased: summary.manualRestockPurchased ? String(summary.manualRestockPurchased) : '',
       note: summary.note || '',
@@ -224,6 +232,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     setExpDesc('');
     setExpAmount('');
     setSummaryText('');
+    setMode((prev) => (allowedModes.includes(prev) ? prev : allowedModes[0] || defaultMode));
     reloadDay(viewDateKey).catch((e) => console.error(e));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDateKey]);
@@ -283,11 +292,13 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         note: cupForm.note || '',
         updatedBy: member?.name || 'ชินชา',
         updatedByUid: member?.uid || '',
+        ...staffSnapshot(member),
         updatedAt: new Date().toISOString(),
         createdBy: cupDoc?.createdBy || member?.name || 'ชินชา',
         createdByUid: cupDoc?.createdByUid || member?.uid || '',
         createdAt: cupDoc?.createdAt || new Date().toISOString(),
       });
+      await writeHistoryLog({ action: 'cupStock.upsert', collection: 'dailyCupStocks', docId: targetDateKey, refPath: `dailyCupStocks/${targetDateKey}`, dateKey: targetDateKey, member, summary: { openingCups, refillCups, cupsSold, remainingCups } });
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
       showFlash(t('cupStockSaved'));
@@ -320,16 +331,20 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         entryMode: 'manual',
         updatedBy: member?.name || 'ชินชา',
         updatedByUid: member?.uid || '',
+        ...staffSnapshot(member),
         updatedAt: new Date().toISOString(),
       };
-      if (isEditing) await fsPatch(`dailyExpenses/${editingExpense.id}`, payload);
-      else {
-        await fsPost('dailyExpenses', {
+      if (isEditing) {
+        await fsPatch(`dailyExpenses/${editingExpense.id}`, payload);
+        await writeHistoryLog({ action: 'expense.update', collection: 'dailyExpenses', docId: editingExpense.id, refPath: `dailyExpenses/${editingExpense.id}`, dateKey: targetDateKey, member, summary: { amount, description: desc } });
+      } else {
+        const created = await fsPost('dailyExpenses', {
           ...payload,
           createdBy: member?.name || 'ชินชา',
           createdByUid: member?.uid || '',
           createdAt: new Date().toISOString(),
         });
+        await writeHistoryLog({ action: 'expense.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey: targetDateKey, member, summary: { amount, description: desc } });
       }
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
@@ -353,24 +368,24 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
-      <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 shadow-sm">
+      {!compactHeader && <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 shadow-sm">
         <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-10 h-10 rounded-xl bg-stone-100 font-black text-stone-600">‹</button>
         <div className="flex-1 text-center min-w-0">
           <p className="font-black text-sm text-stone-800 truncate">{formatDateKeyLabel(viewDateKey, lang)}</p>
           {!isToday && <button type="button" onClick={() => setViewDateKey(todayKey)} className="text-[11px] text-emerald-600 font-black">{t('todayLabel')}</button>}
         </div>
         <button type="button" disabled={viewDateKey >= todayKey} onClick={() => setViewDateKey(shiftDateKey(viewDateKey, 1))} className="w-10 h-10 rounded-xl bg-stone-100 font-black text-stone-600 disabled:opacity-30">›</button>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-3 gap-2 rounded-3xl bg-white p-1.5 border border-stone-200 shadow-sm sticky top-2 z-20">
+      {allowedModes.length > 1 && <div className="grid grid-cols-3 gap-2 rounded-3xl bg-white p-1.5 border border-stone-200 shadow-sm sticky top-2 z-20">
         {[
           ['summary', t('dailySummaryTab')],
           ['cups', t('cupStockTab')],
           ['manual', t('expenseManualTab')],
-        ].map(([id, label]) => (
+        ].filter(([id]) => allowedModes.includes(id)).map(([id, label]) => (
           <button key={id} type="button" onClick={() => setMode(id)} className={`py-3 rounded-2xl text-xs font-black ${mode === id ? 'text-white shadow' : 'text-stone-500'}`} style={mode === id ? { background: '#3d1f0f' } : undefined}>{label}</button>
         ))}
-      </div>
+      </div>}
 
       {flash && <p className="text-center text-xs font-bold py-2 rounded-xl bg-emerald-50 text-emerald-700">{flash}</p>}
 
@@ -400,9 +415,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
             <div className="grid grid-cols-2 gap-2">
               <Field label={t('dailyCash')} value={dayForm.cashAmount} onChange={(v) => setDayForm((p) => ({ ...p, cashAmount: digits(v) }))} />
               <Field label={t('dailyTransfer')} value={dayForm.transferAmount} onChange={(v) => setDayForm((p) => ({ ...p, transferAmount: digits(v) }))} />
-              <Field label={t('dailyStoreExpense')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
+              <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
               <Field label={t('dailyCupsSold')} value={dayForm.cupsSold} onChange={(v) => setDayForm((p) => ({ ...p, cupsSold: digits(v) }))} suffix={t('cupUnit')} />
             </div>
+            <Field label={t('dailyStoreExpense')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
             <Field label={t('dailyRestockPurchased')} value={restockPurchased ? String(restockPurchased) : dayForm.manualRestockPurchased} onChange={(v) => setDayForm((p) => ({ ...p, manualRestockPurchased: digits(v) }))} disabled={restockPurchased > 0} />
             <textarea value={dayForm.note} onChange={(e) => setDayForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('dailyNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
 
@@ -414,6 +430,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
             </div>
 
             <button type="button" onClick={saveDaySummary} disabled={saving || !entryDateKey} className="w-full py-3 rounded-2xl font-black text-white text-sm disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('expenseSaveSummaryBtn')}</button>
+            <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
             <p className="text-[11px] text-stone-400 leading-relaxed">{t('liveSalesHint').replace('{sales}', amountLabel(liveRevenue.totalSales)).replace('{cups}', String(liveRevenue.totalCups))}</p>
           </div>
         </div>
@@ -435,6 +452,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
           </div>
           <Field label={t('cupRemainingEdit')} value={cupForm.remainingCups} onChange={(v) => setCupForm((p) => ({ ...p, remainingCups: digits(v) }))} placeholder={`${autoRemainingCups} ${t('cupPieceUnit')}`} suffix={t('cupPieceUnit')} />
           <textarea value={cupForm.note} onChange={(e) => setCupForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('cupNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
+          <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
           <p className="text-[11px] text-stone-500 bg-amber-50 border border-amber-100 rounded-2xl p-3 leading-relaxed">{t('cupCarryHint')}</p>
           <button type="button" onClick={saveCupStock} disabled={saving || !entryDateKey} className="w-full py-3 rounded-2xl font-black text-white text-sm disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('cupSaveBtn')}</button>
         </div>

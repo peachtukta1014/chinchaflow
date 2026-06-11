@@ -97,10 +97,11 @@ apps/chincha-tea/
 | Collection | ใช้ทำอะไร |
 |------------|-----------|
 | `users` | สมาชิกแอป (approved, role) |
-| `teaOrders` | บิลขายรายวัน |
-| `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`) |
-| `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ) |
-| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`) |
+| `teaOrders` | บิลขายรายวัน + staff ผู้บันทึก |
+| `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`, เงินสด/โอนรวม/เงินทอน/แก้ว/ผู้บันทึก) |
+| `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ / ผู้บันทึก) |
+| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`, staff ผู้บันทึก/จัดซื้อ) |
+| `historyLogs` | ประวัติ action สำคัญของชา ผูก staff จาก login |
 | `orderSlips` | รูปใบสั่งของ/สลิป (Storage URL) |
 | `products` / `toppings` | เมนู |
 | `config/teaLine` | ตั้งค่า LINE สรุปปิดวัน |
@@ -109,11 +110,10 @@ apps/chincha-tea/
 
 | แท็บ UI | ไฟล์ screen |
 |---------|-------------|
-| บันทึกขาย | `OrderTab.jsx` |
-| ประวัติ | `HistoryScreen.jsx` |
-| สรุป | `SummaryTab.jsx` |
-| สั่งของ | `RestockTab.jsx` |
-| สมาชิก/ตั้งค่า (แอดมิน) | `AdminPanel.jsx` |
+| ขาย (POS) | `OrderTab.jsx` |
+| หลังร้าน (Ops) | `OpsTab.jsx` รวม `RestockTab.jsx` + โหมดสต๊อกแก้วใน `ExpensesTab.jsx` |
+| บัญชี & ปิดวัน | `SummaryTab.jsx` รวมโหมดสรุปวัน/จ่ายย่อยใน `ExpensesTab.jsx` |
+| จัดการ (Admin) | `AdminPanel.jsx` + sub-section ภาพรวม/กำไร/ค่าแรง/ประวัติ |
 
 ---
 

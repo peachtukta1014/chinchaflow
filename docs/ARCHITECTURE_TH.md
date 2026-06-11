@@ -75,11 +75,12 @@ flowchart TB
 
 | Collection | ความหมาย |
 |------------|----------|
-| `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) |
+| `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) พร้อม `staffUid/staffName` จากผู้ล็อกอิน |
 | `products`, `toppings` | เมนูและท็อปปิ้ง |
 | `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
-| `restocks`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอน/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวัน) |
+| `restocks`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |
+| `historyLogs` | audit log เหตุการณ์สำคัญของชา (ขาย, ปิดวัน, สต๊อกแก้ว, สั่งของ) ผูก `staffUid/staffName` เพื่อใช้ตรวจย้อนหลัง/ต่อยอดค่าแรง |
 
 ### กุ้ง (`seafood-pos`)
 
@@ -97,7 +98,7 @@ flowchart TB
 
 นอกจากนี้มีฐานข้อมูลชื่อ **`chincha`** (กฎใน `firestore-chincha.rules`) สำหรับข้อมูลรูปแบบเก่า — สคริปต์ `tea:db-reset` สามารถล้างฐานนี้ได้เมื่อข้อมูลค้าง
 
-กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น; `dailyExpenses` รายจ่ายย่อยให้ผู้สร้างแก้เองได้, `dailyExpenses.type=dailySummary` และ `dailyCupStocks` ให้ผู้ใช้ที่อนุมัติแล้วช่วยอัปเดตยอดรายวันได้, แอดมินลบได้
+กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น; `dailyExpenses` รายจ่ายย่อยให้ผู้สร้างแก้เองได้, `dailyExpenses.type=dailySummary` และ `dailyCupStocks` ให้ผู้ใช้ที่อนุมัติแล้วช่วยอัปเดตยอดรายวันได้, `historyLogs` ให้ผู้ใช้ที่อนุมัติแล้วสร้าง log ของตัวเองและแอดมินอ่านได้, แอดมินลบได้
 
 ---
 

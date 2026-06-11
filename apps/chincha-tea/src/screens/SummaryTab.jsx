@@ -7,6 +7,7 @@ import { fsPost, fsQueryExpenses, fsQueryRestocksByDate } from '../lib/firestore
 import { pushTeaLineSummary } from '../lib/lineNotify';
 import { isRestockPurchased, restockPurchaseTotal, sumPurchasedRestocks } from '../lib/restockService';
 import { menuDisplayName } from '../lib/displayNames';
+import { ExpensesTab } from './ExpensesTab';
 
 export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
   const [expenses, setExpenses] = useState([]);
@@ -128,6 +129,17 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
           onFinalText={onVoiceFinal}
         />
       )}
+
+      <ExpensesTab
+        member={member}
+        t={t}
+        lang={lang}
+        viewDateKey={viewDateKey}
+        setViewDateKey={setViewDateKey}
+        allowedModes={['summary', 'manual']}
+        defaultMode="summary"
+        compactHeader
+      />
 
       {lineFlash && (
         <p className={`text-center text-xs font-bold py-2 rounded-xl ${lineFlash.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>

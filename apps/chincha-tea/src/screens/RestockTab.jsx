@@ -26,6 +26,7 @@ import {
 } from '../lib/restockCatalogService';
 import { restockDisplayName } from '../lib/restockDisplay';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
+import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
 import { parseRestockVoice } from '../lib/voiceRestock';
 
 function RestockItemName({ name, lang, catalogItem }) {
@@ -259,14 +260,17 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     setSaving(true);
     try {
       const names = listToSubmit.map((i) => i.name);
-      await fsPost('restocks', {
+      const created = await fsPost('restocks', {
         dateKey,
         uid: member?.uid || 'unknown',
         createdBy: member?.name || 'ชินชา',
+        createdByUid: member?.uid || '',
+        ...staffSnapshot(member),
         items: listToSubmit.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
         purchaseStatus: 'pending',
         createdAt: new Date().toISOString(),
       });
+      await writeHistoryLog({ action: 'restock.create', collection: 'restocks', docId: created?.id || '', refPath: created?.id ? `restocks/${created.id}` : '', dateKey, member, summary: { items: listToSubmit.length } });
       await upsertRestockCatalogItems(names, member);
       setItems([]);
       setFlash(t('restockSent'));
@@ -385,7 +389,9 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         purchaseTotal: amount,
         purchaseItems: lineItems,
         purchasedBy: member?.name || '—',
+        purchasedByUid: member?.uid || '',
       });
+      await writeHistoryLog({ action: 'restock.purchase', collection: 'restocks', docId: req.id, refPath: `restocks/${req.id}`, dateKey: req.dateKey || dateKey, member, summary: { purchaseTotal: amount } });
       setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
       notifyRestockChange();
       closePurchaseEdit();
