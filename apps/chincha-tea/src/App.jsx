@@ -15,8 +15,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
 import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
-import { ExpensesTab } from './screens/ExpensesTab';
-import { RestockTab } from './screens/RestockTab';
+import { OpsTab } from './screens/OpsTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
@@ -42,6 +41,7 @@ export default function App() {
   const [showCart, setShowCart] = useState(false);
   const [payType, setPayType] = useState('cash');
   const [pendingRestocks, setPendingRestocks] = useState(0);
+  const [adminSection, setAdminSection] = useState('dashboard');
   const prevPendingRestocksRef = useRef(null);
   const tabBootstrappedRef = useRef(false);
 
@@ -74,8 +74,8 @@ export default function App() {
   useEffect(() => {
     if (!isAuthed || tabBootstrappedRef.current) return;
     if (member.role === 'admin') {
-      setTab('dashboard');
-      setLastTab('dashboard');
+      setTab('admin');
+      setLastTab('admin');
     }
     tabBootstrappedRef.current = true;
   }, [isAuthed, member?.role]);
@@ -105,7 +105,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed) return;
-    if (tab === 'history' || tab === 'summary' || tab === 'profit') refreshOrders();
+    if (tab === 'summary' || tab === 'admin') refreshOrders();
   }, [isAuthed, tab, refreshOrders]);
 
   const refreshPendingRestocks = useCallback(async (force = false) => {
@@ -273,22 +273,14 @@ export default function App() {
           badges={isAdmin ? { restock: pendingRestocks } : {}}
           onSelect={(id) => {
             setTab(id);
-            if (id === 'admin' || id === 'catalog') refreshCatalog();
-            if (id === 'history' || id === 'summary' || id === 'profit') refreshOrders();
-            if (id === 'restock' && isAdmin) refreshPendingRestocks();
+            if (id === 'admin') refreshCatalog();
+            if (id === 'summary' || id === 'admin') refreshOrders();
+            if (id === 'ops' && isAdmin) refreshPendingRestocks();
           }}
         />
       )}
 
       <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0]" style={{ scrollbarWidth: 'none' }}>
-        {tab === 'dashboard' && isAdmin && (
-          <DashboardTab
-            t={t}
-            todayKey={todayKey}
-            pendingRestocks={pendingRestocks}
-            onNavigate={setTab}
-          />
-        )}
         {tab === 'order' && (
           <OrderTab
             menuItems={menuItems}
@@ -304,17 +296,6 @@ export default function App() {
             }}
           />
         )}
-        {tab === 'history' && (
-          <HistoryScreen
-            orders={orders}
-            viewDateKey={viewDateKey}
-            setViewDateKey={setViewDateKey}
-            todayKey={todayKey}
-            t={t}
-            lang={lang}
-            menuItems={menuItems}
-          />
-        )}
         {tab === 'summary' && (
           <SummaryTab
             orders={orders}
@@ -327,47 +308,56 @@ export default function App() {
             isAdmin={isAdmin}
           />
         )}
-        {tab === 'expenses' && (
-          <ExpensesTab
+        {tab === 'ops' && (
+          <OpsTab
             member={member}
             t={t}
             lang={lang}
             viewDateKey={viewDateKey}
             setViewDateKey={setViewDateKey}
-          />
-        )}
-        {tab === 'restock' && (
-          <RestockTab
-            member={member}
-            t={t}
-            lang={lang}
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
-        {tab === 'profit' && isAdmin && (
-          <ProfitTab
-            t={t}
-            lang={lang}
-            viewDateKey={viewDateKey}
-            setViewDateKey={setViewDateKey}
-            todayKey={todayKey}
-          />
-        )}
-        {tab === 'payroll' && isAdmin && (
-          <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
-        )}
-        {tab === 'admin' && isAdmin && (
-          <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />
-        )}
-        {tab === 'catalog' && !isAdmin && (
-          <AdminPanel catalogOnly t={t} lang={lang} menuItems={menuItems} onCatalogChanged={refreshCatalog} />
+        {tab === 'admin' && (
+          <div className="px-4 pt-3 pb-8 space-y-3">
+            {isAdmin && (
+              <div className="rounded-2xl border border-amber-900/10 bg-stone-100/80 p-1 flex gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                {[
+                  ['dashboard', t('dashboardTabShort')],
+                  ['catalog', t('catalogTabShort')],
+                  ['profit', t('profitTabShort')],
+                  ['payroll', t('payrollTabShort')],
+                  ['history', t('historyTabShort')],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setAdminSection(id)}
+                    className={`shrink-0 px-3 py-2 rounded-xl font-bold text-[10px] transition-all ${adminSection === id ? 'text-white shadow-sm' : 'text-stone-500'}`}
+                    style={adminSection === id ? { background: 'linear-gradient(145deg, #3d1f0f 0%, #5a2d14 100%)' } : {}}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {isAdmin && adminSection === 'dashboard' && <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} onNavigate={(next) => {
+              if (next === 'restock') setTab('ops');
+              else if (next === 'summary') setTab('summary');
+              else setAdminSection(next);
+            }} />}
+            {(!isAdmin || adminSection === 'catalog') && <AdminPanel catalogOnly={!isAdmin} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />}
+            {isAdmin && adminSection === 'profit' && <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />}
+            {isAdmin && adminSection === 'payroll' && <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />}
+            {isAdmin && adminSection === 'history' && <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />}
+          </div>
         )}
         {isProfileTab && (
           <MyProfileScreen member={member} onProfileUpdated={onProfileUpdated} t={t} />
         )}
       </main>
 
-      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'catalog' && tab !== 'payroll' && tab !== 'profit' && tab !== 'dashboard' && tab !== 'expenses' && (
+      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'ops' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"

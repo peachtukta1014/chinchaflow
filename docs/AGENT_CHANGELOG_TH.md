@@ -345,3 +345,11 @@
 - **ไฟล์/จุดสำคัญ:** `lineCustomerContacts.js`, `LineUidFields.jsx`, `customerService.js`, `resolveLineUserId.js`, `shrimpLinePush.js`
 - **พฤติกรรมหลังแก้:** ช่อง「เจ้าของ/โอน」= billing · 「คนสั่งใน LINE」= order (คั่น comma) · สั่ง LINE ครั้งแรกหลังมี billing → UID ใหม่เป็น order อัตโนมัติ
 - **ถ้าพังอีก ให้เช็กก่อน:** `lineContacts` ใน Firestore · deploy **hosting + functions** · billing ซ้ำข้ามร้านหลัก c1–c27 ได้
+
+### 2026-06-11 — ชา: โครง POS + Mini ERP 4 แท็บ + history staff log
+
+- **ปัญหา/คำขอ:** จัดโครงสร้าง `chincha-tea` ใหม่ให้เป็น POS + Mini ERP รองรับขายรายแก้ว, กรอกยอดเหมาปิดวัน, สต๊อกแก้ว, และผูกพนักงานผู้บันทึกเพื่อคิดค่าแรง/ตรวจย้อนหลัง
+- **แก้แล้ว:** แท็บหลักเหลือ 4 แท็บล่าง `ขาย / หลังร้าน / บัญชี / จัดการ`; หลังร้านรวมสั่งของ + สต๊อกแก้ว; บัญชีรวมปิดวัน + จ่ายย่อย; จัดการรวมภาพรวม/สินค้า/กำไร/ค่าแรง/ประวัติ
+- **ข้อมูล:** เพิ่ม `historyLogs` สำหรับ audit action สำคัญ และเพิ่ม `staffUid/staffName` snapshot ใน `teaOrders`, `dailyExpenses`, `dailyCupStocks`, `restocks`; ปิดวันเพิ่ม `cashChangeRemaining`
+- **ไฟล์/จุดสำคัญ:** `App.jsx`, `navConfig.js`, `OpsTab.jsx`, `SummaryTab.jsx`, `ExpensesTab.jsx`, `historyLogService.js`, `firestore.rules`
+- **ถ้าพังอีก ให้เช็กก่อน:** deploy hosting + rules; ตรวจสิทธิ `historyLogs.create` ต้อง `staffUid == request.auth.uid`

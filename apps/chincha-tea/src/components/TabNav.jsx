@@ -59,7 +59,7 @@ export default function TabNav({ groups, activeTab, onSelect, badges = {} }) {
           <p className="text-[8px] font-black uppercase tracking-wider text-amber-900/50 px-1 mb-1">
             {primaryGroup.label}
           </p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-4 gap-1.5">
             {primaryGroup.tabs.map((tab) => (
               <TabButton
                 key={tab.id}

@@ -120,6 +120,16 @@ service cloud.firestore {
     }
 
     // สต๊อกแก้วเปล่ารายวัน — พนักงาน/แอดมินบันทึกยอดคงเหลือเพื่อยกไปวันถัดไป
+    // ประวัติการบันทึกสำคัญ — ผูก staff จาก login ไว้ใช้ audit/ค่าแรง
+    match /historyLogs/{docId} {
+      allow read: if isAdmin();
+      allow create: if isApproved()
+        && request.resource.data.staffUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.createdAt is string;
+      allow update, delete: if isAdmin();
+    }
+
     match /dailyCupStocks/{docId} {
       allow read: if isApproved();
       allow create: if isApproved()
