@@ -98,7 +98,8 @@ apps/chincha-tea/
 |------------|-----------|
 | `users` | สมาชิกแอป (approved, role) |
 | `teaOrders` | บิลขายรายวัน |
-| `dailyExpenses` | ค่าใช้จ่ายร้าน |
+| `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`) |
+| `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ) |
 | `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`) |
 | `orderSlips` | รูปใบสั่งของ/สลิป (Storage URL) |
 | `products` / `toppings` | เมนู |

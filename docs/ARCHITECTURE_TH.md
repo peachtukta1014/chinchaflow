@@ -78,7 +78,7 @@ flowchart TB
 | `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) |
 | `products`, `toppings` | เมนูและท็อปปิ้ง |
 | `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
-| `restocks`, `dailyExpenses`, `orderSlips` | เติมของ / ค่าใช้จ่าย / สลิป (`dailyExpenses` รองรับ `entryMode`, `createdByUid`, `updatedByUid` สำหรับสรุปเหมา/แก้ไขย้อนหลัง) |
+| `restocks`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอน/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวัน) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |
 
 ### กุ้ง (`seafood-pos`)
@@ -97,7 +97,7 @@ flowchart TB
 
 นอกจากนี้มีฐานข้อมูลชื่อ **`chincha`** (กฎใน `firestore-chincha.rules`) สำหรับข้อมูลรูปแบบเก่า — สคริปต์ `tea:db-reset` สามารถล้างฐานนี้ได้เมื่อข้อมูลค้าง
 
-กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น; `dailyExpenses` ให้ผู้สร้างรายการแก้ไขรายการของตัวเองได้เมื่อมี `createdByUid` และแอดมินแก้/ลบได้
+กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น; `dailyExpenses` รายจ่ายย่อยให้ผู้สร้างแก้เองได้, `dailyExpenses.type=dailySummary` และ `dailyCupStocks` ให้ผู้ใช้ที่อนุมัติแล้วช่วยอัปเดตยอดรายวันได้, แอดมินลบได้
 
 ---
 
