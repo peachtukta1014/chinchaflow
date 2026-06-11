@@ -1,0 +1,255 @@
+{
+  "generatedAt": "2026-06-11T11:26:24.430Z",
+  "repository": "peachtukta1014/chinchaflow",
+  "totals": {
+    "files": 368,
+    "bytes": 1909274,
+    "lines": 45739,
+    "blankLines": 4264,
+    "nonBlankLines": 41475
+  },
+  "languages": [
+    {
+      "language": "JavaScript",
+      "files": 222,
+      "bytes": 935423,
+      "lines": 23990,
+      "blankLines": 2296,
+      "nonBlankLines": 21694
+    },
+    {
+      "language": "React JSX",
+      "files": 79,
+      "bytes": 700222,
+      "lines": 16994,
+      "blankLines": 1018,
+      "nonBlankLines": 15976
+    },
+    {
+      "language": "Markdown",
+      "files": 27,
+      "bytes": 210147,
+      "lines": 2943,
+      "blankLines": 801,
+      "nonBlankLines": 2142
+    },
+    {
+      "language": "YAML",
+      "files": 12,
+      "bytes": 28877,
+      "lines": 851,
+      "blankLines": 86,
+      "nonBlankLines": 765
+    },
+    {
+      "language": "Firebase Rules",
+      "files": 3,
+      "bytes": 17220,
+      "lines": 427,
+      "blankLines": 51,
+      "nonBlankLines": 376
+    },
+    {
+      "language": "JSON",
+      "files": 14,
+      "bytes": 9253,
+      "lines": 340,
+      "blankLines": 0,
+      "nonBlankLines": 340
+    },
+    {
+      "language": "HTML",
+      "files": 4,
+      "bytes": 3536,
+      "lines": 86,
+      "blankLines": 0,
+      "nonBlankLines": 86
+    },
+    {
+      "language": "Other",
+      "files": 3,
+      "bytes": 544,
+      "lines": 41,
+      "blankLines": 4,
+      "nonBlankLines": 37
+    },
+    {
+      "language": "Shell",
+      "files": 1,
+      "bytes": 1246,
+      "lines": 36,
+      "blankLines": 4,
+      "nonBlankLines": 32
+    },
+    {
+      "language": "CSS",
+      "files": 3,
+      "bytes": 2806,
+      "lines": 31,
+      "blankLines": 4,
+      "nonBlankLines": 27
+    }
+  ],
+  "topFiles": [
+    {
+      "path": "apps/seafood-pos/scripts/smoke-test.mjs",
+      "language": "JavaScript",
+      "bytes": 68430,
+      "lines": 1372,
+      "blankLines": 62,
+      "nonBlankLines": 1310
+    },
+    {
+      "path": "apps/chincha-tea/src/lib/i18n.js",
+      "language": "JavaScript",
+      "bytes": 84880,
+      "lines": 1231,
+      "blankLines": 2,
+      "nonBlankLines": 1229
+    },
+    {
+      "path": "apps/seafood-pos/src/screens/InventoryScreen.jsx",
+      "language": "React JSX",
+      "bytes": 46118,
+      "lines": 1048,
+      "blankLines": 49,
+      "nonBlankLines": 999
+    },
+    {
+      "path": "apps/seafood-pos/src/liff/LineOrderLiffApp.jsx",
+      "language": "React JSX",
+      "bytes": 33402,
+      "lines": 977,
+      "blankLines": 57,
+      "nonBlankLines": 920
+    },
+    {
+      "path": "apps/seafood-pos/src/lib/firestoreRest.js",
+      "language": "JavaScript",
+      "bytes": 31393,
+      "lines": 891,
+      "blankLines": 91,
+      "nonBlankLines": 800
+    },
+    {
+      "path": "apps/chincha-tea/src/screens/RestockTab.jsx",
+      "language": "React JSX",
+      "bytes": 38547,
+      "lines": 875,
+      "blankLines": 42,
+      "nonBlankLines": 833
+    },
+    {
+      "path": "apps/chincha-tea/src/screens/AdminPanel.jsx",
+      "language": "React JSX",
+      "bytes": 37028,
+      "lines": 869,
+      "blankLines": 41,
+      "nonBlankLines": 828
+    },
+    {
+      "path": "apps/seafood-pos/src/components/LotReportPanel.jsx",
+      "language": "React JSX",
+      "bytes": 36831,
+      "lines": 811,
+      "blankLines": 47,
+      "nonBlankLines": 764
+    },
+    {
+      "path": "apps/seafood-pos/src/App.jsx",
+      "language": "React JSX",
+      "bytes": 24171,
+      "lines": 655,
+      "blankLines": 57,
+      "nonBlankLines": 598
+    },
+    {
+      "path": "apps/seafood-pos/src/screens/CustomerAccountsScreen.jsx",
+      "language": "React JSX",
+      "bytes": 23628,
+      "lines": 595,
+      "blankLines": 31,
+      "nonBlankLines": 564
+    },
+    {
+      "path": "apps/seafood-pos/src/screens/POSMobile.jsx",
+      "language": "React JSX",
+      "bytes": 27330,
+      "lines": 586,
+      "blankLines": 36,
+      "nonBlankLines": 550
+    },
+    {
+      "path": "apps/seafood-pos/src/components/LineOaCustomersPanel.jsx",
+      "language": "React JSX",
+      "bytes": 23273,
+      "lines": 572,
+      "blankLines": 32,
+      "nonBlankLines": 540
+    },
+    {
+      "path": "apps/seafood-pos/src/services/stockService.js",
+      "language": "JavaScript",
+      "bytes": 18722,
+      "lines": 560,
+      "blankLines": 37,
+      "nonBlankLines": 523
+    },
+    {
+      "path": "apps/chincha-tea/src/screens/ExpensesTab.jsx",
+      "language": "React JSX",
+      "bytes": 28497,
+      "lines": 533,
+      "blankLines": 38,
+      "nonBlankLines": 495
+    },
+    {
+      "path": "apps/webhook-core/src/parseLineOrder.js",
+      "language": "JavaScript",
+      "bytes": 20097,
+      "lines": 519,
+      "blankLines": 70,
+      "nonBlankLines": 449
+    },
+    {
+      "path": "apps/webhook-core/src/index.js",
+      "language": "JavaScript",
+      "bytes": 21537,
+      "lines": 508,
+      "blankLines": 46,
+      "nonBlankLines": 462
+    },
+    {
+      "path": "apps/seafood-pos/src/screens/MembersScreen.jsx",
+      "language": "React JSX",
+      "bytes": 23813,
+      "lines": 500,
+      "blankLines": 15,
+      "nonBlankLines": 485
+    },
+    {
+      "path": "apps/seafood-pos/src/services/customerService.js",
+      "language": "JavaScript",
+      "bytes": 16411,
+      "lines": 469,
+      "blankLines": 48,
+      "nonBlankLines": 421
+    },
+    {
+      "path": "apps/seafood-pos/src/services/salesService.js",
+      "language": "JavaScript",
+      "bytes": 15962,
+      "lines": 450,
+      "blankLines": 38,
+      "nonBlankLines": 412
+    },
+    {
+      "path": "apps/webhook-core/src/shrimpBillRender.js",
+      "language": "JavaScript",
+      "bytes": 15175,
+      "lines": 408,
+      "blankLines": 29,
+      "nonBlankLines": 379
+    }
+  ]
+}
