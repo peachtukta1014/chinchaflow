@@ -20,7 +20,6 @@ const EMPTY_DAY = {
   storefrontExpense: '',
   cashChangeRemaining: '',
   cupsSold: '',
-  manualRestockPurchased: '',
   note: '',
 };
 
@@ -102,30 +101,28 @@ async function loadCupStock(dateKey) {
   return fsGetDoc(`dailyCupStocks/${dateKey}`);
 }
 
-async function saveDailySummaryExpense({ existing, dateKey, form, restockPurchased, member, rawSummary }) {
+async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSummary }) {
   const now = new Date().toISOString();
   const cashAmount = moneyValue(form.cashAmount);
   const transferAmount = moneyValue(form.transferAmount);
-  const storefrontExpense = moneyValue(form.storefrontExpense);
+  const cashChangeRemaining = moneyValue(form.cashChangeRemaining);
   const cupsSold = intValue(form.cupsSold);
-  const manualRestockPurchased = moneyValue(form.manualRestockPurchased);
   const totalSales = cashAmount + transferAmount;
-  const totalRestockPurchased = restockPurchased || manualRestockPurchased;
   const payload = {
     dateKey,
     type: 'dailySummary',
     entryMode: 'dailySummary',
-    description: 'สรุปยอด/จ่ายหน้าร้านต่อวัน',
-    amount: storefrontExpense,
+    description: 'สรุปยอดขายปิดวัน',
+    amount: 0,
     cashAmount,
     transferAmount,
-    storefrontExpense,
+    storefrontExpense: 0,
     cashChangeRemaining,
     cupsSold,
     totalSales,
-    totalRestockPurchased,
-    manualRestockPurchased,
-    dailyNetTotal: totalSales - storefrontExpense - totalRestockPurchased,
+    totalRestockPurchased: 0,
+    manualRestockPurchased: 0,
+    dailyNetTotal: totalSales,
     note: form.note || '',
     rawSummary: rawSummary || undefined,
     updatedBy: member?.name || 'ชินชา',
@@ -173,12 +170,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   const liveRevenue = useMemo(() => sumOrderRevenue(orders), [orders]);
   const cashAmount = moneyValue(dayForm.cashAmount);
   const transferAmount = moneyValue(dayForm.transferAmount);
-  const storefrontExpense = moneyValue(dayForm.storefrontExpense);
   const totalSales = cashAmount + transferAmount;
   const cashChangeRemaining = moneyValue(dayForm.cashChangeRemaining);
   const cupsSold = intValue(dayForm.cupsSold);
-  const restockTotal = restockPurchased || moneyValue(dayForm.manualRestockPurchased);
-  const dailyNetTotal = totalSales - storefrontExpense - restockTotal;
+  const dailyNetTotal = totalSales;
   const openingCups = intValue(cupForm.openingCups);
   const refillCups = intValue(cupForm.refillCups);
   const refillTodayTotal = openingCups + refillCups;
@@ -207,10 +202,8 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     setDayForm(summary ? {
       cashAmount: summary.cashAmount ? String(summary.cashAmount) : '',
       transferAmount: summary.transferAmount ? String(summary.transferAmount) : '',
-      storefrontExpense: summary.storefrontExpense ? String(summary.storefrontExpense) : '',
       cashChangeRemaining: summary.cashChangeRemaining ? String(summary.cashChangeRemaining) : '',
       cupsSold: summary.cupsSold ? String(summary.cupsSold) : '',
-      manualRestockPurchased: summary.manualRestockPurchased ? String(summary.manualRestockPurchased) : '',
       note: summary.note || '',
     } : {
       ...EMPTY_DAY,
@@ -245,7 +238,6 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       ...prev,
       cashAmount: parsed.cashAmount ? String(parsed.cashAmount) : prev.cashAmount,
       transferAmount: parsed.transferAmount ? String(parsed.transferAmount) : prev.transferAmount,
-      storefrontExpense: parsed.storefrontExpense ? String(parsed.storefrontExpense) : prev.storefrontExpense,
       cupsSold: parsed.cupsSold ? String(parsed.cupsSold) : prev.cupsSold,
       note: parsed.note || prev.note,
     }));
@@ -263,7 +255,6 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         existing: targetDailySummary,
         dateKey: targetDateKey,
         form: dayForm,
-        restockPurchased,
         member,
         rawSummary: summaryText.trim(),
       });
@@ -418,14 +409,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
               <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
               <Field label={t('dailyCupsSold')} value={dayForm.cupsSold} onChange={(v) => setDayForm((p) => ({ ...p, cupsSold: digits(v) }))} suffix={t('cupUnit')} />
             </div>
-            <Field label={t('dailyStoreExpense')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
-            <Field label={t('dailyRestockPurchased')} value={restockPurchased ? String(restockPurchased) : dayForm.manualRestockPurchased} onChange={(v) => setDayForm((p) => ({ ...p, manualRestockPurchased: digits(v) }))} disabled={restockPurchased > 0} />
             <textarea value={dayForm.note} onChange={(e) => setDayForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('dailyNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
 
             <div className="rounded-2xl bg-stone-50 p-3 space-y-1 text-sm">
               <SummaryRow label={t('dailySalesTotal')} value={amountLabel(totalSales)} strong />
-              <SummaryRow label={t('dailyStoreExpense')} value={`−${amountLabel(storefrontExpense)}`} />
-              <SummaryRow label={t('dailyRestockPurchased')} value={`−${amountLabel(restockTotal)}`} />
               <SummaryRow label={t('dailyAllSummary')} value={amountLabel(dailyNetTotal)} strong tone={dailyNetTotal >= 0 ? 'text-emerald-700' : 'text-red-600'} />
             </div>
 
@@ -461,9 +448,26 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       {mode === 'manual' && (
         <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{isEditing ? t('expenseEditTitle') : t('expenseManualTitle')}</p>
+            <div>
+              <p className="text-xs font-black text-stone-500 uppercase tracking-wide">{isEditing ? t('expenseEditTitle') : t('expenseManualTitle')}</p>
+              <p className="text-[11px] text-stone-400 mt-0.5">{t('expenseManualHelp')}</p>
+            </div>
             {isEditing && <button type="button" onClick={resetManualForm} className="text-[11px] font-black text-stone-500 underline">{t('cancel')}</button>}
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[t('dailyStoreExpense'), t('dailyRestockPurchased')].map((label) => (
+              <button key={label} type="button" onClick={() => setExpDesc(label)} className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-[11px] font-black text-amber-900 active:scale-95">
+                + {label}
+              </button>
+            ))}
+          </div>
+          {restockPurchased > 0 && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+              <p className="text-[11px] font-black text-emerald-800">{t('restockPurchasesSection')}</p>
+              <p className="text-sm font-black text-emerald-700">{amountLabel(restockPurchased)}</p>
+              <p className="text-[10px] text-emerald-700/70">{t('restockPurchasesHint')}</p>
+            </div>
+          )}
           <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-black outline-none focus:border-amber-300" />
           <input value={expDesc} onChange={(e) => setExpDesc(e.target.value)} placeholder={t('expensePlaceholder')} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none focus:border-amber-300" />
           <div className="flex gap-2">
