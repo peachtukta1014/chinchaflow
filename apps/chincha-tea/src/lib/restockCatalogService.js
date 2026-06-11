@@ -155,6 +155,43 @@ export async function bootstrapCatalogFromRestocks(recentRestocks, member) {
   return names.size;
 }
 
+export async function updateRestockCatalogPrices(purchaseItems = []) {
+  const existing = await fsListCollection('restockCatalog', 300);
+  const byKey = new Map(existing.map((d) => [restockNameKey(d.name), d]));
+  const now = new Date().toISOString();
+
+  for (const item of purchaseItems || []) {
+    const name = (item?.name || '').trim();
+    const unitPrice = Math.max(0, Math.round(Number(item?.unitPrice) || 0));
+    if (!name || unitPrice <= 0) continue;
+    const key = restockNameKey(name);
+    const prev = byKey.get(key);
+    const payload = {
+      name,
+      nameKey: key,
+      category: prev?.category || guessRestockCategory(name),
+      latestUnitPrice: unitPrice,
+      latestLineTotal: Math.max(0, Math.round(Number(item?.lineTotal) || 0)),
+      latestPurchaseQty: Math.max(1, Number(item?.qty) || 1),
+      latestPriceAt: now,
+      active: true,
+    };
+
+    if (prev?.id) {
+      await fsPatch(`restockCatalog/${prev.id}`, payload);
+    } else {
+      const created = await fsPost('restockCatalog', {
+        ...payload,
+        usageCount: 1,
+        lastUsedAt: now,
+        createdAt: now,
+        createdBy: 'system',
+      });
+      byKey.set(key, created);
+    }
+  }
+}
+
 export async function deleteRestockCatalogItem(id) {
   await fsDelete(`restockCatalog/${id}`);
 }

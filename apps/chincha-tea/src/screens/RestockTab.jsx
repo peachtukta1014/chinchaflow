@@ -22,6 +22,7 @@ import {
   patchRestockCatalogItem,
   restockCategoryLabel,
   restockNameKey,
+  updateRestockCatalogPrices,
   upsertRestockCatalogItems,
 } from '../lib/restockCatalogService';
 import { restockDisplayName } from '../lib/restockDisplay';
@@ -50,6 +51,17 @@ function RestockItemName({ name, lang, catalogItem }) {
   );
 }
 
+function moneyLabel(value) {
+  const amount = Math.round(Number(value) || 0);
+  return amount > 0 ? `฿${amount.toLocaleString()}` : '';
+}
+
+function catalogUnitPrice(item) {
+  return Math.max(0, Math.round(Number(
+    item?.latestUnitPrice ?? item?.purchaseUnitPrice ?? item?.unitPrice ?? 0,
+  ) || 0));
+}
+
 export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [items, setItems] = useState([]);
   const [catalog, setCatalog] = useState([]);
@@ -76,9 +88,39 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     [items],
   );
 
+  const latestPriceByKey = useMemo(() => {
+    const map = new Map();
+    for (const item of catalog || []) {
+      const unitPrice = catalogUnitPrice(item);
+      if (unitPrice > 0) map.set(restockNameKey(item.name), unitPrice);
+    }
+    for (const req of recentRequests || []) {
+      if (!isRestockPurchased(req)) continue;
+      for (const line of req.purchaseItems || []) {
+        const key = restockNameKey(line?.name);
+        const unitPrice = Math.max(0, Math.round(Number(line?.unitPrice) || 0));
+        if (key && unitPrice > 0 && !map.has(key)) map.set(key, unitPrice);
+      }
+    }
+    return map;
+  }, [catalog, recentRequests]);
+
+  const catalogWithPrices = useMemo(
+    () => (catalog || []).map((item) => ({
+      ...item,
+      latestUnitPrice: catalogUnitPrice(item) || latestPriceByKey.get(restockNameKey(item.name)) || 0,
+    })),
+    [catalog, latestPriceByKey],
+  );
+
   const catalogGroups = useMemo(
-    () => groupCatalogByCategory(catalog, t, lang),
-    [catalog, t, lang],
+    () => groupCatalogByCategory(catalogWithPrices, t, lang),
+    [catalogWithPrices, t, lang],
+  );
+
+  const latestPriceForName = useCallback(
+    (name) => latestPriceByKey.get(restockNameKey(name)) || 0,
+    [latestPriceByKey],
   );
 
   const notifyRestockChange = () => onRestockListChange?.();
@@ -391,6 +433,8 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         purchasedBy: member?.name || '—',
         purchasedByUid: member?.uid || '',
       });
+      await updateRestockCatalogPrices(lineItems);
+      await refreshCatalog();
       await writeHistoryLog({ action: 'restock.purchase', collection: 'restocks', docId: req.id, refPath: `restocks/${req.id}`, dateKey: req.dateKey || dateKey, member, summary: { purchaseTotal: amount } });
       setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
       notifyRestockChange();
@@ -493,9 +537,16 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-stone-700">
-                          <RestockItemName name={catItem.name} lang={lang} catalogItem={catItem} />
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-bold text-stone-700 min-w-0">
+                            <RestockItemName name={catItem.name} lang={lang} catalogItem={catItem} />
+                          </p>
+                          {catalogUnitPrice(catItem) > 0 && (
+                            <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                              {t('restockLatestPrice')} {moneyLabel(catalogUnitPrice(catItem))}/{t('restockUnitShort')}
+                            </span>
+                          )}
+                        </div>
                         {manageCatalog && (
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <select
@@ -631,7 +682,14 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
           {items.map((item) => (
             <div key={item.cid} className="p-4">
               <div className="flex items-center gap-2 mb-3">
-                <p className="flex-1 font-bold text-sm"><RestockItemName name={item.name} lang={lang} /></p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm"><RestockItemName name={item.name} lang={lang} /></p>
+                  {latestPriceForName(item.name) > 0 && (
+                    <p className="text-[10px] font-bold text-emerald-700">
+                      {t('restockLatestPrice')} {moneyLabel(latestPriceForName(item.name))}/{t('restockUnitShort')} · {t('restockEstimateTotal')} {moneyLabel(latestPriceForName(item.name) * item.qty)}
+                    </p>
+                  )}
+                </div>
                 <button type="button" onClick={() => setItems((prev) => prev.map((i) => (i.cid === item.cid ? { ...i, qty: Math.max(1, i.qty - 1) } : i)))} className="w-7 h-7 rounded-full bg-stone-100 font-bold">−</button>
                 <span className="font-black w-5 text-center">{item.qty}</span>
                 <button type="button" onClick={() => setItems((prev) => prev.map((i) => (i.cid === item.cid ? { ...i, qty: i.qty + 1 } : i)))} className="w-7 h-7 rounded-full text-white font-bold" style={{ background: '#6b3a2a' }}>+</button>
@@ -784,11 +842,15 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                       <span className={`ml-1 text-[10px] font-bold ${it.status === 'out' ? 'text-red-500' : it.status === 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
                         {it.status === 'out' ? t('statusOut') : it.status === 'low' ? t('statusLow') : t('statusNormal')}
                       </span>
-                      {purchased && lineTotal > 0 && (
+                      {purchased && lineTotal > 0 ? (
                         <span className="block text-[10px] font-black text-emerald-700">
                           ฿{lineTotal.toLocaleString()}{unitPrice > 0 ? ` · ฿${unitPrice.toLocaleString()}/${t('restockUnitShort')}` : ''}
                         </span>
-                      )}
+                      ) : latestPriceForName(it.name) > 0 ? (
+                        <span className="block text-[10px] font-bold text-emerald-700">
+                          {t('restockLatestPrice')} {moneyLabel(latestPriceForName(it.name))}/{t('restockUnitShort')}
+                        </span>
+                      ) : null}
                     </p>
                     {canDel && !purchased && (
                       <button
