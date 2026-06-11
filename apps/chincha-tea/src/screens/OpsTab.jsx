@@ -12,16 +12,32 @@ export function OpsTab({ member, t, lang, viewDateKey, setViewDateKey, onRestock
         <SegmentedTabBar
           tabs={[
             ['restock', t('restockTabShort')],
+            ['expenses', t('expenseManualTab')],
             ['cups', t('cupStockTab')],
           ]}
           activeId={section}
           onSelect={setSection}
         />
       </div>
-      {section === 'restock' ? (
+      {section === 'restock' && (
         <RestockTab member={member} t={t} lang={lang} onRestockListChange={onRestockListChange} />
-      ) : (
+      )}
+      {section === 'expenses' && (
         <ExpensesTab
+          key="ops-expenses"
+          member={member}
+          t={t}
+          lang={lang}
+          viewDateKey={viewDateKey}
+          setViewDateKey={setViewDateKey}
+          allowedModes={['manual']}
+          defaultMode="manual"
+          compactHeader
+        />
+      )}
+      {section === 'cups' && (
+        <ExpensesTab
+          key="ops-cups"
           member={member}
           t={t}
           lang={lang}
