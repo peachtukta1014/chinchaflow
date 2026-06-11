@@ -1,4 +1,5 @@
 import { fsDelete, fsPatch } from './firestoreRest';
+import { receiveRestockInventory } from './inventoryService';
 
 export function isRestockPurchased(req) {
   return req?.purchaseStatus === 'purchased' && Number(req?.purchaseTotal) > 0;
@@ -41,7 +42,7 @@ export async function removeRestockLine(req, lineIndex) {
   return { ...req, items };
 }
 
-export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, purchasedBy }) {
+export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, purchasedBy, purchasedByUid }) {
   const amount = Math.round(Number(purchaseTotal));
   if (!amount || amount <= 0) throw new Error('invalid amount');
   const now = new Date().toISOString();
@@ -52,6 +53,9 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
       status: item.status || 'out',
       unitPrice: Math.max(0, Math.round(Number(item.unitPrice) || 0)),
       lineTotal: Math.max(0, Math.round(Number(item.lineTotal) || 0)),
+      unit: (item.unit || 'ชิ้น').trim(),
+      base_unit: (item.base_unit || item.baseUnit || item.unit || 'ชิ้น').trim(),
+      conversion_rate: Math.max(1, Math.round(Number(item.conversion_rate ?? item.conversionRate) || 1)),
     }))
     : undefined;
   const patch = {
@@ -60,7 +64,21 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
     purchaseItems: cleanItems,
     purchasedAt: now,
     purchasedBy: purchasedBy || '—',
+    purchasedByUid: purchasedByUid || '',
   };
+  const inventoryUpdates = await receiveRestockInventory(cleanItems || []);
+  patch.inventoryReceived = inventoryUpdates.map((item) => ({
+    name: item.name,
+    unit: item.unit,
+    base_unit: item.base_unit,
+    conversion_rate: item.conversion_rate,
+    stock_base_qty: item.stock_base_qty,
+    latestReceivedBaseQty: item.latestReceivedBaseQty,
+  }));
   await fsPatch(`restocks/${id}`, patch);
   return patch;
+}
+
+export async function confirmPurchase(id, payload) {
+  return markRestockPurchased(id, payload);
 }

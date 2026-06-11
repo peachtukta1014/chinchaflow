@@ -78,7 +78,7 @@ flowchart TB
 | `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) พร้อม `staffUid/staffName` จากผู้ล็อกอิน |
 | `products`, `toppings` | เมนูและท็อปปิ้ง |
 | `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
-| `restocks`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
+| `restocks`, `restockCatalog`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / catalog+inventory / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`restockCatalog` รองรับ `unit`, `base_unit`, `conversion_rate`, `stock_base_qty`; `restocks.inventoryReceived` เก็บ snapshot ตอนแอดมินรับของเข้า; `dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |
 | `historyLogs` | audit log เหตุการณ์สำคัญของชา (ขาย, ปิดวัน, สต๊อกแก้ว, สั่งของ) ผูก `staffUid/staffName` เพื่อใช้ตรวจย้อนหลัง/ต่อยอดค่าแรง |
 
