@@ -461,6 +461,8 @@ try {
 
 try {
   const router = requireWebhook('../../webhook-core/src/shrimpLineWebhookRouter.js');
+  const parser = requireWebhook('../../webhook-core/src/parseLineOrder.js');
+  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
   const directCtx = router.classifyShrimpLineContext({
     source: { type: 'user', userId: 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1' },
   });
@@ -481,6 +483,19 @@ try {
   assert(directCtx.kind === 'direct', 'LINE router classify direct');
   assert(groupCtx.kind === 'group' && groupCtx.chatId === groupCtx.groupId, 'LINE router classify group');
   assert(roomCtx.kind === 'group' && roomCtx.chatId === roomCtx.roomId, 'LINE router classify room as group flow');
+  const familyNoUnit = parser.parseOrderItems('มุขมณี กุ้งเล็ก 5');
+  assert(
+    familyNoUnit.length === 1
+      && familyNoUnit[0].customerName === 'มุขมณี'
+      && familyNoUnit[0].product === 'กุ้งเล็ก'
+      && familyNoUnit[0].qty === 5
+      && familyNoUnit[0].unit === 'กก',
+    'แชทครอบครัวรับออเดอร์มีคำว่ากุ้งแต่ไม่ใส่หน่วย',
+  );
+  assert(
+    intent.isShrimpOrderCommand('พี่อ้อม กุ้งเล็ก4'),
+    'intent รับออเดอร์กุ้งแบบติดเลขไม่ใส่หน่วย',
+  );
   assert(typeof router.handleShrimpLineWebhookEvent === 'function', 'LINE webhook has router entrypoint');
 
   const indexSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
