@@ -78,7 +78,7 @@ flowchart TB
 | `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) |
 | `products`, `toppings` | เมนูและท็อปปิ้ง |
 | `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
-| `restocks`, `dailyExpenses`, `orderSlips` | เติมของ / ค่าใช้จ่าย / สลิป |
+| `restocks`, `dailyExpenses`, `orderSlips` | เติมของ / ค่าใช้จ่าย / สลิป (`dailyExpenses` รองรับ `entryMode`, `createdByUid`, `updatedByUid` สำหรับสรุปเหมา/แก้ไขย้อนหลัง) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |
 
 ### กุ้ง (`seafood-pos`)
@@ -97,7 +97,7 @@ flowchart TB
 
 นอกจากนี้มีฐานข้อมูลชื่อ **`chincha`** (กฎใน `firestore-chincha.rules`) สำหรับข้อมูลรูปแบบเก่า — สคริปต์ `tea:db-reset` สามารถล้างฐานนี้ได้เมื่อข้อมูลค้าง
 
-กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น
+กฎใน `firestore.rules` บังคับ **ต้องได้รับอนุมัติ** (`approved: true`) และแยกสิทธิ **admin** ตามธุรกิจ ส่วนอื่นๆ ถูก deny โดยค่าเริ่มต้น; `dailyExpenses` ให้ผู้สร้างรายการแก้ไขรายการของตัวเองได้เมื่อมี `createdByUid` และแอดมินแก้/ลบได้
 
 ---
 
