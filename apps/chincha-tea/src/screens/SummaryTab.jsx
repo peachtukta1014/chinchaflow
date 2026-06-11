@@ -53,7 +53,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
   return (
     <div className="px-4 pt-3 pb-6 space-y-3">
       <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-stone-200 shadow-sm">
-        <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-10 h-10 rounded-xl bg-stone-100 font-black text-stone-600">‹</button>
+        <button type="button" onClick={() => setViewDateKey(shiftDateKey(viewDateKey, -1))} className="w-12 h-12 rounded-2xl bg-stone-100 font-black text-lg text-stone-600 active:scale-95">‹</button>
         <div className="flex-1 text-center min-w-0">
           <p className="font-black text-sm text-stone-800 truncate">{formatDateKeyLabel(viewDateKey, lang, { year: true })}</p>
           {isToday ? (
@@ -66,7 +66,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
           type="button"
           disabled={viewDateKey >= todayKey}
           onClick={() => setViewDateKey(shiftDateKey(viewDateKey, 1))}
-          className="w-10 h-10 rounded-xl bg-stone-100 font-black text-stone-600 disabled:opacity-30"
+          className="w-12 h-12 rounded-2xl bg-stone-100 font-black text-lg text-stone-600 disabled:opacity-30 active:scale-95"
         >
           ›
         </button>
@@ -102,7 +102,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
           type="button"
           disabled={lineSending}
           onClick={sendLineSummary}
-          className="w-full py-3 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full min-h-14 py-4 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2 disabled:opacity-60 active:scale-95"
           style={{ background: '#1a8f4c' }}
         >
           {lineSending ? '⏳' : '📲'} {t('sendLineSummary')}
