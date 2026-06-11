@@ -2,6 +2,7 @@
  * โครงแท็บหลักแบบ POS + Mini ERP
  * 1) ขาย (POS) 2) หลังร้าน (Ops) 3) บัญชี & ปิดวัน 4) จัดการ
  */
+import { canAccessTeaTab } from './teaRoles.js';
 
 /** @typedef {'order'|'ops'|'summary'|'admin'|'my-profile'} AppTabId */
 
@@ -42,24 +43,42 @@ export const TAB_ICONS = {
   },
 };
 
+const BASE_NAV_GROUPS = [
+  {
+    id: 'main',
+    labelKey: 'navGroupBusinessOs',
+    tabs: [
+      { id: 'order', labelKey: 'orderTabShort', icon: 'order' },
+      { id: 'ops', labelKey: 'opsTabShort', icon: 'ops' },
+      { id: 'summary', labelKey: 'accountCloseTabShort', icon: 'summary' },
+      { id: 'admin', labelKey: 'adminTabShort', icon: 'admin' },
+    ],
+    layout: 'primary',
+  },
+];
+
 /**
- * @param {boolean} _isAdmin
+ * สร้างเมนูตาม role: staff เห็นเฉพาะแท็บงานหน้าร้าน, admin เห็นครบ
+ * @param {{ role?: string } | boolean | null | undefined} memberOrIsAdmin
  * @param {(key: string) => string} t
  */
-export function getAppNavGroups(_isAdmin, t) {
-  return [
-    {
-      id: 'main',
-      label: t('navGroupBusinessOs'),
-      tabs: [
-        { id: 'order', label: t('orderTabShort'), icon: 'order' },
-        { id: 'ops', label: t('opsTabShort'), icon: 'ops' },
-        { id: 'summary', label: t('accountCloseTabShort'), icon: 'summary' },
-        { id: 'admin', label: t('adminTabShort'), icon: 'admin' },
-      ],
-      layout: 'primary',
-    },
-  ];
+export function getAppNavGroups(memberOrIsAdmin, t) {
+  const member = typeof memberOrIsAdmin === 'boolean'
+    ? { role: memberOrIsAdmin ? 'admin' : 'staff' }
+    : memberOrIsAdmin;
+
+  return BASE_NAV_GROUPS.map((group) => ({
+    id: group.id,
+    label: t(group.labelKey),
+    layout: group.layout,
+    tabs: group.tabs
+      .filter((tab) => canAccessTeaTab(member, tab.id))
+      .map((tab) => ({
+        id: tab.id,
+        label: t(tab.labelKey),
+        icon: tab.icon,
+      })),
+  })).filter((group) => group.tabs.length > 0);
 }
 
 /** @param {typeof getAppNavGroups extends (...args: any) => infer R ? R : never} groups */
