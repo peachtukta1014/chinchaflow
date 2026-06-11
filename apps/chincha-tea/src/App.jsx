@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from './firebase';
 import { fsQueryOrders, fsPatch } from './lib/firestoreRest';
@@ -10,6 +10,7 @@ import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
 import TabNav from './components/TabNav';
 import { getAppNavGroups } from './lib/navConfig';
+import { canAccessTeaTab, getDefaultTeaTabForMember, isTeaAdmin } from './lib/teaRoles';
 import CartSheet from './components/CartSheet';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
@@ -57,6 +58,7 @@ export default function App() {
   const { menuItems, toppingsList, refreshCatalog } = useCatalog(!!isAuthed);
   const todayKey = dateKeyBangkok();
   const [viewDateKey, setViewDateKey] = useState(todayKey);
+  const navGroups = useMemo(() => getAppNavGroups(member, t), [member, t]);
 
   const refreshOrders = useCallback(async () => {
     const docs = await fsQueryOrders(viewDateKey);
@@ -73,12 +75,18 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed || tabBootstrappedRef.current) return;
-    if (member.role === 'admin') {
-      setTab('admin');
-      setLastTab('admin');
-    }
+    const defaultTab = getDefaultTeaTabForMember(member);
+    setTab(defaultTab);
+    setLastTab(defaultTab);
     tabBootstrappedRef.current = true;
-  }, [isAuthed, member?.role]);
+  }, [isAuthed, member]);
+
+  useEffect(() => {
+    if (!isAuthed || !member) return;
+    if (canAccessTeaTab(member, tab)) return;
+    const fallbackTab = canAccessTeaTab(member, lastTab) ? lastTab : getDefaultTeaTabForMember(member);
+    setTab(fallbackTab);
+  }, [isAuthed, member, tab, lastTab]);
 
   // ภาษา: sync กับ Firestore เมื่อ login + migration staff 'th' → 'my'
   useEffect(() => {
@@ -232,8 +240,7 @@ export default function App() {
     );
   }
 
-  const isAdmin = member.role === 'admin';
-  const navGroups = getAppNavGroups(isAdmin, t);
+  const isAdmin = isTeaAdmin(member);
   const isProfileTab = tab === 'my-profile';
 
   return (
@@ -272,7 +279,9 @@ export default function App() {
           activeTab={tab}
           badges={isAdmin ? { restock: pendingRestocks } : {}}
           onSelect={(id) => {
+            if (!canAccessTeaTab(member, id)) return;
             setTab(id);
+            setLastTab(id);
             if (id === 'admin') refreshCatalog();
             if (id === 'summary' || id === 'admin') refreshOrders();
             if (id === 'ops' && isAdmin) refreshPendingRestocks();
@@ -318,7 +327,7 @@ export default function App() {
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
-        {tab === 'admin' && (
+        {tab === 'admin' && isAdmin && (
           <div className="px-4 pt-3 pb-8 space-y-3">
             {isAdmin && (
               <div className="rounded-2xl border border-amber-900/10 bg-stone-100/80 p-1 flex gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
@@ -346,7 +355,7 @@ export default function App() {
               else if (next === 'summary') setTab('summary');
               else setAdminSection(next);
             }} />}
-            {(!isAdmin || adminSection === 'catalog') && <AdminPanel catalogOnly={!isAdmin} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />}
+            {adminSection === 'catalog' && <AdminPanel catalogOnly={false} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />}
             {isAdmin && adminSection === 'profit' && <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />}
             {isAdmin && adminSection === 'payroll' && <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />}
             {isAdmin && adminSection === 'history' && <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />}
