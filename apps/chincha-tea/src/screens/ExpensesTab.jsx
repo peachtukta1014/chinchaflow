@@ -94,7 +94,9 @@ function parseSummaryText(text) {
 }
 
 function amountLabel(value) {
-  return `฿${moneyValue(value).toLocaleString()}`;
+  const n = Math.round(Number(value) || 0);
+  const sign = n < 0 ? '-' : '';
+  return `${sign}฿${Math.abs(n).toLocaleString()}`;
 }
 
 async function loadCupStock(dateKey) {
@@ -106,23 +108,24 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   const cashAmount = moneyValue(form.cashAmount);
   const transferAmount = moneyValue(form.transferAmount);
   const cashChangeRemaining = moneyValue(form.cashChangeRemaining);
+  const storefrontExpense = moneyValue(form.storefrontExpense);
   const cupsSold = intValue(form.cupsSold);
   const totalSales = cashAmount + transferAmount;
   const payload = {
     dateKey,
     type: 'dailySummary',
     entryMode: 'dailySummary',
-    description: 'สรุปยอดขายปิดวัน',
-    amount: 0,
+    description: storefrontExpense > 0 ? 'จ่ายจากเงินร้านตามสรุปวัน' : 'สรุปยอดขายปิดวัน',
+    amount: storefrontExpense,
     cashAmount,
     transferAmount,
-    storefrontExpense: 0,
+    storefrontExpense,
     cashChangeRemaining,
     cupsSold,
     totalSales,
     totalRestockPurchased: 0,
     manualRestockPurchased: 0,
-    dailyNetTotal: totalSales,
+    dailyNetTotal: totalSales - storefrontExpense,
     note: form.note || '',
     rawSummary: rawSummary || undefined,
     updatedBy: member?.name || 'ชินชา',
@@ -132,7 +135,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   };
   if (existing?.id) {
     await fsPatch(`dailyExpenses/${existing.id}`, payload);
-    await writeHistoryLog({ action: 'dailySummary.update', collection: 'dailyExpenses', docId: existing.id, refPath: `dailyExpenses/${existing.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, cashChangeRemaining, cupsSold } });
+    await writeHistoryLog({ action: 'dailySummary.update', collection: 'dailyExpenses', docId: existing.id, refPath: `dailyExpenses/${existing.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, storefrontExpense, cashChangeRemaining, cupsSold } });
     return existing.id;
   }
   const created = await fsPost('dailyExpenses', {
@@ -141,7 +144,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
     createdByUid: member?.uid || '',
     createdAt: now,
   });
-  await writeHistoryLog({ action: 'dailySummary.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, cashChangeRemaining, cupsSold } });
+  await writeHistoryLog({ action: 'dailySummary.create', collection: 'dailyExpenses', docId: created.id, refPath: `dailyExpenses/${created.id}`, dateKey, member, summary: { totalSales, cashAmount, transferAmount, storefrontExpense, cashChangeRemaining, cupsSold } });
   return created.id;
 }
 
@@ -171,9 +174,10 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   const cashAmount = moneyValue(dayForm.cashAmount);
   const transferAmount = moneyValue(dayForm.transferAmount);
   const totalSales = cashAmount + transferAmount;
+  const storefrontExpense = moneyValue(dayForm.storefrontExpense);
   const cashChangeRemaining = moneyValue(dayForm.cashChangeRemaining);
   const cupsSold = intValue(dayForm.cupsSold);
-  const dailyNetTotal = totalSales;
+  const dailyNetTotal = totalSales - storefrontExpense;
   const openingCups = intValue(cupForm.openingCups);
   const refillCups = intValue(cupForm.refillCups);
   const refillTodayTotal = openingCups + refillCups;
@@ -199,9 +203,11 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     setCupDoc(cups);
     const summary = expenseRows.find((e) => e.type === 'dailySummary');
     const revenue = sumOrderRevenue(orderRows);
+    const savedStorefrontExpense = summary ? (summary.storefrontExpense || summary.amount || 0) : 0;
     setDayForm(summary ? {
       cashAmount: summary.cashAmount ? String(summary.cashAmount) : '',
       transferAmount: summary.transferAmount ? String(summary.transferAmount) : '',
+      storefrontExpense: savedStorefrontExpense ? String(savedStorefrontExpense) : '',
       cashChangeRemaining: summary.cashChangeRemaining ? String(summary.cashChangeRemaining) : '',
       cupsSold: summary.cupsSold ? String(summary.cupsSold) : '',
       note: summary.note || '',
@@ -238,6 +244,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       ...prev,
       cashAmount: parsed.cashAmount ? String(parsed.cashAmount) : prev.cashAmount,
       transferAmount: parsed.transferAmount ? String(parsed.transferAmount) : prev.transferAmount,
+      storefrontExpense: parsed.storefrontExpense ? String(parsed.storefrontExpense) : prev.storefrontExpense,
       cupsSold: parsed.cupsSold ? String(parsed.cupsSold) : prev.cupsSold,
       note: parsed.note || prev.note,
     }));
@@ -406,6 +413,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
             <div className="grid grid-cols-2 gap-2">
               <Field label={t('dailyCash')} value={dayForm.cashAmount} onChange={(v) => setDayForm((p) => ({ ...p, cashAmount: digits(v) }))} />
               <Field label={t('dailyTransfer')} value={dayForm.transferAmount} onChange={(v) => setDayForm((p) => ({ ...p, transferAmount: digits(v) }))} />
+              <Field label={t('dailyStoreExpense')} value={dayForm.storefrontExpense} onChange={(v) => setDayForm((p) => ({ ...p, storefrontExpense: digits(v) }))} />
               <Field label={t('dailyCashChangeRemaining')} value={dayForm.cashChangeRemaining} onChange={(v) => setDayForm((p) => ({ ...p, cashChangeRemaining: digits(v) }))} />
               <Field label={t('dailyCupsSold')} value={dayForm.cupsSold} onChange={(v) => setDayForm((p) => ({ ...p, cupsSold: digits(v) }))} suffix={t('cupUnit')} />
             </div>
@@ -413,6 +421,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
             <div className="rounded-2xl bg-stone-50 p-3 space-y-1 text-sm">
               <SummaryRow label={t('dailySalesTotal')} value={amountLabel(totalSales)} strong />
+              <SummaryRow label={t('dailyStoreExpense')} value={`−${amountLabel(storefrontExpense)}`} tone="text-red-600" />
               <SummaryRow label={t('dailyAllSummary')} value={amountLabel(dailyNetTotal)} strong tone={dailyNetTotal >= 0 ? 'text-emerald-700' : 'text-red-600'} />
             </div>
 
@@ -488,7 +497,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
         </div>
       )}
 
-      <p className="text-center text-[11px] text-stone-400 px-4 leading-relaxed">{t('expensesRestockHint')}</p>
+      {mode === 'manual' && <p className="text-center text-[11px] text-stone-400 px-4 leading-relaxed">{t('expensesRestockHint')}</p>}
     </div>
   );
 }

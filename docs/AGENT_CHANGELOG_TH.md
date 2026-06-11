@@ -366,3 +366,12 @@
 - **ข้อมูล:** เพิ่ม `historyLogs` สำหรับ audit action สำคัญ และเพิ่ม `staffUid/staffName` snapshot ใน `teaOrders`, `dailyExpenses`, `dailyCupStocks`, `restocks`; ปิดวันเพิ่ม `cashChangeRemaining`
 - **ไฟล์/จุดสำคัญ:** `App.jsx`, `navConfig.js`, `OpsTab.jsx`, `SummaryTab.jsx`, `ExpensesTab.jsx`, `historyLogService.js`, `firestore.rules`
 - **ถ้าพังอีก ให้เช็กก่อน:** deploy hosting + rules; ตรวจสิทธิ `historyLogs.create` ต้อง `staffUid == request.auth.uid`
+
+### 2026-06-11 — ชา: แยก flow พนักงานปิดวัน + สต๊อกแก้ว
+
+- **ปัญหา/คำขอ:** ลูกน้องต้องมี 3 งานหลัก: ขายรายแก้ว, กรอกสรุปเหมาเงินสด/โอน/แก้ว/เงินที่จ่ายจากร้าน, และแจ้งเติมแก้ว/คงเหลือไว้เช็กยอดขายกับแก้วจริง
+- **แก้แล้ว:** `บัญชี > สรุปวัน` มีช่อง `จ่ายจากเงินร้าน` กลับมาในฟอร์มสรุปเหมาและถูกหักในยอดหลังจ่าย; `หลังร้าน` เหลือ `สั่งของ` + `สต๊อกแก้ว` ไม่เอา `จ่ายย่อย` ไปคั่น flow พนักงาน
+- **ข้อมูล:** `dailyExpenses` เอกสาร `type: dailySummary` เก็บ `storefrontExpense` และ `amount` เท่ากับเงินที่จ่ายจากร้าน เพื่อให้กำไร/สรุป LINE นับเป็นค่าใช้จ่ายร้าน
+- **ไฟล์/จุดสำคัญ:** `OpsTab.jsx`, `SummaryTab.jsx`, `ExpensesTab.jsx`, `i18n.js`
+- **พฤติกรรมหลังแก้:** พนักงานใช้ `ขาย` → `บัญชี > สรุปวัน` → `หลังร้าน > สต๊อกแก้ว`; เจ้าของยังดูซื้อของ/กำไรจากข้อมูลชุดเดิม
+- **ถ้าพังอีก ให้เช็กก่อน:** `saveDailySummaryExpense` ต้องไม่ reset `storefrontExpense` เป็น 0 และ `OpsTab` ต้องไม่มี tab `expenses`

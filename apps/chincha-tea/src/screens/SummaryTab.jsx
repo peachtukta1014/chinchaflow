@@ -87,7 +87,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
         lang={lang}
         viewDateKey={viewDateKey}
         setViewDateKey={setViewDateKey}
-        allowedModes={['summary', 'manual']}
+        allowedModes={['summary']}
         defaultMode="summary"
         compactHeader
       />
