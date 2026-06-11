@@ -1,6 +1,7 @@
 import { fsPost } from './firestoreRest';
 import { ensurePrimaryStaffPresentOnSale } from './staffAttendanceService';
 import { staffSnapshot, writeHistoryLog } from './historyLogService';
+import { deductTeaOrderInventory } from './inventoryService';
 
 export async function saveTeaOrder({
   dateKey,
@@ -31,6 +32,11 @@ export async function saveTeaOrder({
     member,
     summary: { total: cartTotal, cups: cart.reduce((s, i) => s + (i.qty || 1), 0), payType },
   });
+  try {
+    await deductTeaOrderInventory(cart);
+  } catch (e) {
+    console.warn('deductTeaOrderInventory failed', e);
+  }
   try {
     await ensurePrimaryStaffPresentOnSale({ dateKey });
   } catch (e) {

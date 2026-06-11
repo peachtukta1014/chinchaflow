@@ -123,6 +123,10 @@ export async function upsertRestockCatalogItems(itemNames, member) {
         category: prev.category || guessRestockCategory(name),
         usageCount: (prev.usageCount || 0) + 1,
         lastUsedAt: now,
+        unit: prev.unit || 'ชิ้น',
+        base_unit: prev.base_unit || prev.unit || 'ชิ้น',
+        conversion_rate: Math.max(1, Math.round(Number(prev.conversion_rate) || 1)),
+        stock_base_qty: Math.max(0, Math.round(Number(prev.stock_base_qty) || 0)),
         active: true,
       });
     } else {
@@ -134,6 +138,10 @@ export async function upsertRestockCatalogItems(itemNames, member) {
         lastUsedAt: now,
         createdAt: now,
         createdBy: member?.name || '—',
+        unit: 'ชิ้น',
+        base_unit: 'ชิ้น',
+        conversion_rate: 1,
+        stock_base_qty: 0,
         active: true,
       });
       byKey.set(key, created);
@@ -174,6 +182,10 @@ export async function updateRestockCatalogPrices(purchaseItems = []) {
       latestLineTotal: Math.max(0, Math.round(Number(item?.lineTotal) || 0)),
       latestPurchaseQty: Math.max(1, Number(item?.qty) || 1),
       latestPriceAt: now,
+      unit: item?.unit || prev?.unit || 'ชิ้น',
+      base_unit: item?.base_unit || item?.baseUnit || prev?.base_unit || item?.unit || prev?.unit || 'ชิ้น',
+      conversion_rate: Math.max(1, Math.round(Number(item?.conversion_rate ?? item?.conversionRate ?? prev?.conversion_rate) || 1)),
+      stock_base_qty: Math.max(0, Math.round(Number(prev?.stock_base_qty) || 0)),
       active: true,
     };
 

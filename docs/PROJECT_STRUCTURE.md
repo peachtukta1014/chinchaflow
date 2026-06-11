@@ -100,7 +100,8 @@ apps/chincha-tea/
 | `teaOrders` | บิลขายรายวัน + staff ผู้บันทึก |
 | `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`, เงินสด/โอนรวม/เงินทอน/แก้ว/ผู้บันทึก) |
 | `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ / ผู้บันทึก) |
-| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`, staff ผู้บันทึก/จัดซื้อ) |
+| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`, `purchaseItems`, `inventoryReceived`, staff ผู้บันทึก/จัดซื้อ) |
+| `restockCatalog` | catalog ของของเข้าร้าน + inventory fields (`unit`, `base_unit`, `conversion_rate`, `stock_base_qty`) สำหรับซื้อเป็นหน่วยใหญ่และตัด stock เป็นหน่วยเล็กสุด |
 | `historyLogs` | ประวัติ action สำคัญของชา ผูก staff จาก login |
 | `orderSlips` | รูปใบสั่งของ/สลิป (Storage URL) |
 | `products` / `toppings` | เมนู |

@@ -1,3 +1,10 @@
+## 2026-06-11 — ชา: PR 2 Smart Inventory Engine (Conversion & Ordering)
+
+- เพิ่ม inventory fields ใน `restockCatalog`: `unit`, `base_unit`, `conversion_rate`, `stock_base_qty` เพื่อรองรับซื้อเป็นหน่วยใหญ่แต่ตัด stock เป็นหน่วยเล็กสุด
+- `confirmPurchase`/ปุ่มแอดมิน「ซื้อแล้ว」รับของเข้าเป็นหน่วยซื้อ แล้วคูณ conversion เข้า `stock_base_qty` พร้อมบันทึก snapshot ใน `restocks.inventoryReceived`
+- `saveTeaOrder` ตัดสต๊อกจาก base unit ของรายการแก้วใน `restockCatalog` หลังบันทึกบิล โดยจับ error ไว้ไม่ให้ flow ขายเดิมพัง
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/inventoryService.js`, `apps/chincha-tea/src/lib/restockService.js`, `apps/chincha-tea/src/screens/RestockTab.jsx`, และ field `stock_base_qty` ใน `restockCatalog`
+
 ## 2026-06-11 — ชา: แสดงราคาล่าสุดในหน้าสต๊อก/สั่งของ
 
 - หน้า `หลังร้าน > สั่งของ` แสดง `ราคาล่าสุด` ต่อรายการใน catalog, รายการที่กำลังเลือก, และรายการสั่งของล่าสุด เพื่อเทียบราคาสินค้าได้ง่าย

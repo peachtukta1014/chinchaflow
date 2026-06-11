@@ -7,7 +7,7 @@ import {
   canMarkRestockPurchased,
   deleteRestockRequest,
   isRestockPurchased,
-  markRestockPurchased,
+  confirmPurchase,
   removeRestockLine,
   restockPurchaseTotal,
 } from '../lib/restockService';
@@ -25,6 +25,8 @@ import {
   updateRestockCatalogPrices,
   upsertRestockCatalogItems,
 } from '../lib/restockCatalogService';
+import { invalidatePendingRestockCache } from '../lib/restockNotifyService';
+import { buildInventoryReceivePreview } from '../lib/inventoryMath';
 import { restockDisplayName } from '../lib/restockDisplay';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
@@ -75,6 +77,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [purchaseEditId, setPurchaseEditId] = useState(null);
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [purchaseLinePrices, setPurchaseLinePrices] = useState({});
+  const [purchaseLineInventory, setPurchaseLineInventory] = useState({});
   const [manageCatalog, setManageCatalog] = useState(false);
   const [catalogSaving, setCatalogSaving] = useState(false);
   const [nameEditId, setNameEditId] = useState(null);
@@ -111,6 +114,11 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       latestUnitPrice: catalogUnitPrice(item) || latestPriceByKey.get(restockNameKey(item.name)) || 0,
     })),
     [catalog, latestPriceByKey],
+  );
+
+  const catalogByKey = useMemo(
+    () => new Map((catalog || []).map((item) => [restockNameKey(item.name), item])),
+    [catalog],
   );
 
   const catalogGroups = useMemo(
@@ -308,10 +316,21 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         createdBy: member?.name || 'ชินชา',
         createdByUid: member?.uid || '',
         ...staffSnapshot(member),
-        items: listToSubmit.map((i) => ({ name: i.name, qty: i.qty, status: i.status })),
+        items: listToSubmit.map((i) => {
+          const catalogItem = catalogByKey.get(restockNameKey(i.name));
+          return {
+            name: i.name,
+            qty: i.qty,
+            status: i.status,
+            unit: catalogItem?.unit || 'ชิ้น',
+            base_unit: catalogItem?.base_unit || catalogItem?.unit || 'ชิ้น',
+            conversion_rate: Math.max(1, Math.round(Number(catalogItem?.conversion_rate) || 1)),
+          };
+        }),
         purchaseStatus: 'pending',
         createdAt: new Date().toISOString(),
       });
+      invalidatePendingRestockCache(dateKey);
       await writeHistoryLog({ action: 'restock.create', collection: 'restocks', docId: created?.id || '', refPath: created?.id ? `restocks/${created.id}` : '', dateKey, member, summary: { items: listToSubmit.length } });
       await upsertRestockCatalogItems(names, member);
       setItems([]);
@@ -324,7 +343,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       alert(t('saveFailed'));
     }
     setSaving(false);
-  }, [dateKey, member, notifyRestockChange, refreshCatalog, refreshRecent, t]);
+  }, [catalogByKey, dateKey, member, notifyRestockChange, refreshCatalog, refreshRecent, t]);
 
   const handleSubmit = () => submitRestockList(items);
 
@@ -393,19 +412,36 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     const qty = Math.max(1, Number(item.qty) || 1);
     const raw = purchaseLinePrices[`${req.id}:${index}`] || '';
     const unitPrice = parseInt(String(raw).replace(/\D/g, ''), 10) || 0;
-    return { ...item, qty, unitPrice, lineTotal: unitPrice * qty };
+    const inventory = purchaseLineInventory[`${req.id}:${index}`] || {};
+    return {
+      ...item,
+      qty,
+      unitPrice,
+      lineTotal: unitPrice * qty,
+      unit: (inventory.unit || item.unit || 'ชิ้น').trim(),
+      base_unit: (inventory.base_unit || item.base_unit || item.unit || 'ชิ้น').trim(),
+      conversion_rate: Math.max(1, Math.round(Number(inventory.conversion_rate ?? item.conversion_rate) || 1)),
+    };
   });
 
   const purchaseLineTotalFor = (req) => purchaseLinesFor(req).reduce((sum, line) => sum + line.lineTotal, 0);
 
   const startPurchaseEdit = (req) => {
     const draft = {};
+    const inventoryDraft = {};
     (req.items || []).forEach((item, index) => {
       const saved = req.purchaseItems?.[index];
       const amount = Number(saved?.unitPrice ?? item.purchaseUnitPrice ?? 0);
       if (amount > 0) draft[`${req.id}:${index}`] = String(Math.round(amount));
+      const catalogItem = catalogByKey.get(restockNameKey(item.name));
+      inventoryDraft[`${req.id}:${index}`] = {
+        unit: saved?.unit || item.unit || catalogItem?.unit || 'ชิ้น',
+        base_unit: saved?.base_unit || item.base_unit || catalogItem?.base_unit || item.unit || 'ชิ้น',
+        conversion_rate: String(saved?.conversion_rate || item.conversion_rate || catalogItem?.conversion_rate || 1),
+      };
     });
     setPurchaseLinePrices(draft);
+    setPurchaseLineInventory(inventoryDraft);
     setPurchaseAmount(String(restockPurchaseTotal(req) || ''));
     setPurchaseEditId(req.id);
   };
@@ -414,6 +450,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     setPurchaseEditId(null);
     setPurchaseAmount('');
     setPurchaseLinePrices({});
+    setPurchaseLineInventory({});
   };
 
   const handleSavePurchase = async (req) => {
@@ -427,7 +464,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     }
     setDeletingId(req.id);
     try {
-      const patch = await markRestockPurchased(req.id, {
+      const patch = await confirmPurchase(req.id, {
         purchaseTotal: amount,
         purchaseItems: lineItems,
         purchasedBy: member?.name || '—',
@@ -780,24 +817,65 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                       const key = `${req.id}:${i}`;
                       const qty = Math.max(1, Number(line.qty) || 1);
                       const unit = parseInt(String(purchaseLinePrices[key] || '').replace(/\D/g, ''), 10) || 0;
+                      const inventoryDraft = purchaseLineInventory[key] || {};
+                      const preview = buildInventoryReceivePreview({
+                        ...line,
+                        qty,
+                        unit: inventoryDraft.unit,
+                        base_unit: inventoryDraft.base_unit,
+                        conversion_rate: inventoryDraft.conversion_rate,
+                      });
+                      const setInventoryField = (field, value) => setPurchaseLineInventory((prev) => ({
+                        ...prev,
+                        [key]: { ...(prev[key] || {}), [field]: value },
+                      }));
                       return (
-                        <div key={key} className="grid grid-cols-[1fr_92px] gap-2 items-center">
-                          <p className="text-[11px] font-bold text-stone-700 min-w-0">
-                            <RestockItemName name={line.name} lang={lang} />
-                            <span className="ml-1 text-stone-400">×{qty}</span>
-                            {unit > 0 && <span className="block text-[10px] text-emerald-700">= ฿{(unit * qty).toLocaleString()}</span>}
+                        <div key={key} className="rounded-xl bg-white/70 border border-emerald-100 p-2 space-y-2">
+                          <div className="grid grid-cols-[1fr_92px] gap-2 items-center">
+                            <p className="text-[11px] font-bold text-stone-700 min-w-0">
+                              <RestockItemName name={line.name} lang={lang} />
+                              <span className="ml-1 text-stone-400">×{qty}</span>
+                              {unit > 0 && <span className="block text-[10px] text-emerald-700">= ฿{(unit * qty).toLocaleString()}</span>}
+                            </p>
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              value={purchaseLinePrices[key] || ''}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, '');
+                                setPurchaseLinePrices((prev) => ({ ...prev, [key]: value }));
+                              }}
+                              placeholder={t('unitPricePlaceholder')}
+                              className="w-full px-2 py-2 rounded-xl border-2 border-emerald-200 text-sm font-bold outline-none bg-white"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <input
+                              type="text"
+                              value={inventoryDraft.unit || ''}
+                              onChange={(e) => setInventoryField('unit', e.target.value)}
+                              placeholder={t('inventoryUnitLabel')}
+                              className="px-2 py-1.5 rounded-lg border border-emerald-100 text-[11px] font-bold"
+                            />
+                            <input
+                              type="text"
+                              value={inventoryDraft.base_unit || ''}
+                              onChange={(e) => setInventoryField('base_unit', e.target.value)}
+                              placeholder={t('inventoryBaseUnitLabel')}
+                              className="px-2 py-1.5 rounded-lg border border-emerald-100 text-[11px] font-bold"
+                            />
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              value={inventoryDraft.conversion_rate || ''}
+                              onChange={(e) => setInventoryField('conversion_rate', e.target.value.replace(/\D/g, ''))}
+                              placeholder={t('inventoryConversionLabel')}
+                              className="px-2 py-1.5 rounded-lg border border-emerald-100 text-[11px] font-bold"
+                            />
+                          </div>
+                          <p className="text-[10px] font-black text-emerald-700">
+                            {t('inventoryReceivePreview').replace('{n}', String(preview.received_base_qty)).replace('{unit}', preview.base_unit)}
                           </p>
-                          <input
-                            type="tel"
-                            inputMode="numeric"
-                            value={purchaseLinePrices[key] || ''}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              setPurchaseLinePrices((prev) => ({ ...prev, [key]: value }));
-                            }}
-                            placeholder={t('unitPricePlaceholder')}
-                            className="w-full px-2 py-2 rounded-xl border-2 border-emerald-200 text-sm font-bold outline-none bg-white"
-                          />
                         </div>
                       );
                     })}
