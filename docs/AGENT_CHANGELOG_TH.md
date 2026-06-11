@@ -1,3 +1,11 @@
+## 2026-06-11 — ชา: PR 3 Flexible POS Workflow + One-Page Closing
+
+- เพิ่มฟอร์ม `บันทึกยอดเหมา` ในหน้าขายชา เก็บใน `dailyExpenses` ด้วย `type=bulkEntry`, `manualBulkTotal`, `manualCupsSold`, และ staff snapshot จาก login ปัจจุบัน
+- ปรับ `SummaryTab`/`ExpensesTab` ให้หน้าปิดกะเป็น One-Page Form: เงินสด, เงินโอน, ยอดเหมา, รายจ่าย, เงินทอน, แก้วอัตโนมัติ, แก้วกรอกเอง, แก้วที่จะใช้หักสต๊อก
+- สต๊อกแก้วเปล่าในหน้าปิดกะแสดง/บันทึก `openingCups + refillCups - finalCupsSold` โดย `finalCupsSold = manualCupsSold || autoCupsSold`
+- ไม่แตะ RBAC, Navigation, Payroll, Profit Report, Firestore rules, หรือ Inventory Core นอกเหนือจาก daily cup stock เดิม
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/screens/OrderTab.jsx`, `apps/chincha-tea/src/screens/ExpensesTab.jsx`, และ `apps/chincha-tea/src/lib/bulkEntryService.js`
+
 ## 2026-06-11 — ชา: PR 2 Smart Inventory Engine (Conversion & Ordering)
 
 - เพิ่ม inventory fields ใน `restockCatalog`: `unit`, `base_unit`, `conversion_rate`, `stock_base_qty` เพื่อรองรับซื้อเป็นหน่วยใหญ่แต่ตัด stock เป็นหน่วยเล็กสุด

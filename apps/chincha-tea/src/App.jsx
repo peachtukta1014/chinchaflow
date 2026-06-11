@@ -300,6 +300,10 @@ export default function App() {
             setModalItem={setModalItem}
             modalItem={modalItem}
             canVoiceCommit={cart.length > 0}
+            member={member}
+            onBulkEntrySaved={(dateKey) => {
+              if (dateKey === viewDateKey) refreshOrders();
+            }}
             onVoiceCommit={async () => {
               if (cart.length) await saveOrder();
             }}
