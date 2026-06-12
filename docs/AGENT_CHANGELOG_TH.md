@@ -1,3 +1,11 @@
+## 2026-06-12 — ชา: PR4 Role-based UI and Navigation
+
+- จัด role navigation ฝั่งชาใหม่เป็น source เดียวผ่าน `teaRoles`/`navConfig`: admin เห็นครบทุกเมนู, manager เห็นงานประจำวัน + dashboard/history, staff เห็นขาย/หลังร้าน/บัญชีปิดกะ/โปรไฟล์เท่านั้น
+- แตกเมนู admin ออกเป็นแท็บจริง (`dashboard`, `catalog`, `profit`, `payroll`, `history`, `admin`) และ render ด้วย guard เดียวกับ navigation เพื่อไม่ให้มีปุ่มที่กดแล้วค่อยโดนปฏิเสธสิทธิ์
+- Header แสดงปุ่ม Admin เฉพาะ admin; manager/staff ไม่เห็นปุ่มระบบ และ dashboard quick links ซ่อนลิงก์ที่ role เข้าไม่ได้
+- หน้าโปรไฟล์เพิ่มการ์ดสิทธิ์ผู้ใช้ แสดง role, userCode, branchId, สถานะอนุมัติ และเมนูที่ role นั้นมองเห็น
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/teaRoles.js`, `apps/chincha-tea/src/lib/navConfig.js`, `apps/chincha-tea/src/App.jsx`, `apps/chincha-tea/src/components/AppHeader.jsx`, `apps/chincha-tea/src/screens/DashboardTab.jsx`, และ `apps/chincha-tea/src/screens/MyProfileScreen.jsx`
+
 ## 2026-06-12 — ชา: PR3 Daily summary and header metrics
 
 - เพิ่ม `dailySummaryService` เป็น source เดียวของสรุปวันชา รวมยอด POS, เงินสด/โอน, ยอดเหมา, จำนวนแก้วจริง, รายจ่าย, เงินทอน และแก้วคงเหลือจาก `dailyCupStocks`

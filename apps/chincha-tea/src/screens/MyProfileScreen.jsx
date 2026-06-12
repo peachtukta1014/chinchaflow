@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import MemberAvatar from '../components/MemberAvatar';
 import { displayMemberPhotoUrl, stripPhotoCacheBust } from '../lib/memberAvatar';
-import { getTeaRoleLabel } from '../lib/teaRoles';
+import { getTeaRoleLabel, getTeaTabsForMember } from '../lib/teaRoles';
 import {
   changeTeaMemberPassword,
   updateTeaMemberProfile,
@@ -45,6 +45,7 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
   const [photoFeedback, setPhotoFeedback] = useState({ message: '', error: '' });
   const [profileFeedback, setProfileFeedback] = useState({ message: '', error: '' });
   const [passwordFeedback, setPasswordFeedback] = useState({ message: '', error: '' });
+  const visibleTabs = getTeaTabsForMember(member).filter((tabId) => tabId !== 'my-profile');
 
   useEffect(() => {
     setName(member?.name || '');
@@ -161,6 +162,37 @@ export default function MyProfileScreen({ member, onProfileUpdated, t }) {
           <p className="text-[10px] text-amber-600 font-bold mt-1">
             {getTeaRoleLabel(member?.role, t)}
           </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 space-y-3">
+        <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">
+          {t('profileAccessTitle')}
+        </p>
+        <div className="grid grid-cols-2 gap-2 text-[11px]">
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+            <p className="font-black text-amber-900">{t('profileRole')}</p>
+            <p className="font-bold text-amber-700 mt-0.5">{getTeaRoleLabel(member?.role, t)}</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+            <p className="font-black text-amber-900">{t('profileUserCode')}</p>
+            <p className="font-bold text-amber-700 mt-0.5">{member?.userCode || '—'}</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+            <p className="font-black text-amber-900">{t('profileBranch')}</p>
+            <p className="font-bold text-amber-700 mt-0.5">{member?.branchId || 'main'}</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+            <p className="font-black text-amber-900">{t('profileStatus')}</p>
+            <p className="font-bold text-emerald-700 mt-0.5">{member?.approved ? t('profileApproved') : t('pendingTitle')}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {visibleTabs.map((tabId) => (
+            <span key={tabId} className="rounded-full bg-stone-100 border border-stone-200 px-2 py-1 text-[10px] font-black text-stone-600">
+              {t(`profileAccess_${tabId}`)}
+            </span>
+          ))}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import {
   listAttendanceStaff,
 } from '../lib/staffAttendanceService';
 import { wageMapFromStaffList } from '../lib/staffWage';
+import { canAccessTeaTab } from '../lib/teaRoles';
 
 function StatCard({ label, value, sub, accent = '#3d1f0f', onClick }) {
   const Tag = onClick ? 'button' : 'div';
@@ -33,6 +34,7 @@ export function DashboardTab({
   todayKey,
   pendingRestocks = 0,
   onNavigate,
+  member,
 }) {
   const [loading, setLoading] = useState(true);
   const [todaySales, setTodaySales] = useState(0);
@@ -42,6 +44,11 @@ export function DashboardTab({
   const [todayWage, setTodayWage] = useState(0);
   const [periodWage, setPeriodWage] = useState(0);
   const [periodDays, setPeriodDays] = useState(0);
+  const canOpen = useCallback(
+    (id) => (id === 'restock' ? canAccessTeaTab(member, 'ops') : canAccessTeaTab(member, id)),
+    [member],
+  );
+  const canViewFinancials = canOpen('profit') || canOpen('payroll');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,9 +57,9 @@ export function DashboardTab({
       const [dailySummary, restocks, attendance, staffList, periodSummary] = await Promise.all([
         fetchTeaDailySummary(todayKey),
         fsQueryRestocksByDate(todayKey),
-        fsQueryStaffAttendanceByDate(todayKey),
-        listAttendanceStaff(),
-        getPeriodAttendanceSummary(period.startKey, period.endKey),
+        canViewFinancials ? fsQueryStaffAttendanceByDate(todayKey) : Promise.resolve([]),
+        canViewFinancials ? listAttendanceStaff() : Promise.resolve([]),
+        canViewFinancials ? getPeriodAttendanceSummary(period.startKey, period.endKey) : Promise.resolve([]),
       ]);
       const wageMap = wageMapFromStaffList(staffList);
       const ledger = computeDayLedger({
@@ -74,7 +81,7 @@ export function DashboardTab({
       console.error(e);
     }
     setLoading(false);
-  }, [todayKey]);
+  }, [canViewFinancials, todayKey]);
 
   useEffect(() => {
     load();
@@ -85,8 +92,9 @@ export function DashboardTab({
     { id: 'profit', label: t('profitTabShort'), icon: '💰' },
     { id: 'payroll', label: t('payrollTabShort'), icon: '📅' },
     { id: 'restock', label: t('restockTabShort'), icon: '📦', badge: pendingRestocks },
+    { id: 'history', label: t('historyTabShort'), icon: '🕘' },
     { id: 'admin', label: t('adminTabShort'), icon: '⚙️' },
-  ];
+  ].filter((link) => canOpen(link.id));
 
   return (
     <div className="px-4 pt-2 pb-8 space-y-3">
@@ -101,27 +109,33 @@ export function DashboardTab({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <StatCard
-              label={t('dashboardOperatingProfit')}
-              value={`฿${operatingProfit.toLocaleString()}`}
-              sub={t('dashboardProfitHint')}
-              accent="#166534"
-              onClick={() => onNavigate?.('profit')}
-            />
-            <StatCard
-              label={t('dashboardTodayWage')}
-              value={`฿${todayWage.toLocaleString()}`}
-              sub={`${staffPresent} ${t('staffAttendanceDaysUnit')}`}
-              accent="#5b21b6"
-              onClick={() => onNavigate?.('payroll')}
-            />
-            <StatCard
-              label={t('dashboardPeriodWage')}
-              value={`฿${periodWage.toLocaleString()}`}
-              sub={`${periodDays} ${t('staffAttendanceDaysUnit')} · ${t('payrollTabShort')}`}
-              accent="#7c3aed"
-              onClick={() => onNavigate?.('payroll')}
-            />
+            {canOpen('profit') && (
+              <StatCard
+                label={t('dashboardOperatingProfit')}
+                value={`฿${operatingProfit.toLocaleString()}`}
+                sub={t('dashboardProfitHint')}
+                accent="#166534"
+                onClick={() => onNavigate?.('profit')}
+              />
+            )}
+            {canOpen('payroll') && (
+              <StatCard
+                label={t('dashboardTodayWage')}
+                value={`฿${todayWage.toLocaleString()}`}
+                sub={`${staffPresent} ${t('staffAttendanceDaysUnit')}`}
+                accent="#5b21b6"
+                onClick={() => onNavigate?.('payroll')}
+              />
+            )}
+            {canOpen('payroll') && (
+              <StatCard
+                label={t('dashboardPeriodWage')}
+                value={`฿${periodWage.toLocaleString()}`}
+                sub={`${periodDays} ${t('staffAttendanceDaysUnit')} · ${t('payrollTabShort')}`}
+                accent="#7c3aed"
+                onClick={() => onNavigate?.('payroll')}
+              />
+            )}
             <StatCard
               label={t('restockTabShort')}
               value={pendingRestocks > 0 ? `${pendingRestocks}` : '—'}
