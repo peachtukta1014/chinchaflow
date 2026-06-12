@@ -1,3 +1,10 @@
+## 2026-06-12 — ชา: PR2 Restock purchase workflow
+
+- ปรับ `apps/chincha-tea` flow สั่งของให้แยก `pending` → `picked` → `pending_confirm` → `received`; ติ๊กหน้าใบสั่งเป็น picked เท่านั้น ยังไม่เพิ่ม stock
+- บันทึกราคาซื้อรายรอบไว้ที่ใบสั่งก่อน และให้ stock/`latestUnitPrice` อัปเดตเฉพาะตอน admin ยืนยัน `received`
+- หน้าใบสั่ง/รับเข้าแสดง row สั้น ชื่อสินค้า + จำนวน (-/ช่องตัวเลข/+) + ราคาล่าสุด/ราคาซื้อ โดยไม่เพิ่มรูปสินค้าและไม่แตะกุ้ง/webhook/voice/dashboard
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/screens/RestockTab.jsx`, `apps/chincha-tea/src/lib/restockService.js`, และ field `purchaseStatus` / `purchaseItems` / `stock_base_qty` / `latestUnitPrice`
+
 ## 2026-06-12 — ชา: Backend Foundation role/user/restock received guard
 
 - เพิ่ม foundation ผู้ใช้ฝั่งชา: role `admin` / `manager` / `staff`, `userCode` deterministic fallback, และ `branchId` ค่าเริ่มต้น `main` ผ่าน `teaUserService`
