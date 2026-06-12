@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
-import { fsGetDoc } from './firestoreRest';
+import { loadTeaUserProfile } from './teaBackendService';
 
 const MEMBER_CACHE_KEY = 'tea:memberProfile';
 
@@ -47,7 +47,7 @@ export function subscribeTeaMember(onMember, onPending) {
     }
 
     try {
-      const profile = await fsGetDoc(`users/${user.uid}`);
+      const profile = await loadTeaUserProfile(user.uid, { email: user.email });
       if (!profile || profile.approved !== true) {
         clearTeaMemberCache();
         onPending?.(true);

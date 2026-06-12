@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
+import { fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
 import { uploadOrderSlip } from '../lib/orderSlipService';
 import {
@@ -29,8 +29,9 @@ import { invalidatePendingRestockCache } from '../lib/restockNotifyService';
 import { buildInventoryReceivePreview } from '../lib/inventoryMath';
 import { restockDisplayName } from '../lib/restockDisplay';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
-import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
+import { writeHistoryLog } from '../lib/historyLogService';
 import { parseRestockVoice } from '../lib/voiceRestock';
+import { createTeaRestockRequest } from '../lib/teaBackendService';
 
 function RestockItemName({ name, lang, catalogItem }) {
   const overrides = catalogItem
@@ -310,25 +311,12 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     setSaving(true);
     try {
       const names = listToSubmit.map((i) => i.name);
-      const created = await fsPost('restocks', {
+      const created = await createTeaRestockRequest({
         dateKey,
-        uid: member?.uid || 'unknown',
-        createdBy: member?.name || 'ชินชา',
-        createdByUid: member?.uid || '',
-        ...staffSnapshot(member),
-        items: listToSubmit.map((i) => {
-          const catalogItem = catalogByKey.get(restockNameKey(i.name));
-          return {
-            name: i.name,
-            qty: i.qty,
-            status: i.status,
-            unit: catalogItem?.unit || 'ชิ้น',
-            base_unit: catalogItem?.base_unit || catalogItem?.unit || 'ชิ้น',
-            conversion_rate: Math.max(1, Math.round(Number(catalogItem?.conversion_rate) || 1)),
-          };
-        }),
-        purchaseStatus: 'pending',
-        createdAt: new Date().toISOString(),
+        items: listToSubmit,
+        member,
+        catalogByKey,
+        restockNameKey,
       });
       invalidatePendingRestockCache(dateKey);
       await writeHistoryLog({ action: 'restock.create', collection: 'restocks', docId: created?.id || '', refPath: created?.id ? `restocks/${created.id}` : '', dateKey, member, summary: { items: listToSubmit.length } });
@@ -469,6 +457,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         purchaseItems: lineItems,
         purchasedBy: member?.name || '—',
         purchasedByUid: member?.uid || '',
+        member,
       });
       await updateRestockCatalogPrices(lineItems);
       await refreshCatalog();

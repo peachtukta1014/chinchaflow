@@ -75,12 +75,12 @@ flowchart TB
 
 | Collection | ความหมาย |
 |------------|----------|
-| `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) พร้อม `staffUid/staffName` จากผู้ล็อกอิน |
+| `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) พร้อม actor snapshot (`actor*`) และ legacy `staffUid/staffName` จากผู้ล็อกอิน |
 | `products`, `toppings` | เมนูและท็อปปิ้ง |
-| `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
-| `restocks`, `restockCatalog`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / catalog+inventory / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`restockCatalog` รองรับ `unit`, `base_unit`, `conversion_rate`, `stock_base_qty`; `restocks.inventoryReceived` เก็บ snapshot ตอนแอดมินรับของเข้า; `dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
+| `users` | โปรไฟล์พนักงาน (`approved`, `role=admin/manager/staff`, `userCode`, `branchId`) |
+| `restocks`, `restockCatalog`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / catalog+inventory / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`restockCatalog` รองรับ `unit`, `base_unit`, `conversion_rate`, `stock_base_qty`; `restocks.purchaseStatus` รองรับ `pending`/`pending_confirm`/`purchased` โดยรับของเข้า inventory เฉพาะ `purchased`, `restocks.inventoryReceived` เก็บ snapshot ตอนแอดมินรับของเข้า; `dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |
-| `historyLogs` | audit log เหตุการณ์สำคัญของชา (ขาย, ปิดวัน, สต๊อกแก้ว, สั่งของ) ผูก `staffUid/staffName` เพื่อใช้ตรวจย้อนหลัง/ต่อยอดค่าแรง |
+| `historyLogs` | audit log เหตุการณ์สำคัญของชา (ขาย, ปิดวัน, สต๊อกแก้ว, สั่งของ) ผูก actor snapshot + legacy `staffUid/staffName` เพื่อใช้ตรวจย้อนหลัง/ต่อยอดค่าแรง |
 
 ### กุ้ง (`seafood-pos`)
 

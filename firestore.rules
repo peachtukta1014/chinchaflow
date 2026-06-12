@@ -80,7 +80,8 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(uid)
         && (
-          (request.resource.data.role == 'staff' && request.resource.data.approved == false)
+          (request.resource.data.role == 'manager' && request.resource.data.approved == false)
+          || (request.resource.data.role == 'staff' && request.resource.data.approved == false)
           || (request.resource.data.role == 'staff' && request.resource.data.approved == true)
           || (isTeaBootstrapAdmin()
             && request.resource.data.role == 'admin'
@@ -181,6 +182,17 @@ service cloud.firestore {
             'purchaseItems',
             'purchasedAt',
             'purchasedBy',
+            'purchasedByUid',
+            'inventoryReceived',
+            'statusUpdatedAt',
+            'statusUpdatedByUid',
+            'statusUpdatedBy',
+            'actorUid',
+            'actorName',
+            'actorEmail',
+            'actorRole',
+            'actorUserCode',
+            'branchId',
           ])
         );
       allow delete: if isAdmin()

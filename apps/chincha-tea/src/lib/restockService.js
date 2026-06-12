@@ -1,8 +1,15 @@
 import { fsDelete, fsPatch } from './firestoreRest';
 import { receiveRestockInventory } from './inventoryService';
+import {
+  TEA_RESTOCK_PURCHASE_STATUS,
+  actorSnapshot,
+  isConfirmedRestockPurchaseStatus,
+  normalizeRestockPurchaseStatus,
+  restockStatusSnapshot,
+} from './teaBackendService';
 
 export function isRestockPurchased(req) {
-  return req?.purchaseStatus === 'purchased' && Number(req?.purchaseTotal) > 0;
+  return isConfirmedRestockPurchaseStatus(req?.purchaseStatus) && Number(req?.purchaseTotal) > 0;
 }
 
 export function restockPurchaseTotal(req) {
@@ -42,7 +49,7 @@ export async function removeRestockLine(req, lineIndex) {
   return { ...req, items };
 }
 
-export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, purchasedBy, purchasedByUid }) {
+export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, purchasedBy, purchasedByUid, member }) {
   const amount = Math.round(Number(purchaseTotal));
   if (!amount || amount <= 0) throw new Error('invalid amount');
   const now = new Date().toISOString();
@@ -59,14 +66,17 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
     }))
     : undefined;
   const patch = {
-    purchaseStatus: 'purchased',
+    purchaseStatus: TEA_RESTOCK_PURCHASE_STATUS.PURCHASED,
     purchaseTotal: amount,
     purchaseItems: cleanItems,
     purchasedAt: now,
     purchasedBy: purchasedBy || '—',
-    purchasedByUid: purchasedByUid || '',
+    purchasedByUid: purchasedByUid || member?.uid || '',
+    ...restockStatusSnapshot(TEA_RESTOCK_PURCHASE_STATUS.PURCHASED, member || { uid: purchasedByUid, name: purchasedBy }),
   };
-  const inventoryUpdates = await receiveRestockInventory(cleanItems || []);
+  const inventoryUpdates = normalizeRestockPurchaseStatus(patch.purchaseStatus) === TEA_RESTOCK_PURCHASE_STATUS.PURCHASED
+    ? await receiveRestockInventory(cleanItems || [])
+    : [];
   patch.inventoryReceived = inventoryUpdates.map((item) => ({
     name: item.name,
     unit: item.unit,
@@ -79,6 +89,21 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
   return patch;
 }
 
+export async function markRestockPurchaseStatus(id, { status, member, summary = {} }) {
+  const nextStatus = normalizeRestockPurchaseStatus(status);
+  const patch = {
+    ...restockStatusSnapshot(nextStatus, member, summary),
+  };
+  // Foundation only: pending_confirm records status for debugging but never receives stock.
+  if (nextStatus === TEA_RESTOCK_PURCHASE_STATUS.PENDING_CONFIRM) {
+    patch.inventoryReceived = [];
+  }
+  await fsPatch(`restocks/${id}`, patch);
+  return patch;
+}
+
 export async function confirmPurchase(id, payload) {
   return markRestockPurchased(id, payload);
 }
+
+export { actorSnapshot };

@@ -25,7 +25,8 @@ chincha-business-os/
 │   └── shrimp-stock-reset.mjs     # รีเซ็ตสต๊อก/ข้อมูลกุ้ง
 │
 ├── docs/                          # คู่มือ / โครงสร้าง (อ้างอิงใน repo)
-│   ├── PROJECT_STRUCTURE.md       # ไฟล์นี้
+│   ├── PROJECT_STRUCTURE.md
+│   ├── work-specs/              # สเปกงานราย PR แยกแอปสำหรับ Agent/Codex       # ไฟล์นี้
 │   ├── CLOUD_STATUS.md
 │   └── ENABLE_CLOUD_SCHEDULER.md
 │
@@ -96,13 +97,13 @@ apps/chincha-tea/
 
 | Collection | ใช้ทำอะไร |
 |------------|-----------|
-| `users` | สมาชิกแอป (approved, role) |
-| `teaOrders` | บิลขายรายวัน + staff ผู้บันทึก |
+| `users` | สมาชิกแอป (`approved`, `role=admin/manager/staff`, `userCode`, `branchId`) |
+| `teaOrders` | บิลขายรายวัน + actor snapshot / staff ผู้บันทึก |
 | `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`, เงินสด/โอนรวม/เงินทอน/แก้ว/ผู้บันทึก) + ยอดเหมา (`type=bulkEntry`, `manualBulkTotal`, `manualCupsSold`) |
 | `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ / ผู้บันทึก) |
-| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus`, `purchaseTotal`, `purchaseItems`, `inventoryReceived`, staff ผู้บันทึก/จัดซื้อ) |
+| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus=pending/pending_confirm/purchased`, `purchaseTotal`, `purchaseItems`, `inventoryReceived`, actor/staff ผู้บันทึก/จัดซื้อ; `pending_confirm` ไม่รับ stock จริง) |
 | `restockCatalog` | catalog ของของเข้าร้าน + inventory fields (`unit`, `base_unit`, `conversion_rate`, `stock_base_qty`) สำหรับซื้อเป็นหน่วยใหญ่และตัด stock เป็นหน่วยเล็กสุด |
-| `historyLogs` | ประวัติ action สำคัญของชา ผูก staff จาก login |
+| `historyLogs` | ประวัติ action สำคัญของชา ผูก actor snapshot + legacy staff จาก login |
 | `orderSlips` | รูปใบสั่งของ/สลิป (Storage URL) |
 | `products` / `toppings` | เมนู |
 | `config/teaLine` | ตั้งค่า LINE สรุปปิดวัน |

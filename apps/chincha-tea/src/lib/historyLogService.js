@@ -1,12 +1,8 @@
 import { fsPost } from './firestoreRest';
+import { teaWriteSnapshot } from './teaBackendService';
 
 export function staffSnapshot(member) {
-  return {
-    staffUid: member?.uid || '',
-    staffName: member?.name || member?.email || 'ชินชา',
-    staffEmail: member?.email || '',
-    staffRole: member?.role || 'staff',
-  };
+  return teaWriteSnapshot(member);
 }
 
 export async function writeHistoryLog({ action, collection, docId = '', dateKey = '', member, summary = {}, refPath = '' }) {
@@ -20,6 +16,7 @@ export async function writeHistoryLog({ action, collection, docId = '', dateKey 
       dateKey,
       ...staffSnapshot(member),
       summary,
+      schemaVersion: 2,
       createdAt: new Date().toISOString(),
     });
   } catch (e) {

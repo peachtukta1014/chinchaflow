@@ -41,6 +41,7 @@ import MemberAvatar from '../components/MemberAvatar';
 import { displayMemberPhotoUrl } from '../lib/memberAvatar';
 import { FIREBASE_PROJECT_ID } from '../lib/viteEnv.js';
 import { SegmentedTabBar } from '../components/TabNav';
+import { getTeaRoleLabel } from '../lib/teaRoles';
 
 const PROJECT_ID = FIREBASE_PROJECT_ID;
 const DEFAULT_LINE_CONFIG = {
@@ -258,6 +259,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
 
 function MembersSection({ users, t, onUpdate, onDelete }) {
   const selfId = auth?.currentUser?.uid;
+  const nextRole = (role) => (role === 'admin' ? 'manager' : role === 'manager' ? 'staff' : 'admin');
   const [wageDraft, setWageDraft] = useState({});
 
   return (
@@ -286,7 +288,7 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
                   <span className={`px-2 py-0.5 rounded-full font-bold ${u.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                     {u.approved ? t('approvedYes') : t('approvedNo')}
                   </span>
-                  <span className="ml-2 text-stone-500">{u.role === 'admin' ? t('roleAdmin') : t('roleStaff')}</span>
+                  <span className="ml-2 text-stone-500">{getTeaRoleLabel(u.role, t)}</span>
                 </p>
               </div>
             </div>
@@ -336,10 +338,10 @@ function MembersSection({ users, t, onUpdate, onDelete }) {
               )}
               <button
                 type="button"
-                onClick={() => onUpdate(u.id, { role: u.role === 'admin' ? 'staff' : 'admin' })}
+                onClick={() => onUpdate(u.id, { role: nextRole(u.role) })}
                 className="px-3 py-1.5 rounded-xl border-2 border-stone-200 text-xs font-bold text-stone-600"
               >
-                → {u.role === 'admin' ? t('roleStaff') : t('roleAdmin')}
+                → {getTeaRoleLabel(nextRole(u.role), t)}
               </button>
             </div>
             <button

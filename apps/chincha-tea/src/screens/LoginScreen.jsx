@@ -9,8 +9,9 @@ import {
 } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from '../firebase';
-import { fsGetDoc, fsPatch, fsSetUserProfile } from '../lib/firestoreRest';
+import { fsGetDoc, fsPatch } from '../lib/firestoreRest';
 import { getTeaSignupRole, isBootstrapAdminEmail } from '../lib/constants';
+import { createTeaUserProfile, ensureTeaUserFoundation, loadTeaUserProfile } from '../lib/teaBackendService';
 import { CreditsStrip, PlatformMark } from '@chincha/app-credits';
 import { T } from '../lib/i18n';
 
@@ -37,18 +38,16 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
   const [resetSent, setResetSent] = useState(false);
 
   const loadOrCreateProfile = async (uid, em) => {
-    let profile = await fsGetDoc(`users/${uid}`);
+    let profile = await loadTeaUserProfile(uid, { email: em });
     if (!profile) {
       const role = getTeaSignupRole(em);
-      await fsSetUserProfile(uid, {
+      await createTeaUserProfile(uid, {
         name: em.split('@')[0],
         email: em,
         role,
         approved: true,
-        uid,
-        createdAt: new Date().toISOString(),
       });
-      profile = await fsGetDoc(`users/${uid}`);
+      profile = await loadTeaUserProfile(uid, { email: em, role });
     }
     if (!profile) throw new Error('authCreateFailed');
     return ensureBootstrapAdmin(uid, em, { uid, ...profile });
@@ -60,7 +59,7 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
     if (profile.role === 'admin' && profile.approved === true) return profile;
     await fsPatch(`users/${uid}`, { role: 'admin', approved: true });
     const updated = await fsGetDoc(`users/${uid}`);
-    return updated ? { uid, ...updated } : { ...profile, role: 'admin', approved: true };
+    return updated ? ensureTeaUserFoundation(uid, { uid, ...updated }, { email: em, role: 'admin' }) : { ...profile, role: 'admin', approved: true };
   };
 
   const handleRegister = async () => {
@@ -76,15 +75,13 @@ export function LoginScreen({ onAuthed, lang, setLang, pending, setPending }) {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const cred = await createUserWithEmailAndPassword(auth, em, pw);
       const role = getTeaSignupRole(em);
-      await fsSetUserProfile(cred.user.uid, {
+      await createTeaUserProfile(cred.user.uid, {
         name,
         email: em,
         role,
         approved: true,
-        uid: cred.user.uid,
-        createdAt: new Date().toISOString(),
       });
-      const profile = await fsGetDoc(`users/${cred.user.uid}`);
+      const profile = await loadTeaUserProfile(cred.user.uid, { email: em, role });
       if (profile) onAuthed({ uid: cred.user.uid, ...profile });
     } catch (e) {
       const code = e?.code || '';
