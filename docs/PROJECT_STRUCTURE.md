@@ -26,7 +26,6 @@ chincha-business-os/
 │
 ├── docs/                          # คู่มือ / โครงสร้าง (อ้างอิงใน repo)
 │   ├── PROJECT_STRUCTURE.md
-│   ├── work-specs/              # สเปกงานราย PR แยกแอปสำหรับ Agent/Codex       # ไฟล์นี้
 │   ├── CLOUD_STATUS.md
 │   └── ENABLE_CLOUD_SCHEDULER.md
 │

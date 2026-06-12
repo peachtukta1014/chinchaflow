@@ -1,6 +1,5 @@
-## 2026-06-12 — ชา: PR1 Backend Foundation + Work Specs
+## 2026-06-12 — ชา: PR1 Backend Foundation
 
-- เพิ่ม `docs/work-specs/` สำหรับเก็บสเปกงานราย PR แยก `chincha-tea` / `seafood-pos` / `webhook-core` และบันทึก PR1 ของชาไว้ใน repo
 - เพิ่ม foundation ฝั่งชา: role `manager`, `userCode`, `branchId`, actor snapshot (`actor*` + legacy `staff*`) และ service layer กลางสำหรับ profile/restock/status
 - รายการสั่งของใหม่มี `purchaseStatus=pending`, `statusHistory`, `branchId`; status หลักคือ `pending` → `picked` → `pending_confirm` → `received`/`cancelled`; รับของเข้า inventory เฉพาะ `received` (`purchased` เป็น legacy alias เท่านั้น)
 - ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/teaBackendService.js`, `apps/chincha-tea/src/lib/restockService.js`, `apps/chincha-tea/src/screens/RestockTab.jsx`, และ `firestore.rules`
