@@ -25,6 +25,14 @@ service cloud.firestore {
       return isApproved() && currentUser().data.role == 'admin';
     }
 
+    function isTeaRole(role) {
+      return role in ['admin', 'manager', 'staff'];
+    }
+
+    function isRestockStatus(status) {
+      return status in ['pending', 'picked', 'pending_confirm', 'received', 'cancelled'];
+    }
+
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
@@ -80,8 +88,8 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(uid)
         && (
-          (request.resource.data.role == 'staff' && request.resource.data.approved == false)
-          || (request.resource.data.role == 'staff' && request.resource.data.approved == true)
+          (request.resource.data.role in ['staff', 'manager'] && request.resource.data.approved == false)
+          || (request.resource.data.role in ['staff', 'manager'] && request.resource.data.approved == true)
           || (isTeaBootstrapAdmin()
             && request.resource.data.role == 'admin'
             && request.resource.data.approved == true)
@@ -90,7 +98,9 @@ service cloud.firestore {
         || (isOwner(uid)
           && request.resource.data.role == resource.data.role
           && request.resource.data.approved == resource.data.approved
-          && request.resource.data.email == resource.data.email)
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.userCode == resource.data.userCode
+          && request.resource.data.branchId == resource.data.branchId)
         || (isOwner(uid) && isTeaBootstrapAdmin()
           && request.resource.data.role == 'admin'
           && request.resource.data.approved == true);
@@ -169,18 +179,32 @@ service cloud.firestore {
       allow read: if isApproved();
       allow create: if isApproved()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.items is list;
-      // ราคาทุน/สถานะซื้อแล้วแก้ได้เฉพาะแอดมิน; พนักงานแก้ได้แค่รายการที่ตัวเองส่ง
-      allow update: if isAdmin()
+        && request.resource.data.items is list
+        && isRestockStatus(request.resource.data.purchaseStatus)
+        && request.resource.data.purchaseStatus == 'pending'
+        && request.resource.data.branchId is string;
+      // รับ stock จริงได้เฉพาะแอดมินตอนเปลี่ยนเป็น received; พนักงานแก้ได้เฉพาะรายการที่ตัวเองส่งและห้ามแตะสถานะรับเข้า/ต้นทุน
+      allow update: if (isAdmin()
+          && isRestockStatus(request.resource.data.purchaseStatus)
+          && (request.resource.data.purchaseStatus != 'received'
+            || request.resource.data.inventoryReceived is list)
+        )
         || (
           isApproved()
           && resource.data.uid == request.auth.uid
+          && resource.data.purchaseStatus != 'received'
+          && request.resource.data.purchaseStatus != 'received'
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'purchaseStatus',
             'purchaseTotal',
             'purchaseItems',
             'purchasedAt',
+            'receivedAt',
             'purchasedBy',
+            'purchasedByUid',
+            'receivedBy',
+            'receivedByUid',
+            'inventoryReceived'
           ])
         );
       allow delete: if isAdmin()
@@ -190,9 +214,20 @@ service cloud.firestore {
     // รายการสั่งของประจำร้าน — พนักงานเพิ่ม/อัปเดตได้ · แอดมินลบได้
     match /restockCatalog/{docId} {
       allow read: if isApproved();
-      allow create, update: if isApproved()
+      allow create: if isApproved()
         && request.resource.data.name is string
         && request.resource.data.nameKey is string;
+      allow update: if request.resource.data.name is string
+        && request.resource.data.nameKey is string
+        && (isAdmin()
+          || (isApproved()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'stock_base_qty',
+              'latestReceivedBaseQty',
+              'latestInventoryAt',
+              'latestDeductedBaseQty',
+              'latestDeductedAt'
+            ])));
       allow delete: if isAdmin();
     }
 

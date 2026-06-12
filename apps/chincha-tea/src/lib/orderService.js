@@ -19,6 +19,7 @@ export async function saveTeaOrder({
     payType,
     createdBy: member?.name || 'ชินชา',
     createdByUid: member?.uid,
+    branchId: member?.branchId || 'main',
     ...staffSnapshot(member),
     lang,
     createdAt: new Date().toISOString(),
