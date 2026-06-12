@@ -44,7 +44,6 @@ export default function App() {
   const [payType, setPayType] = useState('cash');
   const [pendingRestocks, setPendingRestocks] = useState(0);
   const [headerSummary, setHeaderSummary] = useState(null);
-  const [adminSection, setAdminSection] = useState('dashboard');
   const prevPendingRestocksRef = useRef(null);
   const tabBootstrappedRef = useRef(false);
 
@@ -135,7 +134,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed) return;
-    if (tab === 'summary' || tab === 'admin') refreshOrders();
+    if (tab === 'summary' || tab === 'admin' || tab === 'history') refreshOrders();
   }, [isAuthed, tab, refreshOrders]);
 
   const refreshPendingRestocks = useCallback(async (force = false) => {
@@ -173,7 +172,7 @@ export default function App() {
       showWebNotify(
         t('restockNotifyTitle'),
         t('restockNotifyBody').replace('{n}', String(pendingRestocks)),
-        { tag: 'restock', onClick: () => setTab('restock') },
+        { tag: 'restock', onClick: () => setTab('ops') },
       );
     }
     prevPendingRestocksRef.current = pendingRestocks;
@@ -199,6 +198,14 @@ export default function App() {
   const onProfileUpdated = useCallback((next) => {
     setMember((prev) => (prev ? { ...prev, ...next } : prev));
   }, []);
+
+  const openAdminFromHeader = useCallback(() => {
+    if (!canAccessTeaTab(member, 'admin')) return;
+    setTab('admin');
+    setLastTab('admin');
+    refreshCatalog();
+    refreshOrders();
+  }, [member, refreshCatalog, refreshOrders]);
 
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
@@ -286,6 +293,8 @@ export default function App() {
         onOpenProfile={openProfile}
         profileMode={isProfileTab}
         onBackFromProfile={goBackFromProfile}
+        onOpenAdmin={openAdminFromHeader}
+        showAdminButton={canAccessTeaTab(member, 'admin')}
         t={t}
         dailySummary={headerSummary}
       />
@@ -306,9 +315,9 @@ export default function App() {
             if (!canAccessTeaTab(member, id)) return;
             setTab(id);
             setLastTab(id);
-            if (id === 'admin') refreshCatalog();
-            if (id === 'summary' || id === 'admin') refreshOrders();
-            if (id === 'ops' && isAdmin) refreshPendingRestocks();
+            if (id === 'admin' || id === 'catalog') refreshCatalog();
+            if (id === 'summary' || id === 'admin' || id === 'history') refreshOrders();
+            if ((id === 'ops' || id === 'dashboard') && isAdmin) refreshPendingRestocks();
           }}
         />
       )}
@@ -357,38 +366,29 @@ export default function App() {
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
-        {tab === 'admin' && isAdmin && (
-          <div className="px-4 pt-3 pb-8 space-y-3">
-            {isAdmin && (
-              <div className="rounded-2xl border border-amber-900/10 bg-stone-100/80 p-1 flex gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {[
-                  ['dashboard', t('dashboardTabShort')],
-                  ['catalog', t('catalogTabShort')],
-                  ['profit', t('profitTabShort')],
-                  ['payroll', t('payrollTabShort')],
-                  ['history', t('historyTabShort')],
-                ].map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setAdminSection(id)}
-                    className={`shrink-0 px-3 py-2 rounded-xl font-bold text-[10px] transition-all ${adminSection === id ? 'text-white shadow-sm' : 'text-stone-500'}`}
-                    style={adminSection === id ? { background: 'linear-gradient(145deg, #3d1f0f 0%, #5a2d14 100%)' } : {}}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {isAdmin && adminSection === 'dashboard' && <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} onNavigate={(next) => {
-              if (next === 'restock') setTab('ops');
-              else if (next === 'summary') setTab('summary');
-              else setAdminSection(next);
-            }} />}
-            {adminSection === 'catalog' && <AdminPanel catalogOnly={false} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />}
-            {isAdmin && adminSection === 'profit' && <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />}
-            {isAdmin && adminSection === 'payroll' && <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />}
-            {isAdmin && adminSection === 'history' && <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />}
+        {tab === 'dashboard' && canAccessTeaTab(member, 'dashboard') && (
+          <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} member={member} onNavigate={(next) => {
+            if (next === 'restock') setTab('ops');
+            else if (canAccessTeaTab(member, next)) setTab(next);
+          }} />
+        )}
+        {tab === 'catalog' && canAccessTeaTab(member, 'catalog') && (
+          <div className="px-4 pt-3 pb-8">
+            <AdminPanel catalogOnly t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />
+          </div>
+        )}
+        {tab === 'profit' && canAccessTeaTab(member, 'profit') && (
+          <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />
+        )}
+        {tab === 'payroll' && canAccessTeaTab(member, 'payroll') && (
+          <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
+        )}
+        {tab === 'history' && canAccessTeaTab(member, 'history') && (
+          <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />
+        )}
+        {tab === 'admin' && canAccessTeaTab(member, 'admin') && (
+          <div className="px-4 pt-3 pb-8">
+            <AdminPanel catalogOnly={false} settingsOnly t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />
           </div>
         )}
         {isProfileTab && (
@@ -396,7 +396,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && !isProfileTab && tab !== 'admin' && tab !== 'ops' && (
+      {cart.length > 0 && tab === 'order' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"

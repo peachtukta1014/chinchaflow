@@ -64,9 +64,9 @@ const DEFAULT_LINE_CONFIG = {
   instantRestockNotify: true,
 };
 
-/** @param {{ catalogOnly?: boolean }} props — catalogOnly: พนักงานเห็นเฉพาะจัดการสินค้า */
-export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged, catalogOnly = false }) {
-  const [section, setSection] = useState('products');
+/** @param {{ catalogOnly?: boolean, settingsOnly?: boolean }} props — catalogOnly: เห็นเฉพาะสินค้า · settingsOnly: เมนูระบบไม่ซ้ำกับแท็บสินค้า */
+export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged, catalogOnly = false, settingsOnly = false }) {
+  const [section, setSection] = useState(catalogOnly ? 'products' : 'members');
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [toppings, setToppings] = useState([]);
@@ -223,7 +223,7 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
         <SegmentedTabBar
           tabs={[
             ['members', t('members')],
-            ['products', t('products')],
+            ...(!settingsOnly ? [['products', t('products')]] : []),
             ['orders', t('orderHistory')],
             ['settings', t('lineSettings')],
           ]}
@@ -231,11 +231,11 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
           onSelect={setSection}
         />
       )}
-      {loading && (!catalogOnly && section === 'members' || section === 'products') ? (
+      {loading && ((!catalogOnly && section === 'members') || section === 'products') ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
       ) : !catalogOnly && section === 'members' ? (
         <MembersSection users={users} t={t} onUpdate={updateUser} onDelete={deleteUser} />
-      ) : section === 'products' || catalogOnly ? (
+      ) : (section === 'products' || catalogOnly) && !settingsOnly ? (
         <ProductsSection
           products={products}
           toppings={toppings}

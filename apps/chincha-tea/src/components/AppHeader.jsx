@@ -11,6 +11,8 @@ export default function AppHeader({
   onOpenProfile,
   profileMode = false,
   onBackFromProfile,
+  onOpenAdmin,
+  showAdminButton = false,
   t,
   dailySummary,
 }) {
@@ -94,6 +96,21 @@ export default function AppHeader({
             </button>
           ))}
         </div>
+        {showAdminButton && !profileMode && (
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="w-8 h-8 rounded-full border border-amber-800 text-amber-300 flex items-center justify-center"
+            style={{ background: '#5a2d14' }}
+            aria-label={t('adminTabShort')}
+            title={t('adminTabShort')}
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6V21a2 2 0 01-4 0v-1a1.7 1.7 0 00-1-.6 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1H3a2 2 0 010-4h1a1.7 1.7 0 00.6-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 012.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6V3a2 2 0 014 0v1a1.7 1.7 0 001 .6 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 012.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.2.36.4.7.6 1h1a2 2 0 010 4h-1a1.7 1.7 0 00-.6 1z" />
+            </svg>
+          </button>
+        )}
         <button
           type="button"
           onClick={handleReload}

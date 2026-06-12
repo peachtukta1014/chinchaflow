@@ -1,10 +1,10 @@
 /**
  * โครงแท็บหลักแบบ POS + Mini ERP
- * 1) ขาย (POS) 2) หลังร้าน (Ops) 3) บัญชี & ปิดวัน 4) จัดการ
+ * แยกเมนูตาม role ตั้งแต่ navigation: ไม่แสดงปุ่มที่ผู้ใช้ไม่มีสิทธิ์กด
  */
 import { canAccessTeaTab } from './teaRoles.js';
 
-/** @typedef {'order'|'ops'|'summary'|'admin'|'my-profile'} AppTabId */
+/** @typedef {'order'|'ops'|'summary'|'dashboard'|'catalog'|'profit'|'payroll'|'history'|'admin'|'my-profile'} AppTabId */
 
 /** @type {Record<string, { d: string }>} */
 export const TAB_ICONS = {
@@ -45,20 +45,32 @@ export const TAB_ICONS = {
 
 const BASE_NAV_GROUPS = [
   {
-    id: 'main',
-    labelKey: 'navGroupBusinessOs',
+    id: 'daily',
+    labelKey: 'navGroupDaily',
     tabs: [
       { id: 'order', labelKey: 'orderTabShort', icon: 'order' },
       { id: 'ops', labelKey: 'opsTabShort', icon: 'ops' },
       { id: 'summary', labelKey: 'accountCloseTabShort', icon: 'summary' },
-      { id: 'admin', labelKey: 'adminTabShort', icon: 'admin' },
+      { id: 'dashboard', labelKey: 'dashboardTabShort', icon: 'dashboard' },
     ],
     layout: 'primary',
+  },
+  {
+    id: 'admin-tools',
+    labelKey: 'navGroupAdmin',
+    tabs: [
+      { id: 'catalog', labelKey: 'catalogTabShort', icon: 'catalog' },
+      { id: 'profit', labelKey: 'profitTabShort', icon: 'profit' },
+      { id: 'payroll', labelKey: 'payrollTabShort', icon: 'payroll' },
+      { id: 'history', labelKey: 'historyTabShort', icon: 'history' },
+      { id: 'admin', labelKey: 'adminTabShort', icon: 'admin' },
+    ],
+    layout: 'secondary',
   },
 ];
 
 /**
- * สร้างเมนูตาม role: staff เห็นเฉพาะแท็บงานหน้าร้าน, admin เห็นครบ
+ * สร้างเมนูตาม role: admin เห็นครบ, manager เห็นงานประจำวัน, staff เห็นงานขาย/สั่งของเท่านั้น
  * @param {{ role?: string } | boolean | null | undefined} memberOrIsAdmin
  * @param {(key: string) => string} t
  */
