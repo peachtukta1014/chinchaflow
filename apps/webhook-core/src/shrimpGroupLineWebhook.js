@@ -1,5 +1,12 @@
 const { todayBKK, lineReply } = require('./teaDailySummary');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
+const { parseDeliveryDateFromText } = require('./parseDeliveryDate');
+const {
+  normalizeOrderText,
+  parseOrderItems,
+  parseRiverPrawnPendingLine,
+  parseSimpleOrderItems,
+} = require('./parseLineOrder');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { getLineOrderSession } = require('./lineOrderSession');
 const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
@@ -8,6 +15,30 @@ const { buildShrimpTodayOrdersSummary } = require('./shrimpTodayOrdersSummary');
 const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 
 const GROUP_ALLOWED_TEXT_INTENTS = new Set(['summary', 'today_orders', 'order']);
+const SHRIMP_GROUP_PRODUCT_RE = /กุ้ง\s*(ใหญ่|กลาง|เล็ก|ตาย|แม่น้ำ)|กุ้ง(ใหญ่|กลาง|เล็ก|ตาย|แม่น้ำ)/i;
+
+function hasGroupOrderQuantity(body) {
+  if (parseOrderItems(body).length > 0) return true;
+  if (parseSimpleOrderItems(body).length > 0) return true;
+  const riverPending = parseRiverPrawnPendingLine(body);
+  return Boolean(riverPending?.qty);
+}
+
+function shouldIgnoreGroupProductWithoutQuantity(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+
+  const { textWithoutDate } = parseDeliveryDateFromText(raw);
+  const body = (textWithoutDate || raw).trim();
+  const normalized = normalizeOrderText(body);
+  if (!SHRIMP_GROUP_PRODUCT_RE.test(normalized)) return false;
+
+  if (hasGroupOrderQuantity(body)) return false;
+
+  // Words like “ทั้งหมด” / “หมดบ่อ” are not quantities. If no number remains
+  // after date stripping + Thai number normalization, group chat must stay quiet.
+  return !/\d/.test(normalized);
+}
 
 async function logShrimpGroupText(db, admin, { event, text, groupId }) {
   const ts = admin.firestore.FieldValue.serverTimestamp();
@@ -27,6 +58,10 @@ async function handleShrimpGroupTextEvent(db, admin, { event, token, context }) 
   const groupId = context.chatId;
   const replyToken = event.replyToken;
   await logShrimpGroupText(db, admin, { event, text, groupId });
+
+  if (shouldIgnoreGroupProductWithoutQuantity(text)) {
+    return { skipped: 'group_product_without_quantity' };
+  }
 
   const session = await getLineOrderSession(db, groupId, userId);
   const intent = classifyShrimpLineMessage(text, session, { groupId });
@@ -84,5 +119,6 @@ async function handleShrimpGroupLineEvent(db, admin, { event, token, context }) 
 
 module.exports = {
   GROUP_ALLOWED_TEXT_INTENTS,
+  shouldIgnoreGroupProductWithoutQuantity,
   handleShrimpGroupLineEvent,
 };
