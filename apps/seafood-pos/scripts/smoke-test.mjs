@@ -463,6 +463,7 @@ try {
   const router = requireWebhook('../../webhook-core/src/shrimpLineWebhookRouter.js');
   const parser = requireWebhook('../../webhook-core/src/parseLineOrder.js');
   const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  const groupWebhook = requireWebhook('../../webhook-core/src/shrimpGroupLineWebhook.js');
   const directCtx = router.classifyShrimpLineContext({
     source: { type: 'user', userId: 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1' },
   });
@@ -492,6 +493,30 @@ try {
       && familyNoUnit[0].unit === 'กก',
     'แชทครอบครัวรับออเดอร์มีคำว่ากุ้งแต่ไม่ใส่หน่วย',
   );
+  const acceptedGroupOrders = [
+    'แหลมทราย กุ้งใหญ่ 5',
+    'แหลมทราย กุ้งใหญ่5',
+    'แหลมทราย ใหญ่ 5',
+    'แหลมทราย กุ้งใหญ่ 5 กก.',
+  ];
+  for (const text of acceptedGroupOrders) {
+    assert(
+      !groupWebhook.shouldIgnoreGroupProductWithoutQuantity(text),
+      `group รับออเดอร์เมื่อมีจำนวน: ${text}`,
+    );
+  }
+  const ignoredGroupProductMessages = [
+    'พรุ่งนี้แหลมทราย กุ้งใหญ่ทั้งหมด',
+    'แหลมทราย กุ้งใหญ่หมดบ่อ',
+    'พรุ่งนี้ กุ้งใหญ่ทั้งหมด',
+    'กุ้งใหญ่ทั้งหมด',
+  ];
+  for (const text of ignoredGroupProductMessages) {
+    assert(
+      groupWebhook.shouldIgnoreGroupProductWithoutQuantity(text),
+      `group ignore สินค้าไม่มีจำนวนกิโล: ${text}`,
+    );
+  }
   assert(
     intent.isShrimpOrderCommand('พี่อ้อม กุ้งเล็ก4'),
     'intent รับออเดอร์กุ้งแบบติดเลขไม่ใส่หน่วย',
