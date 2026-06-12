@@ -1,3 +1,11 @@
+## 2026-06-12 — ชา: Backend Foundation role/user/restock received guard
+
+- เพิ่ม foundation ผู้ใช้ฝั่งชา: role `admin` / `manager` / `staff`, `userCode` deterministic fallback, และ `branchId` ค่าเริ่มต้น `main` ผ่าน `teaUserService`
+- เพิ่ม actor snapshot (`actor`, `userCode`, `branchId`) ใน history log, order, และ restock create/receive เพื่อ audit action สำคัญ
+- เปลี่ยนสถานะ restock ใหม่เป็น `pending` / `picked` / `pending_confirm` / `received` / `cancelled`; สต๊อกจริงเข้าเฉพาะตอนแอดมิน mark เป็น `received` เท่านั้น (legacy `purchased` ยังอ่านเป็น received เพื่อไม่ทำข้อมูลเก่าพัง)
+- ปรับ `firestore.rules` เฉพาะฝั่งชาให้รองรับ manager, ล็อก restock received/ต้นทุน/stock fields และกันพนักงานแก้ stock จริงใน `restockCatalog`
+- ไม่แตะแอปกุ้ง, `webhook-core`, voice flow, dashboard/summary หรือ docs spec; ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/teaUserService.js`, `apps/chincha-tea/src/lib/restockService.js`, `apps/chincha-tea/src/screens/RestockTab.jsx`, และ `firestore.rules`
+
 ## 2026-06-11 — ชา: PR 3 Flexible POS Workflow + One-Page Closing
 
 - เพิ่มฟอร์ม `บันทึกยอดเหมา` ในหน้าขายชา เก็บใน `dailyExpenses` ด้วย `type=bulkEntry`, `manualBulkTotal`, `manualCupsSold`, และ staff snapshot จาก login ปัจจุบัน

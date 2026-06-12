@@ -1,6 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { fsGetDoc } from './firestoreRest';
+import { normalizeTeaMember } from './teaUserService.js';
 
 const MEMBER_CACHE_KEY = 'tea:memberProfile';
 
@@ -54,7 +55,7 @@ export function subscribeTeaMember(onMember, onPending) {
         onMember(null);
         return;
       }
-      const member = { uid: user.uid, email: user.email, ...profile };
+      const member = normalizeTeaMember({ uid: user.uid, email: user.email, ...profile });
       writeCachedMember(member);
       onPending?.(false);
       onMember(member);

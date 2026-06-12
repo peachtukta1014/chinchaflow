@@ -30,6 +30,7 @@ import { buildInventoryReceivePreview } from '../lib/inventoryMath';
 import { restockDisplayName } from '../lib/restockDisplay';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
+import { actorSnapshot } from '../lib/teaUserService.js';
 import { parseRestockVoice } from '../lib/voiceRestock';
 
 function RestockItemName({ name, lang, catalogItem }) {
@@ -315,6 +316,8 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         uid: member?.uid || 'unknown',
         createdBy: member?.name || 'ชินชา',
         createdByUid: member?.uid || '',
+        branchId: member?.branchId || 'main',
+        actor: actorSnapshot(member),
         ...staffSnapshot(member),
         items: listToSubmit.map((i) => {
           const catalogItem = catalogByKey.get(restockNameKey(i.name));
@@ -469,10 +472,11 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         purchaseItems: lineItems,
         purchasedBy: member?.name || '—',
         purchasedByUid: member?.uid || '',
+        member,
       });
       await updateRestockCatalogPrices(lineItems);
       await refreshCatalog();
-      await writeHistoryLog({ action: 'restock.purchase', collection: 'restocks', docId: req.id, refPath: `restocks/${req.id}`, dateKey: req.dateKey || dateKey, member, summary: { purchaseTotal: amount } });
+      await writeHistoryLog({ action: 'restock.received', collection: 'restocks', docId: req.id, refPath: `restocks/${req.id}`, dateKey: req.dateKey || dateKey, member, summary: { purchaseTotal: amount } });
       setRecentRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, ...patch } : r)));
       notifyRestockChange();
       closePurchaseEdit();

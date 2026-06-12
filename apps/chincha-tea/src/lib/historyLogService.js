@@ -1,11 +1,16 @@
 import { fsPost } from './firestoreRest';
+import { actorSnapshot } from './teaUserService.js';
 
 export function staffSnapshot(member) {
+  const actor = actorSnapshot(member);
   return {
-    staffUid: member?.uid || '',
-    staffName: member?.name || member?.email || 'ชินชา',
-    staffEmail: member?.email || '',
-    staffRole: member?.role || 'staff',
+    staffUid: actor.uid,
+    staffName: actor.name,
+    staffEmail: actor.email,
+    staffRole: actor.role,
+    userCode: actor.userCode,
+    branchId: actor.branchId,
+    actor,
   };
 }
 

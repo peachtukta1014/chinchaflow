@@ -126,7 +126,6 @@ export async function upsertRestockCatalogItems(itemNames, member) {
         unit: prev.unit || 'ชิ้น',
         base_unit: prev.base_unit || prev.unit || 'ชิ้น',
         conversion_rate: Math.max(1, Math.round(Number(prev.conversion_rate) || 1)),
-        stock_base_qty: Math.max(0, Math.round(Number(prev.stock_base_qty) || 0)),
         active: true,
       });
     } else {
