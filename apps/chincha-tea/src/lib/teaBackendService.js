@@ -4,9 +4,20 @@ export const DEFAULT_TEA_BRANCH_ID = 'main';
 export const TEA_ROLES = ['admin', 'manager', 'staff'];
 export const TEA_RESTOCK_PURCHASE_STATUS = {
   PENDING: 'pending',
+  PICKED: 'picked',
   PENDING_CONFIRM: 'pending_confirm',
-  PURCHASED: 'purchased',
+  RECEIVED: 'received',
   CANCELLED: 'cancelled',
+};
+
+const LEGACY_RESTOCK_STATUS_ALIASES = {
+  purchased: TEA_RESTOCK_PURCHASE_STATUS.RECEIVED,
+};
+
+const USER_CODE_PREFIX_BY_ROLE = {
+  admin: 'ADM',
+  manager: 'MGR',
+  staff: 'STF',
 };
 
 export function normalizeTeaRole(role) {
@@ -17,13 +28,16 @@ export function normalizeTeaBranchId(branchId) {
   return String(branchId || DEFAULT_TEA_BRANCH_ID).trim() || DEFAULT_TEA_BRANCH_ID;
 }
 
-export function buildTeaUserCode({ uid = '', email = '' } = {}) {
+/** Deterministic fallback userCode: stable per uid/email until a real code is assigned. */
+export function buildTeaUserCode({ uid = '', email = '', role = 'staff' } = {}) {
+  const normalizedRole = normalizeTeaRole(role);
+  const prefix = USER_CODE_PREFIX_BY_ROLE[normalizedRole] || 'STF';
   const seed = String(uid || email || 'user')
     .replace(/[^a-zA-Z0-9]/g, '')
     .toUpperCase()
     .slice(0, 6)
     .padEnd(6, '0');
-  return `TEA-${seed}`;
+  return `${prefix}-${seed}`;
 }
 
 export function normalizeTeaUserProfile(profile = {}, fallback = {}) {
@@ -34,7 +48,7 @@ export function normalizeTeaUserProfile(profile = {}, fallback = {}) {
     uid,
     email,
     role: normalizeTeaRole(profile.role || fallback.role),
-    userCode: profile.userCode || buildTeaUserCode({ uid, email }),
+    userCode: profile.userCode || buildTeaUserCode({ uid, email, role: profile.role || fallback.role }),
     branchId: normalizeTeaBranchId(profile.branchId || fallback.branchId),
   };
 }
@@ -48,7 +62,7 @@ export function buildTeaUserProfile({ uid, email, name, role = 'staff', approved
     role: normalizedRole,
     approved: Boolean(approved),
     uid,
-    userCode: buildTeaUserCode({ uid, email }),
+    userCode: buildTeaUserCode({ uid, email, role: normalizedRole }),
     branchId: normalizedBranchId,
     createdAt: new Date().toISOString(),
   };
@@ -62,10 +76,11 @@ export async function ensureTeaUserFoundation(uid, profile = {}, fallback = {}) 
   if (!profile.branchId) patch.branchId = normalized.branchId;
   if (profile.role && profile.role !== normalized.role) patch.role = normalized.role;
 
+  const finalProfile = normalizeTeaUserProfile({ ...profile, ...patch }, { ...fallback, uid });
   if (Object.keys(patch).length > 0) {
     await fsPatch(`users/${uid}`, patch);
   }
-  return { ...profile, ...patch, ...normalized };
+  return finalProfile;
 }
 
 export async function createTeaUserProfile(uid, data) {
@@ -106,12 +121,14 @@ export function teaWriteSnapshot(member = {}) {
 }
 
 export function normalizeRestockPurchaseStatus(status) {
+  const raw = String(status || '').trim();
+  const aliased = LEGACY_RESTOCK_STATUS_ALIASES[raw] || raw;
   const allowed = Object.values(TEA_RESTOCK_PURCHASE_STATUS);
-  return allowed.includes(status) ? status : TEA_RESTOCK_PURCHASE_STATUS.PENDING;
+  return allowed.includes(aliased) ? aliased : TEA_RESTOCK_PURCHASE_STATUS.PENDING;
 }
 
-export function isConfirmedRestockPurchaseStatus(status) {
-  return normalizeRestockPurchaseStatus(status) === TEA_RESTOCK_PURCHASE_STATUS.PURCHASED;
+export function isReceivedRestockPurchaseStatus(status) {
+  return normalizeRestockPurchaseStatus(status) === TEA_RESTOCK_PURCHASE_STATUS.RECEIVED;
 }
 
 export function restockStatusSnapshot(status, member, extra = {}) {

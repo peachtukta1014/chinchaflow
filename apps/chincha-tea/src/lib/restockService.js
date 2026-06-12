@@ -3,13 +3,13 @@ import { receiveRestockInventory } from './inventoryService';
 import {
   TEA_RESTOCK_PURCHASE_STATUS,
   actorSnapshot,
-  isConfirmedRestockPurchaseStatus,
+  isReceivedRestockPurchaseStatus,
   normalizeRestockPurchaseStatus,
   restockStatusSnapshot,
 } from './teaBackendService';
 
 export function isRestockPurchased(req) {
-  return isConfirmedRestockPurchaseStatus(req?.purchaseStatus) && Number(req?.purchaseTotal) > 0;
+  return isReceivedRestockPurchaseStatus(req?.purchaseStatus) && Number(req?.purchaseTotal) > 0;
 }
 
 export function restockPurchaseTotal(req) {
@@ -66,15 +66,15 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
     }))
     : undefined;
   const patch = {
-    purchaseStatus: TEA_RESTOCK_PURCHASE_STATUS.PURCHASED,
+    purchaseStatus: TEA_RESTOCK_PURCHASE_STATUS.RECEIVED,
     purchaseTotal: amount,
     purchaseItems: cleanItems,
     purchasedAt: now,
     purchasedBy: purchasedBy || '—',
     purchasedByUid: purchasedByUid || member?.uid || '',
-    ...restockStatusSnapshot(TEA_RESTOCK_PURCHASE_STATUS.PURCHASED, member || { uid: purchasedByUid, name: purchasedBy }),
+    ...restockStatusSnapshot(TEA_RESTOCK_PURCHASE_STATUS.RECEIVED, member || { uid: purchasedByUid, name: purchasedBy }),
   };
-  const inventoryUpdates = normalizeRestockPurchaseStatus(patch.purchaseStatus) === TEA_RESTOCK_PURCHASE_STATUS.PURCHASED
+  const inventoryUpdates = isReceivedRestockPurchaseStatus(patch.purchaseStatus)
     ? await receiveRestockInventory(cleanItems || [])
     : [];
   patch.inventoryReceived = inventoryUpdates.map((item) => ({
@@ -91,13 +91,14 @@ export async function markRestockPurchased(id, { purchaseTotal, purchaseItems, p
 
 export async function markRestockPurchaseStatus(id, { status, member, summary = {} }) {
   const nextStatus = normalizeRestockPurchaseStatus(status);
+  if (nextStatus === TEA_RESTOCK_PURCHASE_STATUS.RECEIVED) {
+    throw new Error('received status must go through confirmPurchase to receive inventory');
+  }
   const patch = {
     ...restockStatusSnapshot(nextStatus, member, summary),
   };
-  // Foundation only: pending_confirm records status for debugging but never receives stock.
-  if (nextStatus === TEA_RESTOCK_PURCHASE_STATUS.PENDING_CONFIRM) {
-    patch.inventoryReceived = [];
-  }
+  // Foundation only: picked/pending_confirm/cancelled record progress but never receive stock.
+  patch.inventoryReceived = [];
   await fsPatch(`restocks/${id}`, patch);
   return patch;
 }

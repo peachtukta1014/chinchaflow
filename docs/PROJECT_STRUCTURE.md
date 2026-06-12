@@ -101,7 +101,7 @@ apps/chincha-tea/
 | `teaOrders` | บิลขายรายวัน + actor snapshot / staff ผู้บันทึก |
 | `dailyExpenses` | ค่าใช้จ่ายร้าน + สรุปยอดหน้าร้านรายวัน (`type=dailySummary`, เงินสด/โอนรวม/เงินทอน/แก้ว/ผู้บันทึก) + ยอดเหมา (`type=bulkEntry`, `manualBulkTotal`, `manualCupsSold`) |
 | `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน (ยกยอด / เติม / คงเหลือ / ผู้บันทึก) |
-| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus=pending/pending_confirm/purchased`, `purchaseTotal`, `purchaseItems`, `inventoryReceived`, actor/staff ผู้บันทึก/จัดซื้อ; `pending_confirm` ไม่รับ stock จริง) |
+| `restocks` | รายการสั่งของเข้าร้าน (`purchaseStatus=pending/picked/pending_confirm/received/cancelled`, `purchaseTotal`, `purchaseItems`, `inventoryReceived`, actor/staff ผู้บันทึก/จัดซื้อ; `pending_confirm` ไม่รับ stock จริง; `purchased` เป็น legacy alias ของ `received`) |
 | `restockCatalog` | catalog ของของเข้าร้าน + inventory fields (`unit`, `base_unit`, `conversion_rate`, `stock_base_qty`) สำหรับซื้อเป็นหน่วยใหญ่และตัด stock เป็นหน่วยเล็กสุด |
 | `historyLogs` | ประวัติ action สำคัญของชา ผูก actor snapshot + legacy staff จาก login |
 | `orderSlips` | รูปใบสั่งของ/สลิป (Storage URL) |

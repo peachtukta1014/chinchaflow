@@ -9,7 +9,7 @@ export async function fetchPendingRestockCount(dateKey, { force = false } = {}) 
   const key = pendingCacheKey(dateKey);
   if (force) invalidateCache(key);
   const rows = await cachedFetch(key, () => fsQueryRestocksByDate(dateKey), PENDING_TTL_MS);
-  return rows.filter((r) => r.purchaseStatus !== 'purchased').length;
+  return rows.filter((r) => !['received', 'purchased', 'cancelled'].includes(r.purchaseStatus)).length;
 }
 
 export function invalidatePendingRestockCache(dateKey) {

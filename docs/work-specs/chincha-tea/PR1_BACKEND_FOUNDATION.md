@@ -17,11 +17,11 @@ Build PR1 backend foundation for the Chincha Tea app so future PRs can debug ope
 ## Requirements
 
 - Add/standardize roles: `admin`, `manager`, `staff`
-- Add `userCode` foundation for tea users
+- Add `userCode` foundation for tea users; generated codes are deterministic fallbacks until real staff codes are assigned (`ADM-*`, `MGR-*`, `STF-*`)
 - Add actor snapshot foundation for write operations
 - Add `branchId` foundation
 - Add service layer foundation for debuggable backend writes
-- Add purchase/restock status foundation
+- Add purchase/restock status foundation: `pending`, `picked`, `pending_confirm`, `received`, `cancelled` (`purchased` legacy alias/fallback only)
 - Add history log foundation
 
 ## Do Not Touch
@@ -30,6 +30,7 @@ Build PR1 backend foundation for the Chincha Tea app so future PRs can debug ope
 - Do not touch Seafood POS
 - Do not touch `webhook-core` unless necessary
 - Do not add real stock from `pending_confirm`
+- Only `received` may add real stock; `picked` and `pending_confirm` must not update `stock_base_qty`
 - Must remain backward compatible with existing data
 
 ## PR title
