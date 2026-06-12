@@ -7,7 +7,7 @@ import { pushTeaLineSummary } from '../lib/lineNotify';
 import { menuDisplayName } from '../lib/displayNames';
 import { ExpensesTab } from './ExpensesTab';
 
-export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey, member, menuItems, isAdmin }) {
+export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey, member, menuItems, isAdmin, onSummaryChanged }) {
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
 
@@ -90,6 +90,7 @@ export function SummaryTab({ orders, t, lang = 'th', viewDateKey, setViewDateKey
         allowedModes={['summary']}
         defaultMode="summary"
         compactHeader
+        onSummaryChanged={onSummaryChanged}
       />
 
       {lineFlash && (

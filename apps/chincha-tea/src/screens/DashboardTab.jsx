@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { computeDayLedger } from '../lib/dailyLedger';
+import { fetchTeaDailySummary } from '../lib/dailySummaryService';
 import { getBiweeklyPeriodForDate } from '../lib/payrollPeriod';
 import {
-  fsQueryExpenses,
-  fsQueryOrders,
   fsQueryRestocksByDate,
   fsQueryStaffAttendanceByDate,
 } from '../lib/firestoreRest';
@@ -48,9 +47,8 @@ export function DashboardTab({
     setLoading(true);
     try {
       const period = getBiweeklyPeriodForDate(todayKey);
-      const [orders, expenses, restocks, attendance, staffList, periodSummary] = await Promise.all([
-        fsQueryOrders(todayKey),
-        fsQueryExpenses(todayKey),
+      const [dailySummary, restocks, attendance, staffList, periodSummary] = await Promise.all([
+        fetchTeaDailySummary(todayKey),
         fsQueryRestocksByDate(todayKey),
         fsQueryStaffAttendanceByDate(todayKey),
         listAttendanceStaff(),
@@ -58,8 +56,7 @@ export function DashboardTab({
       ]);
       const wageMap = wageMapFromStaffList(staffList);
       const ledger = computeDayLedger({
-        orders,
-        expenses,
+        dailySummary,
         restocks,
         attendance,
         wageMap,

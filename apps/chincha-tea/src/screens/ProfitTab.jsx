@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { shiftDateKey } from '../lib/constants';
 import { computeDayLedger } from '../lib/dailyLedger';
+import { fetchTeaDailySummary } from '../lib/dailySummaryService';
 import { formatDateKeyLabel } from '../lib/localeFormat';
 import {
-  fsQueryExpenses,
-  fsQueryOrders,
   fsQueryRestocksByDate,
   fsQueryStaffAttendanceByDate,
 } from '../lib/firestoreRest';
@@ -48,9 +47,8 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
   const loadLedger = useCallback(async () => {
     setLoading(true);
     try {
-      const [orders, expenses, restocks, attendance, staffList] = await Promise.all([
-        fsQueryOrders(viewDateKey),
-        fsQueryExpenses(viewDateKey),
+      const [dailySummary, restocks, attendance, staffList] = await Promise.all([
+        fetchTeaDailySummary(viewDateKey),
         fsQueryRestocksByDate(viewDateKey),
         fsQueryStaffAttendanceByDate(viewDateKey),
         listAttendanceStaff(),
@@ -58,8 +56,7 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
       const wageMap = wageMapFromStaffList(staffList);
       setLedger(
         computeDayLedger({
-          orders,
-          expenses,
+          dailySummary,
           restocks,
           attendance,
           wageMap,

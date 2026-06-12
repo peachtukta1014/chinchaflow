@@ -54,9 +54,10 @@ export function primaryStaffWageForDay(attendanceRows = [], staffUid, wageMap = 
 }
 
 /**
- * @param {{ orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], wageMap?: Map, primaryStaffUid?: string, primaryStaffName?: string }} input
+ * @param {{ dailySummary?: object, orders?: object[], expenses?: object[], restocks?: object[], attendance?: object[], wageMap?: Map, primaryStaffUid?: string, primaryStaffName?: string }} input
  */
 export function computeDayLedger({
+  dailySummary = null,
   orders = [],
   expenses = [],
   restocks = [],
@@ -65,8 +66,15 @@ export function computeDayLedger({
   primaryStaffUid,
   primaryStaffName,
 }) {
-  const revenue = sumOrderRevenue(orders);
-  const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const revenue = dailySummary ? {
+    orderCount: dailySummary.orderCount || 0,
+    totalCups: dailySummary.cupsSold || dailySummary.totalCups || 0,
+    totalSales: dailySummary.salesTotal || 0,
+    cashTotal: dailySummary.cashTotal || 0,
+    transferTotal: dailySummary.transferTotal || 0,
+  } : sumOrderRevenue(orders);
+  const expenseItems = dailySummary?.expenseItems || expenses;
+  const totalExpenses = dailySummary ? (dailySummary.expenseTotal || 0) : expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const totalRestockPurchased = sumPurchasedRestocks(restocks);
   const purchasedRestocks = restocks.filter(isRestockPurchased);
 
@@ -84,7 +92,7 @@ export function computeDayLedger({
   return {
     ...revenue,
     totalExpenses,
-    expenseItems: expenses,
+    expenseItems,
     totalRestockPurchased,
     purchasedRestocks,
     operatingProfit,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth, fbReady } from './firebase';
 import { fsQueryOrders, fsPatch } from './lib/firestoreRest';
+import { fetchTeaDailySummary } from './lib/dailySummaryService';
 import { dateKeyBangkok } from './lib/constants';
 import { useLang } from './lib/i18n';
 import { useCatalog } from './lib/useCatalog';
@@ -42,6 +43,7 @@ export default function App() {
   const [showCart, setShowCart] = useState(false);
   const [payType, setPayType] = useState('cash');
   const [pendingRestocks, setPendingRestocks] = useState(0);
+  const [headerSummary, setHeaderSummary] = useState(null);
   const [adminSection, setAdminSection] = useState('dashboard');
   const prevPendingRestocksRef = useRef(null);
   const tabBootstrappedRef = useRef(false);
@@ -64,6 +66,26 @@ export default function App() {
     const docs = await fsQueryOrders(viewDateKey);
     setOrders(docs);
   }, [viewDateKey]);
+
+  const refreshDailySummary = useCallback(async (dateKey = todayKey) => {
+    if (!isAuthed) return null;
+    try {
+      const summary = await fetchTeaDailySummary(dateKey);
+      if (dateKey === todayKey) setHeaderSummary(summary);
+      return summary;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [isAuthed, todayKey]);
+
+  useEffect(() => {
+    if (!isAuthed) {
+      setHeaderSummary(null);
+      return;
+    }
+    refreshDailySummary(todayKey);
+  }, [isAuthed, refreshDailySummary, todayKey]);
 
   useEffect(() => {
     if (!fbReady) {
@@ -204,6 +226,7 @@ export default function App() {
       });
       setCart([]);
       refreshOrders(); // fire-and-forget — อัปเดต list หลังบันทึก ไม่บล็อก UI
+      refreshDailySummary(todayKey);
       alert(t('saved'));
       return true;
     } catch (e) {
@@ -264,6 +287,7 @@ export default function App() {
         profileMode={isProfileTab}
         onBackFromProfile={goBackFromProfile}
         t={t}
+        dailySummary={headerSummary}
       />
 
       {member?.role === 'staff' && (
@@ -303,6 +327,7 @@ export default function App() {
             member={member}
             onBulkEntrySaved={(dateKey) => {
               if (dateKey === viewDateKey) refreshOrders();
+              refreshDailySummary(dateKey);
             }}
             onVoiceCommit={async () => {
               if (cart.length) await saveOrder();
@@ -319,6 +344,7 @@ export default function App() {
             member={member}
             menuItems={menuItems}
             isAdmin={isAdmin}
+            onSummaryChanged={refreshDailySummary}
           />
         )}
         {tab === 'ops' && (
@@ -359,7 +385,7 @@ export default function App() {
               else if (next === 'summary') setTab('summary');
               else setAdminSection(next);
             }} />}
-            {adminSection === 'catalog' && <AdminPanel catalogOnly={false} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={refreshOrders} onCatalogChanged={refreshCatalog} />}
+            {adminSection === 'catalog' && <AdminPanel catalogOnly={false} t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />}
             {isAdmin && adminSection === 'profit' && <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />}
             {isAdmin && adminSection === 'payroll' && <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />}
             {isAdmin && adminSection === 'history' && <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />}

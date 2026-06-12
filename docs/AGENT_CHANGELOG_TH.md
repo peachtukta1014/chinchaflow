@@ -1,3 +1,10 @@
+## 2026-06-12 — ชา: PR3 Daily summary and header metrics
+
+- เพิ่ม `dailySummaryService` เป็น source เดียวของสรุปวันชา รวมยอด POS, เงินสด/โอน, ยอดเหมา, จำนวนแก้วจริง, รายจ่าย, เงินทอน และแก้วคงเหลือจาก `dailyCupStocks`
+- Header แอปชาแสดงยอดขายวันนี้และจำนวนแก้วขายวันนี้จาก summary กลาง และ refresh หลังบันทึกขาย/บันทึกยอดเหมา/บันทึกสรุปวัน
+- ปรับ `SummaryTab`, `ExpensesTab`, Dashboard และ Profit ให้ใช้ summary กลางแทนคำนวณยอดขาย/แก้วคนละสูตร โดยไม่แตะ restock workflow, voice command, สูตรเมนู, seafood-pos หรือ webhook-core
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/dailySummaryService.js`, `apps/chincha-tea/src/App.jsx`, `apps/chincha-tea/src/screens/ExpensesTab.jsx`, และ `apps/chincha-tea/src/components/AppHeader.jsx`
+
 ## 2026-06-12 — ชา: PR2 Restock purchase workflow
 
 - ปรับ `apps/chincha-tea` flow สั่งของให้แยก `pending` → `picked` → `pending_confirm` → `received`; ติ๊กหน้าใบสั่งเป็น picked เท่านั้น ยังไม่เพิ่ม stock
