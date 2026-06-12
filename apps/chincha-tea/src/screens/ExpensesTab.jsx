@@ -2,17 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { dateKeyBangkok, shiftDateKey } from '../lib/constants';
 import { formatDateKeyLabel } from '../lib/localeFormat';
 import {
-  fsGetDoc,
   fsPatch,
   fsPost,
   fsQueryExpenses,
-  fsQueryOrders,
   fsQueryRestocksByDate,
   fsUpsertDoc,
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
-import { sumOrderRevenue } from '../lib/dailyLedger';
-import { sumBulkEntries } from '../lib/bulkEntryService';
+import { fetchTeaDailySummary, intValue, moneyValue } from '../lib/dailySummaryService';
 import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
 
 const EMPTY_DAY = {
@@ -46,16 +43,6 @@ function normalizeYear(rawYear) {
   if (y > 2400) return y - 543;
   if (y < 100) return 2000 + y;
   return y;
-}
-
-function moneyValue(v) {
-  const n = Math.round(Number(v) || 0);
-  return n > 0 ? n : 0;
-}
-
-function intValue(v) {
-  const n = Math.round(Number(v) || 0);
-  return n > 0 ? n : 0;
 }
 
 function digits(v) {
@@ -111,10 +98,6 @@ function getCupStockStatus(remaining) {
     return { labelKey: 'cupStockStatusLow', tone: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-400', panel: 'from-amber-500 to-orange-400' };
   }
   return { labelKey: 'cupStockStatusNormal', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', panel: 'from-emerald-600 to-teal-500' };
-}
-
-async function loadCupStock(dateKey) {
-  return fsGetDoc(`dailyCupStocks/${dateKey}`);
 }
 
 async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSummary }) {
@@ -177,9 +160,8 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   return created.id;
 }
 
-export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey, allowedModes = ['summary', 'cups', 'manual'], defaultMode = 'summary', compactHeader = false }) {
+export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey, allowedModes = ['summary', 'cups', 'manual'], defaultMode = 'summary', compactHeader = false, onSummaryChanged }) {
   const [expenses, setExpenses] = useState([]);
-  const [orders, setOrders] = useState([]);
   const [restocks, setRestocks] = useState([]);
   const [entryDateKey, setEntryDateKey] = useState(viewDateKey);
   const [mode, setMode] = useState(defaultMode);
@@ -195,20 +177,19 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
   const todayKey = dateKeyBangkok();
   const isToday = viewDateKey === todayKey;
-  const bulkEntries = useMemo(() => expenses.filter((e) => e.type === 'bulkEntry'), [expenses]);
   const manualExpenses = useMemo(() => expenses.filter((e) => e.type !== 'dailySummary' && e.type !== 'bulkEntry'), [expenses]);
   const dailySummary = useMemo(() => expenses.find((e) => e.type === 'dailySummary'), [expenses]);
-  const manualExpenseTotal = useMemo(() => manualExpenses.reduce((s, e) => s + (e.amount || 0), 0), [manualExpenses]);
   const restockPurchased = useMemo(() => sumPurchasedRestocks(restocks), [restocks]);
-  const liveRevenue = useMemo(() => sumOrderRevenue(orders), [orders]);
-  const bulkSummary = useMemo(() => sumBulkEntries(bulkEntries), [bulkEntries]);
+  const [centralSummary, setCentralSummary] = useState(null);
+  const liveRevenue = centralSummary || { salesTotal: 0, cupsSold: 0, posSalesTotal: 0, posCupsSold: 0 };
+  const bulkSummary = centralSummary ? { count: centralSummary.bulkEntryCount, manualBulkTotal: centralSummary.manualBulkTotal, manualCupsSold: centralSummary.bulkCupsSold } : { count: 0, manualBulkTotal: 0, manualCupsSold: 0 };
   const cashAmount = moneyValue(dayForm.cashAmount);
   const transferAmount = moneyValue(dayForm.transferAmount);
   const manualBulkTotal = moneyValue(dayForm.manualBulkTotal);
   const totalSales = cashAmount + transferAmount + manualBulkTotal;
   const storefrontExpense = moneyValue(dayForm.storefrontExpense);
   const cashChangeRemaining = moneyValue(dayForm.cashChangeRemaining);
-  const autoCupsSold = liveRevenue.totalCups;
+  const autoCupsSold = liveRevenue.autoCupsSold || liveRevenue.cupsSold || 0;
   const manualCupsSold = intValue(dayForm.manualCupsSold);
   const finalCupsSold = manualCupsSold || autoCupsSold;
   const cupsSold = finalCupsSold;
@@ -226,20 +207,20 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   };
 
   const reloadDay = async (dateKey) => {
-    const [expenseRows, orderRows, restockRows, cups] = await Promise.all([
-      fsQueryExpenses(dateKey),
-      fsQueryOrders(dateKey),
+    const [loadedSummary, restockRows] = await Promise.all([
+      fetchTeaDailySummary(dateKey),
       fsQueryRestocksByDate(dateKey),
-      loadCupStock(dateKey),
     ]);
+    const expenseRows = loadedSummary.expenses;
+    const cups = loadedSummary.cupStock;
+    setCentralSummary(loadedSummary);
     setExpenses(expenseRows);
-    setOrders(orderRows);
     setRestocks(restockRows);
     setCupDoc(cups);
-    const summary = expenseRows.find((e) => e.type === 'dailySummary');
-    const revenue = sumOrderRevenue(orderRows);
-    const loadedBulkSummary = sumBulkEntries(expenseRows.filter((e) => e.type === 'bulkEntry'));
-    const savedStorefrontExpense = summary ? (summary.storefrontExpense || summary.amount || 0) : 0;
+    const summary = loadedSummary.dailySummaryDoc;
+    const revenue = { cashTotal: loadedSummary.posCashTotal, transferTotal: loadedSummary.posTransferTotal };
+    const loadedBulkSummary = { manualBulkTotal: loadedSummary.manualBulkTotal, manualCupsSold: loadedSummary.bulkCupsSold };
+    const savedStorefrontExpense = summary ? loadedSummary.storefrontExpense : 0;
     setDayForm(summary ? {
       cashAmount: summary.cashAmount ? String(summary.cashAmount) : '',
       transferAmount: summary.transferAmount ? String(summary.transferAmount) : '',
@@ -325,6 +306,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       });
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
+      onSummaryChanged?.(targetDateKey);
       showFlash(t('expenseSaved'));
     } catch (e) {
       console.error(e);
@@ -360,6 +342,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       await writeHistoryLog({ action: 'cupStock.upsert', collection: 'dailyCupStocks', docId: targetDateKey, refPath: `dailyCupStocks/${targetDateKey}`, dateKey: targetDateKey, member, summary: { openingCups, refillCups, autoCupsSold, manualCupsSold, finalCupsSold, remainingCups } });
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
+      onSummaryChanged?.(targetDateKey);
       showFlash(t('cupStockSaved'));
     } catch (e) {
       console.error(e);
@@ -407,6 +390,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       }
       if (targetDateKey !== viewDateKey) setViewDateKey(targetDateKey);
       else await reloadDay(targetDateKey);
+      onSummaryChanged?.(targetDateKey);
       resetManualForm();
       showFlash(isEditing ? t('expenseUpdated') : t('expenseSaved'));
     } catch (e) {
@@ -522,7 +506,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
             <button type="button" onClick={saveDaySummary} disabled={saving || !entryDateKey} className="w-full min-h-14 py-4 rounded-2xl font-black text-white text-base disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('expenseSaveSummaryBtn')}</button>
             <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
-            <p className="text-[11px] text-stone-400 leading-relaxed">{t('liveSalesHint').replace('{sales}', amountLabel(liveRevenue.totalSales)).replace('{cups}', String(liveRevenue.totalCups))}</p>
+            <p className="text-[11px] text-stone-400 leading-relaxed">{t('liveSalesHint').replace('{sales}', amountLabel(liveRevenue.salesTotal || liveRevenue.posSalesTotal || 0)).replace('{cups}', String(liveRevenue.cupsSold || liveRevenue.posCupsSold || 0))}</p>
           </div>
         </div>
       )}

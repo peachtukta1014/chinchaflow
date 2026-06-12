@@ -12,8 +12,11 @@ export default function AppHeader({
   profileMode = false,
   onBackFromProfile,
   t,
+  dailySummary,
 }) {
   const staffNeedsMy = member?.role === 'staff' && lang !== 'my';
+  const todaySales = Math.round(Number(dailySummary?.salesTotal) || 0);
+  const todayCups = Math.round(Number(dailySummary?.cupsSold) || 0);
   const buildLabel = getAppBuildLabel();
   const handleReload = () => {
     if (!window.confirm(t('reloadConfirm'))) return;
@@ -56,6 +59,14 @@ export default function AppHeader({
                 {t('appName')}
                 <span className="font-semibold text-amber-600/90"> · {member.name}</span>
               </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-[9px] font-black text-amber-100">
+                  {t('todaySales')} ฿{todaySales.toLocaleString()}
+                </span>
+                <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-[9px] font-black text-amber-100">
+                  {todayCups.toLocaleString()} {t('cupUnit')}
+                </span>
+              </div>
               {buildLabel && (
                 <p className="text-[8px] text-cyan-300/80 truncate max-w-[180px]" title={t('buildVersionHint')}>
                   {buildLabel}
