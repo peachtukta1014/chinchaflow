@@ -217,8 +217,14 @@ export default function App() {
 
   const addToCart = (item) => setCart((c) => [...c, item]);
   const removeCart = (id) => setCart((c) => c.filter((i) => i.cartId !== id));
-  const updateCartQty = (id, qty) => setCart((c) => c.map((i) => (i.cartId === id ? { ...i, qty: Math.max(1, qty) } : i)));
-  const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const updateCartQty = (id, qty) => setCart((c) => c.map((i) => {
+    if (i.cartId !== id) return i;
+    const nextQty = Math.max(1, qty);
+    if (!i.smartPrice) return { ...i, qty: nextQty };
+    const toppingTotal = (i.toppings || []).reduce((sum, tp) => sum + Number(tp.price || 0) * Number(tp.qty || 1), 0);
+    return { ...i, qty: nextQty, lineTotal: (Number(i.basePrice || i.price || 0) * nextQty) + toppingTotal };
+  }));
+  const cartTotal = cart.reduce((s, i) => s + (i.lineTotal ?? (i.price * i.qty)), 0);
 
   const saveOrder = async () => {
     if (!cart.length) return false;
