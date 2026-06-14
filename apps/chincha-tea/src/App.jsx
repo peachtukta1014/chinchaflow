@@ -332,14 +332,10 @@ export default function App() {
             onAddToCart={addToCart}
             setModalItem={setModalItem}
             modalItem={modalItem}
-            canVoiceCommit={cart.length > 0}
             member={member}
             onBulkEntrySaved={(dateKey) => {
               if (dateKey === viewDateKey) refreshOrders();
               refreshDailySummary(dateKey);
-            }}
-            onVoiceCommit={async () => {
-              if (cart.length) await saveOrder();
             }}
           />
         )}

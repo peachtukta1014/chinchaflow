@@ -1,3 +1,10 @@
+## 2026-06-14 — ชา: PR6 sync follow-up / กัน Voice จบบิลเอง
+
+- ปรับ follow-up หลัง PR #262 ติดตามหลัง main: ใน environment นี้ไม่มี remote/main ให้ fetch จริง จึงแก้เฉพาะ conflict-risk ที่พบใน branch และคงงาน PR6 alias ไว้ครบ
+- กันไม่ให้ Voice Flow ฝั่งขายชาเรียก `saveOrder()` / `onVoiceCommit` จากคำพูดประเภท `จบบิล`, `คิดเงิน`, `save order`; voice ตอนนี้ทำหน้าที่เพิ่มรายการเข้าตะกร้าเพื่อให้พนักงาน review และกดบันทึกเอง
+- คง PR4 Role-based UI โดยไม่แตะ `teaRoles`/`navConfig` และคง PR6 alias mapping สำหรับ Search/Voice ผ่าน `productSearchTokens()` + `voiceAliasNames()`
+- ถ้ามี conflict กับ main จริง ให้เก็บ entry PR5 Voice Review Flow จาก main ร่วมกับ entry PR6 นี้ใน `AGENT_CHANGELOG_TH.md` และเช็ก `apps/chincha-tea/src/screens/OrderTab.jsx`, `apps/chincha-tea/src/App.jsx`, `apps/chincha-tea/src/lib/voiceOrder.js`
+
 ## 2026-06-14 — ชา: PR6 Product Catalog and Alias Management
 
 - เพิ่ม `products.aliases` เป็นรายการชื่อเรียกหลายแบบต่อสินค้า (รองรับไทย/พม่า/อังกฤษ) และยัง sync `voiceAliases` เดิมไว้เพื่อ backward compatible กับข้อมูลเก่า
