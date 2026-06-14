@@ -17,7 +17,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
 import HistoryScreen from './screens/HistoryScreen';
 import { SummaryTab } from './screens/SummaryTab';
-import { OpsTab } from './screens/OpsTab';
+import { ExpensesTab } from './screens/ExpensesTab';
+import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
@@ -172,7 +173,7 @@ export default function App() {
       showWebNotify(
         t('restockNotifyTitle'),
         t('restockNotifyBody').replace('{n}', String(pendingRestocks)),
-        { tag: 'restock', onClick: () => setTab('ops') },
+        { tag: 'restock', onClick: () => setTab('restock') },
       );
     }
     prevPendingRestocksRef.current = pendingRestocks;
@@ -217,8 +218,14 @@ export default function App() {
 
   const addToCart = (item) => setCart((c) => [...c, item]);
   const removeCart = (id) => setCart((c) => c.filter((i) => i.cartId !== id));
-  const updateCartQty = (id, qty) => setCart((c) => c.map((i) => (i.cartId === id ? { ...i, qty: Math.max(1, qty) } : i)));
-  const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const updateCartQty = (id, qty) => setCart((c) => c.map((i) => {
+    if (i.cartId !== id) return i;
+    const nextQty = Math.max(1, qty);
+    if (!i.smartPrice) return { ...i, qty: nextQty };
+    const toppingTotal = (i.toppings || []).reduce((sum, tp) => sum + Number(tp.price || 0) * Number(tp.qty || 1), 0);
+    return { ...i, qty: nextQty, lineTotal: (Number(i.basePrice || i.price || 0) * nextQty) + toppingTotal };
+  }));
+  const cartTotal = cart.reduce((s, i) => s + (i.lineTotal ?? (i.price * i.qty)), 0);
 
   const saveOrder = async () => {
     if (!cart.length) return false;
@@ -311,14 +318,14 @@ export default function App() {
         <TabNav
           groups={navGroups}
           activeTab={tab}
-          badges={isAdmin ? { ops: pendingRestocks } : {}}
+          badges={isAdmin ? { restock: pendingRestocks } : {}}
           onSelect={(id) => {
             if (!canAccessTeaTab(member, id)) return;
             setTab(id);
             setLastTab(id);
             if (id === 'admin' || id === 'catalog') refreshCatalog();
             if (id === 'summary' || id === 'admin' || id === 'history') refreshOrders();
-            if ((id === 'ops' || id === 'dashboard') && isAdmin) refreshPendingRestocks();
+            if ((id === 'restock' || id === 'dashboard') && isAdmin) refreshPendingRestocks();
           }}
         />
       )}
@@ -354,19 +361,29 @@ export default function App() {
             onSummaryChanged={refreshDailySummary}
           />
         )}
-        {tab === 'ops' && (
-          <OpsTab
+        {tab === 'cups' && (
+          <ExpensesTab
             member={member}
             t={t}
             lang={lang}
             viewDateKey={viewDateKey}
             setViewDateKey={setViewDateKey}
+            allowedModes={['cups']}
+            defaultMode="cups"
+            compactHeader
+          />
+        )}
+        {tab === 'restock' && (
+          <RestockTab
+            member={member}
+            t={t}
+            lang={lang}
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
         {tab === 'dashboard' && canAccessTeaTab(member, 'dashboard') && (
           <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} member={member} onNavigate={(next) => {
-            if (next === 'restock') setTab('ops');
+            if (next === 'restock' && canAccessTeaTab(member, 'restock')) setTab('restock');
             else if (canAccessTeaTab(member, next)) setTab(next);
           }} />
         )}
