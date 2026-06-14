@@ -1,4 +1,5 @@
 import { cartItemDisplayName } from '../lib/displayNames';
+import { smartPriceOrderSummary } from '../lib/smartPriceOrder';
 
 export default function CartSheet({
   open,
@@ -28,10 +29,13 @@ export default function CartSheet({
         <div className="space-y-2 max-h-56 overflow-y-auto mb-4">
           {cart.map((item) => {
             const { primary, sub } = cartItemDisplayName(item, lang, t, menuItems);
+            const lineTotal = item.lineTotal ?? (item.price * item.qty);
+            const smartSub = smartPriceOrderSummary(item);
             return (
             <div key={item.cartId} className="flex justify-between text-sm gap-2">
               <span className="min-w-0">
                 {item.emoji} {primary} ×{item.qty}
+                {smartSub ? <span className="block text-[10px] font-bold text-amber-700">{smartSub}</span> : null}
                 {sub ? <span className="block text-[10px] text-stone-400">{sub}</span> : null}
               </span>
               <div className="flex gap-2 items-center shrink-0">
@@ -40,7 +44,7 @@ export default function CartSheet({
                   <span className="w-6 text-center font-black">{item.qty}</span>
                   <button type="button" onClick={() => updateCartQty(item.cartId, item.qty + 1)} className="w-7 h-7 rounded-lg bg-stone-100 font-black">+</button>
                 </div>
-                <span className="font-black">฿{item.price * item.qty}</span>
+                <span className="font-black">฿{lineTotal}</span>
                 <button type="button" onClick={() => removeCart(item.cartId)} className="text-red-400 font-black">×</button>
               </div>
             </div>
