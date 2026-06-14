@@ -45,7 +45,7 @@ export function DashboardTab({
   const [periodWage, setPeriodWage] = useState(0);
   const [periodDays, setPeriodDays] = useState(0);
   const canOpen = useCallback(
-    (id) => (id === 'restock' ? canAccessTeaTab(member, 'ops') : canAccessTeaTab(member, id)),
+    (id) => canAccessTeaTab(member, id),
     [member],
   );
   const canViewFinancials = canOpen('profit') || canOpen('payroll');

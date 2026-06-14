@@ -4,7 +4,7 @@
  */
 import { canAccessTeaTab } from './teaRoles.js';
 
-/** @typedef {'order'|'ops'|'summary'|'dashboard'|'catalog'|'profit'|'payroll'|'history'|'admin'|'my-profile'} AppTabId */
+/** @typedef {'order'|'cups'|'restock'|'summary'|'dashboard'|'catalog'|'profit'|'payroll'|'history'|'admin'|'my-profile'} AppTabId */
 
 /** @type {Record<string, { d: string }>} */
 export const TAB_ICONS = {
@@ -13,6 +13,9 @@ export const TAB_ICONS = {
   },
   ops: {
     d: 'M3 7h18l-2 12H5L3 7zm4-4h10l1 4H6l1-4zM8 12h8M8 16h5',
+  },
+  cups: {
+    d: 'M8 3h8l-1 18H9L8 3zm1 4h6M9 11h6M10 15h4',
   },
   summary: {
     d: 'M4 19V9m6 10V5m6 14v-8m6 8V11',
@@ -49,7 +52,8 @@ const BASE_NAV_GROUPS = [
     labelKey: 'navGroupDaily',
     tabs: [
       { id: 'order', labelKey: 'orderTabShort', icon: 'order' },
-      { id: 'ops', labelKey: 'opsTabShort', icon: 'ops' },
+      { id: 'cups', labelKey: 'cupStockTab', icon: 'cups' },
+      { id: 'restock', labelKey: 'restockTabShort', icon: 'restock' },
       { id: 'summary', labelKey: 'accountCloseTabShort', icon: 'summary' },
     ],
     layout: 'primary',
@@ -70,7 +74,7 @@ const BASE_NAV_GROUPS = [
 ];
 
 /**
- * สร้างเมนูตาม role: admin เห็นครบ, manager เห็นงานประจำวัน, staff เห็นงานขาย/สั่งของเท่านั้น
+ * สร้างเมนูตาม role: admin เห็นครบ, manager เห็นงานประจำวัน, staff เห็นงานขาย/แก้ว/สั่งของ/ปิดกะเท่านั้น
  * @param {{ role?: string } | boolean | null | undefined} memberOrIsAdmin
  * @param {(key: string) => string} t
  */

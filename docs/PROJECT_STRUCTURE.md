@@ -112,8 +112,9 @@ apps/chincha-tea/
 | แท็บ UI | ไฟล์ screen |
 |---------|-------------|
 | ขาย (POS) | `OrderTab.jsx` |
-| หลังร้าน (Ops) | `OpsTab.jsx` รวม `RestockTab.jsx` + โหมดสต๊อกแก้วใน `ExpensesTab.jsx` |
-| บัญชี & ปิดวัน | `SummaryTab.jsx` รวมโหมดสรุปวัน/จ่ายย่อยใน `ExpensesTab.jsx` |
+| แก้วหน้าร้าน | `ExpensesTab.jsx` โหมด `cups` |
+| สั่งของเข้าร้าน | `RestockTab.jsx` |
+| ประวัติ/สรุปวัน | `SummaryTab.jsx` และ `HistoryScreen.jsx` |
 | จัดการ (Admin) | `AdminPanel.jsx` + sub-section ภาพรวม/กำไร/ค่าแรง/ประวัติ |
 
 ---

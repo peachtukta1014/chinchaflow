@@ -6,7 +6,8 @@ export const MEMBER_PROFILE_TAB = 'my-profile';
 /** เมนูแอดมินเห็นครบทุกงานในแอปชา */
 export const ADMIN_TEA_TABS = [
   'order',
-  'ops',
+  'cups',
+  'restock',
   'summary',
   'dashboard',
   'catalog',
@@ -20,17 +21,19 @@ export const ADMIN_TEA_TABS = [
 /** ผู้จัดการเห็นงานประจำวัน + ภาพรวม/ประวัติ แต่ไม่เห็นเมนูจัดการระบบ/เงินเดือน/กำไร */
 export const MANAGER_TEA_TABS = [
   'order',
-  'ops',
+  'cups',
+  'restock',
   'summary',
   'dashboard',
   'history',
   MEMBER_PROFILE_TAB,
 ];
 
-/** พนักงานหน้าร้านเห็นเฉพาะขาย, สั่งของ/สต๊อกแก้ว, ปิดกะ และโปรไฟล์ตัวเอง */
+/** พนักงานหน้าร้านเห็นเฉพาะขาย, สต๊อกแก้ว, สั่งของ, ปิดกะ และโปรไฟล์ตัวเอง */
 export const STAFF_TEA_TABS = [
   'order',
-  'ops',
+  'cups',
+  'restock',
   'summary',
   MEMBER_PROFILE_TAB,
 ];
