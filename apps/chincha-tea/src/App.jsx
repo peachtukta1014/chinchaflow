@@ -217,6 +217,7 @@ export default function App() {
 
   const addToCart = (item) => setCart((c) => [...c, item]);
   const removeCart = (id) => setCart((c) => c.filter((i) => i.cartId !== id));
+  const updateCartQty = (id, qty) => setCart((c) => c.map((i) => (i.cartId === id ? { ...i, qty: Math.max(1, qty) } : i)));
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
   const saveOrder = async () => {
@@ -332,15 +333,12 @@ export default function App() {
             onAddToCart={addToCart}
             setModalItem={setModalItem}
             modalItem={modalItem}
-            canVoiceCommit={cart.length > 0}
             member={member}
             onBulkEntrySaved={(dateKey) => {
               if (dateKey === viewDateKey) refreshOrders();
               refreshDailySummary(dateKey);
             }}
-            onVoiceCommit={async () => {
-              if (cart.length) await saveOrder();
-            }}
+            onVoiceCartReady={() => setShowCart(true)}
           />
         )}
         {tab === 'summary' && (
@@ -418,6 +416,7 @@ export default function App() {
         payType={payType}
         setPayType={setPayType}
         removeCart={removeCart}
+        updateCartQty={updateCartQty}
         saving={saving}
         lang={lang}
         menuItems={menuItems}

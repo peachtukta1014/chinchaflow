@@ -8,6 +8,7 @@ export default function CartSheet({
   payType,
   setPayType,
   removeCart,
+  updateCartQty,
   saving,
   onSave,
   t,
@@ -34,6 +35,11 @@ export default function CartSheet({
                 {sub ? <span className="block text-[10px] text-stone-400">{sub}</span> : null}
               </span>
               <div className="flex gap-2 items-center shrink-0">
+                <div className="flex items-center gap-1 rounded-xl border border-stone-200 px-1 py-0.5">
+                  <button type="button" onClick={() => updateCartQty(item.cartId, item.qty - 1)} className="w-7 h-7 rounded-lg bg-stone-100 font-black">−</button>
+                  <span className="w-6 text-center font-black">{item.qty}</span>
+                  <button type="button" onClick={() => updateCartQty(item.cartId, item.qty + 1)} className="w-7 h-7 rounded-lg bg-stone-100 font-black">+</button>
+                </div>
                 <span className="font-black">฿{item.price * item.qty}</span>
                 <button type="button" onClick={() => removeCart(item.cartId)} className="text-red-400 font-black">×</button>
               </div>
