@@ -311,7 +311,7 @@ export default function App() {
         <TabNav
           groups={navGroups}
           activeTab={tab}
-          badges={isAdmin ? { restock: pendingRestocks } : {}}
+          badges={isAdmin ? { ops: pendingRestocks } : {}}
           onSelect={(id) => {
             if (!canAccessTeaTab(member, id)) return;
             setTab(id);
@@ -323,7 +323,7 @@ export default function App() {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0]" style={{ scrollbarWidth: 'none' }}>
+      <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0] pb-24" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
           <OrderTab
             menuItems={menuItems}
