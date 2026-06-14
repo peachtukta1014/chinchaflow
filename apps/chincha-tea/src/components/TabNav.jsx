@@ -53,13 +53,38 @@ export default function TabNav({ groups, activeTab, onSelect, badges = {} }) {
   const otherGroups = groups.filter((g) => g.layout !== 'primary');
 
   return (
-    <nav className="z-10 shrink-0 px-3 pt-1 pb-1.5 space-y-1.5" style={{ background: '#fdf6f0' }}>
+    <>
+      {otherGroups.length > 0 && (
+        <nav className="z-10 shrink-0 px-3 pt-2 pb-2 space-y-1.5 border-b border-amber-900/10" style={{ background: '#fdf6f0' }}>
+          {otherGroups.map((group) => (
+            <section key={group.id} aria-label={group.label} className="space-y-1">
+              <p className="text-[8px] font-black uppercase tracking-wider text-amber-900/50 px-1">
+                {group.label}
+              </p>
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                {group.tabs.map((tab) => (
+                  <TabButton
+                    key={tab.id}
+                    {...tab}
+                    active={activeTab === tab.id}
+                    badge={badges[tab.id]}
+                    onSelect={onSelect}
+                    size="compact"
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </nav>
+      )}
+
       {primaryGroup && (
-        <section aria-label={primaryGroup.label}>
-          <p className="text-[8px] font-black uppercase tracking-wider text-amber-900/50 px-1 mb-1">
-            {primaryGroup.label}
-          </p>
-          <div className="grid grid-cols-4 gap-1.5">
+        <nav
+          className="absolute bottom-0 left-0 right-0 z-50 px-3 pt-2 border-t border-stone-200 rounded-t-2xl shadow-[0_-10px_30px_rgba(61,31,15,0.08)]"
+          style={{ background: '#fffaf5', paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          aria-label={primaryGroup.label}
+        >
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${primaryGroup.tabs.length}, minmax(0, 1fr))` }}>
             {primaryGroup.tabs.map((tab) => (
               <TabButton
                 key={tab.id}
@@ -71,38 +96,9 @@ export default function TabNav({ groups, activeTab, onSelect, badges = {} }) {
               />
             ))}
           </div>
-        </section>
+        </nav>
       )}
-
-      {otherGroups.length > 0 && (
-        <section className="rounded-xl border border-amber-900/10 bg-white/50 px-1.5 py-1.5">
-          <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-            {otherGroups.map((group, gi) => (
-              <div key={group.id} className="flex items-stretch gap-1.5 shrink-0">
-                {gi > 0 && <div className="w-px self-stretch bg-amber-900/15 my-1" aria-hidden />}
-                <div className="flex flex-col shrink-0">
-                  <p className="text-[8px] font-black uppercase tracking-wider text-amber-900/45 px-1 mb-1 truncate max-w-[120px]">
-                    {group.label}
-                  </p>
-                  <div className="flex gap-1.5">
-                    {group.tabs.map((tab) => (
-                      <TabButton
-                        key={tab.id}
-                        {...tab}
-                        active={activeTab === tab.id}
-                        badge={badges[tab.id]}
-                        onSelect={onSelect}
-                        size="compact"
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </nav>
+    </>
   );
 }
 

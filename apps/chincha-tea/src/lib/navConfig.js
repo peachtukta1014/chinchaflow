@@ -51,7 +51,6 @@ const BASE_NAV_GROUPS = [
       { id: 'order', labelKey: 'orderTabShort', icon: 'order' },
       { id: 'ops', labelKey: 'opsTabShort', icon: 'ops' },
       { id: 'summary', labelKey: 'accountCloseTabShort', icon: 'summary' },
-      { id: 'dashboard', labelKey: 'dashboardTabShort', icon: 'dashboard' },
     ],
     layout: 'primary',
   },
@@ -59,6 +58,7 @@ const BASE_NAV_GROUPS = [
     id: 'admin-tools',
     labelKey: 'navGroupAdmin',
     tabs: [
+      { id: 'dashboard', labelKey: 'dashboardTabShort', icon: 'dashboard' },
       { id: 'catalog', labelKey: 'catalogTabShort', icon: 'catalog' },
       { id: 'profit', labelKey: 'profitTabShort', icon: 'profit' },
       { id: 'payroll', labelKey: 'payrollTabShort', icon: 'payroll' },
