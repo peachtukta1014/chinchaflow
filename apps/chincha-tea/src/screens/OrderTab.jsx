@@ -2,13 +2,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { DRINK_CATEGORIES, dateKeyBangkok, menuItemToCard } from '../lib/constants';
 import { burmeseToThai } from '../lib/burmeseToThai';
 import { categoryDisplayLabel, categoryDisplaySub } from '../lib/displayNames';
-import { parseTeaVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
+import { parseTeaVoice, voiceLinesToCart } from '../lib/voiceOrder';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { MenuCard } from '../components/MenuCard';
 import { CustomizeModal } from '../components/CustomizeModal';
 import { saveBulkEntry } from '../lib/bulkEntryService';
 
-export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoiceCommit, canVoiceCommit, setModalItem, modalItem, member, onBulkEntrySaved }) {
+export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoiceCartReady, setModalItem, modalItem, member, onBulkEntrySaved }) {
   const [search, setSearch] = useState('');
 
   const onVoiceFinal = useCallback((text) => {
@@ -17,21 +17,13 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
 
     if (cartLines.length > 0) {
       cartLines.forEach((line) => onAddToCart(line));
+      onVoiceCartReady?.();
       const summary = cartLines.map((c) => `${c.qty}×${c.nameSnapshot}`).join(', ');
-      return { log: `${text} · ✅ ${summary}` };
-    }
-
-    if (hasVoiceCommitCommand(text)) {
-      const hasItemsToCommit = canVoiceCommit || cartLines.length > 0;
-      if (!hasItemsToCommit) {
-        return { log: `${text} · ${t('voiceCartEmpty')}` };
-      }
-      onVoiceCommit?.({ pendingLines: cartLines, rawText: text });
-      return { log: `${text} · ✅` };
+      return { log: `${text} · ✅ ${summary} · ตรวจรายการแล้วกดบันทึกเอง` };
     }
 
     return { log: `${text} · ${t('voiceNoMenu')}` };
-  }, [menuItems, toppingsList, t, onAddToCart, onVoiceCommit, canVoiceCommit]);
+  }, [menuItems, toppingsList, t, onAddToCart, onVoiceCartReady, lang]);
 
   const grouped = useMemo(() => {
     const kw = burmeseToThai(search.trim()).toLowerCase();

@@ -17,10 +17,8 @@ const THAI_NUM = {
   zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5',
 };
 
-const VOICE_COMMIT_RE = /(จบบิล|คิดเงิน|บันทึก(?:ออเดอร์)?|คอมมิท|confirm|checkout|save order|သိမ်းမည်|စာရင်းပိတ်|ချို့တော့|ပိတ်မည်|sin\s*ma\s*ne)/i;
-
 const MENU_SYNONYMS = [
-  { re: /ชาไทย|ชาส้ม|cha\s*thai|ထိုင်းချာ|chainngar\s*thai/i, keys: ['thaiTea', 'thai-tea'] },
+  { re: /ชาไทย|ชาเย็น|ชาส้ม|cha\s*thai|thai\s*tea|ice(?:d)?\s*tea|ထိုင်းချာ|chainngar\s*thai/i, keys: ['thaiTea', 'thai-tea'] },
   { re: /บราวน์ชูการ์|ชานมบราวน์|brown\s*sugar|ဘရောင်းရှူး/i, keys: ['brownSugar', 'brown-sugar'] },
   { re: /ชาเขียว|green\s*tea|လက်ဖက်စိမ်း/i, keys: ['greenTea', 'green-tea'] },
   { re: /ชามะนาว|เลมอน|lemon\s*tea|သံပုရာ/i, keys: ['lemonTea', 'lemon-tea'] },
@@ -64,7 +62,7 @@ const SIZE_PATTERNS = [
 ];
 
 const TOPPING_SYNONYMS = [
-  { re: /ไข่มุก|บีบี|pearl|boba|ပုလဲ/i, ids: ['pearl'] },
+  { re: /ไข่มุก|บุก|เพิ่มบุก|บีบี|pearl|boba|ပုလဲ/i, ids: ['pearl'] },
   { re: /ป๊อบ|popping|ပေါ့ပ်/i, ids: ['popping'] },
   { re: /วุ้น(?:มะพร้าว)?|coco|jelly|အုန်းသီး/i, ids: ['coco-jelly'] },
   { re: /เฉาก๊วย|grass|စဉ်စူ|ချဉ်စူ/i, ids: ['grass-jelly'] },
@@ -80,10 +78,6 @@ function normalize(text) {
 
 function compact(s) {
   return (s || '').replace(/\s+/g, '').toLowerCase();
-}
-
-export function hasVoiceCommitCommand(text) {
-  return VOICE_COMMIT_RE.test(text || '');
 }
 
 function buildMenuPatterns(menuItems) {
