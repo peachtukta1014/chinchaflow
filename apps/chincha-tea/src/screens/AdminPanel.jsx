@@ -29,6 +29,7 @@ import {
   saveTopping,
   updateProductPrice,
 } from '../lib/productService';
+import { parseProductAliases, productAliasText } from '../lib/productAliases';
 import { cachedFetch } from '../lib/fetchCache';
 import { StaffAttendanceCleanupPanel } from '../components/StaffAttendanceCleanupPanel';
 import {
@@ -386,7 +387,7 @@ function ProductsSection({
   const [priceDraft, setPriceDraft] = useState('');
 
   const emptyProduct = () => ({
-    nameTh: '', nameEn: '', nameMy: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true, voiceAliases: '',
+    nameTh: '', nameEn: '', nameMy: '', key: '', basePrice: 30, category: 'milk-tea', tag: '', emoji: '☕', star: false, active: true, aliases: [], voiceAliases: '',
   });
   const emptyTopping = () => ({ label: '', price: 10, active: true });
 
@@ -450,6 +451,9 @@ function ProductsSection({
                     <div className="min-w-0">
                       <p className="font-bold text-sm text-stone-800">{p.nameTh || p.nameEn}</p>
                       <p className="text-[10px] text-stone-400 truncate">{p.nameEn}{p.nameMy ? ` · ${p.nameMy}` : ''}</p>
+                      {parseProductAliases(p.aliases || p.voiceAliases).length > 0 && (
+                        <p className="text-[10px] text-amber-700 truncate mt-0.5">Alias: {parseProductAliases(p.aliases || p.voiceAliases).join(', ')}</p>
+                      )}
                       <p className="text-xs text-stone-500 mt-0.5">
                         {p.active === false ? t('productOff') : t('productOn')}
                         {p.tag ? ` · ${p.tag}` : ''}
@@ -545,7 +549,7 @@ function ProductsSection({
 }
 
 function ProductFormModal({ form, isNew, t, lang = 'th', onClose, onSave }) {
-  const [f, setF] = useState(form);
+  const [f, setF] = useState({ ...form, aliasText: productAliasText(form) });
   return (
     <ModalShell title={isNew ? t('addProduct') : t('editProduct')} onClose={onClose}>
       <div className="space-y-2">
@@ -555,13 +559,26 @@ function ProductFormModal({ form, isNew, t, lang = 'th', onClose, onSave }) {
         <input className="field" value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} />
         <label className="text-[10px] font-bold text-stone-500">{t('nameMyLabel')}</label>
         <input className="field" value={f.nameMy || ''} onChange={(e) => setF({ ...f, nameMy: e.target.value })} />
-        <label className="text-[10px] font-bold text-stone-500">{t('voiceAliasesLabel')}</label>
-        <input
-          className="field"
-          value={f.voiceAliases || ''}
-          onChange={(e) => setF({ ...f, voiceAliases: e.target.value })}
-          placeholder={t('voiceAliasesPlaceholder')}
+        <label className="text-[10px] font-bold text-stone-500">{t('productAliasesLabel')}</label>
+        <textarea
+          className="field min-h-20 resize-none"
+          value={f.aliasText || ''}
+          onChange={(e) => setF({ ...f, aliasText: e.target.value })}
+          placeholder={t('productAliasesPlaceholder')}
         />
+        <div className="flex flex-wrap gap-1.5">
+          {parseProductAliases(f.aliasText).map((alias) => (
+            <button
+              key={alias}
+              type="button"
+              onClick={() => setF({ ...f, aliasText: parseProductAliases(f.aliasText).filter((a) => a !== alias).join(', ') })}
+              className="rounded-full bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] font-black text-amber-800"
+              title={t('delete')}
+            >
+              {alias} ×
+            </button>
+          ))}
+        </div>
         <label className="text-[10px] font-bold text-stone-500">{t('priceLabel')}</label>
         <input className="field" type="tel" inputMode="numeric" value={f.basePrice} onChange={(e) => setF({ ...f, basePrice: e.target.value.replace(/\D/g, '') })} />
         <label className="text-[10px] font-bold text-stone-500">{t('categoryLabel')}</label>
@@ -578,7 +595,7 @@ function ProductFormModal({ form, isNew, t, lang = 'th', onClose, onSave }) {
           <input type="checkbox" checked={f.active !== false} onChange={(e) => setF({ ...f, active: e.target.checked })} />
           {t('productOn')}
         </label>
-        <button type="button" onClick={() => onSave(f)} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
+        <button type="button" onClick={() => onSave({ ...f, aliases: parseProductAliases(f.aliasText), voiceAliases: parseProductAliases(f.aliasText).join(', ') })} className="w-full py-3 rounded-2xl font-black text-white" style={{ background: '#3d1f0f' }}>{t('save')}</button>
       </div>
     </ModalShell>
   );

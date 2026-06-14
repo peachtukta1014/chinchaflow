@@ -76,7 +76,7 @@ flowchart TB
 | Collection | ความหมาย |
 |------------|----------|
 | `teaOrders` | ยอดขายรายวัน (คีย์ `dateKey` ตามเวลาไทย) พร้อม `staffUid/staffName` จากผู้ล็อกอิน |
-| `products`, `toppings` | เมนูและท็อปปิ้ง |
+| `products`, `toppings` | เมนูและท็อปปิ้ง (`products.aliases`/`voiceAliases` เป็นชื่อเรียกหลายภาษา ใช้ค้นหาและ voice mapping; บิล/ยอดขายเก็บชื่อหลัก `nameSnapshot` จึงไม่กระทบข้อมูลขายเก่า) |
 | `users` | โปรไฟล์พนักงาน (`approved`, `role`) |
 | `restocks`, `restockCatalog`, `dailyExpenses`, `dailyCupStocks`, `orderSlips` | เติมของ / catalog+inventory / สรุปยอด-ค่าใช้จ่าย / สต๊อกแก้วเปล่า / สลิป (`restockCatalog` รองรับ `unit`, `base_unit`, `conversion_rate`, `stock_base_qty`; `restocks.inventoryReceived` เก็บ snapshot ตอนแอดมินรับของเข้า; `dailyExpenses` รองรับ `type=dailySummary`, ยอดเงินสด/โอนรวม/เงินทอนคงเหลือ/แก้ว/จ่ายหน้าร้าน, `createdByUid`, `updatedByUid`, `staffUid`; `dailyCupStocks` เก็บยกยอด-เติม-คงเหลือแก้วรายวันพร้อม staff ผู้บันทึก) |
 | `config/teaLine` | ตั้งค่า LINE bot และสรุปอัตโนมัติ |

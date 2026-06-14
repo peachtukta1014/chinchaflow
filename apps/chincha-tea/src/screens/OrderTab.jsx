@@ -3,6 +3,7 @@ import { DRINK_CATEGORIES, dateKeyBangkok, menuItemToCard } from '../lib/constan
 import { burmeseToThai } from '../lib/burmeseToThai';
 import { categoryDisplayLabel, categoryDisplaySub } from '../lib/displayNames';
 import { parseTeaVoice, voiceLinesToCart, hasVoiceCommitCommand } from '../lib/voiceOrder';
+import { productSearchTokens } from '../lib/productAliases';
 import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { MenuCard } from '../components/MenuCard';
 import { CustomizeModal } from '../components/CustomizeModal';
@@ -41,13 +42,12 @@ export function OrderTab({ menuItems, toppingsList, lang, t, onAddToCart, onVoic
         if (m.active === false) return false;
         if (m.category !== cat.id) return false;
         if (!kw) return true;
-        const th = (m.nameTh || '').toLowerCase();
-        const en = (m.nameEn || '').toLowerCase();
-        const my = (m.nameMy || t(m.key) || '').toLowerCase();
-        return th.includes(kw) || en.includes(kw) || my.includes(kw) || (m.key || '').toLowerCase().includes(kw);
+        return productSearchTokens(m, t).some((token) =>
+          burmeseToThai(token).toLowerCase().includes(kw),
+        );
       }),
     })).filter((g) => g.items.length > 0);
-  }, [menuItems, search]);
+  }, [menuItems, search, t]);
 
   return (
     <div className="pb-32">

@@ -1,3 +1,12 @@
+## 2026-06-14 — ชา: PR6 Product Catalog and Alias Management
+
+- เพิ่ม `products.aliases` เป็นรายการชื่อเรียกหลายแบบต่อสินค้า (รองรับไทย/พม่า/อังกฤษ) และยัง sync `voiceAliases` เดิมไว้เพื่อ backward compatible กับข้อมูลเก่า
+- หน้า Admin > จัดการสินค้า แก้ alias ได้ใน modal เดิม: พิมพ์คั่น comma/ขึ้นบรรทัดใหม่, เห็น chip alias ใต้รายการสินค้า, และลบ alias รายตัวได้จาก chip
+- หน้าขายค้นหาเมนูจาก alias ได้แล้ว โดยรวมชื่อไทย/อังกฤษ/พม่า/key/alias และแปลงข้อความพม่าผ่าน `burmeseToThai` เหมือนเดิม
+- Voice Flow ใช้ alias mapping เดียวกันผ่าน `voiceAliasNames()` จึงพูดชื่อเรียกอื่น เช่น `ชาเย็น`, `Thai Tea`, `လက်ဖက်ရည်` แล้ว map เข้าสินค้าหลักได้
+- ตะกร้า/บิลใหม่บันทึก `nameSnapshot` เป็นชื่อหลักของสินค้าเสมอ (`nameTh` เป็นหลัก) ไม่ใช้ alias; บิลเก่าที่มี snapshot เดิมยังอ่าน fallback เหมือนเดิม ไม่ migrate/ไม่กระทบยอดขายเก่า
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/productAliases.js`, `apps/chincha-tea/src/lib/voiceAliases.js`, `apps/chincha-tea/src/screens/AdminPanel.jsx`, `apps/chincha-tea/src/screens/OrderTab.jsx`, และ `apps/chincha-tea/src/components/CustomizeModal.jsx`
+
 ## 2026-06-12 — ชา: PR4 Role-based UI and Navigation
 
 - จัด role navigation ฝั่งชาใหม่เป็น source เดียวผ่าน `teaRoles`/`navConfig`: admin เห็นครบทุกเมนู, manager เห็นงานประจำวัน + dashboard/history, staff เห็นขาย/หลังร้าน/บัญชีปิดกะ/โปรไฟล์เท่านั้น

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ICE_OPTIONS, SIZES, SWEET_OPTIONS } from '../lib/constants';
 import { menuDisplayName, toppingDisplayLabel, toppingDisplaySub } from '../lib/displayNames';
+import { canonicalProductName } from '../lib/productAliases';
 
 export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) {
   const [selectedSize, setSelectedSize] = useState(SIZES[0]);
@@ -137,7 +138,7 @@ export function CustomizeModal({ item, toppingsList, lang, t, onAdd, onClose }) 
           onClick={() => onAdd({
             key: item.key || item.id,
             emoji: item.emoji,
-            nameSnapshot: name,
+            nameSnapshot: canonicalProductName(item, t),
             size: selectedSize.label,
             sweet: selectedSweet.label,
             ice: selectedIce.id,

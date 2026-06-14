@@ -1,4 +1,5 @@
 import { DEFAULT_MENU, DEFAULT_TOPPINGS } from './constants';
+import { formProductAliases } from './productAliases';
 import { fsPatch, fsPost } from './firestoreRest';
 
 export function normalizeProductForm(form) {
@@ -13,7 +14,8 @@ export function normalizeProductForm(form) {
     emoji: form.emoji || '☕',
     star: !!form.star,
     active: form.active !== false,
-    voiceAliases: (form.voiceAliases || '').trim(),
+    aliases: formProductAliases(form),
+    voiceAliases: formProductAliases(form).join(', '),
   };
 }
 
