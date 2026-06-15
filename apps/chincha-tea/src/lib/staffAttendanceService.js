@@ -134,27 +134,43 @@ export async function setStaffPresent({
   return saved;
 }
 
-/** บันทึกเวรพนักงานหลักอัตโนมัติเมื่อมีการขายวันนั้น (ครั้งแรกของวัน) */
-export async function ensurePrimaryStaffPresentOnSale({ dateKey }) {
+/** บันทึกเวรอัตโนมัติเมื่อมีการขายวันนั้น (ครั้งแรกของวัน) — ติ๊กคนขายถ้าเป็นพนักงาน */
+export async function ensureStaffPresentOnSale({ dateKey, member }) {
   if (!dateKey) return { ok: false, reason: 'no_date' };
-  const { staff } = await getPrimaryAttendanceStaff();
-  if (!staff?.id) return { ok: false, reason: 'no_staff' };
+
+  let staffUid = '';
+  let staffName = 'พนักงาน';
+
+  if (member?.uid && member?.approved === true && member?.role === 'staff') {
+    staffUid = member.uid;
+    staffName = member.name || staffName;
+  } else {
+    const { staff } = await getPrimaryAttendanceStaff();
+    if (!staff?.id) return { ok: false, reason: 'no_staff' };
+    staffUid = staff.id;
+    staffName = staff.name || staffName;
+  }
 
   const dayRows = await getAttendanceForDate(dateKey);
-  if (isStaffPresentOnDate(staff.id, dayRows)) {
+  if (isStaffPresentOnDate(staffUid, dayRows)) {
     return { ok: true, skipped: true, reason: 'already_present' };
   }
 
   await setStaffPresent({
     dateKey,
-    staffUid: staff.id,
-    staffName: staff.name || 'พนักงาน',
+    staffUid,
+    staffName,
     present: true,
     markedBy: 'ระบบ (ยอดขายแรกของวัน)',
-    markedByUid: '',
+    markedByUid: member?.uid || '',
     markedSource: 'sale',
   });
   return { ok: true, skipped: false };
+}
+
+/** @deprecated ใช้ ensureStaffPresentOnSale */
+export async function ensurePrimaryStaffPresentOnSale({ dateKey }) {
+  return ensureStaffPresentOnSale({ dateKey, member: null });
 }
 
 /** สรุปเวรในรอบ 15 วัน — รวมรายการวันที่มาทำงานต่อคน (อัตราค่าแรงต่อคน) */

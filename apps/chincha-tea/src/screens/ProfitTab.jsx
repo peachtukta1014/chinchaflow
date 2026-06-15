@@ -7,10 +7,28 @@ import {
   fsQueryRestocksByDate,
   fsQueryStaffAttendanceByDate,
 } from '../lib/firestoreRest';
+import { getBiweeklyPeriodForDate } from '../lib/payrollPeriod';
 import { restockPurchaseTotal } from '../lib/restockService';
-import { listAttendanceStaff } from '../lib/staffAttendanceService';
+import {
+  getPeriodAttendanceSummary,
+  listAttendanceStaff,
+} from '../lib/staffAttendanceService';
 import { wageMapFromStaffList } from '../lib/staffWage';
 import { pushTeaLineSummary } from '../lib/lineNotify';
+import { isTeaAdmin } from '../lib/teaRoles';
+
+function StatCard({ label, value, sub, accent = '#3d1f0f' }) {
+  return (
+    <div
+      className="rounded-2xl p-3 text-left border shadow-sm"
+      style={{ background: `${accent}08`, borderColor: `${accent}22` }}
+    >
+      <p className="text-[9px] font-bold uppercase tracking-wide text-stone-500">{label}</p>
+      <p className="text-xl font-black mt-0.5" style={{ color: accent }}>{value}</p>
+      {sub && <p className="text-[10px] text-stone-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
 
 function Money({ n, className = '' }) {
   const v = Math.round(n || 0);
@@ -36,22 +54,37 @@ function LedgerRow({ label, amount, negative, detail }) {
   );
 }
 
-export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKey }) {
+export function ProfitTab({
+  t,
+  lang = 'th',
+  member,
+  viewDateKey,
+  setViewDateKey,
+  todayKey,
+  pendingRestocks = 0,
+}) {
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
+  const [periodWage, setPeriodWage] = useState(0);
+  const [periodDays, setPeriodDays] = useState(0);
 
   const isToday = viewDateKey === todayKey;
+  const showAdminExtras = isTeaAdmin(member);
 
   const loadLedger = useCallback(async () => {
     setLoading(true);
     try {
-      const [dailySummary, restocks, attendance, staffList] = await Promise.all([
+      const period = getBiweeklyPeriodForDate(todayKey);
+      const [dailySummary, restocks, attendance, staffList, periodSummary] = await Promise.all([
         fetchTeaDailySummary(viewDateKey),
         fsQueryRestocksByDate(viewDateKey),
         fsQueryStaffAttendanceByDate(viewDateKey),
         listAttendanceStaff(),
+        isToday && showAdminExtras
+          ? getPeriodAttendanceSummary(period.startKey, period.endKey)
+          : Promise.resolve([]),
       ]);
       const wageMap = wageMapFromStaffList(staffList);
       setLedger(
@@ -62,12 +95,16 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
           wageMap,
         }),
       );
+      if (isToday && showAdminExtras) {
+        setPeriodWage(periodSummary.reduce((s, r) => s + (r.wage || 0), 0));
+        setPeriodDays(periodSummary.reduce((s, r) => s + (r.days || 0), 0));
+      }
     } catch (e) {
       console.error(e);
       setLedger(null);
     }
     setLoading(false);
-  }, [viewDateKey]);
+  }, [isToday, showAdminExtras, todayKey, viewDateKey]);
 
   useEffect(() => {
     loadLedger();
@@ -126,6 +163,45 @@ export function ProfitTab({ t, lang = 'th', viewDateKey, setViewDateKey, todayKe
       <p className="text-[10px] text-stone-500 text-center leading-relaxed px-2">
         {t('profitTabHint')}
       </p>
+
+      {!loading && ledger && isToday && (
+        <div className="grid grid-cols-2 gap-2">
+          <StatCard
+            label={t('dashboardTodaySales')}
+            value={`฿${ledger.totalSales.toLocaleString()}`}
+            sub={`${ledger.totalCups} ${t('cupUnit')} · ${ledger.orderCount} ${t('orders')}`}
+            accent="#166534"
+          />
+          <StatCard
+            label={t('dashboardOperatingProfit')}
+            value={`฿${ledger.operatingProfit.toLocaleString()}`}
+            sub={t('dashboardProfitHint')}
+            accent="#4c1d95"
+          />
+          <StatCard
+            label={t('dashboardTodayWage')}
+            value={`฿${ledger.wageCost.toLocaleString()}`}
+            sub={`${ledger.staffWageRows?.length || 0} ${t('staffAttendanceDaysUnit')}`}
+            accent="#5b21b6"
+          />
+          {showAdminExtras && (
+            <StatCard
+              label={t('dashboardPeriodWage')}
+              value={`฿${periodWage.toLocaleString()}`}
+              sub={`${periodDays} ${t('staffAttendanceDaysUnit')}`}
+              accent="#7c3aed"
+            />
+          )}
+          {showAdminExtras && (
+            <StatCard
+              label={t('restockTabShort')}
+              value={pendingRestocks > 0 ? String(pendingRestocks) : '—'}
+              sub={pendingRestocks > 0 ? t('dashboardRestockPending') : t('dashboardRestockClear')}
+              accent="#b45309"
+            />
+          )}
+        </div>
+      )}
 
       {lineFlash && (
         <p

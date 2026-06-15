@@ -5,6 +5,8 @@ import { VoiceCommandBar } from '../components/VoiceCommandBar';
 import { SegmentedTabBar } from '../components/TabNav';
 import { parseSmartPriceOrder, smartPriceOrderSummary } from '../lib/smartPriceOrder';
 import { ExpensesTab } from './ExpensesTab';
+import ToppingSaleSettings from '../components/ToppingSaleSettings';
+import { canManageTeaSaleSettings } from '../lib/teaRoles';
 
 export function OrderTab({
   toppingsList,
@@ -18,6 +20,7 @@ export function OrderTab({
   onSummaryChanged,
   section = 'order',
   onSectionChange,
+  onToppingsChanged,
 }) {
   const [localSection, setLocalSection] = useState(section);
   const activeSection = onSectionChange ? section : localSection;
@@ -66,7 +69,14 @@ export function OrderTab({
           <div className="px-4 pt-3 pb-2 space-y-2">
             <VoiceCommandBar lang={lang} t={t} onFinalText={onVoiceFinal} />
           </div>
-          <SmartPriceOrderPanel toppingsList={toppingsList} onAddToCart={onAddToCart} onCartReady={onVoiceCartReady} t={t} />
+          <SmartPriceOrderPanel
+            toppingsList={toppingsList}
+            onAddToCart={onAddToCart}
+            onCartReady={onVoiceCartReady}
+            t={t}
+            member={member}
+            onToppingsChanged={onToppingsChanged}
+          />
         </>
       ) : (
         <ExpensesTab
@@ -87,7 +97,8 @@ export function OrderTab({
   );
 }
 
-function SmartPriceOrderPanel({ toppingsList, onAddToCart, onCartReady, t }) {
+function SmartPriceOrderPanel({ toppingsList, onAddToCart, onCartReady, t, member, onToppingsChanged }) {
+  const canManageToppings = canManageTeaSaleSettings(member);
   const [basePrice, setBasePrice] = useState('25');
   const [qty, setQty] = useState('1');
   const [selectedToppingIds, setSelectedToppingIds] = useState([]);
@@ -183,6 +194,9 @@ function SmartPriceOrderPanel({ toppingsList, onAddToCart, onCartReady, t }) {
               })}
             </div>
           </div>
+        )}
+        {canManageToppings && (
+          <ToppingSaleSettings toppingsList={toppingsList} t={t} onChanged={onToppingsChanged} />
         )}
         <button type="button" onClick={add} disabled={!cupPrice || !cupQty} className="w-full py-3 rounded-2xl font-black text-white text-sm disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>
           {t('smartAddToCart')} · ฿{lineTotal}
