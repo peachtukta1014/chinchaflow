@@ -91,8 +91,8 @@ function isShrimpLiffOpenCommand(text) {
   return LIFF_OPEN_CMD.test(String(text || '').trim());
 }
 
-/** ในกลุ่มครอบครัว/พนักงาน — ตอบคำสั่งสรุป/ออเดอร์/help (ไม่รบกวนแชททั่วไป) */
-const SHRIMP_GROUP_ALLOWED_INTENTS = new Set(['order', 'summary', 'today_orders', 'help']);
+/** ในกลุ่มครอบครัว/พนักงาน — สรุป · ออเดอร์ · สลิป (ไม่ตอบ help) */
+const SHRIMP_GROUP_ALLOWED_INTENTS = new Set(['order', 'summary', 'today_orders']);
 
 function applyShrimpGroupOrdersOnlyFilter(intent, groupId) {
   if (!isShrimpGroupChat(groupId)) return intent;
