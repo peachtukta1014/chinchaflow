@@ -597,7 +597,7 @@ function OrderEditModal({ order, t, onClose, onSave }) {
 
 function LineSettingsSection({ t }) {
   const [form, setForm] = useState({ ...DEFAULT_LINE_CONFIG });
-  const [shrimpGroupId, setShrimpGroupId] = useState('');
+  const [teaGroupId, setteaGroupId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchBusy, setFetchBusy] = useState(null);
