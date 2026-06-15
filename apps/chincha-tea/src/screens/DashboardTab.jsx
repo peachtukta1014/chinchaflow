@@ -101,12 +101,6 @@ export function DashboardTab({
 
   return (
     <div className="px-4 pt-2 pb-8 space-y-3">
-      <div className="rounded-2xl p-4 text-white shadow-md" style={{ background: 'linear-gradient(145deg, #3d1f0f 0%, #5a2d14 100%)' }}>
-        <p className="text-amber-200/90 text-[10px] font-bold uppercase tracking-wider">{t('dashboardTitle')}</p>
-        <p className="text-2xl font-black text-amber-100 mt-1">฿{todaySales.toLocaleString()}</p>
-        <p className="text-[11px] text-amber-200/80 mt-0.5">{t('dashboardTodaySales')} · {orderCount} {t('orders')}</p>
-      </div>
-
       {loading ? (
         <p className="text-center text-stone-400 text-sm py-6">{t('loading')}</p>
       ) : (

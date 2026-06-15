@@ -1,3 +1,12 @@
+## 2026-06-15 — ชา: PR3 UI แบบกุ้ง + LINE 3 ช่อง
+
+- ย้าย 4 แท็บหลักขึ้นด้านบน (ไม่มีแท็บล่าง) พร้อม `DailySummaryStickyBar` แสดงยอดขาย/แก้ววันนี้จาก `dailySummaryService` แบบ real-time
+- แอดมิน/เมเนเจอร์เปิด overlay ผ่าน `TeaAppHeaderMenu` + `TeaHeaderQuickLinks` (แท็บลิปแบบกุ้ง) ไม่ซ้ำแท็บหลัก
+- ลด UI ซ้ำ: ปิดวันซ่อน hero card ยอดซ้ำ · Dashboard ไม่โชว์ยอดซ้ำ header
+- พนักงานส่งสรุป LINE ได้จาก **ปิดวัน** และ **ประวัติ** (`teaPushSummary` รองรับ staff/manager/admin)
+- Admin LINE Bot แยก 3 ช่องชัด: OA · กลุ่มร้านน้ำ · กลุ่มกุ้ง (อ่านอย่างเดียว) · webhook ชา ignore กลุ่มที่ไม่ใช่ `notifyGroupId`
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/App.jsx`, `DailySummaryStickyBar.jsx`, `TeaHeaderQuickLinks.jsx`, `ExpensesTab.jsx`, `AdminPanel.jsx`, `apps/webhook-core/src/index.js`
+
 ## 2026-06-15 — ชา: PR2 Smart POS 4-tab cleanup
 
 - จัดแท็บล่างเป็น 4 แท็บหลัก: `ขาย`, `แก้วหน้าร้าน`, `สั่งของ`, `ประวัติ` แทน `ขาย/หลังร้าน/บัญชี`

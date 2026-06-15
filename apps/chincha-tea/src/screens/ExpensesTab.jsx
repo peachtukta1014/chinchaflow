@@ -10,6 +10,7 @@ import {
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
 import { fetchTeaDailySummary, intValue, moneyValue } from '../lib/dailySummaryService';
+import { pushTeaLineSummary } from '../lib/lineNotify';
 import { staffSnapshot, writeHistoryLog } from '../lib/historyLogService';
 
 const EMPTY_DAY = {
@@ -160,7 +161,7 @@ async function saveDailySummaryExpense({ existing, dateKey, form, member, rawSum
   return created.id;
 }
 
-export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey, allowedModes = ['summary', 'cups', 'manual'], defaultMode = 'summary', compactHeader = false, onSummaryChanged }) {
+export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKey, allowedModes = ['summary', 'cups', 'manual'], defaultMode = 'summary', compactHeader = false, hideSummaryHero = false, showLineSend = false, onSummaryChanged }) {
   const [expenses, setExpenses] = useState([]);
   const [restocks, setRestocks] = useState([]);
   const [entryDateKey, setEntryDateKey] = useState(viewDateKey);
@@ -174,6 +175,8 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
   const [cupDoc, setCupDoc] = useState(null);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState('');
+  const [lineSending, setLineSending] = useState(false);
+  const [lineFlash, setLineFlash] = useState('');
 
   const todayKey = dateKeyBangkok();
   const isToday = viewDateKey === todayKey;
@@ -316,6 +319,21 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
     }
   };
 
+  const sendLineSummary = async () => {
+    const targetDateKey = entryDateKey || viewDateKey;
+    setLineSending(true);
+    setLineFlash('');
+    try {
+      await pushTeaLineSummary(targetDateKey);
+      setLineFlash(t('lineSummarySent'));
+      setTimeout(() => setLineFlash(''), 3000);
+    } catch (e) {
+      console.error(e);
+      setLineFlash(`⚠️ ${e.message || t('lineSummaryFailed')}`);
+    }
+    setLineSending(false);
+  };
+
   const saveCupStock = async () => {
     const targetDateKey = entryDateKey || viewDateKey;
     setSaving(true);
@@ -440,6 +458,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
 
       {mode === 'summary' && (
         <div className="space-y-3">
+          {!hideSummaryHero && (
           <div className="rounded-3xl p-5 text-white shadow-lg" style={{ background: '#3d1f0f' }}>
             <p className="text-amber-500 text-xs font-black">{t('closingOnePageTitle')}</p>
             <p className="text-4xl font-black text-amber-200 mt-2">{amountLabel(totalSales)}</p>
@@ -450,6 +469,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
               <div className="rounded-2xl bg-white/10 p-2"><p className="text-[10px] text-amber-200">{t('finalCupsSold')}</p><p className="font-black">{finalCupsSold}</p></div>
             </div>
           </div>
+          )}
 
           <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200 space-y-4">
             <input type="date" max={todayKey} value={dateKeyToInputValue(entryDateKey)} onChange={(e) => setEntryDateKey(e.target.value)} className="w-full min-h-12 px-4 py-3 rounded-2xl border-2 border-stone-200 text-base font-black outline-none focus:border-amber-300" />
@@ -505,8 +525,18 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
             </div>
 
             <button type="button" onClick={saveDaySummary} disabled={saving || !entryDateKey} className="w-full min-h-14 py-4 rounded-2xl font-black text-white text-base disabled:opacity-50 active:scale-95" style={{ background: '#3d1f0f' }}>{saving ? '⏳' : t('expenseSaveSummaryBtn')}</button>
+            {showLineSend && (
+              <button type="button" disabled={lineSending || !entryDateKey} onClick={sendLineSummary} className="w-full min-h-12 py-3 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 disabled:opacity-60 active:scale-95" style={{ background: '#1a8f4c' }}>
+                {lineSending ? '⏳' : '📲'} {t('sendLineSummary')}
+              </button>
+            )}
+            {lineFlash && (
+              <p className={`text-center text-xs font-bold py-2 rounded-xl ${lineFlash.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>{lineFlash}</p>
+            )}
             <p className="text-[11px] font-bold text-stone-500">{t('staffRecorderLabel')}: {member?.name || 'ชินชา'}</p>
+            {!hideSummaryHero && (
             <p className="text-[11px] text-stone-400 leading-relaxed">{t('liveSalesHint').replace('{sales}', amountLabel(liveRevenue.salesTotal || liveRevenue.posSalesTotal || 0)).replace('{cups}', String(liveRevenue.cupsSold || liveRevenue.posCupsSold || 0))}</p>
+            )}
           </div>
         </div>
       )}

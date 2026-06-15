@@ -39,6 +39,16 @@ export function isMainTeaTab(tabId) {
   return MAIN_TEA_TABS.includes(tabId);
 }
 
+export function isTeaOverlayTab(tabId) {
+  return ADMIN_OVERLAY_TABS.includes(tabId) || tabId === MEMBER_PROFILE_TAB;
+}
+
+export function canSendTeaLineSummary(member) {
+  if (!member || member.approved !== true) return false;
+  const role = normalizeTeaRole(member.role);
+  return role === 'admin' || role === 'manager' || role === 'staff';
+}
+
 export function resolveLegacyTeaTab(tabId) {
   return LEGACY_TAB_ALIASES[tabId] || tabId;
 }

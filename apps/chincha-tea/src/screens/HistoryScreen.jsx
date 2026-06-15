@@ -4,7 +4,7 @@ import { formatDateKeyLabel, formatTimeLabel } from '../lib/localeFormat';
 import { fetchTeaDailySummary } from '../lib/dailySummaryService';
 import { cartItemDisplayName } from '../lib/displayNames';
 import { pushTeaLineSummary } from '../lib/lineNotify';
-import { isTeaAdmin } from '../lib/teaRoles';
+import { canSendTeaLineSummary } from '../lib/teaRoles';
 
 function moneyLabel(value) {
   const n = Math.round(Number(value) || 0);
@@ -34,7 +34,7 @@ export default function HistoryScreen({
   const [daySummary, setDaySummary] = useState(null);
   const [lineSending, setLineSending] = useState(false);
   const [lineFlash, setLineFlash] = useState('');
-  const isAdmin = isTeaAdmin(member);
+  const canSendLine = canSendTeaLineSummary(member);
   const closeDoc = daySummary?.dailySummaryDoc;
 
   const loadDay = useCallback(async () => {
@@ -117,7 +117,7 @@ export default function HistoryScreen({
             <p className="text-xs text-stone-500 bg-stone-50 rounded-2xl px-3 py-2">{closeDoc.note}</p>
           )}
 
-          {isAdmin && (
+          {canSendLine && (
             <button
               type="button"
               disabled={lineSending}

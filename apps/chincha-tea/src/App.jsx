@@ -9,10 +9,19 @@ import { useCatalog } from './lib/useCatalog';
 import { clearTeaMemberCache, subscribeTeaMember } from './lib/authSession';
 import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
-import AdminShortcutBar from './components/AdminShortcutBar';
+import DailySummaryStickyBar from './components/DailySummaryStickyBar';
+import TeaAppHeaderMenu from './components/TeaAppHeaderMenu';
+import TeaHeaderQuickLinks from './components/TeaHeaderQuickLinks';
 import TabNav from './components/TabNav';
-import { getAdminShortcutTabs, getAppNavGroups } from './lib/navConfig';
-import { canAccessTeaTab, getDefaultTeaTabForMember, isMainTeaTab, isTeaAdmin, resolveLegacyTeaTab } from './lib/teaRoles';
+import { getAdminShortcutTabs, getAppNavGroups, TEA_OVERLAY_TITLES } from './lib/navConfig';
+import {
+  canAccessTeaTab,
+  getDefaultTeaTabForMember,
+  isMainTeaTab,
+  isTeaAdmin,
+  isTeaOverlayTab,
+  resolveLegacyTeaTab,
+} from './lib/teaRoles';
 import CartSheet from './components/CartSheet';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
@@ -36,7 +45,7 @@ export default function App() {
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
   const [tab, setTab] = useState('order');
-  const [lastTab, setLastTab] = useState('order');
+  const [lastMainTab, setLastMainTab] = useState('order');
   const [orderSection, setOrderSection] = useState('order');
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -45,6 +54,7 @@ export default function App() {
   const [payType, setPayType] = useState('cash');
   const [pendingRestocks, setPendingRestocks] = useState(0);
   const [headerSummary, setHeaderSummary] = useState(null);
+  const [summaryLoadError, setSummaryLoadError] = useState(false);
   const prevPendingRestocksRef = useRef(null);
   const tabBootstrappedRef = useRef(false);
 
@@ -63,6 +73,10 @@ export default function App() {
   const navGroups = useMemo(() => getAppNavGroups(member, t), [member, t]);
   const adminShortcuts = useMemo(() => getAdminShortcutTabs(member, t), [member, t]);
 
+  const isMainTab = isMainTeaTab(tab);
+  const isOverlayTab = isTeaOverlayTab(tab);
+  const isProfileTab = tab === 'my-profile';
+
   const refreshOrders = useCallback(async () => {
     const docs = await fsQueryOrders(viewDateKey);
     setOrders(docs);
@@ -72,10 +86,14 @@ export default function App() {
     if (!isAuthed) return null;
     try {
       const summary = await fetchTeaDailySummary(dateKey);
-      if (dateKey === todayKey) setHeaderSummary(summary);
+      if (dateKey === todayKey) {
+        setHeaderSummary(summary);
+        setSummaryLoadError(false);
+      }
       return summary;
     } catch (e) {
       console.error(e);
+      if (dateKey === todayKey) setSummaryLoadError(true);
       return null;
     }
   }, [isAuthed, todayKey]);
@@ -83,6 +101,7 @@ export default function App() {
   useEffect(() => {
     if (!isAuthed) {
       setHeaderSummary(null);
+      setSummaryLoadError(false);
       return;
     }
     refreshDailySummary(todayKey);
@@ -100,8 +119,15 @@ export default function App() {
     if (!isAuthed || tabBootstrappedRef.current) return;
     const defaultTab = getDefaultTeaTabForMember(member);
     const resolvedTab = resolveLegacyTeaTab(defaultTab);
-    setTab(resolvedTab);
-    setLastTab(resolvedTab);
+    if (isMainTeaTab(resolvedTab)) {
+      setTab(resolvedTab);
+      setLastMainTab(resolvedTab);
+    } else if (canAccessTeaTab(member, resolvedTab)) {
+      setTab(resolvedTab);
+    } else {
+      setTab('order');
+      setLastMainTab('order');
+    }
     if (defaultTab === 'summary') setOrderSection('close');
     tabBootstrappedRef.current = true;
   }, [isAuthed, member]);
@@ -115,26 +141,22 @@ export default function App() {
       return;
     }
     if (canAccessTeaTab(member, tab)) return;
-    const fallbackTab = canAccessTeaTab(member, lastTab) ? lastTab : getDefaultTeaTabForMember(member);
-    setTab(resolveLegacyTeaTab(fallbackTab));
-  }, [isAuthed, member, tab, lastTab]);
+    const fallback = canAccessTeaTab(member, lastMainTab) ? lastMainTab : 'order';
+    setTab(fallback);
+  }, [isAuthed, member, tab, lastMainTab]);
 
-  // ภาษา: sync กับ Firestore เมื่อ login + migration staff 'th' → 'my'
   useEffect(() => {
     if (!member?.uid) return;
     let storedLang = null;
     try {
       storedLang = window.localStorage?.getItem('chincha-lang') ?? null;
     } catch {
-      // Android WebView/old browsers may block localStorage; keep the main UI alive.
       storedLang = null;
     }
     if (member.preferredLang) {
-      // cross-device: ดึงค่าจาก Firestore เป็น source of truth
       setLang(member.preferredLang);
       return;
     }
-    // migration: staff ที่ยังเก็บ 'th' เก่าค้างใน localStorage → รีเซ็ตเป็น 'my'
     if (member.role === 'staff' && (!storedLang || storedLang === 'th')) {
       setLang('my');
       fsPatch(`users/${member.uid}`, { preferredLang: 'my' }).catch(() => {});
@@ -182,13 +204,12 @@ export default function App() {
       showWebNotify(
         t('restockNotifyTitle'),
         t('restockNotifyBody').replace('{n}', String(pendingRestocks)),
-        { tag: 'restock', onClick: () => setTab('restock') },
+        { tag: 'restock', onClick: () => goMainTab('restock') },
       );
     }
     prevPendingRestocksRef.current = pendingRestocks;
-  }, [isAuthed, member?.role, pendingRestocks]);
+  }, [isAuthed, member?.role, pendingRestocks, t]);
 
-  // เปลี่ยนภาษา: บันทึก localStorage + Firestore (cross-device sync)
   const handleSetLang = useCallback((l) => {
     setLang(l);
     if (member?.uid) {
@@ -196,38 +217,54 @@ export default function App() {
     }
   }, [member?.uid, setLang]);
 
+  const goMainTab = useCallback((id) => {
+    if (!canAccessTeaTab(member, id) || !isMainTeaTab(id)) return;
+    setTab(id);
+    setLastMainTab(id);
+    if (id === 'history' || id === 'order') refreshOrders();
+    if (id === 'restock' && isTeaAdmin(member)) refreshPendingRestocks();
+  }, [member, refreshOrders, refreshPendingRestocks]);
+
+  const openOverlay = useCallback((id) => {
+    if (!canAccessTeaTab(member, id) || !isTeaOverlayTab(id)) return;
+    setLastMainTab((prev) => (isMainTeaTab(tab) ? tab : prev));
+    setTab(id);
+    if (id === 'admin' || id === 'catalog') refreshCatalog();
+    if (id === 'history' || id === 'admin') refreshOrders();
+    if ((id === 'dashboard') && isTeaAdmin(member)) refreshPendingRestocks();
+  }, [member, tab, refreshCatalog, refreshOrders, refreshPendingRestocks]);
+
+  const goBackFromOverlay = useCallback(() => {
+    setTab(lastMainTab);
+  }, [lastMainTab]);
+
   const openProfile = useCallback(() => {
-    setLastTab((prev) => (tab === 'my-profile' ? prev : tab));
+    setLastMainTab((prev) => (isMainTeaTab(tab) ? tab : prev));
     setTab('my-profile');
   }, [tab]);
 
   const goBackFromProfile = useCallback(() => {
-    setTab(lastTab);
-  }, [lastTab]);
+    setTab(lastMainTab);
+  }, [lastMainTab]);
 
   const onProfileUpdated = useCallback((next) => {
     setMember((prev) => (prev ? { ...prev, ...next } : prev));
   }, []);
 
-  const openAdminFromHeader = useCallback(() => {
-    const target = canAccessTeaTab(member, 'dashboard') ? 'dashboard' : 'admin';
-    if (!canAccessTeaTab(member, target)) return;
-    setTab(target);
-    setLastTab(target);
-    if (target === 'admin' || target === 'catalog') refreshCatalog();
-    refreshOrders();
-  }, [member, refreshCatalog, refreshOrders]);
-
   const selectTab = useCallback((id) => {
     if (!canAccessTeaTab(member, id)) return;
     const resolved = resolveLegacyTeaTab(id);
-    if (resolved === 'order' && id === 'summary') setOrderSection('close');
-    setTab(resolved);
-    if (isMainTeaTab(resolved)) setLastTab(resolved);
-    if (resolved === 'admin' || resolved === 'catalog') refreshCatalog();
-    if (resolved === 'history' || resolved === 'admin' || resolved === 'order') refreshOrders();
-    if ((resolved === 'restock' || resolved === 'dashboard') && isTeaAdmin(member)) refreshPendingRestocks();
-  }, [member, refreshCatalog, refreshOrders, refreshPendingRestocks]);
+    if (resolved === 'order' && id === 'summary') {
+      goMainTab('order');
+      setOrderSection('close');
+      return;
+    }
+    if (isMainTeaTab(resolved)) {
+      goMainTab(resolved);
+      return;
+    }
+    openOverlay(resolved);
+  }, [member, goMainTab, openOverlay]);
 
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
@@ -261,7 +298,7 @@ export default function App() {
         lang,
       });
       setCart([]);
-      refreshOrders(); // fire-and-forget — อัปเดต list หลังบันทึก ไม่บล็อก UI
+      refreshOrders();
       refreshDailySummary(todayKey);
       alert(t('saved'));
       return true;
@@ -273,6 +310,14 @@ export default function App() {
       setSaving(false);
     }
   };
+
+  const adminMenuItems = useMemo(() => adminShortcuts.map((item) => ({
+    ...item,
+    badge: item.id === 'restock' ? pendingRestocks : 0,
+  })), [adminShortcuts, pendingRestocks]);
+
+  const overlayTitleKey = TEA_OVERLAY_TITLES[tab];
+  const overlayTitle = overlayTitleKey ? t(overlayTitleKey) : t('adminTabShort');
 
   if (member === undefined && fbReady) {
     return (
@@ -300,7 +345,6 @@ export default function App() {
   }
 
   const isAdmin = isTeaAdmin(member);
-  const isProfileTab = tab === 'my-profile';
 
   return (
     <div
@@ -322,39 +366,49 @@ export default function App() {
         onOpenProfile={openProfile}
         profileMode={isProfileTab}
         onBackFromProfile={goBackFromProfile}
-        onOpenAdmin={openAdminFromHeader}
-        showAdminButton={adminShortcuts.length > 0}
+        overlayMode={isOverlayTab}
+        overlayTitle={overlayTitle}
+        onBackFromOverlay={goBackFromOverlay}
+        adminMenu={adminMenuItems.length > 0 && !isProfileTab && !isOverlayTab ? (
+          <TeaAppHeaderMenu
+            items={adminMenuItems}
+            activeTab={tab}
+            onNavigate={openOverlay}
+            t={t}
+          />
+        ) : null}
         t={t}
-        dailySummary={headerSummary}
       />
 
-      {member?.role === 'staff' && (
+      {isMainTab && !isProfileTab && (
+        <DailySummaryStickyBar t={t} dailySummary={headerSummary} loadError={summaryLoadError} />
+      )}
+
+      {member?.role === 'staff' && isMainTab && (
         <>
           <StaffLangNudge lang={lang} setLang={handleSetLang} t={t} />
           <StaffGuidePanel t={t} lang={lang} />
         </>
       )}
 
-      {adminShortcuts.length > 0 && !isProfileTab && (
-        <AdminShortcutBar
-          shortcuts={adminShortcuts}
-          activeTab={tab}
-          badges={isAdmin ? { restock: pendingRestocks } : {}}
-          onSelect={selectTab}
-          t={t}
-        />
-      )}
-
-      {!isProfileTab && (
+      {isMainTab && !isProfileTab && (
         <TabNav
           groups={navGroups}
-          activeTab={isMainTeaTab(tab) ? tab : ''}
+          activeTab={tab}
           badges={isAdmin ? { restock: pendingRestocks } : {}}
-          onSelect={selectTab}
+          onSelect={goMainTab}
         />
       )}
 
-      <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0] pb-24" style={{ scrollbarWidth: 'none' }}>
+      {isMainTab && adminShortcuts.length > 0 && (
+        <TeaHeaderQuickLinks
+          links={adminMenuItems}
+          activeTab={tab}
+          onNavigate={openOverlay}
+        />
+      )}
+
+      <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0] pb-4" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
           <OrderTab
             toppingsList={toppingsList}
@@ -388,12 +442,30 @@ export default function App() {
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
+        {tab === 'history' && (
+          <HistoryScreen
+            orders={orders}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+            todayKey={todayKey}
+            t={t}
+            lang={lang}
+            menuItems={menuItems}
+            member={member}
+          />
+        )}
         {tab === 'dashboard' && canAccessTeaTab(member, 'dashboard') && (
-          <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} member={member} onNavigate={(next) => {
-            if (next === 'restock') selectTab('restock');
-            else if (next === 'summary') { selectTab('order'); setOrderSection('close'); }
-            else if (canAccessTeaTab(member, next)) selectTab(next);
-          }} />
+          <DashboardTab
+            t={t}
+            todayKey={todayKey}
+            pendingRestocks={pendingRestocks}
+            member={member}
+            onNavigate={(next) => {
+              if (next === 'restock') goMainTab('restock');
+              else if (next === 'summary') { goMainTab('order'); setOrderSection('close'); }
+              else if (canAccessTeaTab(member, next)) openOverlay(next);
+            }}
+          />
         )}
         {tab === 'catalog' && canAccessTeaTab(member, 'catalog') && (
           <div className="px-4 pt-3 pb-8">
@@ -405,18 +477,6 @@ export default function App() {
         )}
         {tab === 'payroll' && canAccessTeaTab(member, 'payroll') && (
           <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
-        )}
-        {tab === 'history' && canAccessTeaTab(member, 'history') && (
-          <HistoryScreen
-            orders={orders}
-            viewDateKey={viewDateKey}
-            setViewDateKey={setViewDateKey}
-            todayKey={todayKey}
-            t={t}
-            lang={lang}
-            menuItems={menuItems}
-            member={member}
-          />
         )}
         {tab === 'admin' && canAccessTeaTab(member, 'admin') && (
           <div className="px-4 pt-3 pb-8">
