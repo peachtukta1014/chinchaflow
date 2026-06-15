@@ -11,37 +11,42 @@ export default function AppHeader({
   onOpenProfile,
   profileMode = false,
   onBackFromProfile,
-  onOpenAdmin,
-  showAdminButton = false,
+  overlayMode = false,
+  overlayTitle = '',
+  onBackFromOverlay,
+  adminMenu = null,
   t,
-  dailySummary,
 }) {
   const staffNeedsMy = member?.role === 'staff' && lang !== 'my';
-  const todaySales = Math.round(Number(dailySummary?.salesTotal) || 0);
-  const todayCups = Math.round(Number(dailySummary?.cupsSold) || 0);
   const buildLabel = getAppBuildLabel();
   const handleReload = () => {
     if (!window.confirm(t('reloadConfirm'))) return;
     hardReloadApp();
   };
+
   return (
     <header
-      className="z-10 shrink-0 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-2"
+      className="z-30 shrink-0 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-2"
       style={{ background: '#3d1f0f' }}
     >
       <div className="flex items-center gap-2 min-w-0">
-        {profileMode ? (
-          <button
-            type="button"
-            onClick={onBackFromProfile}
-            className="w-8 h-8 rounded-full border border-amber-800 text-amber-300 flex items-center justify-center shrink-0"
-            style={{ background: '#5a2d14' }}
-            aria-label={t('profileBack')}
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
+        {profileMode || overlayMode ? (
+          <>
+            <button
+              type="button"
+              onClick={profileMode ? onBackFromProfile : onBackFromOverlay}
+              className="w-8 h-8 rounded-full border border-amber-800 text-amber-300 flex items-center justify-center shrink-0"
+              style={{ background: '#5a2d14' }}
+              aria-label={t('profileBack')}
+            >
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <p className="font-black text-amber-300 text-sm leading-tight truncate">
+              {profileMode ? t('profileMyTitle') : overlayTitle}
+            </p>
+          </>
         ) : (
           <button
             type="button"
@@ -61,14 +66,6 @@ export default function AppHeader({
                 {t('appName')}
                 <span className="font-semibold text-amber-600/90"> · {member.name}</span>
               </p>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-[9px] font-black text-amber-100">
-                  {t('todaySales')} ฿{todaySales.toLocaleString()}
-                </span>
-                <span className="rounded-full bg-amber-300/15 px-2 py-0.5 text-[9px] font-black text-amber-100">
-                  {todayCups.toLocaleString()} {t('cupUnit')}
-                </span>
-              </div>
               {buildLabel && (
                 <p className="text-[8px] text-cyan-300/80 truncate max-w-[180px]" title={t('buildVersionHint')}>
                   {buildLabel}
@@ -76,9 +73,6 @@ export default function AppHeader({
               )}
             </div>
           </button>
-        )}
-        {profileMode && (
-          <p className="font-black text-amber-300 text-sm leading-tight">{t('profileMyTitle')}</p>
         )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
@@ -96,21 +90,7 @@ export default function AppHeader({
             </button>
           ))}
         </div>
-        {showAdminButton && !profileMode && (
-          <button
-            type="button"
-            onClick={onOpenAdmin}
-            className="w-8 h-8 rounded-full border border-amber-800 text-amber-300 flex items-center justify-center"
-            style={{ background: '#5a2d14' }}
-            aria-label={t('adminTabShort')}
-            title={t('adminTabShort')}
-          >
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6V21a2 2 0 01-4 0v-1a1.7 1.7 0 00-1-.6 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1H3a2 2 0 010-4h1a1.7 1.7 0 00.6-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 012.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6V3a2 2 0 014 0v1a1.7 1.7 0 001 .6 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 012.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.2.36.4.7.6 1h1a2 2 0 010 4h-1a1.7 1.7 0 00-.6 1z" />
-            </svg>
-          </button>
-        )}
+        {!profileMode && adminMenu}
         <button
           type="button"
           onClick={handleReload}

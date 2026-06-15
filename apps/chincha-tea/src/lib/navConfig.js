@@ -104,3 +104,12 @@ export function getAdminShortcutTabs(member, t) {
 export function flattenNavTabIds(groups) {
   return groups.flatMap((g) => g.tabs.map((tab) => tab.id));
 }
+
+/** ชื่อหน้า overlay แอดมิน */
+export const TEA_OVERLAY_TITLES = {
+  dashboard: 'dashboardTabShort',
+  catalog: 'catalogTabShort',
+  profit: 'profitTabShort',
+  payroll: 'payrollTabShort',
+  admin: 'adminTabShort',
+};

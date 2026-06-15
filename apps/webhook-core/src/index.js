@@ -116,6 +116,13 @@ exports.lineWebhookTea = functions
         const userId     = event.source.userId;
         const groupId    = event.source.groupId || event.source.roomId || null;
 
+        const teaConfig = await getTeaLineConfig(db());
+        const teaGroupId = (teaConfig.notifyGroupId || '').trim();
+        if (groupId && teaGroupId && groupId !== teaGroupId) {
+          await completeLineEvent(db(), event);
+          continue;
+        }
+
         if (HELP_CMD.test(text)) {
           await lineReply(replyToken, HELP_TEXT, token);
           await completeLineEvent(db(), event);
@@ -408,8 +415,12 @@ exports.teaPushSummary = functions
       const decoded = await admin.auth().verifyIdToken(idToken);
       const userSnap = await db().collection('users').doc(decoded.uid).get();
       const user = userSnap.data();
-      if (!userSnap.exists || user.approved !== true || user.role !== 'admin') {
-        res.status(403).json({ error: 'admin only' }); return;
+      if (!userSnap.exists || user.approved !== true) {
+        res.status(403).json({ error: 'forbidden' }); return;
+      }
+      const role = user.role || 'staff';
+      if (!['admin', 'manager', 'staff'].includes(role)) {
+        res.status(403).json({ error: 'forbidden' }); return;
       }
 
       const dateKey = (req.body && req.body.dateKey) || todayBKK();

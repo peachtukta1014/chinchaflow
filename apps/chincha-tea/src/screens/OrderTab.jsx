@@ -78,6 +78,8 @@ export function OrderTab({
           allowedModes={['summary']}
           defaultMode="summary"
           compactHeader
+          hideSummaryHero
+          showLineSend
           onSummaryChanged={onSummaryChanged}
         />
       )}

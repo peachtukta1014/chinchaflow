@@ -34,8 +34,11 @@ export async function pushTeaLineSummary(dateKey) {
     if (json.error === 'no_targets') {
       throw new Error('ยังไม่ได้ตั้ง LINE Group ID ในแอดมิน → LINE Bot');
     }
+    if (json.error === 'forbidden') {
+      throw new Error('ไม่มีสิทธิ์ส่งสรุป LINE');
+    }
     if (json.error === 'admin only') {
-      throw new Error('เฉพาะแอดมินเท่านั้นที่ส่งสรุปได้');
+      throw new Error('ไม่มีสิทธิ์ส่งสรุป LINE');
     }
     if (json.error === 'unauthorized') {
       throw new Error('กรุณาออกจากระบบแล้วเข้าใหม่');

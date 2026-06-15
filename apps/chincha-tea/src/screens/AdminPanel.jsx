@@ -699,14 +699,19 @@ function OrderEditModal({ order, t, onClose, onSave }) {
 
 function LineSettingsSection({ t }) {
   const [form, setForm] = useState({ ...DEFAULT_LINE_CONFIG });
+  const [shrimpGroupId, setShrimpGroupId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchBusy, setFetchBusy] = useState(null);
   const [flash, setFlash] = useState('');
 
   useEffect(() => {
-    fsGetConfig('teaLine').then((doc) => {
-      if (doc) setForm({ ...DEFAULT_LINE_CONFIG, ...doc });
+    Promise.all([
+      fsGetConfig('teaLine'),
+      fsGetConfig('shrimpLine'),
+    ]).then(([teaDoc, shrimpDoc]) => {
+      if (teaDoc) setForm({ ...DEFAULT_LINE_CONFIG, ...teaDoc });
+      if (shrimpDoc?.notifyGroupId) setShrimpGroupId(String(shrimpDoc.notifyGroupId).trim());
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -787,39 +792,60 @@ function LineSettingsSection({ t }) {
         <p><code className="bg-white px-1 rounded">{form.envToken}</code> — Channel Access Token (Functions env)</p>
         <p className="text-[10px] opacity-80">รหัสลับตั้งใน Firebase Console → Functions → Environment variables เท่านั้น</p>
       </div>
-      <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-3">
+      <div className="bg-white rounded-2xl p-4 border border-stone-200 space-y-4">
         <p className="font-bold text-xs text-stone-700">{t('lineNotifyTargets')}</p>
-        <label className="text-[10px] font-bold text-stone-500 block">LINE Group ID (แจ้งสรุปปิดวัน)</label>
-        <input
-          className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
-          placeholder={t('lineGroupIdPlaceholder')}
-          value={form.notifyGroupId || ''}
-          onChange={(e) => setForm({ ...form, notifyGroupId: e.target.value.trim() })}
-        />
-        <button
-          type="button"
-          disabled={!!fetchBusy || saving}
-          onClick={() => fetchLineIds('group')}
-          className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
-        >
-          {fetchBusy === 'group' ? '⏳' : `📥 ${t('lineFetchGroupId')}`}
-        </button>
-        <label className="text-[10px] font-bold text-stone-500 block">User ID เพิ่มเติม (คั่นด้วย comma)</label>
-        <input
-          className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none"
-          placeholder={t('lineUserIdsPlaceholder')}
-          value={form.notifyUserIds || ''}
-          onChange={(e) => setForm({ ...form, notifyUserIds: e.target.value })}
-        />
-        <button
-          type="button"
-          disabled={!!fetchBusy || saving}
-          onClick={() => fetchLineIds('user')}
-          className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
-        >
-          {fetchBusy === 'user' ? '⏳' : `📥 ${t('lineFetchUserId')}`}
-        </button>
-        <p className="text-[10px] text-stone-400">{t('lineGroupIdHint')}</p>
+        <p className="text-[10px] text-stone-500 leading-relaxed">{t('lineThreeChannelsHint')}</p>
+
+        <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-3 space-y-2">
+          <p className="text-[11px] font-black text-stone-700">{t('lineChannelOa')}</p>
+          <p className="text-[10px] text-stone-500">{t('lineChannelOaHint')}</p>
+          <input
+            className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 text-xs font-mono outline-none bg-white"
+            placeholder={t('lineUserIdsPlaceholder')}
+            value={form.notifyUserIds || ''}
+            onChange={(e) => setForm({ ...form, notifyUserIds: e.target.value })}
+          />
+          <button
+            type="button"
+            disabled={!!fetchBusy || saving}
+            onClick={() => fetchLineIds('user')}
+            className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-emerald-50 text-emerald-800 disabled:opacity-50"
+          >
+            {fetchBusy === 'user' ? '⏳' : `📥 ${t('lineFetchUserId')}`}
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+          <p className="text-[11px] font-black text-emerald-900">{t('lineChannelTeaGroup')}</p>
+          <p className="text-[10px] text-emerald-800">{t('lineChannelTeaGroupHint')}</p>
+          <input
+            className="w-full px-3 py-2.5 rounded-xl border-2 border-emerald-200 text-xs font-mono outline-none bg-white"
+            placeholder={t('lineGroupIdPlaceholder')}
+            value={form.notifyGroupId || ''}
+            onChange={(e) => setForm({ ...form, notifyGroupId: e.target.value.trim() })}
+          />
+          <button
+            type="button"
+            disabled={!!fetchBusy || saving}
+            onClick={() => fetchLineIds('group')}
+            className="w-full py-2 rounded-xl text-xs font-bold border-2 border-emerald-300 bg-white text-emerald-800 disabled:opacity-50"
+          >
+            {fetchBusy === 'group' ? '⏳' : `📥 ${t('lineFetchGroupId')}`}
+          </button>
+          <p className="text-[10px] text-emerald-700/80">{t('lineGroupIdHint')}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+          <p className="text-[11px] font-black text-slate-700">{t('lineChannelShrimpGroup')}</p>
+          <p className="text-[10px] text-slate-500">{t('lineChannelShrimpGroupHint')}</p>
+          <input
+            readOnly
+            className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-xs font-mono outline-none bg-white text-slate-600"
+            placeholder={t('lineChannelShrimpEmpty')}
+            value={shrimpGroupId}
+          />
+          <p className="text-[10px] text-slate-400">{t('lineChannelShrimpReadonly')}</p>
+        </div>
       </div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-2">
         <p className="font-bold text-xs text-emerald-900">{t('lineInstantRestockNotify')}</p>
