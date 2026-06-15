@@ -6,8 +6,8 @@ export const MEMBER_PROFILE_TAB = 'my-profile';
 /** แท็บหลัก 4 แท็บ — พนักงานใช้ทุกวัน */
 export const MAIN_TEA_TABS = ['order', 'cups', 'restock', 'history'];
 
-/** แท็บแอดมิน/เมเนเจอร์ — เปิดจากปุ่มลัดด้านบน ไม่ซ้ำแท็บล่าง */
-export const ADMIN_OVERLAY_TABS = ['dashboard', 'catalog', 'profit', 'payroll', 'admin'];
+/** แท็บแอดมิน/เมเนเจอร์ — เปิดจากเมนู header เท่านั้น */
+export const ADMIN_OVERLAY_TABS = ['profit', 'stock', 'admin'];
 
 /** เมนูแอดมินเห็นครบทุกงานในแอปชา */
 export const ADMIN_TEA_TABS = [
@@ -16,10 +16,11 @@ export const ADMIN_TEA_TABS = [
   MEMBER_PROFILE_TAB,
 ];
 
-/** ผู้จัดการเห็นงานประจำวัน + ภาพรวม แต่ไม่เห็นเมนูจัดการระบบ/เงินเดือน/กำไร */
+/** ผู้จัดการเห็นงานประจำวัน + แดชบอร์ดกำไร/สต๊อก แต่ไม่เห็นเมนูจัดการระบบ */
 export const MANAGER_TEA_TABS = [
   ...MAIN_TEA_TABS,
-  'dashboard',
+  'profit',
+  'stock',
   MEMBER_PROFILE_TAB,
 ];
 
@@ -33,6 +34,9 @@ export const STAFF_TEA_TABS = [
 export const LEGACY_TAB_ALIASES = {
   ops: 'restock',
   summary: 'order',
+  dashboard: 'profit',
+  catalog: 'stock',
+  payroll: 'profit',
 };
 
 export function isMainTeaTab(tabId) {
@@ -72,6 +76,13 @@ export function isTeaStaff(member) {
   return normalizeTeaRole(member?.role) === 'staff';
 }
 
+/** เมเนเจอร์/แอดมิน — ตั้งราคาแก้วและท็อปปิ้งบนหน้าขาย */
+export function canManageTeaSaleSettings(member) {
+  if (!member || member.approved !== true) return false;
+  const role = normalizeTeaRole(member.role);
+  return role === 'admin' || role === 'manager';
+}
+
 export function getTeaTabsForMember(member) {
   if (!member) return [];
   if (isTeaAdmin(member)) return ADMIN_TEA_TABS;
@@ -85,6 +96,6 @@ export function canAccessTeaTab(member, tabId) {
 }
 
 export function getDefaultTeaTabForMember(member) {
-  if (isTeaAdmin(member)) return 'dashboard';
+  void member;
   return 'order';
 }

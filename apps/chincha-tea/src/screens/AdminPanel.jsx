@@ -64,29 +64,12 @@ const DEFAULT_LINE_CONFIG = {
   instantRestockNotify: true,
 };
 
-/** @param {{ catalogOnly?: boolean, settingsOnly?: boolean }} props — catalogOnly: เห็นเฉพาะสินค้า · settingsOnly: เมนูระบบไม่ซ้ำกับแท็บสินค้า */
-export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, onCatalogChanged, catalogOnly = false, settingsOnly = false }) {
-  const [section, setSection] = useState(catalogOnly ? 'products' : 'members');
+/** ตั้งค่าระบบ — สมาชิก · ประวัติออเดอร์ · LINE (เฉพาะแอดมิน) */
+export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged }) {
+  const [section, setSection] = useState('members');
   const [users, setUsers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [toppings, setToppings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [importBusy, setImportBusy] = useState(false);
   const [flash, setFlash] = useState('');
-
-  const refreshCatalogSection = useCallback(async () => {
-    try {
-      const [p, tp] = await cachedFetch(
-        CATALOG_CACHE_KEY,
-        () => Promise.all([fsQueryProducts(), fsQueryToppings()]),
-        CATALOG_TTL_MS,
-      );
-      setProducts(p);
-      setToppings(tp);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
 
   const refreshMembers = useCallback(async () => {
     try {
@@ -99,13 +82,12 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      if (catalogOnly) await refreshCatalogSection();
-      else await Promise.all([refreshMembers(), refreshCatalogSection()]);
+      await refreshMembers();
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
-  }, [catalogOnly, refreshCatalogSection, refreshMembers]);
+  }, [refreshMembers]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -151,111 +133,27 @@ export function AdminPanel({ t, lang = 'th', menuItems = [], onOrdersChanged, on
     }
   };
 
-  const saveProductHandler = async (form, id) => {
-    const saved = await saveProduct(form, id);
-    const row = { ...normalizeProductForm(form), id: saved.id || id };
-    setProducts((prev) => {
-      const idx = prev.findIndex((p) => p.id === row.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], ...row };
-        return next;
-      }
-      return [...prev, row];
-    });
-    onCatalogChanged?.();
-    showFlash(t('productSaved'));
-  };
-
-  const saveToppingHandler = async (form, id) => {
-    const saved = await saveTopping(form, id);
-    const row = { ...normalizeToppingForm(form), id: saved.id || id };
-    setToppings((prev) => {
-      const idx = prev.findIndex((p) => p.id === row.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], ...row };
-        return next;
-      }
-      return [...prev, row];
-    });
-    onCatalogChanged?.();
-    showFlash(t('toppingSaved'));
-  };
-
-  const quickPriceHandler = async (id, basePrice) => {
-    const price = await updateProductPrice(id, basePrice);
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, basePrice: price } : p)));
-    onCatalogChanged?.();
-    showFlash(t('priceUpdated'));
-  };
-
-  const menuNotInDb = listMenuNotInFirestore(products);
-
-  const importMenuHandler = async () => {
-    if (!window.confirm(`${t('importMenuToDb')}?\n(${menuNotInDb.length} เมนู)`)) return;
-    setImportBusy(true);
-    try {
-      const addedMenu = await importDefaultMenuToFirestore(products);
-      const addedTop = await importDefaultToppingsToFirestore(toppings);
-      await refresh();
-      onCatalogChanged?.();
-      showFlash(`${t('importMenuDone')} (+${addedMenu} เมนู · +${addedTop} ท็อป)`);
-    } catch (e) {
-      console.error(e);
-      showFlash(`❌ ${e?.message || 'นำเข้าไม่สำเร็จ'}`);
-    } finally {
-      setImportBusy(false);
-    }
-  };
-
   return (
     <div className="px-4 pt-3 pb-8 space-y-3">
-      {catalogOnly && (
-        <p className="text-[11px] text-sky-900 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 leading-relaxed">
-          {t('staffCatalogHint')}
-        </p>
-      )}
+      <p className="text-[11px] text-stone-600 bg-white border border-stone-200 rounded-xl px-3 py-2 leading-relaxed">
+        {t('adminSettingsHint')}
+      </p>
       {flash && (
         <div className="py-2 px-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200">{flash}</div>
       )}
-      {!catalogOnly && (
-        <SegmentedTabBar
-          tabs={[
-            ['members', t('members')],
-            ...(!settingsOnly ? [['products', t('products')]] : []),
-            ['orders', t('orderHistory')],
-            ['settings', t('lineSettings')],
-          ]}
-          activeId={section}
-          onSelect={setSection}
-        />
-      )}
-      {loading && ((!catalogOnly && section === 'members') || section === 'products') ? (
+      <SegmentedTabBar
+        tabs={[
+          ['members', t('members')],
+          ['orders', t('orderHistory')],
+          ['settings', t('lineSettings')],
+        ]}
+        activeId={section}
+        onSelect={setSection}
+      />
+      {loading && section === 'members' ? (
         <p className="text-center text-stone-400 py-8">{t('loading')}</p>
-      ) : !catalogOnly && section === 'members' ? (
+      ) : section === 'members' ? (
         <MembersSection users={users} t={t} onUpdate={updateUser} onDelete={deleteUser} />
-      ) : (section === 'products' || catalogOnly) && !settingsOnly ? (
-        <ProductsSection
-          products={products}
-          toppings={toppings}
-          menuNotInDb={menuNotInDb}
-          importBusy={importBusy}
-          onImportMenu={importMenuHandler}
-          t={t}
-          lang={lang}
-          onSaveProduct={saveProductHandler}
-          onSaveTopping={saveToppingHandler}
-          onQuickPrice={quickPriceHandler}
-          onDeleteProduct={(id) => fsDelete(`products/${id}`).then(() => {
-            setProducts((prev) => prev.filter((p) => p.id !== id));
-            onCatalogChanged?.();
-          })}
-          onDeleteTopping={(id) => fsDelete(`toppings/${id}`).then(() => {
-            setToppings((prev) => prev.filter((p) => p.id !== id));
-            onCatalogChanged?.();
-          })}
-        />
       ) : section === 'orders' ? (
         <OrdersSection t={t} lang={lang} menuItems={menuItems} onChanged={onOrdersChanged} />
       ) : (

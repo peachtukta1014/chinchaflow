@@ -34,6 +34,9 @@ export const TAB_ICONS = {
   profit: {
     d: 'M4 20V10m6 10V4m6 16v-6m4 6V8',
   },
+  stock: {
+    d: 'M5 4h14l1 8H4l1-8zm2 12h10v2H7v-2z',
+  },
 };
 
 const PRIMARY_NAV_GROUP = {
@@ -49,10 +52,8 @@ const PRIMARY_NAV_GROUP = {
 };
 
 const ADMIN_SHORTCUT_DEFS = [
-  { id: 'dashboard', labelKey: 'dashboardTabShort', icon: 'dashboard' },
-  { id: 'catalog', labelKey: 'catalogTabShort', icon: 'catalog' },
   { id: 'profit', labelKey: 'profitTabShort', icon: 'profit' },
-  { id: 'payroll', labelKey: 'payrollTabShort', icon: 'payroll' },
+  { id: 'stock', labelKey: 'stockTabShort', icon: 'stock' },
   { id: 'admin', labelKey: 'adminTabShort', icon: 'admin' },
 ];
 
@@ -107,9 +108,7 @@ export function flattenNavTabIds(groups) {
 
 /** ชื่อหน้า overlay แอดมิน */
 export const TEA_OVERLAY_TITLES = {
-  dashboard: 'dashboardTabShort',
-  catalog: 'catalogTabShort',
   profit: 'profitTabShort',
-  payroll: 'payrollTabShort',
+  stock: 'stockTabShort',
   admin: 'adminTabShort',
 };

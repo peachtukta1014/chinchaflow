@@ -11,7 +11,6 @@ import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
 import DailySummaryStickyBar from './components/DailySummaryStickyBar';
 import TeaAppHeaderMenu from './components/TeaAppHeaderMenu';
-import TeaHeaderQuickLinks from './components/TeaHeaderQuickLinks';
 import TabNav from './components/TabNav';
 import { getAdminShortcutTabs, getAppNavGroups, TEA_OVERLAY_TITLES } from './lib/navConfig';
 import {
@@ -29,9 +28,8 @@ import HistoryScreen from './screens/HistoryScreen';
 import { CupsTab } from './screens/CupsTab';
 import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
-import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
-import { DashboardTab } from './screens/DashboardTab';
+import { StockTab } from './screens/StockTab';
 import StaffGuidePanel from './components/StaffGuidePanel';
 import StaffLangNudge from './components/StaffLangNudge';
 import MyProfileScreen from './screens/MyProfileScreen';
@@ -229,9 +227,8 @@ export default function App() {
     if (!canAccessTeaTab(member, id) || !isTeaOverlayTab(id)) return;
     setLastMainTab((prev) => (isMainTeaTab(tab) ? tab : prev));
     setTab(id);
-    if (id === 'admin' || id === 'catalog') refreshCatalog();
-    if (id === 'history' || id === 'admin') refreshOrders();
-    if ((id === 'dashboard') && isTeaAdmin(member)) refreshPendingRestocks();
+    if (id === 'admin') refreshOrders();
+    if (id === 'stock' && isTeaAdmin(member)) refreshPendingRestocks();
   }, [member, tab, refreshCatalog, refreshOrders, refreshPendingRestocks]);
 
   const goBackFromOverlay = useCallback(() => {
@@ -400,14 +397,6 @@ export default function App() {
         />
       )}
 
-      {isMainTab && adminShortcuts.length > 0 && (
-        <TeaHeaderQuickLinks
-          links={adminMenuItems}
-          activeTab={tab}
-          onNavigate={openOverlay}
-        />
-      )}
-
       <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0] pb-4" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
           <OrderTab
@@ -422,6 +411,7 @@ export default function App() {
             onSectionChange={setOrderSection}
             onSummaryChanged={refreshDailySummary}
             onVoiceCartReady={() => setShowCart(true)}
+            onToppingsChanged={refreshCatalog}
           />
         )}
         {tab === 'cups' && (
@@ -454,33 +444,23 @@ export default function App() {
             member={member}
           />
         )}
-        {tab === 'dashboard' && canAccessTeaTab(member, 'dashboard') && (
-          <DashboardTab
+        {tab === 'profit' && canAccessTeaTab(member, 'profit') && (
+          <ProfitTab
             t={t}
+            lang={lang}
+            member={member}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
             todayKey={todayKey}
             pendingRestocks={pendingRestocks}
-            member={member}
-            onNavigate={(next) => {
-              if (next === 'restock') goMainTab('restock');
-              else if (next === 'summary') { goMainTab('order'); setOrderSection('close'); }
-              else if (canAccessTeaTab(member, next)) openOverlay(next);
-            }}
           />
         )}
-        {tab === 'catalog' && canAccessTeaTab(member, 'catalog') && (
-          <div className="px-4 pt-3 pb-8">
-            <AdminPanel catalogOnly t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />
-          </div>
-        )}
-        {tab === 'profit' && canAccessTeaTab(member, 'profit') && (
-          <ProfitTab t={t} lang={lang} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} />
-        )}
-        {tab === 'payroll' && canAccessTeaTab(member, 'payroll') && (
-          <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
+        {tab === 'stock' && canAccessTeaTab(member, 'stock') && (
+          <StockTab member={member} t={t} lang={lang} />
         )}
         {tab === 'admin' && canAccessTeaTab(member, 'admin') && (
           <div className="px-4 pt-3 pb-8">
-            <AdminPanel catalogOnly={false} settingsOnly t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} onCatalogChanged={refreshCatalog} />
+            <AdminPanel t={t} lang={lang} menuItems={menuItems} onOrdersChanged={() => { refreshOrders(); refreshDailySummary(todayKey); }} />
           </div>
         )}
         {isProfileTab && (

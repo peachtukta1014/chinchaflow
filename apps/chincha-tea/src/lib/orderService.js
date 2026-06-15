@@ -1,5 +1,5 @@
 import { fsPost } from './firestoreRest';
-import { ensurePrimaryStaffPresentOnSale } from './staffAttendanceService';
+import { ensureStaffPresentOnSale } from './staffAttendanceService';
 import { staffSnapshot, writeHistoryLog } from './historyLogService';
 import { deductTeaOrderInventory } from './inventoryService';
 
@@ -39,8 +39,8 @@ export async function saveTeaOrder({
     console.warn('deductTeaOrderInventory failed', e);
   }
   try {
-    await ensurePrimaryStaffPresentOnSale({ dateKey });
+    await ensureStaffPresentOnSale({ dateKey, member });
   } catch (e) {
-    console.warn('ensurePrimaryStaffPresentOnSale failed', e);
+    console.warn('ensureStaffPresentOnSale failed', e);
   }
 }
