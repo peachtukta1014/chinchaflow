@@ -9,12 +9,12 @@ const {
 } = require('./parseLineOrder');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { getLineOrderSession } = require('./lineOrderSession');
-const { buildShrimpSummaryForDate } = require('./shrimpDailySummary');
+const { buildShrimpSummaryForDate, SHRIMP_GROUP_HELP_TEXT } = require('./shrimpDailySummary');
 const { isShrimpGroupChat } = require('./shrimpGroupKeyboard');
 const { buildShrimpTodayOrdersSummary } = require('./shrimpTodayOrdersSummary');
 const { processShrimpPaymentSlipImage } = require('./shrimpPaymentSlip');
 
-const GROUP_ALLOWED_TEXT_INTENTS = new Set(['summary', 'today_orders', 'order']);
+const GROUP_ALLOWED_TEXT_INTENTS = new Set(['summary', 'today_orders', 'order', 'help']);
 const SHRIMP_GROUP_PRODUCT_RE = /กุ้ง\s*(ใหญ่|กลาง|เล็ก|ตาย|แม่น้ำ)|กุ้ง(ใหญ่|กลาง|เล็ก|ตาย|แม่น้ำ)/i;
 
 function hasGroupOrderQuantity(body) {
@@ -67,6 +67,11 @@ async function handleShrimpGroupTextEvent(db, admin, { event, token, context }) 
   const intent = classifyShrimpLineMessage(text, session, { groupId });
   if (!GROUP_ALLOWED_TEXT_INTENTS.has(intent)) {
     return { skipped: 'ignored_group_text' };
+  }
+
+  if (intent === 'help') {
+    await lineReply(replyToken, SHRIMP_GROUP_HELP_TEXT, token);
+    return { ok: true, handled: 'help' };
   }
 
   if (intent === 'summary') {

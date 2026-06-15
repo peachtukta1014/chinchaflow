@@ -16,9 +16,7 @@ const {
   dispatchTeaSummary,
   lineReply,
   HELP_TEXT,
-  SUMMARY_CMD,
-  RESTOCK_PURCHASE_CMD,
-  HELP_CMD,
+  classifyTeaLineCommand,
   getTeaLineConfig,
 } = require('./teaDailySummary');
 const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
@@ -118,18 +116,27 @@ exports.lineWebhookTea = functions
 
         const teaConfig = await getTeaLineConfig(db());
         const teaGroupId = (teaConfig.notifyGroupId || '').trim();
+        const cmd = classifyTeaLineCommand(text);
         if (groupId && teaGroupId && groupId !== teaGroupId) {
+          if (cmd) {
+            await lineReply(
+              replyToken,
+              '⚠️ กลุ่ม LINE นี้ไม่ตรงกับกลุ่มร้านน้ำที่ตั้งในแอป (จัดการ → LINE)\n'
+              + 'ให้แอดมินเช็ก Group ID หรือพิมพ์ในกลุ่มร้านน้ำที่ถูกต้อง',
+              token,
+            );
+          }
           await completeLineEvent(db(), event);
           continue;
         }
 
-        if (HELP_CMD.test(text)) {
+        if (cmd === 'help') {
           await lineReply(replyToken, HELP_TEXT, token);
           await completeLineEvent(db(), event);
           continue;
         }
 
-        if (SUMMARY_CMD.test(text)) {
+        if (cmd === 'summary') {
           const dateKey = todayBKK();
           try {
             const summary = await buildSummaryForDate(db(), dateKey);
@@ -142,7 +149,7 @@ exports.lineWebhookTea = functions
           continue;
         }
 
-        if (RESTOCK_PURCHASE_CMD.test(text)) {
+        if (cmd === 'restock') {
           const dateKey = todayBKK();
           try {
             const msg = await buildRestockPurchaseForDate(db(), dateKey);
