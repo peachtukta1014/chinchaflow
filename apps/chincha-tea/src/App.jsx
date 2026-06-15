@@ -9,15 +9,16 @@ import { useCatalog } from './lib/useCatalog';
 import { clearTeaMemberCache, subscribeTeaMember } from './lib/authSession';
 import { saveTeaOrder } from './lib/orderService';
 import AppHeader from './components/AppHeader';
+import AdminShortcutBar from './components/AdminShortcutBar';
 import TabNav from './components/TabNav';
-import { getAppNavGroups } from './lib/navConfig';
-import { canAccessTeaTab, getDefaultTeaTabForMember, isTeaAdmin } from './lib/teaRoles';
+import { getAdminShortcutTabs, getAppNavGroups } from './lib/navConfig';
+import { canAccessTeaTab, getDefaultTeaTabForMember, isMainTeaTab, isTeaAdmin, resolveLegacyTeaTab } from './lib/teaRoles';
 import CartSheet from './components/CartSheet';
 import { LoginScreen } from './screens/LoginScreen';
 import { OrderTab } from './screens/OrderTab';
 import HistoryScreen from './screens/HistoryScreen';
-import { SummaryTab } from './screens/SummaryTab';
-import { OpsTab } from './screens/OpsTab';
+import { CupsTab } from './screens/CupsTab';
+import { RestockTab } from './screens/RestockTab';
 import { AdminPanel } from './screens/AdminPanel';
 import { PayrollTab } from './screens/PayrollTab';
 import { ProfitTab } from './screens/ProfitTab';
@@ -36,8 +37,8 @@ export default function App() {
   const [authPending, setAuthPending] = useState(false);
   const [tab, setTab] = useState('order');
   const [lastTab, setLastTab] = useState('order');
+  const [orderSection, setOrderSection] = useState('order');
   const [cart, setCart] = useState([]);
-  const [modalItem, setModalItem] = useState(null);
   const [orders, setOrders] = useState([]);
   const [saving, setSaving] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -60,6 +61,7 @@ export default function App() {
   const todayKey = dateKeyBangkok();
   const [viewDateKey, setViewDateKey] = useState(todayKey);
   const navGroups = useMemo(() => getAppNavGroups(member, t), [member, t]);
+  const adminShortcuts = useMemo(() => getAdminShortcutTabs(member, t), [member, t]);
 
   const refreshOrders = useCallback(async () => {
     const docs = await fsQueryOrders(viewDateKey);
@@ -97,16 +99,24 @@ export default function App() {
   useEffect(() => {
     if (!isAuthed || tabBootstrappedRef.current) return;
     const defaultTab = getDefaultTeaTabForMember(member);
-    setTab(defaultTab);
-    setLastTab(defaultTab);
+    const resolvedTab = resolveLegacyTeaTab(defaultTab);
+    setTab(resolvedTab);
+    setLastTab(resolvedTab);
+    if (defaultTab === 'summary') setOrderSection('close');
     tabBootstrappedRef.current = true;
   }, [isAuthed, member]);
 
   useEffect(() => {
     if (!isAuthed || !member) return;
+    const resolvedTab = resolveLegacyTeaTab(tab);
+    if (resolvedTab !== tab) {
+      setTab(resolvedTab);
+      if (tab === 'summary') setOrderSection('close');
+      return;
+    }
     if (canAccessTeaTab(member, tab)) return;
     const fallbackTab = canAccessTeaTab(member, lastTab) ? lastTab : getDefaultTeaTabForMember(member);
-    setTab(fallbackTab);
+    setTab(resolveLegacyTeaTab(fallbackTab));
   }, [isAuthed, member, tab, lastTab]);
 
   // ภาษา: sync กับ Firestore เมื่อ login + migration staff 'th' → 'my'
@@ -134,7 +144,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isAuthed) return;
-    if (tab === 'summary' || tab === 'admin' || tab === 'history') refreshOrders();
+    if (tab === 'history' || tab === 'admin' || tab === 'order') refreshOrders();
   }, [isAuthed, tab, refreshOrders]);
 
   const refreshPendingRestocks = useCallback(async (force = false) => {
@@ -172,7 +182,7 @@ export default function App() {
       showWebNotify(
         t('restockNotifyTitle'),
         t('restockNotifyBody').replace('{n}', String(pendingRestocks)),
-        { tag: 'restock', onClick: () => setTab('ops') },
+        { tag: 'restock', onClick: () => setTab('restock') },
       );
     }
     prevPendingRestocksRef.current = pendingRestocks;
@@ -200,12 +210,24 @@ export default function App() {
   }, []);
 
   const openAdminFromHeader = useCallback(() => {
-    if (!canAccessTeaTab(member, 'admin')) return;
-    setTab('admin');
-    setLastTab('admin');
-    refreshCatalog();
+    const target = canAccessTeaTab(member, 'dashboard') ? 'dashboard' : 'admin';
+    if (!canAccessTeaTab(member, target)) return;
+    setTab(target);
+    setLastTab(target);
+    if (target === 'admin' || target === 'catalog') refreshCatalog();
     refreshOrders();
   }, [member, refreshCatalog, refreshOrders]);
+
+  const selectTab = useCallback((id) => {
+    if (!canAccessTeaTab(member, id)) return;
+    const resolved = resolveLegacyTeaTab(id);
+    if (resolved === 'order' && id === 'summary') setOrderSection('close');
+    setTab(resolved);
+    if (isMainTeaTab(resolved)) setLastTab(resolved);
+    if (resolved === 'admin' || resolved === 'catalog') refreshCatalog();
+    if (resolved === 'history' || resolved === 'admin' || resolved === 'order') refreshOrders();
+    if ((resolved === 'restock' || resolved === 'dashboard') && isTeaAdmin(member)) refreshPendingRestocks();
+  }, [member, refreshCatalog, refreshOrders, refreshPendingRestocks]);
 
   const handleLogout = async () => {
     if (!window.confirm(`${t('logout')}?`)) return;
@@ -301,7 +323,7 @@ export default function App() {
         profileMode={isProfileTab}
         onBackFromProfile={goBackFromProfile}
         onOpenAdmin={openAdminFromHeader}
-        showAdminButton={canAccessTeaTab(member, 'admin')}
+        showAdminButton={adminShortcuts.length > 0}
         t={t}
         dailySummary={headerSummary}
       />
@@ -313,67 +335,64 @@ export default function App() {
         </>
       )}
 
+      {adminShortcuts.length > 0 && !isProfileTab && (
+        <AdminShortcutBar
+          shortcuts={adminShortcuts}
+          activeTab={tab}
+          badges={isAdmin ? { restock: pendingRestocks } : {}}
+          onSelect={selectTab}
+          t={t}
+        />
+      )}
+
       {!isProfileTab && (
         <TabNav
           groups={navGroups}
-          activeTab={tab}
-          badges={isAdmin ? { ops: pendingRestocks } : {}}
-          onSelect={(id) => {
-            if (!canAccessTeaTab(member, id)) return;
-            setTab(id);
-            setLastTab(id);
-            if (id === 'admin' || id === 'catalog') refreshCatalog();
-            if (id === 'summary' || id === 'admin' || id === 'history') refreshOrders();
-            if ((id === 'ops' || id === 'dashboard') && isAdmin) refreshPendingRestocks();
-          }}
+          activeTab={isMainTeaTab(tab) ? tab : ''}
+          badges={isAdmin ? { restock: pendingRestocks } : {}}
+          onSelect={selectTab}
         />
       )}
 
       <main className="flex-1 overflow-y-auto z-10 bg-[#fdf6f0] pb-24" style={{ scrollbarWidth: 'none' }}>
         {tab === 'order' && (
           <OrderTab
-            menuItems={menuItems}
             toppingsList={toppingsList}
             lang={lang}
             t={t}
             onAddToCart={addToCart}
-            setModalItem={setModalItem}
-            modalItem={modalItem}
             member={member}
-            onBulkEntrySaved={(dateKey) => {
-              if (dateKey === viewDateKey) refreshOrders();
-              refreshDailySummary(dateKey);
-            }}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+            section={orderSection}
+            onSectionChange={setOrderSection}
+            onSummaryChanged={refreshDailySummary}
             onVoiceCartReady={() => setShowCart(true)}
           />
         )}
-        {tab === 'summary' && (
-          <SummaryTab
-            orders={orders}
+        {tab === 'cups' && (
+          <CupsTab
+            member={member}
             t={t}
             lang={lang}
             viewDateKey={viewDateKey}
             setViewDateKey={setViewDateKey}
-            member={member}
-            menuItems={menuItems}
-            isAdmin={isAdmin}
             onSummaryChanged={refreshDailySummary}
           />
         )}
-        {tab === 'ops' && (
-          <OpsTab
+        {tab === 'restock' && (
+          <RestockTab
             member={member}
             t={t}
             lang={lang}
-            viewDateKey={viewDateKey}
-            setViewDateKey={setViewDateKey}
             onRestockListChange={isAdmin ? () => refreshPendingRestocks(true) : undefined}
           />
         )}
         {tab === 'dashboard' && canAccessTeaTab(member, 'dashboard') && (
           <DashboardTab t={t} todayKey={todayKey} pendingRestocks={pendingRestocks} member={member} onNavigate={(next) => {
-            if (next === 'restock') setTab('ops');
-            else if (canAccessTeaTab(member, next)) setTab(next);
+            if (next === 'restock') selectTab('restock');
+            else if (next === 'summary') { selectTab('order'); setOrderSection('close'); }
+            else if (canAccessTeaTab(member, next)) selectTab(next);
           }} />
         )}
         {tab === 'catalog' && canAccessTeaTab(member, 'catalog') && (
@@ -388,7 +407,16 @@ export default function App() {
           <PayrollTab member={member} t={t} lang={lang} todayKey={todayKey} />
         )}
         {tab === 'history' && canAccessTeaTab(member, 'history') && (
-          <HistoryScreen orders={orders} viewDateKey={viewDateKey} setViewDateKey={setViewDateKey} todayKey={todayKey} t={t} lang={lang} menuItems={menuItems} />
+          <HistoryScreen
+            orders={orders}
+            viewDateKey={viewDateKey}
+            setViewDateKey={setViewDateKey}
+            todayKey={todayKey}
+            t={t}
+            lang={lang}
+            menuItems={menuItems}
+            member={member}
+          />
         )}
         {tab === 'admin' && canAccessTeaTab(member, 'admin') && (
           <div className="px-4 pt-3 pb-8">
@@ -400,7 +428,7 @@ export default function App() {
         )}
       </main>
 
-      {cart.length > 0 && tab === 'order' && (
+      {cart.length > 0 && tab === 'order' && orderSection === 'order' && (
         <div className="z-20 shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"

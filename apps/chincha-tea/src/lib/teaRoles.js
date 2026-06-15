@@ -3,37 +3,45 @@ import { normalizeTeaRole } from './teaUserService.js';
 
 export const MEMBER_PROFILE_TAB = 'my-profile';
 
+/** แท็บหลัก 4 แท็บ — พนักงานใช้ทุกวัน */
+export const MAIN_TEA_TABS = ['order', 'cups', 'restock', 'history'];
+
+/** แท็บแอดมิน/เมเนเจอร์ — เปิดจากปุ่มลัดด้านบน ไม่ซ้ำแท็บล่าง */
+export const ADMIN_OVERLAY_TABS = ['dashboard', 'catalog', 'profit', 'payroll', 'admin'];
+
 /** เมนูแอดมินเห็นครบทุกงานในแอปชา */
 export const ADMIN_TEA_TABS = [
-  'order',
-  'ops',
-  'summary',
-  'dashboard',
-  'catalog',
-  'profit',
-  'payroll',
-  'history',
-  'admin',
+  ...MAIN_TEA_TABS,
+  ...ADMIN_OVERLAY_TABS,
   MEMBER_PROFILE_TAB,
 ];
 
-/** ผู้จัดการเห็นงานประจำวัน + ภาพรวม/ประวัติ แต่ไม่เห็นเมนูจัดการระบบ/เงินเดือน/กำไร */
+/** ผู้จัดการเห็นงานประจำวัน + ภาพรวม แต่ไม่เห็นเมนูจัดการระบบ/เงินเดือน/กำไร */
 export const MANAGER_TEA_TABS = [
-  'order',
-  'ops',
-  'summary',
+  ...MAIN_TEA_TABS,
   'dashboard',
-  'history',
   MEMBER_PROFILE_TAB,
 ];
 
-/** พนักงานหน้าร้านเห็นเฉพาะขาย, สั่งของ/สต๊อกแก้ว, ปิดกะ และโปรไฟล์ตัวเอง */
+/** พนักงานหน้าร้านเห็นเฉพาะงานขาย/แก้ว/สั่งของ/ประวัติ และโปรไฟล์ตัวเอง */
 export const STAFF_TEA_TABS = [
-  'order',
-  'ops',
-  'summary',
+  ...MAIN_TEA_TABS,
   MEMBER_PROFILE_TAB,
 ];
+
+/** @deprecated ใช้ MAIN_TEA_TABS แทน — คง alias เพื่อ migration localStorage */
+export const LEGACY_TAB_ALIASES = {
+  ops: 'restock',
+  summary: 'order',
+};
+
+export function isMainTeaTab(tabId) {
+  return MAIN_TEA_TABS.includes(tabId);
+}
+
+export function resolveLegacyTeaTab(tabId) {
+  return LEGACY_TAB_ALIASES[tabId] || tabId;
+}
 
 export function getTeaRoleLabel(role, t) {
   if (role === 'admin') return t('roleAdmin');
@@ -62,7 +70,8 @@ export function getTeaTabsForMember(member) {
 }
 
 export function canAccessTeaTab(member, tabId) {
-  return getTeaTabsForMember(member).includes(tabId);
+  const resolved = resolveLegacyTeaTab(tabId);
+  return getTeaTabsForMember(member).includes(resolved);
 }
 
 export function getDefaultTeaTabForMember(member) {
