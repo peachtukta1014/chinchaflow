@@ -45,7 +45,7 @@ export function DashboardTab({
   const [periodWage, setPeriodWage] = useState(0);
   const [periodDays, setPeriodDays] = useState(0);
   const canOpen = useCallback(
-    (id) => (id === 'restock' ? canAccessTeaTab(member, 'ops') : canAccessTeaTab(member, id)),
+    (id) => canAccessTeaTab(member, id),
     [member],
   );
   const canViewFinancials = canOpen('profit') || canOpen('payroll');
@@ -88,13 +88,16 @@ export function DashboardTab({
   }, [load]);
 
   const quickLinks = [
-    { id: 'summary', label: t('summaryTabShort'), icon: '📊' },
+    { id: 'order-close', label: t('orderSubTabClose'), icon: '📊' },
     { id: 'profit', label: t('profitTabShort'), icon: '💰' },
     { id: 'payroll', label: t('payrollTabShort'), icon: '📅' },
     { id: 'restock', label: t('restockTabShort'), icon: '📦', badge: pendingRestocks },
     { id: 'history', label: t('historyTabShort'), icon: '🕘' },
     { id: 'admin', label: t('adminTabShort'), icon: '⚙️' },
-  ].filter((link) => canOpen(link.id));
+  ].filter((link) => {
+    if (link.id === 'order-close') return canOpen('order');
+    return canOpen(link.id);
+  });
 
   return (
     <div className="px-4 pt-2 pb-8 space-y-3">
@@ -154,7 +157,7 @@ export function DashboardTab({
                 <button
                   key={link.id}
                   type="button"
-                  onClick={() => onNavigate?.(link.id)}
+                  onClick={() => onNavigate?.(link.id === 'order-close' ? 'summary' : link.id)}
                   className="relative flex flex-col items-center justify-center gap-1 py-3 rounded-xl bg-white border border-stone-200 text-stone-700 active:scale-95"
                 >
                   <span className="text-lg">{link.icon}</span>

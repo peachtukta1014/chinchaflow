@@ -1,4 +1,12 @@
-## 2026-06-14 — ชา: Smart Price Order รอบปลอดภัย
+## 2026-06-15 — ชา: PR2 Smart POS 4-tab cleanup
+
+- จัดแท็บล่างเป็น 4 แท็บหลัก: `ขาย`, `แก้วหน้าร้าน`, `สั่งของ`, `ประวัติ` แทน `ขาย/หลังร้าน/บัญชี`
+- แท็บ `ขาย` มีแถบย่อย `บันทึกออเดอร์` + `ปิดวัน` (ฟอร์มสรุปจาก `ExpensesTab` / `dailySummaryService`) และลบเมนูเดิม/สำรองออกจากหน้าขาย
+- ย้ายเมนูแอดมิน (`Dashboard`, `สินค้า`, `กำไร`, `ค่าแรง`, `ระบบ`) เป็นปุ่มลัดด้านบน (`AdminShortcutBar`) ไม่ซ้ำแท็บล่าง
+- หน้า `ประวัติ` แสดงบันทึกปิดกะย้อนหลังจาก `dailyExpenses` type `dailySummary` + รายการบิลแบบพับได้
+- Header ยังใช้ `dailySummaryService` สำหรับยอดเงิน/แก้ววันนี้ทุกแท็บ · alias `ops→restock`, `summary→order+ปิดวัน` สำหรับ session เก่า
+- ถ้าพังอีกให้เช็ก `apps/chincha-tea/src/lib/navConfig.js`, `apps/chincha-tea/src/lib/teaRoles.js`, `apps/chincha-tea/src/App.jsx`, `apps/chincha-tea/src/screens/OrderTab.jsx`, `apps/chincha-tea/src/screens/HistoryScreen.jsx`, `apps/chincha-tea/src/components/AdminShortcutBar.jsx`
+
 
 - เพิ่ม flow ขายแบบราคาแก้วตรง ๆ ใน `OrderTab`: เลือกราคา/จำนวน/ท็อปปิ้ง แล้วเพิ่มเข้าตะกร้าให้พนักงานตรวจและกดบันทึกเอง
 - เพิ่ม parser เสียง/ข้อความ `parseSmartPriceOrder` สำหรับตัวอย่าง `25 2แก้ว ไข่มุก 1 แก้ว` ให้คำนวณเป็น `25×2 + 10 = 60` โดยไม่จบบิลอัตโนมัติ
