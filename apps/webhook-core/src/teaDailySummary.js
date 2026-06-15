@@ -252,18 +252,41 @@ const HELP_TEXT = [
   'ไม่ใช่รับออเดอร์ลูกค้า',
   '',
   'คำสั่ง:',
-  '• สรุป / สรุปวันนี้ / ปิดวัน',
+  '• สรุป / สรุปวันนี้ / ปิดวัน / ยอดขายวันนี้',
   '   → สรุปยอดขาย สด/โอน แก้ว ค่าใช้จ่าย สั่งของ',
-  '• ซื้อเข้าร้าน / ซื้อของ',
+  '• ซื้อเข้าร้าน / ซื้อของ / restock',
   '   → รายการสั่งของวันนี้ + ยอดที่ซื้อแล้ว',
-  '• help / ช่วยเหลือ',
+  '• help / ช่วยเหลือ / คำสั่ง / menu',
+  '',
+  'คีย์ลัด (กลุ่มร้านน้ำ):',
+  '• 1 → สรุปวันนี้',
+  '• 2 → ซื้อเข้าร้าน',
+  '• 3 หรือ help → คำสั่งนี้',
   '',
   'สรุปอัตโนมัติตามเวลาที่แอดมินตั้งในแอป',
 ].join('\n');
 
-const SUMMARY_CMD = /^(สรุป|สรุปวันนี้|ปิดวัน|summary|daily|รายงาน)/i;
-const RESTOCK_PURCHASE_CMD = /^(ซื้อเข้าร้าน|ซื้อของเข้าร้าน|ซื้อของ|restock|buy[\s-]?in)/i;
-const HELP_CMD = /^(help|ช่วยเหลือ|คำสั่ง|menu)/i;
+const SUMMARY_CMD = /^(สรุป|สรุปวันนี้|ปิดวัน|ยอดขาย|ยอดขายวันนี้|summary|daily|รายงาน)(\s|$)/i;
+const RESTOCK_PURCHASE_CMD = /^(ซื้อเข้าร้าน|ซื้อของเข้าร้าน|ซื้อของ|restock|buy[\s-]?in)(\s|$)/i;
+const HELP_CMD = /^(help|ช่วยเหลือ|ช่วย|คำสั่ง|menu|เมนู|คีย์|\?|h)(\s|$)/i;
+
+/** จำแนกคำสั่งข้อความ LINE ชา — รวมคีย์ลัดตัวเลข */
+function classifyTeaLineCommand(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+  if (/^1$/.test(raw)) return 'summary';
+  if (/^2$/.test(raw)) return 'restock';
+  if (/^3$/.test(raw)) return 'help';
+  if (HELP_CMD.test(raw)) return 'help';
+  if (SUMMARY_CMD.test(raw)) return 'summary';
+  if (RESTOCK_PURCHASE_CMD.test(raw)) return 'restock';
+  if (/ยอดขาย.*(วันนี้|สรุป)|(สรุป|ปิดวัน).*ยอดขาย/i.test(raw)) return 'summary';
+  return null;
+}
+
+function isTeaLineCommand(text) {
+  return classifyTeaLineCommand(text) != null;
+}
 
 module.exports = {
   todayBKK,
@@ -277,4 +300,6 @@ module.exports = {
   SUMMARY_CMD,
   RESTOCK_PURCHASE_CMD,
   HELP_CMD,
+  classifyTeaLineCommand,
+  isTeaLineCommand,
 };

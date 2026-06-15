@@ -545,11 +545,30 @@ try {
   assert(routerSrc.includes('handleShrimpGroupLineEvent'), 'router แยก group handler');
   assert(groupSrc.includes('GROUP_ALLOWED_TEXT_INTENTS'), 'group flow allowlist text intents');
   assert(groupSrc.includes('allowGroup: Boolean(context.chatId && isShrimpGroupChat(context.chatId))'), 'group image uses group guard');
+  assert(groupSrc.includes("'help'"), 'group flow รองรับ help');
+  assert(groupSrc.includes('SHRIMP_GROUP_HELP_TEXT'), 'group help text');
   assert(slipSrc.includes('group_image_without_open_bill'), 'group image without open bill is guarded');
   assert(directSrc.includes('allowGroup: false'), 'direct image ไม่เปิด group guard');
   assert(!directSrc.includes('group_image_without_open_bill'), 'direct image ไม่ถูกบังคับด้วย group_image_without_open_bill');
 } catch (e) {
   fail('shrimpLineWebhookRouter', e);
+}
+
+try {
+  const tea = requireWebhook('../../webhook-core/src/teaDailySummary.js');
+  assert(tea.classifyTeaLineCommand('สรุป') === 'summary', 'tea สรุป');
+  assert(tea.classifyTeaLineCommand('1') === 'summary', 'tea key 1');
+  assert(tea.classifyTeaLineCommand('2') === 'restock', 'tea key 2');
+  assert(tea.classifyTeaLineCommand('help') === 'help', 'tea help');
+  const kb = requireWebhook('../../webhook-core/src/shrimpGroupKeyboard.js');
+  assert(kb.classifyShrimpGroupKeyboard('2') === 'help', 'shrimp group key 2 help');
+  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  assert(
+    intent.classifyShrimpLineMessage('help', null, { groupId: 'C123' }) === 'help',
+    'shrimp group help intent',
+  );
+} catch (e) {
+  fail('lineKeywordCommands', e);
 }
 
 try {

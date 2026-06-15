@@ -159,6 +159,21 @@ const SHRIMP_HELP_TEXT = [
   'ไม่ระบุวันส่ง = ตามช่วงเวลาในแอป (ค่าเริ่มต้น 18:00–15:00 น.) · แชททั่วไป — บอทไม่ตอบ',
 ].join('\n');
 
+const SHRIMP_GROUP_HELP_TEXT = [
+  '🤖 กลุ่มกุ้ง — คีย์ลัด',
+  '',
+  '• 1 → สรุปออเดอร์วันนี้',
+  '• 3 → สรุปยอดขาย POS',
+  '• 2 หรือ help → คำสั่ง',
+  '',
+  'พิมพ์ได้เต็ม:',
+  '• สรุปออเดอร์ / สรุปรายการวันนี้',
+  '• สรุป / ยอดขายวันนี้',
+  '• สั่งกุ้ง + จำนวน (เช่น กุ้งใหญ่ 2 กก)',
+  '',
+  'แชททั่วไป — บอทไม่ตอบ',
+].join('\n');
+
 module.exports = {
   aggregateDailySales,
   buildShrimpSummaryForDate,
@@ -167,4 +182,5 @@ module.exports = {
   isShrimpSummaryCommand,
   SHRIMP_HELP_CMD,
   SHRIMP_HELP_TEXT,
+  SHRIMP_GROUP_HELP_TEXT,
 };
