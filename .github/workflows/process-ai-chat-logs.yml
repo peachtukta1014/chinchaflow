@@ -25,5 +25,5 @@ jobs:
       - name: Run AI Agent
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          AI_CODE_INSTRUCTION: "จัดระเบียบ Partition ใน apps/webhook-core/"
+          AI_CODE_INSTRUCTION: ""
         run: node index.js
