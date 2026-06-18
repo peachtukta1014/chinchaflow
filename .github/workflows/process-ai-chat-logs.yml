@@ -1,0 +1,41 @@
+name: Process Historical AI Chat Logs
+
+on:
+  # เปิดให้พี่พีชสามารถมากดปุ่มสั่งรันระบบด้วยมือตัวเองได้จากหน้าต่าง Actions บน GitHub
+  workflow_dispatch:
+
+jobs:
+  run-ai-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # ใช้ Node.js เวอร์ชันมาตรฐานในการรันสคริปต์
+
+      - name: Install Dependencies
+        # คำสั่งนี้จะช่วยติดตั้ง library ที่จำเป็นก่อนรันงาน (ถ้ามีไฟล์ package.json)
+        run: |
+          if [ -f package.json ]; then
+            npm install
+          fi
+
+      - name: Run AI Agent with DeepSeek V4 Flash
+        # จังหวะนี้ระบบจะทำการดึงกุญแจลับจาก GitHub Secret และตั้งค่าโมเดล DeepSeek V4 Flash สแตนด์บายไว้ครับ
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEFAULT_MODEL: "deepseek/deepseek-v4-flash"
+        run: |
+          echo "🤖 [Chinchaflow AI System] กำลังเปิดใช้งานสมอง DeepSeek V4 Flash..."
+          echo "📂 เตรียมพร้อมประมวลผลและจัดระเบียบไฟล์ประวัติแชท AI ย้อนหลัง..."
+          
+          # โค้ดด้านล่างนี้คือคำสั่งจำลองรันไฟล์หลัก (พี่สามารถเปลี่ยนเป็นชื่อไฟล์สคริปต์จริงของพี่ได้ในอนาคตครับ)
+          if [ -f index.js ]; then
+            node index.js
+          else
+            echo "💡 ระเบียบล็อคระบบเชื่อมต่อท่อน้ำสำเร็จ! (รอไฟล์สคริปต์หลักเพื่อเริ่มประมวลผลข้อมูลแชท)"
+          fi
