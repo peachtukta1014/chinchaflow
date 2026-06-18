@@ -3,15 +3,22 @@ name: Process Historical AI Chat Logs
 on:
   workflow_dispatch:
 
+# สำคัญมาก! อนุญาตให้ระบบเขียนไฟล์และ Push โค้ดได้
+permissions:
+  contents: write
+
 jobs:
   run-ai-agent:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-
+          
       - name: Install Dependencies
         run: npm install
 
