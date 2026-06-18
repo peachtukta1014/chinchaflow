@@ -6,33 +6,17 @@ on:
 jobs:
   run-ai-agent:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install Dependencies
-        run: |
-          if [ -f package.json ]; then
-            npm install
-          fi
+        run: npm install
 
-      - name: Run AI Agent with DeepSeek V4 Flash
+      - name: Run AI Agent
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          DEFAULT_MODEL: "deepseek/deepseek-v4-flash"
-        run: node index.js|
-          echo "🤖 [Chinchaflow AI System] กำลังเปิดใช้งานสมอง DeepSeek V4 Flash..."
-          echo "📂 เตรียมพร้อมประมวลผลและจัดระเบียบไฟล์ประวัติแชท AI ย้อนหลัง..."
-          
-          # ใช้ --input-type=commonjs เพื่อบังคับให้ Node มองไฟล์เป็น CommonJS
-          if [ -f index.js ]; then
-            node --input-type=commonjs index.js
-          else
-            echo "💡 ระเบียบล็อคระบบเชื่อมต่อท่อน้ำสำเร็จ! (รอไฟล์สคริปต์หลักเพื่อเริ่มประมวลผลข้อมูลแชท)"
-          fi
+          AI_CODE_INSTRUCTION: "จัดระเบียบ Partition ใน apps/webhook-core/"
+        run: node index.js
