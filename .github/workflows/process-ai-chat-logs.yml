@@ -26,7 +26,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           DEFAULT_MODEL: "deepseek/deepseek-v4-flash"
-        run: |
+        run: node index.js|
           echo "🤖 [Chinchaflow AI System] กำลังเปิดใช้งานสมอง DeepSeek V4 Flash..."
           echo "📂 เตรียมพร้อมประมวลผลและจัดระเบียบไฟล์ประวัติแชท AI ย้อนหลัง..."
           
