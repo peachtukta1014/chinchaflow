@@ -2,8 +2,12 @@ name: Process Historical AI Chat Logs
 
 on:
   workflow_dispatch:
+    inputs:
+      ai_instruction:
+        description: 'คำสั่งสำหรับ AI (เช่น สร้างไฟล์สรุปแชท, แก้ไขโค้ด ฯลฯ)'
+        required: true
+        default: 'สรุปประวัติแชททั้งหมดในโฟลเดอร์ logs'
 
-# สำคัญมาก! อนุญาตให้ระบบเขียนไฟล์และ Push โค้ดได้
 permissions:
   contents: write
 
@@ -25,5 +29,6 @@ jobs:
       - name: Run AI Agent
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          AI_CODE_INSTRUCTION: ""
+          # ดึงค่าจากช่อง Input ที่เราสร้างขึ้น
+          AI_CODE_INSTRUCTION: ${{ github.event.inputs.ai_instruction }}
         run: node index.js
