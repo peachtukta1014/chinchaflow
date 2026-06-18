@@ -6,7 +6,7 @@ on:
       ai_instruction:
         description: 'คำสั่งถึง AI Admin:'
         required: true
-        default: 'จัดระเบียบ Partition ใน apps/webhook-core/'
+        default: ''
 
 # สำคัญมาก! อนุญาตให้ระบบเขียนไฟล์และ Push โค้ดได้
 permissions:
