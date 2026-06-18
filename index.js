@@ -1,6 +1,7 @@
-Const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+Crequire('child_process');
 
 console.log(`🚀 [Chinchaflow Orchestrator v1.4.0] System Ready...`);
 
