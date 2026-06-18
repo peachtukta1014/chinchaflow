@@ -3,6 +3,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
+// สร้าง __dirname สำหรับ ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -19,14 +20,9 @@ async function runOrchestrator() {
     return;
   }
 
-  // 📖 ขั้นตอนที่ 1: อ่านกฎและคัมภีร์จาก docs/
+  // 📖 อ่านกฎและคัมภีร์
   const loadDoc = (name) => fs.readFileSync(path.join(__dirname, 'docs', name), 'utf8');
-  const context = {
-    changelog: loadDoc('AGENT_CHANGELOG_TH.md'),
-    structure: loadDoc('PROJECT_STRUCTURE.md'),
-    architecture: loadDoc('ARCHITECTURE_TH.md')
-  };
-
+  
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -35,7 +31,7 @@ async function runOrchestrator() {
         "model": modelName,
         "response_format": { "type": "json_object" },
         "messages": [
-          { "role": "system", "content": "คุณคือ AI Admin ของ CHINCHA FLOW ทำหน้าที่จัด Partition โค้ดและอัปเดตระบบตามโครงสร้างที่ได้รับมอบหมาย" },
+          { "role": "system", "content": "คุณคือ AI Admin ของ CHINCHA FLOW ทำหน้าที่จัด Partition โค้ดและอัปเดตระบบ" },
           { "role": "user", "content": `คำสั่ง: ${aiInstruction}` }
         ]
       })
@@ -44,7 +40,7 @@ async function runOrchestrator() {
     const data = await response.json();
     const result = JSON.parse(data.choices?.[0]?.message?.content || "{}");
 
-    // 🛠️ ขั้นตอนที่ 2: ปฏิบัติการ
+    // 🛠️ ปฏิบัติการ
     if (result.operations) {
       result.operations.forEach(op => {
         const absPath = path.join(__dirname, op.path);
