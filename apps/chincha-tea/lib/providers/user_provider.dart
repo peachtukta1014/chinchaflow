@@ -1,0 +1,1 @@
+Add null check for UID, and if null show fallback UI message instead of white screen

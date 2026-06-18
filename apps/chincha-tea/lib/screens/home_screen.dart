@@ -1,0 +1,1 @@
+Add ErrorBoundary wrapper and console.log statements at start of build method to trace loading flow

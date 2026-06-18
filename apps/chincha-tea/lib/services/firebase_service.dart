@@ -1,0 +1,1 @@
+Add try-catch with console.log in firebase fetch method, and return fallback data if error

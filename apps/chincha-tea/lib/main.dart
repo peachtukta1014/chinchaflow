@@ -1,0 +1,1 @@
+check if ErrorBoundary is implemented
