@@ -1,0 +1,23 @@
+name: AI Admin Orchestrator
+on:
+  workflow_dispatch:
+    inputs:
+      ai_instruction:
+        description: 'คำสั่งถึง AI Admin:'
+        required: true
+        default: 'จัดระเบียบ Partition ใน apps/webhook-core/'
+
+jobs:
+  run-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Run Orchestrator
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AI_CODE_INSTRUCTION: ${{ github.event.inputs.ai_instruction }}
+        run: node index.js
