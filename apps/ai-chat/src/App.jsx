@@ -24,7 +24,7 @@ const IconTrash = () => (
 );
 
 const AGENT_OPTIONS = [
-  { id: 'root', label: '💬 AI Admin', desc: 'ทั่วไป' },
+  { id: 'root', label: '💬 เด๊ฟ', desc: 'ทั่วไป' },
   { id: 'tea', label: '🧋 ชินชา', desc: 'ร้านชา' },
   { id: 'seafood', label: '🦐 โกอ้วน', desc: 'ร้านกุ้ง' },
   { id: 'webhook', label: '🤖 LINE', desc: 'Bot' },
@@ -33,7 +33,7 @@ const AGENT_OPTIONS = [
 
 export default function App() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีพี่! 🙋‍♂️ พี่เซอยินดีช่วยงาน\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n• "กุ้งวันนี้มียอดขายเท่าไหร่"\n• "ช่วยดูสต็อกชาหน่อย"\n• "webhook มี error ไหม"' },
+    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ 🙋‍♂️ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n• "กุ้งวันนี้มียอดขายเท่าไหร่"\n• "ช่วยดูสต็อกชาหน่อย"\n• "webhook มี error ไหม"' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -130,7 +130,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <span className="text-lg">🤖</span>
           <div>
-            <h1 className="text-sm font-semibold leading-tight">AI Admin</h1>
+            <h1 className="text-sm font-semibold leading-tight">เด๊ฟ</h1>
             <p className="text-[10px] text-ai-muted">CHINCHA FLOW</p>
           </div>
         </div>
