@@ -128,12 +128,24 @@ chincha/
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | จาก Firebase Console |
 | `VITE_FIREBASE_APP_ID_SHRIMP` | **ของกุ้ง** → map เป็น `VITE_FIREBASE_APP_ID` ใน `apps/seafood-pos/.env.local` |
 | `VITE_FIREBASE_APP_ID_TEA` | **ของชา** → map เป็น `VITE_FIREBASE_APP_ID` ใน `apps/chincha-tea/.env.local` |
+| `OPENROUTER_API_KEY` | **AI Admin** — key จาก https://openrouter.ai/keys สำหรับ AI Chat Agent |
+| `DEFAULT_MODEL` | (ทางเลือก) — เริ่มต้น `deepseek/deepseek-chat` |
 
 ค่าตัวอย่างชื่อตัวแปรอยู่ที่ `apps/seafood-pos/.env.example` (ไม่มีค่าจริง)
 
 หลังเพิ่ม/แก้ Secrets แล้ว **เริ่ม agent session ใหม่** — session เก่าไม่เห็นค่าใหม่
 
 Cloud Agent รัน `scripts/materialize-cloud-env.sh` หลัง `npm install` (ดู `.cursor/environment.json`) เพื่อสร้าง `apps/*/.env.local` อัตโนมัติ — อย่า commit `.env.local`
+
+### AI Admin Chat
+
+แอป `apps/ai-chat` PWA สำหรับคุยกับ AI — ปักหน้า home screen มือถือ คุยด้วยเสียงหรือพิมพ์
+
+**URL:** https://chincha-ai-chat.web.app
+
+**Agent Scopes (5):** root (ทั่วไป) · tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Automation)
+
+AI Chat เรียก Cloud Function `aiChatAgentHttp` — API key `OPENROUTER_API_KEY` อยู่ฝั่ง server เท่านั้น ไม่รั่วไหล
 
 ### ล็อกอินแอดมินให้ agent อ่าน Firestore (ทางเลือก)
 

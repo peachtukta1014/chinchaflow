@@ -1,3 +1,12 @@
+## 2026-06-19 — AI Chat PWA + LINE Partition + Docs รอบใหญ่
+- เพิ่ม `apps/ai-chat` — PWA แชทคุย AI ด้วยเสียง/พิมพ์ ปัก home screen ได้
+- เพิ่ม `apps/webhook-core/src/aiChatAgent.js` — Cloud Function 5 agent scopes (root/tea/seafood/webhook/scheduled) classifier + system prompt + OpenRouter
+- ตั้งค่า `OPENROUTER_API_KEY` ผ่าน root `.env` (dotenv) + GitHub Secrets
+- GitHub Actions: เพิ่ม job `deploy_ai_chat` ใน `deploy-hosting.yml` · เพิ่ม target `ai-chat` ใน `firebase.json` / `.firebaserc`
+- LINE Partition: สร้าง `docs/LINE_OA_PARTITION_TH.md` — แยก 4 สายชัด (OA กุ้ง / ครอบครัวกุ้ง / แจ้งเตือนกุ้ง / แอปชา) + AI Chat agent
+- Docs อัปเดตทั้งชุด: `CHINCHA_FLOW_NAMING_TH.md`, `ARCHITECTURE_TH.md`, `PROJECT_STRUCTURE.md`, `CLOUD_STATUS.md`, `CURSOR_AGENT_SETUP_TH.md`, `AGENT_HANDBOOK_TH.md`, `PEACH_WORKING_STYLE_TH.md`
+- ถ้าพังอีกให้เช็ก `apps/ai-chat/src/App.jsx`, `apps/ai-chat/src/api.js`, `apps/webhook-core/src/aiChatAgent.js`, `firebase.json`, `.firebaserc`
+
 ## 2026-06-15 — ชา: PR3 UI แบบกุ้ง + LINE 3 ช่อง
 
 - ย้าย 4 แท็บหลักขึ้นด้านบน (ไม่มีแท็บล่าง) พร้อม `DailySummaryStickyBar` แสดงยอดขาย/แก้ววันนี้จาก `dailySummaryService` แบบ real-time

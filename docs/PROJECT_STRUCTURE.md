@@ -6,7 +6,8 @@
 |-----|-------------|-----------|
 | กุ้ง `seafood-pos` | https://ko-seafood.top | พนักงานร้านกุ้ง |
 | ชา `chincha-tea` | https://chincha-tea.web.app | พนักงานร้านชา + แอดมิน |
-| LINE `webhook-core` | Cloud Functions | บอท LINE กุ้ง/ชา |
+| AI `ai-chat` | https://chincha-ai-chat.web.app | เจ้าของร้าน — คุย AI ผ่านเสียง/พิมพ์ |
+| LINE `webhook-core` | Cloud Functions | บอท LINE กุ้ง/ชา + AI Chat Agent |
 
 ---
 
@@ -17,7 +18,8 @@ chincha-business-os/
 ├── apps/                          # แอปหลัก (npm workspaces)
 │   ├── seafood-pos/               # POS กุ้ง
 │   ├── chincha-tea/               # POS ร้านชา/กาแฟ/ปั่น
-│   ├── webhook-core/              # LINE webhook + สรุปปิดวัน (Functions)
+│   ├── ai-chat/                   # AI Admin Chat PWA (Vite + React + tailwind)
+│   ├── webhook-core/              # LINE webhook + AI Chat Agent + LIFF (Functions)
 │   └── webhook-core-scheduled/    # สรุปชาอัตโนมัติ (ถ้า deploy แยก codebase)
 │
 ├── scripts/                       # สคริปต์ดูแลข้อมูล (รันจาก root)
@@ -26,8 +28,11 @@ chincha-business-os/
 │
 ├── docs/                          # คู่มือ / โครงสร้าง (อ้างอิงใน repo)
 │   ├── PROJECT_STRUCTURE.md       # ไฟล์นี้
+│   ├── ARCHITECTURE_TH.md
 │   ├── CLOUD_STATUS.md
-│   └── ENABLE_CLOUD_SCHEDULER.md
+│   ├── LINE_OA_PARTITION_TH.md    # จัด partition LINE 4 สายงาน
+│   ├── LINE_OA_ORDER_SCOPE_TH.md
+│   └── AGENT_CHANGELOG_TH.md
 │
 ├── .github/workflows/             # CI/CD (deploy แยกตาม path)
 │   ├── deploy-hosting.yml         # build + deploy กุ้ง/ชา
@@ -43,6 +48,32 @@ chincha-business-os/
 ├── package.json                   # workspaces + scripts รวม
 └── README.md
 ```
+
+---
+
+## แอป AI Chat `apps/ai-chat/`
+
+**สแต็ก:** React 18 + Vite + Tailwind · PWA ปักหน้าจอได้ · Voice Input (Web Speech API) · คุยผ่าน Cloud Function
+
+```
+apps/ai-chat/
+├── public/
+│   └── manifest.json              # PWA
+├── src/
+│   ├── main.jsx                   # entry
+│   ├── App.jsx                    # Chat UI — bubbles + voice input + scope picker
+│   ├── api.js                     # คุยกับ Cloud Function aiChatAgentHttp
+│   └── index.css                  # Tailwind base + scrollbar
+├── index.html
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+└── package.json
+```
+
+**5 Agent Scopes (ปุ่มเลือกในแอป):** root (ทั่วไป) · tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Automation)
+
+**Deploy:** `push main` → `deploy-hosting.yml` (job `deploy_ai_chat`) · URL: https://chincha-ai-chat.web.app
 
 ---
 

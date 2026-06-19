@@ -13,6 +13,7 @@ flowchart TB
   subgraph clients["แอปฝั่งลูกค้า (React + Vite PWA)"]
     Shrimp["seafood-pos\nko-seafood.top"]
     Tea["chincha-tea\nchincha-tea.web.app"]
+    AI["ai-chat\nchincha-ai-chat.web.app"]
   end
 
   subgraph firebase["Firebase โปรเจกต์: chincha-eeed6"]
@@ -22,30 +23,36 @@ flowchart TB
     Storage[Cloud Storage]
     Host1[Hosting: shrimp]
     Host2[Hosting: tea]
-    Fn1[webhook-core\nLINE + สรุปยอดชา]
+    Host3[Hosting: ai-chat]
+    Fn1[webhook-core\nLINE + สรุปยอดชา + AI Chat Agent]
     Fn2[webhook-core-scheduled\ncron รายชั่วโมง]
   end
 
   subgraph external["ภายนอก"]
     LINE[LINE Messaging API]
     GHA[GitHub Actions]
+    OR[OpenRouter API]
   end
 
   Shrimp --> Auth
   Tea --> Auth
   Shrimp --> FS
   Tea --> FS
+  AI --> Fn1
   Shrimp --> Storage
   GHA --> Host1
   GHA --> Host2
+  GHA --> Host3
   GHA --> Fn1
   GHA --> FS
   LINE --> Fn1
   Fn1 --> FS
   Fn2 --> FS
   Fn2 --> LINE
+  Fn1 --> OR
   Shrimp --> Host1
   Tea --> Host2
+  AI --> Host3
 ```
 
 ---
@@ -56,7 +63,8 @@ flowchart TB
 |------|--------|
 | `apps/seafood-pos` | POS กุ้ง — ขาย, สต๊อก FIFO, ลูกค้า, ออเดอร์จาก LINE |
 | `apps/chincha-tea` | ร้านชา — บันทึกออเดอร์, สรุปยอด, เติมของ, แอดมิน, หลายภาษา |
-| `apps/webhook-core` | Cloud Functions: LINE webhook + ส่งสรุปยอดชาด้วยมือ |
+| `apps/ai-chat` | AI Admin Chat — PWA แชทด้วยเสียง/พิมพ์ ควบคุม 5 agent scopes ผ่าน Cloud Function + OpenRouter |
+| `apps/webhook-core` | Cloud Functions: LINE webhook + ส่งสรุปยอด + LIFF + AI Chat Agent |
 | `apps/webhook-core-scheduled` | สรุปยอดชาอัตโนมัติตามเวลา (codebase แยก) |
 | `firestore.rules` / `firestore.indexes.json` | กฎความปลอดภัย + index ของฐานข้อมูล **(default)** |
 | `firestore-chincha.rules` | กฎของฐานข้อมูล **`chincha`** (ข้อมูลเก่า) |
@@ -141,8 +149,10 @@ flowchart TB
 | ฟังก์ชัน | หน้าที่ |
 |---------|--------|
 | `lineWebhook` | บอท LINE กุ้ง — entrypoint เดิมสำหรับ LINE Console; ทำแค่ verify signature, dedup event พื้นฐาน แล้วส่งเข้า router แยก direct/group |
-| `lineWebhookTea` | บอท LINE ชา — คำสั่ง `สรุป` / `help` (ไม่รับออเดอร์ลูกค้า) |
+| `lineWebhookTea` | บอท LINE ชา — คำสั่ง `สรุป` / `help` (ไม่รับออเดอร์ลูกค้า), ignore กลุ่มที่ไม่ใช่ `notifyGroupId` |
 | `teaPushSummary` | HTTP POST สำหรับแอดมิน — ส่งสรุปยอดวันนั้นไปกลุ่ม LINE ที่ตั้งไว้ |
+| `aiChatAgent` | V2 onCall — AI Chat 5 agent scopes (root/tea/seafood/webhook/scheduled) ผ่าน OpenRouter |
+| `aiChatAgentHttp` | V1 onRequest — HTTP endpoint สำหรับ PWA `chincha-ai-chat.web.app` |
 
 LINE กุ้งแยกบริบทใน `apps/webhook-core/src/` ดังนี้:
 
@@ -183,6 +193,7 @@ URL ที่ใช้งาน (จาก `docs/CLOUD_STATUS.md`):
 
 - ชา: https://chincha-tea.web.app
 - กุ้ง: https://ko-seafood.top
+- AI Chat: https://chincha-ai-chat.web.app
 
 ---
 
@@ -202,6 +213,7 @@ URL ที่ใช้งาน (จาก `docs/CLOUD_STATUS.md`):
 
 - **กุ้ง** = POS เน้นสต๊อก + ลูกหนี้ + กล่องออเดอร์จาก LINE
 - **ชา** = บันทึกยอดขายง่าย + UX หลายภาษาสำหรับพนักงาน + สรุปปิดวันผ่าน LINE
+- **AI Admin** = PWA แชท คุยกับเจ้าของร้าน ควบคุมผ่าน Cloud Function + OpenRouter 5 agent scopes
 
 สิ่งที่เชื่อมทั้งสองคือโครงสร้างพื้นฐานร่วม (โปรเจกต์ Auth, Firestore default, pipeline deploy) มากกว่าแพ็กเกจ React ร่วม — ณ ตอนนี้
 
@@ -212,3 +224,4 @@ URL ที่ใช้งาน (จาก `docs/CLOUD_STATUS.md`):
 - [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) — โครงสร้างโฟลเดอร์และ stack
 - [CLOUD_STATUS.md](./CLOUD_STATUS.md) — สถานะบนคลาวและ URL
 - [ENABLE_CLOUD_SCHEDULER.md](./ENABLE_CLOUD_SCHEDULER.md) — เปิด scheduler สรุปชาอัตโนมัติ
+- [LINE_OA_PARTITION_TH.md](./LINE_OA_PARTITION_TH.md) — จัด partition LINE 4 สายงาน

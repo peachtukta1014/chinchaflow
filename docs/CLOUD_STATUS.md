@@ -18,15 +18,17 @@
 |-----|-----|
 | ชินชา | https://chincha-tea.web.app |
 | กุ้ง | https://ko-seafood.top |
+| AI Chat | https://chincha-ai-chat.web.app |
 
 ## Cloud Functions — ต้องเขียวใน Console
 Console → Build → Functions → ควรเห็น:
-- `lineWebhook`, `lineWebhookTea`, `teaPushSummary` (region asia-southeast1)
+- `lineWebhook`, `lineWebhookTea`, `teaPushSummary`, `aiChatAgent`, `aiChatAgentHttp` (region asia-southeast1)
 - `teaDailyScheduledSummary` (codebase tea-scheduled, ถ้า deploy สำเร็จ)
 
 URL ทดสอบ (GET อาจได้ 405/503 ถ้ายังไม่ deploy):
 - https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhookTea
 - https://asia-southeast1-chincha-eeed6.cloudfunctions.net/teaPushSummary
+- https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp
 
 ## Firestore
 - Database: **(default)** — แอพชาใช้ตัวนี้

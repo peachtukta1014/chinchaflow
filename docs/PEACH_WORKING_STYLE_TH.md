@@ -33,6 +33,7 @@
 | Peach พูดประมาณ | ใน repo / แอป |
 |-----------------|---------------|
 | บอท LINE / แชทลูกค้า | `apps/webhook-core` · LINE OA กุ้ง |
+| AI Admin / AI Chat | `apps/ai-chat` · https://chincha-ai-chat.web.app · คุยผ่านเสียง/พิมพ์ |
 | แอปกุ้ง / โกอ้วน | `apps/seafood-pos` · https://ko-seafood.top |
 | รายชื่อลูกค้า / สมาชิก | `customers` + หน้า Members |
 | ยูเซอร์ไอดี LINE / UID | `lineUserId` หรือ `lineContacts[]` (หลายคนต่อร้าน) |

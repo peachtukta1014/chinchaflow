@@ -16,7 +16,8 @@
 CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chincha-eeed6
 ├── apps/chincha-tea/      # ชินชา Tea POS · chincha-tea.web.app
 ├── apps/seafood-pos/      # โกอ้วน คลังซีฟู้ด · ko-seafood.top
-├── apps/webhook-core/     # LINE backend · asia-southeast1
+├── apps/ai-chat/          # AI Admin Chat · chincha-ai-chat.web.app
+├── apps/webhook-core/     # LINE backend + AI Agent · asia-southeast1
 ├── firestore.rules        # กฎ Firestore ร่วม
 ├── .github/workflows/     # deploy hosting / functions / rules
 ├── docs/                  # เอกสารทีม + สถาปัตยกรรม
@@ -31,6 +32,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 | [ARCHITECTURE_TH.md](./ARCHITECTURE_TH.md) | ภาพรวมระบบ, Firestore collections, deploy |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | โฟลเดอร์/ไฟล์สำคัญแต่ละแอป |
 | [LINE_OA_ORDER_SCOPE_TH.md](./LINE_OA_ORDER_SCOPE_TH.md) | ขอบเขต LINE OA กุ้ง, LIFF, Rich Menu |
+| [LINE_OA_PARTITION_TH.md](./LINE_OA_PARTITION_TH.md) | จัด partition LINE 4 สายงาน (OA กุ้ง · ครอบครัวกุ้ง · แจ้งเตือนกุ้ง · แอปชา) |
 | [PEACH_WORKING_STYLE_TH.md](./PEACH_WORKING_STYLE_TH.md) | วิธีคุยกับ Peach, ทบทวนก่อนลงมือ |
 | `AGENTS.md` | กฎ monorepo, smoke, อย่าเพิ่ม CI ซ้ำ |
 | `apps/seafood-pos/AGENTS.md` | ขอบเขตงานกุ้ง |
@@ -46,7 +48,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 |------------|-------------|
 | collection / field Firestore ใหม่ | `ARCHITECTURE_TH.md` + `firestore.rules` comment ถ้าจำเป็น |
 | โฟลเดอร์/โมดูลใหม่สำคัญ | `PROJECT_STRUCTURE.md` ส่วนที่เกี่ยว |
-| พฤติกรรม LINE / ลูกค้า / UID | `LINE_OA_ORDER_SCOPE_TH.md` หรือ `PEACH_WORKING_STYLE_TH.md` |
+| พฤติกรรม LINE / ลูกค้า / UID | `LINE_OA_ORDER_SCOPE_TH.md` หรือ `LINE_OA_PARTITION_TH.md` หรือ `PEACH_WORKING_STYLE_TH.md` |
 | กฎทีม / workflow เอเจนต์ | `AGENTS.md` หรือ skill ใน `.cursor/skills/` |
 | ตั้งค่าแอดมินใหม่ (`config/*`) | บรรทัดใน `ARCHITECTURE_TH.md` หรือ `PEACH_WORKING_STYLE_TH.md` |
 
