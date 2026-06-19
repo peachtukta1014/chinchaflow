@@ -259,8 +259,8 @@ try {
 }
 
 try {
-  const { renderShrimpBillJpeg } = requireWebhook('../../webhook-core/src/shrimpBillRender.js');
-  const serverRows = requireWebhook('../../webhook-core/src/shrimpBillTemplateRows.js').FIXED_TEMPLATE_ROWS;
+  const { renderShrimpBillJpeg } = requireWebhook('../../webhook-core/src/seafood-notify/shrimpBillRender.js');
+  const serverRows = requireWebhook('../../webhook-core/src/seafood-notify/shrimpBillTemplateRows.js').FIXED_TEMPLATE_ROWS;
   assert(serverRows.length === FIXED_TEMPLATE_ROWS.length, 'server bill template row count');
   const sampleBill = saleToBillData({
     billNo: 'SMOKE-BILL',
@@ -283,12 +283,12 @@ try {
   const billApi = fs.readFileSync(path.join(root, 'src/lib/shrimpBillApi.js'), 'utf8');
   assert(billApi.includes('shrimpRenderBill'), 'shrimpBillApi calls render endpoint');
   assert(billApi.includes('scheduleShrimpBillPreRender'), 'shrimpBillApi schedules bill pre-render');
-  const billPreRender = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillPreRender.js'), 'utf8');
+  const billPreRender = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-notify/shrimpBillPreRender.js'), 'utf8');
   assert(billPreRender.includes('preRenderBillForSale'), 'shrimpBillPreRender caches bill image');
-  const linePushWh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpLinePush.js'), 'utf8');
+  const linePushWh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-notify/shrimpLinePush.js'), 'utf8');
   assert(linePushWh.includes('resolveCachedBillImageUrl'), 'shrimpLinePush uses cached bill image');
   assert(billApi.includes('buildBillDataForCloudResolved'), 'cloud bill resolves customer profile');
-  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillRender.js'), 'utf8');
+  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-notify/shrimpBillRender.js'), 'utf8');
   assert(!renderSrc.includes('📞'), 'server bill header must not use emoji (Satori tofu)');
   assert(renderSrc.includes('โทร.'), 'server bill header uses text phone label');
   const billSheet = fs.readFileSync(path.join(root, 'src/components/BillImageSheet.jsx'), 'utf8');
@@ -315,7 +315,7 @@ try {
   assert(noAddrBill.customerPhone === '0899088208', 'phone on bill');
   assert(noAddrBill.deliveryAddress === '', 'no address stays empty');
   assert(noAddrBill.address === '0899088208', 'legacy address field may combine phone only');
-  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillRender.js'), 'utf8');
+  const renderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-notify/shrimpBillRender.js'), 'utf8');
   assert(
     !renderSrc.includes("data.deliveryAddress || data.address"),
     'bill address line must not fall back to legacy address (shows phone)',
@@ -460,10 +460,10 @@ try {
 }
 
 try {
-  const router = requireWebhook('../../webhook-core/src/shrimpLineWebhookRouter.js');
-  const parser = requireWebhook('../../webhook-core/src/parseLineOrder.js');
-  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
-  const groupWebhook = requireWebhook('../../webhook-core/src/shrimpGroupLineWebhook.js');
+  const router = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineWebhookRouter.js');
+  const parser = requireWebhook('../../webhook-core/src/seafood-oa/parseLineOrder.js');
+  const intent = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineIntent.js');
+  const groupWebhook = requireWebhook('../../webhook-core/src/seafood-oa/shrimpGroupLineWebhook.js');
   const directCtx = router.classifyShrimpLineContext({
     source: { type: 'user', userId: 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1' },
   });
@@ -525,19 +525,19 @@ try {
 
   const indexSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   const routerSrc = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpLineWebhookRouter.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpLineWebhookRouter.js'),
     'utf8',
   );
   const directSrc = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpDirectLineWebhook.js'),
     'utf8',
   );
   const groupSrc = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpGroupLineWebhook.js'),
     'utf8',
   );
   const slipSrc = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpPaymentSlip.js'),
     'utf8',
   );
   assert(indexSrc.includes('handleShrimpLineWebhookEvent'), 'lineWebhook forwards to shrimp router');
@@ -555,16 +555,16 @@ try {
 }
 
 try {
-  const tea = requireWebhook('../../webhook-core/src/teaDailySummary.js');
+  const tea = requireWebhook('../../webhook-core/src/tea/teaDailySummary.js');
   assert(tea.classifyTeaLineCommand('สรุป') === 'summary', 'tea สรุป');
   assert(tea.classifyTeaLineCommand('1') === 'summary', 'tea key 1');
   assert(tea.classifyTeaLineCommand('2') === 'restock', 'tea key 2');
   assert(tea.classifyTeaLineCommand('help') === 'help', 'tea help');
-  const kb = requireWebhook('../../webhook-core/src/shrimpGroupKeyboard.js');
+  const kb = requireWebhook('../../webhook-core/src/seafood-oa/shrimpGroupKeyboard.js');
   assert(kb.classifyShrimpGroupKeyboard('1') === 'today_orders', 'shrimp group key 1');
   assert(kb.classifyShrimpGroupKeyboard('3') === 'summary', 'shrimp group key 3');
   assert(kb.classifyShrimpGroupKeyboard('2') == null, 'shrimp group key 2 ไม่ตอบ');
-  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  const intent = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineIntent.js');
   assert(
     intent.classifyShrimpLineMessage('help', null, { groupId: 'C123' }) === 'ignore',
     'shrimp group help เงียบ',
@@ -574,26 +574,26 @@ try {
 }
 
 try {
-  const link = requireWebhook('../../webhook-core/src/shrimpLineCustomerLink.js');
+  const link = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineCustomerLink.js');
   assert(link.isLinkCustomerCommand('ผูกไอดีลูกค้า'), 'คำสั่งผูกไอดีลูกค้า');
   assert(link.parseLinkCustomerShopName('ผูกไอดีลูกค้า ตาจุ้ย') === 'ตาจุ้ย', 'ชื่อร้านหลังคำสั่ง');
-  const pending = requireWebhook('../../webhook-core/src/shrimpLinePendingLink.js');
+  const pending = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLinePendingLink.js');
   const norm = pending.normalizePendingLinkMap({ Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1: { requestedAt: 'x' } });
   assert(norm.Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1?.source === 'link_cmd', 'pendingLinkByUid normalize');
-  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  const intent = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineIntent.js');
   assert(intent.classifyShrimpLineMessage('ผูกไอดีลูกค้า', null) === 'link_customer', 'intent link_customer');
   const directWh = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpDirectLineWebhook.js'),
     'utf8',
   );
   const groupWh = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpGroupLineWebhook.js'),
     'utf8',
   );
   assert(directWh.includes("intent === 'link_customer'"), 'direct webhook link_customer handler');
   assert(directWh.includes("source: 'shrimp'") && groupWh.includes("source: 'shrimp'"), 'webhook log line_messages');
   const linkSrc = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpLineCustomerLink.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpLineCustomerLink.js'),
     'utf8',
   );
   assert(linkSrc.includes('registerPendingLinkRequest'), 'link cmd registers pending');
@@ -668,7 +668,7 @@ try {
     resolveLineOrderDeliveryDate,
     coalesceSessionDeliveryDate,
     defaultDeliveryDateKeyBangkok,
-  } = requireWebhook('../../webhook-core/src/parseDeliveryDate.js');
+  } = requireWebhook('../../webhook-core/src/seafood-oa/parseDeliveryDate.js');
   assert(
     coalesceSessionDeliveryDate('2026-05-26', '2026-05-28') === null,
     'session วันส่งเลยวันนี้แล้ว → ไม่ใช้ซ้ำ',
@@ -1151,12 +1151,12 @@ try {
   const { saleRemainingAmount, isOpenSaleForSlip } = await import('../src/lib/paymentSlipOpenSale.js');
   assert(saleRemainingAmount({ paymentType: 'credit', total: 500 }) === 500, 'saleRemainingAmount credit');
   assert(!isOpenSaleForSlip({ paymentType: 'transfer', remainingAmount: 0 }), 'closed transfer not open');
-  const slipMod = requireWebhook('../../webhook-core/src/shrimpPaymentSlip.js');
+  const slipMod = requireWebhook('../../webhook-core/src/seafood-oa/shrimpPaymentSlip.js');
   assert(slipMod.isOpenSale({ remainingAmount: 100 }), 'webhook isOpenSale');
   assert(slipMod.isSuggestedOpenBillForSlip({ saleId: 's1', billNo: 'B1', remainingAmount: 100 }), 'group slip needs open bill context');
   assert(!slipMod.isSuggestedOpenBillForSlip(null), 'group random image without bill context is ignored');
   assert(!slipMod.isSuggestedOpenBillForSlip({ saleId: 's1', billNo: 'B1', remainingAmount: 0, total: 5200 }), 'group closed bill image is ignored');
-  const slipSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpPaymentSlip.js'), 'utf8');
+  const slipSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpPaymentSlip.js'), 'utf8');
   assert(slipSrc.includes('findSlipByLineMessageId'), 'สลิป dedup ตาม lineMessageId');
   assert(slipSrc.includes('duplicate: true'), 'สลิปซ้ำคืน submission เดิม');
   assert(slipSrc.includes('resolveSuggestedBill'), 'shrimpPaymentSlip uses resolveSuggestedBill');
@@ -1179,11 +1179,11 @@ try {
   assert(hub.includes('PaymentSlipsScreen'), 'SalesHub มีแท็บสลิป');
   const wh = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
   const directWh = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpDirectLineWebhook.js'),
     'utf8',
   );
   const groupWh = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpGroupLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpGroupLineWebhook.js'),
     'utf8',
   );
   assert(directWh.includes('processShrimpPaymentSlipImage'), 'direct webhook รับรูปสลิป');
@@ -1191,7 +1191,7 @@ try {
   assert(groupWh.includes('allowGroup: Boolean(context.chatId && isShrimpGroupChat(context.chatId))'), 'group webhook รับรูปสลิปจากกลุ่มครอบครัว');
   assert(wh.includes('onShrimpPaymentSlipCreated'), 'trigger แจ้งสลิป');
   assert(wh.includes('onShrimpAdminAlertCreated'), 'trigger แจ้งขอลบบิล');
-  const notify = requireWebhook('../../webhook-core/src/instantLineNotify.js');
+  const notify = requireWebhook('../../webhook-core/src/seafood-notify/instantLineNotify.js');
   const slipMsg = notify.formatShrimpPaymentSlipMessage({
     customerName: 'ร้านทดสอบ',
     suggestedBillNo: 'B-001',
@@ -1206,7 +1206,7 @@ try {
   );
   assert(!slipTargets.has(customerUid), 'แจ้งสลิปไม่ push ไปหาคนส่งสลิป');
   assert(slipTargets.has(staffUid), 'แจ้งสลิปยัง push staff');
-  const preRenderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/shrimpBillPreRender.js'), 'utf8');
+  const preRenderSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/seafood-notify/shrimpBillPreRender.js'), 'utf8');
   assert(preRenderSrc.includes("createHash('sha1')"), 'cache ภาพบิลใช้ URL แยกตามสถานะจ่าย/ค้าง');
   assert(preRenderSrc.includes('${safeId}_${hash}.png'), 'บิลค้างและบิลจ่ายแล้วไม่ใช้ storage URL เดิม');
 } catch (e) {
@@ -1214,17 +1214,17 @@ try {
 }
 
 try {
-  const intent = requireWebhook('../../webhook-core/src/shrimpLineIntent.js');
+  const intent = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLineIntent.js');
   assert(intent.isShrimpLiffOpenCommand('ฟอร์ม'), 'LIFF intent ฟอร์ม');
   assert(intent.isShrimpLiffOpenCommand('form'), 'LIFF intent form');
   assert(intent.classifyShrimpLineMessage('liff', null) === 'open_liff', 'classify open_liff');
-  const msg = requireWebhook('../../webhook-core/src/shrimpLiffMessaging.js');
+  const msg = requireWebhook('../../webhook-core/src/seafood-oa/shrimpLiffMessaging.js');
   assert(typeof msg.buildLiffOrderFlex === 'function', 'buildLiffOrderFlex');
   const flex = msg.buildLiffOrderFlex('1234567890-AbcdEfgh');
   assert(flex.type === 'flex', 'flex message type');
   assert(flex.contents.footer.contents[0].action.uri.includes('liff.line.me'), 'flex LIFF uri');
   const wh2 = fs.readFileSync(
-    path.join(root, '../../apps/webhook-core/src/shrimpDirectLineWebhook.js'),
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/shrimpDirectLineWebhook.js'),
     'utf8',
   );
   assert(wh2.includes("intent === 'open_liff'"), 'direct webhook open_liff handler');
@@ -1238,7 +1238,7 @@ try {
   const liffApp = fs.readFileSync(path.join(root, 'src/liff/LineOrderLiffApp.jsx'), 'utf8');
   assert(liffApp.includes('IdentityStep'), 'LIFF order-before-identity flow');
   assert(liffApp.includes("setStep('identity')"), 'LIFF identity routing');
-  const prov = requireWebhook('../../webhook-core/src/provisionShrimpLiff.js');
+  const prov = requireWebhook('../../webhook-core/src/seafood-oa/provisionShrimpLiff.js');
   assert(typeof prov.ensureShrimpLiffApp === 'function', 'provisionShrimpLiff');
   assert(typeof prov.readSlipLiffIdFromRepo === 'function', 'readSlipLiffIdFromRepo');
   const slipSession = fs.readFileSync(path.join(root, 'src/liff/useLiffSlipSession.js'), 'utf8');
@@ -1248,7 +1248,7 @@ try {
   assert(slipLiff.includes('compressImageFile'), 'LineSlipLiffApp compresses slip before upload');
   assert(slipLiff.includes('liff.sendMessages'), 'LineSlipLiffApp confirms slip in customer chat');
   assert(slipLiff.includes('liff.closeWindow'), 'LineSlipLiffApp closes after submit');
-  const verifyMod = requireWebhook('../../webhook-core/src/verifyLineLiffToken.js');
+  const verifyMod = requireWebhook('../../webhook-core/src/seafood-oa/verifyLineLiffToken.js');
   const prevLiff = process.env.LINE_LIFF_ID;
   const prevLoginCh = process.env.LINE_LOGIN_CHANNEL_ID;
   try {
