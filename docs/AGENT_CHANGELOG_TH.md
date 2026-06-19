@@ -1,3 +1,9 @@
+## 2026-06-19 — PR#285: ยกเลิก restock หาย + ดึง Group ID ชาได้
+
+- `RestockTab.jsx`: filter ตัด `cancelled` ออกจากลิสต์ด้วย (เดิมตัดแค่ `received`) → ยกเลิกแล้วหายทันที
+- `teaWebhook.js`: save `line_messages` แม้กลุ่ม LINE ไม่ตรง config → ปุ่ม "📥 ดึง Group ID" ใช้ได้แม้ยังตั้ง Group ID ไม่ถูก แก้ปัญหาวนซ้ำ
+- ถ้าพังอีกให้เช็ก `RestockTab.jsx` (filter `recentRequests`) · `teaWebhook.js` (wrong-group branch ก่อน continue)
+
 ## 2026-06-19 — Hotfix PR#284: prepareOrderInput.js + aiWorkflowAgent paths
 
 - ย้าย `prepareOrderInput.js` จาก `src/` root → `src/seafood-oa/` (ถูกลืมตอน refactor PR #283)
