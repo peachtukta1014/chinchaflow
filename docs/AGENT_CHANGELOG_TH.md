@@ -1,3 +1,16 @@
+## 2026-06-19 — PR#288: 3-tier model DeepSeek V4 + smoke-test paths
+
+- `aiChatAgent.js` — เปลี่ยนจาก 1 model → 3-tier อัตโนมัติ: Flash (แชท) / Pro (โค้ด) / Vision (รูป)
+- ค่า model: `deepseek/deepseek-v4-flash` · `deepseek/deepseek-v4-pro` · `openai/gpt-4o-mini`
+- เพิ่ม `isCodeRelated()` กว้างกว่า `isCodeAction` — ครอบ อธิบาย/วิเคราะห์ โค้ด, firestore, deploy, pr
+- เพิ่ม `pickModel(text, {imageBase64})` — เลือก model อัตโนมัติก่อน call OpenRouter
+- ปรับ env var ได้: `FLASH_MODEL`, `CODE_MODEL`, `VISION_MODEL`
+- `smoke-test.mjs` — อัปเดต 35 paths จาก `webhook-core/src/file.js` → `subfolder/file.js` หลัง PR #283 refactor
+  - `seafood-notify/`: shrimpBillRender, shrimpBillTemplateRows, shrimpBillPreRender, shrimpLinePush, instantLineNotify
+  - `seafood-oa/`: shrimpLineWebhookRouter, parseLineOrder, shrimpLineIntent, shrimpGroupLineWebhook, shrimpGroupKeyboard, shrimpLineCustomerLink, shrimpLinePendingLink, parseDeliveryDate, shrimpPaymentSlip, shrimpLiffMessaging, provisionShrimpLiff, verifyLineLiffToken, shrimpDirectLineWebhook
+  - `tea/`: teaDailySummary
+- ถ้าพังให้เช็ก `aiChatAgent.js` (pickModel, isCodeRelated) · `smoke-test.mjs` (requireWebhook paths)
+
 ## 2026-06-19 — PR#287: AI เลขา + image vision + per-app CHANGELOG + README
 
 - `aiChatAgent.js` — เปลี่ยน persona จาก "เด๊ฟ" → "เลขา" (เลขาส่วนตัวพีช เพื่อนคู่คิด รู้ใจ)

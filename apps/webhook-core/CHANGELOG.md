@@ -7,6 +7,15 @@
 
 ## 2026-06
 
+### 2026-06-19 | PR #288
+**feat: 3-tier model — Flash/Pro/Vision (DeepSeek V4)**
+- `aiChatAgent.js` — แทน `DEFAULT_MODEL` ด้วย 3-tier อัตโนมัติ
+  - `FLASH_MODEL = 'deepseek/deepseek-v4-flash'` — แชททั่วไป
+  - `PRO_MODEL = 'deepseek/deepseek-v4-pro'` — โค้ด / วิเคราะห์
+  - `VISION_MODEL = 'openai/gpt-4o-mini'` — มีรูปแนบ (คงเดิม)
+- เพิ่ม `isCodeRelated()` ครอบคลุม deploy, pr, branch, firebase, วิเคราะห์
+- เพิ่ม `pickModel(text, {imageBase64})` — เลือก tier อัตโนมัติ
+
 ### 2026-06-19 | PR #287
 **feat: อัปเดต AI persona → เลขาส่วนตัวพีช + รองรับ image vision**
 - `aiChatAgent.js` — เปลี่ยน persona จาก "เด๊ฟ" เป็น "เลขา" (เลขาส่วนตัวพีช เพื่อนคู่คิด รู้ใจ)
