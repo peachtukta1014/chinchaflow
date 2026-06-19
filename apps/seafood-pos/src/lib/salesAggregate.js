@@ -69,5 +69,5 @@ export function mergeSalesDocs(cloud = [], local = []) {
 }
 
 export function billMatchesDateKey(bill, dateKey) {
-  return saleDateKeyFromBill(bill) === dateKey;
+  return saleDateKeyFromBill(bill) === dateKey;yFromBill(bill) === dateKey;
 }
