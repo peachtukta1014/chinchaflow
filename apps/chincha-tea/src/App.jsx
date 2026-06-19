@@ -41,6 +41,43 @@ import { useAppShellChrome } from './lib/useAppShellChrome';
 export default function App() {
 
   const [appReady, setAppReady] = useState(false);
+  const [loadingError, setLoadingError] = useState(null);
+
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        await fbReady;
+        setAppReady(true);
+      } catch (err) {
+        setLoadingError(err.message);
+        console.error('App init failed:', err);
+      }
+    };
+    initApp();
+  }, []);
+
+  if (!appReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-brown-100">
+        {loadingError ? (
+          <div className="text-center p-4 bg-white rounded-lg">
+            <h2 className="text-red-500 font-bold">Error loading app</h2>
+            <p className="text-gray-700">{loadingError}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-brown-500 text-white rounded"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="text-brown-700">Loading...</div>
+        )}
+      </div>
+    );
+  }
+
+  const [appReady, setAppReady] = useState(false);
   useEffect(() => {
     const init = async () => {
       await fbReady;
