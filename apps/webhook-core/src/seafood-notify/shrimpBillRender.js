@@ -11,7 +11,7 @@ const {
 
 const PUBLIC_ORIGIN = process.env.SHRIMP_PUBLIC_ORIGIN || 'https://ko-seafood.top';
 /** TTF เต็มชุด (ไทย+เลข) — subset woff ของ @fontsource ทำให้ Satori ขึ้นกล่อง */
-const FONT_DIR = path.join(__dirname, '../assets/fonts');
+const FONT_DIR = path.join(__dirname, '../../assets/fonts');
 
 let fontCache = null;
 const imageCache = new Map();
