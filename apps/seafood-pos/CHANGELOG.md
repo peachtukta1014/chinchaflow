@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-19 | PR #288
+**fix: อัปเดต smoke-test paths หลัง webhook-core refactor (PR #283)**
+- `scripts/smoke-test.mjs` — อัปเดต 35 `requireWebhook` / `fs.readFileSync` paths
+  - `seafood-notify/`: shrimpBillRender, shrimpBillTemplateRows, shrimpBillPreRender, shrimpLinePush, instantLineNotify
+  - `seafood-oa/`: shrimpLineWebhookRouter, parseLineOrder, shrimpLineIntent, shrimpGroupLineWebhook, shrimpGroupKeyboard, shrimpLineCustomerLink, shrimpLinePendingLink, parseDeliveryDate, shrimpPaymentSlip, shrimpLiffMessaging, provisionShrimpLiff, verifyLineLiffToken, shrimpDirectLineWebhook
+  - `tea/`: teaDailySummary
+- CI "Verify Shrimp POS" ผ่านอีกครั้ง (เดิมติด 9 ENOENT / Cannot find module)
+
 ### 2026-06-19 | PR #283–284
 **refactor: ย้ายไฟล์ seafood-oa ไปโฟลเดอร์แยกใน webhook-core (ไม่มีการเปลี่ยนแปลงฝั่ง frontend)**
 - ไม่มี UI/logic เปลี่ยนแปลงในแอปกุ้ง
