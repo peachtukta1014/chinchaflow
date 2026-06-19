@@ -29,6 +29,7 @@ export function aggregateDailySales(bills) {
 
   for (const bill of bills) {
     for (const item of normalizeBillItems(bill)) {
+for (const item of normalizeBillItems(bill)) {
       if (isOtherBillItem(item)) {
         otherRevenue += item.lineTotal;
       } else if (item.type === 'dead') {
