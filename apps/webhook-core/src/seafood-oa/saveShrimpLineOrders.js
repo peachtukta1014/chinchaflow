@@ -1,7 +1,7 @@
 const { groupItemsByCustomer } = require('./parseLineOrder');
-const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
+const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('../seafood-notify/shrimpLinePush');
 const { isStaffLineUserId } = require('./shrimpStaffLineUids');
-const { notifyShrimpLineOrdersAfterSave } = require('./instantLineNotify');
+const { notifyShrimpLineOrdersAfterSave } = require('../seafood-notify/instantLineNotify');
 const {
   applySyncedCustomerNameToItems,
   resolveLineOrderCustomerName,

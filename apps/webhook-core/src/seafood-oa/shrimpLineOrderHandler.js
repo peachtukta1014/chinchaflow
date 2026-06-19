@@ -13,7 +13,7 @@ const {
 } = require('./parseDeliveryDate');
 const { getShrimpLineDeliveryWindow } = require('./shrimpLineConfig');
 const { getLineOrderSession, setLineOrderSession } = require('./lineOrderSession');
-const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('./shrimpLinePush');
+const { linkLineUserToCustomers, findCustomerNameByLineUserId } = require('../seafood-notify/shrimpLinePush');
 const { resolveRiverDefaultProduct } = require('./customerRiverDefault');
 const {
   assessLineCustomerProfile,

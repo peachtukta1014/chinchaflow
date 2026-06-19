@@ -1,4 +1,4 @@
-const { todayBKK, lineReply } = require('./teaDailySummary');
+const { todayBKK, lineReply } = require('../shared/lineUtils');
 const { classifyShrimpLineMessage } = require('./shrimpLineIntent');
 const { processShrimpLineOrder } = require('./shrimpLineOrderHandler');
 const { processShrimpLinkCustomer } = require('./shrimpLineCustomerLink');

@@ -1,8 +1,6 @@
-const {
-  normalizeLineUserId,
-  findCustomerNameByLineUserId,
-} = require('./shrimpLinePush');
-const { lineReply } = require('./teaDailySummary');
+const { normalizeLineUserId } = require('./lineUserId');
+const { findCustomerNameByLineUserId } = require('../seafood-notify/shrimpLinePush');
+const { lineReply } = require('../shared/lineUtils');
 const { isStaffLineUserId } = require('./shrimpStaffLineUids');
 
 const LINE_CONTENT_URL = 'https://api-data.line.me/v2/bot/message';

@@ -1,0 +1,102 @@
+/** LINE Webhook — ร้านชา: บอทแจ้งสรุปปิดวัน (ไม่รับออเดอร์ลูกค้า) */
+const {
+  todayBKK,
+  buildSummaryForDate,
+  buildRestockPurchaseForDate,
+  getTeaLineConfig,
+  classifyTeaLineCommand,
+  HELP_TEXT,
+} = require('./teaDailySummary');
+const { lineReply } = require('../shared/lineUtils');
+const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('../shared/webhookDedup');
+
+async function handleTeaLineWebhook(db, admin, req, res) {
+  if (req.method === 'GET') { res.status(200).send('ok'); return; }
+  if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+
+  const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
+  const signature = req.headers['x-line-signature'] || '';
+  const token = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
+
+  const crypto = require('crypto');
+  const secret = process.env.LINE_TEA_CHANNEL_SECRET;
+  if (!secret) { res.status(401).send('Invalid signature'); return; }
+  const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
+  if (hash !== signature) { res.status(401).send('Invalid signature'); return; }
+
+  const events = req.body.events || [];
+
+  for (const event of events) {
+    if (event.type !== 'message' || event.message.type !== 'text') continue;
+    if (event.deliveryContext?.isRedelivery) continue;
+    if (!(await claimLineEvent(db, event))) continue;
+
+    try {
+      const text = event.message.text.trim();
+      const replyToken = event.replyToken;
+      const userId = event.source.userId;
+      const groupId = event.source.groupId || event.source.roomId || null;
+
+      const teaConfig = await getTeaLineConfig(db);
+      const teaGroupId = (teaConfig.notifyGroupId || '').trim();
+      const cmd = classifyTeaLineCommand(text);
+      if (groupId && teaGroupId && groupId !== teaGroupId) {
+        if (cmd) {
+          await lineReply(
+            replyToken,
+            '⚠️ กลุ่ม LINE นี้ไม่ตรงกับกลุ่มร้านน้ำที่ตั้งในแอป (จัดการ → LINE)\n'
+            + 'ให้แอดมินเช็ก Group ID หรือพิมพ์ในกลุ่มร้านน้ำที่ถูกต้อง',
+            token,
+          );
+        }
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      if (cmd === 'help') {
+        await lineReply(replyToken, HELP_TEXT, token);
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      if (cmd === 'summary') {
+        const dateKey = todayBKK();
+        try {
+          const summary = await buildSummaryForDate(db, dateKey);
+          await lineReply(replyToken, summary, token);
+        } catch (err) {
+          console.error('tea summary reply', err);
+          await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
+        }
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      if (cmd === 'restock') {
+        const dateKey = todayBKK();
+        try {
+          const msg = await buildRestockPurchaseForDate(db, dateKey);
+          await lineReply(replyToken, msg, token);
+        } catch (err) {
+          console.error('tea restock reply', err);
+          await lineReply(replyToken, '⚠️ ดึงรายการซื้อเข้าร้านไม่สำเร็จ ลองใหม่ครับ', token);
+        }
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      await db.collection('line_messages').add({
+        userId, groupId, text,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await completeLineEvent(db, event);
+    } catch (err) {
+      await releaseLineEvent(db, event);
+      throw err;
+    }
+  }
+
+  res.status(200).json({ status: 'ok' });
+}
+
+module.exports = { handleTeaLineWebhook };

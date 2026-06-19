@@ -1,4 +1,4 @@
-const { normalizeLineUserId } = require('./shrimpLinePush');
+const { normalizeLineUserId } = require('./lineUserId');
 const {
   customerHasLineUserId,
   getBillingLineUserId,
