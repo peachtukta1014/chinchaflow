@@ -1,6 +1,6 @@
 {
-  "name": "AI Admin · CHINCHA FLOW",
-  "short_name": "AI Admin",
+  "name": "เด๊ฟ · CHINCHA FLOW",
+  "short_name": "เด๊ฟ",
   "description": "CHINCHA FLOW — ผู้ช่วย AI สำหรับร้านชินชาและโกอ้วน",
   "start_url": "/?source=pwa",
   "scope": "/",
@@ -14,8 +14,8 @@
   ],
   "shortcuts": [
     {
-      "name": "คุยกับ AI Admin",
-      "short_name": "AI Admin",
+      "name": "คุยกับเด๊ฟ",
+      "short_name": "เด๊ฟ",
       "url": "/?source=shortcut",
       "icons": [{ "src": "/chincha-logo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
     }

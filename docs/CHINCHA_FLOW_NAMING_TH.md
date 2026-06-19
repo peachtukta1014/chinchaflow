@@ -19,7 +19,7 @@
 |------------|----------|-----|-----------|
 | **โกอ้วน คลังซีฟู้ด** | `apps/seafood-pos` | https://ko-seafood.top | ขาย, สต๊อก FIFO, ลูกค้า, บิล, ออเดอร์ LINE |
 | **CHINCHA / ชินชา Tea POS** | `apps/chincha-tea` | https://chincha-tea.web.app | ขายร้านชา, สรุปวัน, เติมของ, แอดมิน, หลายภาษา |
-| **AI Admin** | `apps/ai-chat` | https://chincha-ai-chat.web.app | ผู้ช่วย AI คุยกับเจ้าของร้าน — รับคำสั่งเสียง/พิมพ์ ควบคุม 5 agent scopes |
+| **AI Admin (เด๊ฟ)** | `apps/ai-chat` | https://chincha-ai-chat.web.app | ผู้ช่วย AI คุยกับเจ้าของร้าน — รับคำสั่งเสียง/พิมพ์ ควบคุม 5 agent scopes |
 | **LINE backend** | `apps/webhook-core` | Cloud Functions `asia-southeast1` | Webhook, ส่งบิล, สรุปยอด, LIFF, AI Chat Agent — ไม่มีหน้าเว็บพนักงาน |
 
 ทั้งสามอยู่บน **Firebase โปรเจกต์เดียว** แยก collection / Hosting target ตามธุรกิจ
