@@ -3,8 +3,13 @@
  *
  * เลขาส่วนตัวพีช: เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน ก่อนรับหน้าที่สรุปความเข้าใจก่อนเสมอ
  *
+ * Model selection (3-tier):
+ *   🟢 Flash (deepseek-v4-flash)  — แชททั่วไป
+ *   🟡 Pro   (deepseek-v4-pro)    — โค้ด / วิเคราะห์ complex
+ *   🔵 Vision (gpt-4o-mini)       — มีรูปแนบ
+ *
  * Router + intent classifier:
- *   user message → detect scope → pick system prompt → call OpenRouter → reply
+ *   user message → detect scope → pickModel → call OpenRouter → reply
  *   if intent is "code-action" → route to aiWorkflowAgent (OpenRouter + GitHub API)
  *
  * 5 Agent Scopes:
@@ -19,8 +24,9 @@ const functions = require('firebase-functions/v1');
 const https = require('firebase-functions/v2/https');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
-const DEFAULT_MODEL = 'deepseek/deepseek-chat';
-const VISION_MODEL = 'openai/gpt-4o-mini';
+const FLASH_MODEL = 'deepseek/deepseek-v4-flash';   // แชททั่วไป — ถูก เร็ว
+const PRO_MODEL   = 'deepseek/deepseek-v4-pro';     // โค้ด / วิเคราะห์ complex
+const VISION_MODEL = 'openai/gpt-4o-mini';           // มีรูปแนบ
 
 // ── Scope detection from user message ────────────────────────────────────
 function detectScope(text, currentScope) {
@@ -115,11 +121,35 @@ Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE B
 ตอบ concise เหมาะกับ devops วิเคราะห์ schedule / cron expression`,
 };
 
+// ── เลือก model จากประเภทงาน ─────────────────────────────────────────────
+function pickModel(text, { imageBase64 } = {}) {
+  if (imageBase64) return process.env.VISION_MODEL || VISION_MODEL;
+  if (isCodeRelated(text)) return process.env.CODE_MODEL || PRO_MODEL;
+  return process.env.FLASH_MODEL || FLASH_MODEL;
+}
+
+// ── ตรวจว่าเกี่ยวกับโค้ด (กว้างกว่า isCodeAction — ครอบ "อธิบาย/วิเคราะห์" ด้วย) ──
+function isCodeRelated(text) {
+  if (!text || typeof text !== 'string') return false;
+  const t = text.toLowerCase();
+  return (
+    t.includes('โค้ด') || t.includes('code') || t.includes('บั๊ก') || t.includes('bug') ||
+    t.includes('error') || t.includes('แก้') || t.includes('fix') ||
+    t.includes('feature') || t.includes('ฟีเจอร์') || t.includes('refactor') ||
+    t.includes('ฟังก์ชัน') || t.includes('function') || t.includes('component') ||
+    t.includes('api') || t.includes('deploy') || t.includes('ดีพลอย') ||
+    t.includes('import') || t.includes('export') || t.includes('logic') ||
+    t.includes('อธิบายโค้ด') || t.includes('วิเคราะห์') || t.includes('implement') ||
+    t.includes('script') || t.includes('สคริปต์') || t.includes('ไฟล์') ||
+    t.includes('firestore') || t.includes('firebase') || t.includes('webhook') ||
+    t.includes('pr') || t.includes('pull request') || t.includes('branch') ||
+    t.includes('commit') || t.includes('merge')
+  );
+}
+
 // ── Call OpenRouter (รองรับ vision เมื่อมี imageBase64) ──────────────────
-async function callOpenRouter(apiKey, messages, { imageBase64 } = {}) {
-  const model = imageBase64
-    ? (process.env.VISION_MODEL || VISION_MODEL)
-    : (process.env.DEFAULT_MODEL || DEFAULT_MODEL);
+async function callOpenRouter(apiKey, messages, { imageBase64, text } = {}) {
+  const model = pickModel(text || '', { imageBase64 });
 
   let finalMessages = messages;
   if (imageBase64) {
@@ -192,7 +222,7 @@ exports.aiChatAgent = https.onCall(
     ];
 
     try {
-      const reply = await callOpenRouter(apiKey, messages);
+      const reply = await callOpenRouter(apiKey, messages, { text: message });
       return { reply, scope: resolvedScope };
     } catch (err) {
       console.error('aiChatAgent error:', err);
@@ -280,7 +310,7 @@ exports.aiChatAgentHttp = functions
     ];
 
     try {
-      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null });
+      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, text: message });
       res.json({ reply, scope: resolvedScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);
