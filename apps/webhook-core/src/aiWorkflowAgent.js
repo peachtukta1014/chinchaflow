@@ -239,4 +239,4 @@ exports.aiWorkflowStatusHttp = functions
     }
   });
 
-module.exports = { handleCodeAction };
+exports.handleCodeAction = handleCodeAction;
