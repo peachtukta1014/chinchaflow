@@ -893,11 +893,11 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         {saving ? '⏳...' : `📋 ${t('submitRestock')}${items.length ? ` (${items.length})` : ''}`}
       </button>
 
-      {recentRequests.filter((r) => !isRestockReceived(r)).length > 0 && (
+      {recentRequests.filter((r) => !isRestockReceived(r) && normalizeRestockStatus(r.purchaseStatus) !== 'cancelled').length > 0 && (
         <div className="mt-4">
           <p className="font-black text-xs text-stone-500 uppercase mb-2">{t('recentRestocks')}</p>
           <div className="space-y-2">
-            {recentRequests.filter((r) => !isRestockReceived(r)).map((req) => {
+            {recentRequests.filter((r) => !isRestockReceived(r) && normalizeRestockStatus(r.purchaseStatus) !== 'cancelled').map((req) => {
               const canDel = canManageRestock(req, member);
               const canPurchase = canMarkRestockPurchased(req, member);
               const canReceive = canConfirmRestockReceived(req, member);

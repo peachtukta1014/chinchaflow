@@ -49,6 +49,10 @@ async function handleTeaLineWebhook(db, admin, req, res) {
             token,
           );
         }
+        await db.collection('line_messages').add({
+          userId, groupId, text,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
         await completeLineEvent(db, event);
         continue;
       }
