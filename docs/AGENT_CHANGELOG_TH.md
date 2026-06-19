@@ -1,3 +1,22 @@
+## 2026-06-19 — PR#287: AI เลขา + image vision + per-app CHANGELOG + README
+
+- `aiChatAgent.js` — เปลี่ยน persona จาก "เด๊ฟ" → "เลขา" (เลขาส่วนตัวพีช เพื่อนคู่คิด รู้ใจ)
+- เพิ่ม pattern สรุป-ก่อนรับหน้าที่ในทุก system prompt (หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ)
+- เพิ่ม vision: `VISION_MODEL = 'openai/gpt-4o-mini'` ใช้เมื่อมี `imageBase64` → multimodal content array
+- `apps/ai-chat/src/App.jsx` — ปุ่ม 📸 แนบรูป, thumbnail preview, bubble แสดงรูป, persona "เลขา" 🗂
+- `apps/ai-chat/src/api.js` — `chatWithAI()` รับ `imageBase64` ส่งไป backend
+- สร้าง `apps/*/CHANGELOG.md` ทุก app: chincha-tea, seafood-pos, webhook-core, ai-chat
+- อัปเดต `README.md`: เพิ่มแถว ai-chat, อัปเดต webhook structure 4 โฟลเดอร์, เพิ่มหัวข้อ AI Chat
+- ถ้าพังให้เช็ก `aiChatAgent.js` (callOpenRouter imageBase64) · `App.jsx` (fileInputRef, imagePreview)
+
+## 2026-06-19 — PR#286: คำสั่ง แอด uid ในบอทชา
+
+- เพิ่มคำสั่ง `แอด uid` / `adduid` / `เพิ่ม uid` / `addme` ในกลุ่ม LINE ร้านน้ำชา
+- บอทบันทึก userId ลง `config/teaLine.notifyUserIds` → รับสรุปปิดวันส่วนตัวได้
+- ตอบยืนยันพร้อม UID ถ้ามีอยู่แล้วก็แจ้ง ไม่ซ้ำ
+- อัปเดต HELP_TEXT และ regex `ADD_UID_CMD` ใน `teaDailySummary.js`
+- ถ้าพังให้เช็ก `tea/teaDailySummary.js` (ADD_UID_CMD) · `tea/teaWebhook.js` (cmd === 'add_uid')
+
 ## 2026-06-19 — PR#285: ยกเลิก restock หาย + ดึง Group ID ชาได้
 
 - `RestockTab.jsx`: filter ตัด `cancelled` ออกจากลิสต์ด้วย (เดิมตัดแค่ `received`) → ยกเลิกแล้วหายทันที

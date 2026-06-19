@@ -10,7 +10,8 @@
 |---|---|---|---|
 | **โกอ้วน คลังซีฟู้ด** | `apps/seafood-pos` | https://ko-seafood.top | POS กุ้ง, สต๊อก, ลูกค้า, ลูกหนี้, LINE order, LIFF |
 | **ชินชา Tea POS ไม้ขาว** | `apps/chincha-tea` | https://chincha-tea.web.app | POS ร้านน้ำ, สรุปวัน, หลังร้าน, เติมของ, ค่าใช้จ่าย, พนักงาน, 3 ภาษา |
-| **LINE backend** | `apps/webhook-core` | Cloud Functions | webhook กุ้ง/ชา, สรุปยอด, แจ้งเตือน, กัน event ซ้ำ |
+| **LINE backend** | `apps/webhook-core` | Cloud Functions | webhook กุ้ง/ชา, สรุปยอด, แจ้งเตือน, กัน event ซ้ำ, AI chat agent |
+| **AI Admin Chat** | `apps/ai-chat` | PWA (chincha-flow.web.app) | แชทกับ "เลขา" AI ผู้ช่วยส่วนตัว — ถามข้อมูลร้าน, แก้โค้ด, ส่งรูป |
 | **Scheduled backend** | `apps/webhook-core-scheduled` | Cloud Functions / Scheduler | งานสรุปอัตโนมัติ ถ้า deploy แยก codebase |
 
 ---
@@ -103,18 +104,34 @@ chincha-business-os/
 │   │   ├── package.json
 │   │   └── vite.config.js
 │   │
-│   ├── webhook-core/                  # Cloud Functions หลักของ LINE
+│   ├── webhook-core/                  # Cloud Functions หลัก (LINE Bot + AI Agent)
 │   │   ├── src/
-│   │   │   ├── index.js               # exports functions: lineWebhook, lineWebhookTea, teaPushSummary, ...
-│   │   │   ├── parseLineOrder.js      # แปลงข้อความ LINE → ออเดอร์กุ้ง
-│   │   │   ├── shrimpLineIntent.js    # คำสั่ง LINE ฝั่งกุ้ง
-│   │   │   ├── shrimpDailySummary.js  # สรุปกุ้ง
-│   │   │   ├── shrimpBillTemplateRows.js
-│   │   │   ├── shrimpBuiltinCustomers.js
-│   │   │   ├── shrimpLinePush.js
-│   │   │   ├── teaDailySummary.js     # สรุปปิดวันร้านชา
-│   │   │   ├── webhookDedup.js        # กัน event ซ้ำ
-│   │   │   └── notify.js
+│   │   │   ├── index.js               # exports functions: lineWebhook, lineWebhookTea, teaPushSummary, aiChatAgentHttp, ...
+│   │   │   ├── seafood-oa/            # LINE webhook + logic ฝั่งกุ้ง
+│   │   │   │   ├── shrimpDirectLineWebhook.js
+│   │   │   │   ├── shrimpLineOrderHandler.js
+│   │   │   │   ├── shrimpLineIntent.js
+│   │   │   │   ├── shrimpDailySummary.js
+│   │   │   │   ├── parseLineOrder.js
+│   │   │   │   ├── prepareOrderInput.js
+│   │   │   │   └── ...
+│   │   │   ├── seafood-notify/        # instant notify กุ้ง
+│   │   │   │   └── shrimpLinePush.js
+│   │   │   ├── tea/                   # LINE webhook + logic ฝั่งชา
+│   │   │   │   ├── teaWebhook.js
+│   │   │   │   └── teaDailySummary.js
+│   │   │   ├── shared/                # utils ใช้ร่วม
+│   │   │   │   ├── lineUtils.js
+│   │   │   │   └── webhookDedup.js
+│   │   │   ├── aiChatAgent.js         # AI "เลขา" — chat + vision + code-action routing
+│   │   │   └── aiWorkflowAgent.js     # code-action: OpenRouter + GitHub API → PR
+│   │   └── package.json
+│   │
+│   ├── ai-chat/                       # AI Admin Chat PWA
+│   │   ├── src/
+│   │   │   ├── App.jsx                # UI แชท: text + voice + image upload
+│   │   │   └── api.js                 # chatWithAI() → aiChatAgentHttp Cloud Function
+│   │   ├── index.html
 │   │   └── package.json
 │   │
 │   └── webhook-core-scheduled/        # งาน scheduled ถ้าแยก deploy/codebase
@@ -233,19 +250,20 @@ chincha-business-os/
 
 ---
 
-## LINE backend: `apps/webhook-core`
+## LINE backend + AI Agent: `apps/webhook-core`
 
-Cloud Functions สำหรับงานหลังบ้านที่ไม่ควรอยู่ใน frontend โดยตรง
+Cloud Functions สำหรับงานหลังบ้าน แยกเป็น 4 โฟลเดอร์ตาม scope
 
 | Function / Module | หน้าที่ |
 |---|---|
 | `lineWebhook` | รับข้อความ LINE ฝั่งกุ้ง (OA 1:1 + กลุ่มครอบครัว) |
-| `lineWebhookTea` | บอท LINE ชา — คำสั่งสรุป/ซื้อเข้าร้าน/help (กลุ่มร้านน้ำที่ตั้งในแอป) |
+| `lineWebhookTea` | บอท LINE ชา — คำสั่งสรุป/ซื้อเข้าร้าน/แอด uid/help |
 | `teaPushSummary` | ส่งสรุปปิดวันร้านชา (จากแอป) |
-| `parseLineOrder.js` | แปลงข้อความลูกค้าเป็น order |
-| `webhookDedup.js` | กัน LINE event ซ้ำ |
-| `shrimpDailySummary.js` | สรุปยอดกุ้ง |
-| `teaDailySummary.js` | สรุปยอดชา + คำสั่ง LINE |
+| `aiChatAgentHttp` | AI "เลขา" — chat + vision + code-action routing (HTTP) |
+| `seafood-oa/parseLineOrder.js` | แปลงข้อความลูกค้าเป็น order กุ้ง |
+| `shared/webhookDedup.js` | กัน LINE event ซ้ำ |
+| `seafood-oa/shrimpDailySummary.js` | สรุปยอดกุ้ง |
+| `tea/teaDailySummary.js` | สรุปยอดชา + คำสั่ง LINE |
 
 ### คำสั่ง LINE (อัปเดต 2026-06)
 
@@ -263,6 +281,7 @@ Webhook URL ใน LINE Developers:
 | `สรุป` / `ปิดวัน` / `ยอดขายวันนี้` / `1` | สรุปยอดขายวันนี้ |
 | `ซื้อเข้าร้าน` / `ซื้อของ` / `2` | รายการสั่งของ + ยอดซื้อแล้ว |
 | `help` / `ช่วยเหลือ` / `3` | แสดงคำสั่ง |
+| `แอด uid` / `adduid` / `เพิ่ม uid` | เพิ่ม User ID ตัวเองเข้ารับสรุปส่วนตัว |
 
 **โกอ้วน — แชต OA 1:1 (ลูกค้า):** สั่งกุ้ง · `help` · `ฟอร์ม` · `ยกเลิก` · ส่งสลิป
 
@@ -278,6 +297,26 @@ Webhook URL ใน LINE Developers:
 > `help` / คีย์ `2` — **ไม่ตอบในกลุ่ม** (ใช้ในแชต OA 1:1 ลูกค้าเท่านั้น)
 
 หลังแก้ `apps/webhook-core` ต้อง deploy functions (`main` push หรือ Actions → **Deploy Cloud Functions**)
+
+## AI Admin Chat: `apps/ai-chat`
+
+PWA แชทกับ "เลขา" — AI ผู้ช่วยส่วนตัวพีช เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน
+
+| ฟีเจอร์ | รายละเอียด |
+|---------|-----------|
+| 💬 Text chat | ถามข้อมูลร้าน วิเคราะห์ปัญหา แนะนำแนวทาง |
+| 🎤 Voice input | พูดภาษาไทยได้ (Web Speech API) |
+| 📸 Image upload | ส่งรูป screenshot/error ให้ AI วิเคราะห์ (vision) |
+| 🔧 Code-action | สั่ง "แก้บั๊ก / สร้าง feature" → AI deepseek + GitHub → PR อัตโนมัติ |
+| 🗂 Multi-scope | สลับ scope: ชา / กุ้ง / LINE Bot / Cron |
+
+ก่อนรับหน้าที่ AI จะสรุป: **หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ** แล้วรอยืนยัน
+
+**Backend:** `aiChatAgentHttp` (Cloud Function) → OpenRouter API  
+**Vision model:** `openai/gpt-4o-mini` (ใช้เมื่อมีรูปแนบ)  
+**Text model:** `deepseek/deepseek-chat` (ค่าเริ่มต้น, ปรับได้ผ่าน env `DEFAULT_MODEL`)
+
+---
 
 ## พัฒนา local
 
@@ -297,6 +336,12 @@ npm run dev:tea
 
 ```bash
 npm run dev:seafood
+```
+
+รัน AI Chat:
+
+```bash
+npm run dev --workspace=ai-chat
 ```
 
 Build:
