@@ -69,32 +69,6 @@ async function callOpenRouter(apiKey, messages, maxTokens) {
   return data?.choices?.[0]?.message?.content || '';
 }
 
-// ── Fetch file from GitHub repo ─────────────────────────────────────────
-async function fetchRepoFile(pat, filePath, ref) {
-  const url = `${GH_API}/repos/${GH_REPO}/contents/${filePath}${ref ? '?ref=' + ref : ''}`;
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': `token ${pat}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'CHINCHA-FLOW-AI',
-    },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub fetch ${res.status} for ${filePath}`);
-  const data = await res.json();
-  return {
-    content: Buffer.from(data.content, 'base64').toString('utf-8'),
-    sha: data.sha,
-    path: filePath,
-  };
-}
-
-// ── List repo files matching a glob pattern (simple) ────────────────────
-const REPO_FILE_LIST = [
-  'apps/seafood-pos/src/', 'apps/chincha-tea/src/',
-  'apps/webhook-core/src/', 'package.json', 'firebase.json', '.firebaserc',
-];
-
 // ── Code-action system prompt ────────────────────────────────────────────
 const CODE_ACTION_PROMPT = `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ของ CHINCHA FLOW monorepo
 คุณกำลังแก้โค้ดตามคำสั่งของพี่ (เจ้าของร้าน)
@@ -153,40 +127,51 @@ async function applyCodeChanges(pat, changePlan) {
   const mainRef = await mainRefRes.json();
   const mainSha = mainRef.object.sha;
 
-  // Step 2: Create branch from main
-  const branchRes = await fetch(`${GH_API}/repos/${GH_REPO}/git/refs`, {
-    method: 'POST',
-    headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
-    body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: mainSha }),
-  });
-  if (branchRes.status !== 201) {
-    // Branch might already exist — get its SHA
-    const existing = await fetch(`${GH_API}/repos/${GH_REPO}/git/refs/heads/${branchName}`, {
-      headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'CF-AI' },
-    });
-    if (!existing.ok) throw new Error(`GitHub branch create failed ${branchRes.status}`);
-    const exRef = await existing.json();
-    // Reset branch to main
-    await fetch(`${GH_API}/repos/${GH_REPO}/git/refs/heads/${branchName}`, {
-      method: 'PATCH',
+  // Step 2: Create branch from main (skip if exists)
+  let branchCreated = false;
+  try {
+    const branchRes = await fetch(`${GH_API}/repos/${GH_REPO}/git/refs`, {
+      method: 'POST',
       headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
-      body: JSON.stringify({ sha: mainSha, force: true }),
+      body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: mainSha }),
     });
+    if (branchRes.status === 201) {
+      branchCreated = true;
+    } else if (branchRes.status === 422 && (await branchRes.text()).includes('already exists')) {
+      // Branch exists — force reset to main
+      await fetch(`${GH_API}/repos/${GH_REPO}/git/refs/heads/${branchName}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
+        body: JSON.stringify({ sha: mainSha, force: true }),
+      });
+    } else {
+      throw new Error(`GitHub branch create failed ${branchRes.status}`);
+    }
+  } catch (e) {
+    if (branchCreated) throw e;
+    // Branch may exist already, try reset
+    try {
+      await fetch(`${GH_API}/repos/${GH_REPO}/git/refs/heads/${branchName}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
+        body: JSON.stringify({ sha: mainSha, force: true }),
+      });
+    } catch { /* fine if it fails */ }
   }
 
-  // Step 3: Read current file contents from main
+  // Step 3: Read current file contents from the NEW branch (not main)
   const fileContents = {};
   for (const change of changes) {
     if (!change.path) continue;
-    const file = await fetchRepoFile(pat, change.path, 'main');
+    const file = await fetchRepoFile(pat, change.path, branchName);
     if (file) {
       fileContents[change.path] = file;
     } else if (change.action === 'create') {
-      fileContents[change.path] = { content: '', sha: null, path: change.path };
+      fileContents[change.path] = null; // new file, no sha
     }
   }
 
-  // Step 4: Apply changes
+  // Step 4: Apply changes and commit each file
   for (const change of changes) {
     const file = fileContents[change.path];
     let newContent;
@@ -194,27 +179,29 @@ async function applyCodeChanges(pat, changePlan) {
     if (change.action === 'create') {
       newContent = change.new || change.content || '';
     } else if (change.action === 'replace') {
-      if (!file || !file.content) throw new Error(`ไม่พบไฟล์ ${change.path}`);
-      // Find old content and replace
-      if (change.old && file.content.includes(change.old)) {
+      if (!file) throw new Error(`ไม่พบไฟล์ ${change.path} ใน repo`);
+      // Try exact replacement first
+      if (change.old && file.content.indexOf(change.old) !== -1) {
         newContent = file.content.replace(change.old, change.new || '');
       } else {
-        // If old not found exactly, try line-based approach or use full replace
+        // Full file replacement (AI gives the complete new file content)
         newContent = change.new || file.content;
       }
     } else if (change.action === 'patch') {
-      if (!file || !file.content) throw new Error(`ไม่พบไฟล์ ${change.path}`);
-      if (change.find && file.content.includes(change.find)) {
+      if (!file) throw new Error(`ไม่พบไฟล์ ${change.path} ใน repo`);
+      if (change.find && file.content.indexOf(change.find) !== -1) {
         const idx = file.content.indexOf(change.find) + change.find.length;
         newContent = file.content.slice(0, idx) + '\n' + (change.insert || '') + file.content.slice(idx);
+      } else if (change.insert) {
+        newContent = file.content + '\n' + change.insert;
       } else {
-        newContent = file.content + '\n' + (change.insert || '');
+        newContent = file.content;
       }
     } else {
       newContent = change.new || change.content || (file ? file.content : '');
     }
 
-    // Step 5: Commit the file via GitHub API
+    // Step 5: Commit the file via GitHub Contents API
     const commitBody = {
       message: commitMsg,
       content: Buffer.from(newContent).toString('base64'),
@@ -235,11 +222,32 @@ async function applyCodeChanges(pat, changePlan) {
     });
     if (!commitRes.ok) {
       const err = await commitRes.json().catch(() => ({}));
-      throw new Error(`GitHub commit ${change.path} failed: ${commitRes.status} ${err.message || ''}`);
+      const detail = err.message || `HTTP ${commitRes.status}`;
+      throw new Error(`GitHub commit ${change.path} failed: ${detail}`);
     }
   }
 
   return branchName;
+}
+
+// ── Fetch file from GitHub repo ─────────────────────────────────────────
+async function fetchRepoFile(pat, filePath, ref) {
+  const url = `${GH_API}/repos/${GH_REPO}/contents/${filePath}${ref ? '?ref=' + encodeURIComponent(ref) : ''}`;
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `token ${pat}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'CHINCHA-FLOW-AI',
+    },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub fetch ${res.status} for ${filePath}`);
+  const data = await res.json();
+  return {
+    content: Buffer.from(data.content, 'base64').toString('utf-8'),
+    sha: data.sha,
+    path: filePath,
+  };
 }
 
 // ── Open a PR ────────────────────────────────────────────────────────────
