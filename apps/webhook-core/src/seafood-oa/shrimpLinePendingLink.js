@@ -1,4 +1,4 @@
-const { normalizeLineUserId } = require('./shrimpLinePush');
+const { normalizeLineUserId } = require('./lineUserId');
 
 const SHRIMP_LINE_DOC = 'shrimpLine';
 

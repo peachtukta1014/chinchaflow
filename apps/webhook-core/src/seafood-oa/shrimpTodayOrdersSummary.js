@@ -3,10 +3,8 @@
  */
 
 const { todayBKK, formatDateThai } = require('./parseDeliveryDate');
-const {
-  buildCustomerNameByLineUidMap,
-  normalizeLineUserId,
-} = require('./shrimpLinePush');
+const { normalizeLineUserId } = require('./lineUserId');
+const { buildCustomerNameByLineUidMap } = require('../seafood-notify/shrimpLinePush');
 const {
   BUILTIN_CUSTOMERS,
   buildCustomerZoneCatalog,

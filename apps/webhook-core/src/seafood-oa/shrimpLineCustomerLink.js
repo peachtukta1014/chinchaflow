@@ -5,7 +5,7 @@ const {
 const {
   findCustomerNameByLineUserId,
   linkLineUserToCustomers,
-} = require('./shrimpLinePush');
+} = require('../seafood-notify/shrimpLinePush');
 const { isStaffLineUserId } = require('./shrimpStaffLineUids');
 const { setLineOrderSession } = require('./lineOrderSession');
 const { registerPendingLinkRequest, clearPendingLinkRequest } = require('./shrimpLinePendingLink');

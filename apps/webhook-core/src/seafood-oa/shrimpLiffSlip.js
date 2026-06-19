@@ -1,5 +1,5 @@
 const { verifyLineLiffIdToken } = require('./verifyLineLiffToken');
-const { normalizeLineUserId } = require('./shrimpLinePush');
+const { normalizeLineUserId } = require('./lineUserId');
 const {
   SLIP_RECEIVED_REPLY,
   recordPaymentSlipSubmission,

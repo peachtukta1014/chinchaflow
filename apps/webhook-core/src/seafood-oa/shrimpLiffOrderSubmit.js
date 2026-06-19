@@ -9,7 +9,7 @@ const {
 } = require('./lineCustomerContacts');
 const { saveLineOrders } = require('./saveShrimpLineOrders');
 const { verifyLineLiffIdToken } = require('./verifyLineLiffToken');
-const { normalizeLineUserId } = require('./shrimpLinePush');
+const { normalizeLineUserId } = require('./lineUserId');
 const { getOrderWeightIssue } = require('./orderWeight');
 const { formatItemsSummary, deliveryLabelForLang } = require('./shrimpLineReply');
 const {

@@ -1,11 +1,11 @@
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
-const { getShrimpSlipLiffOpenUrl } = require('./provisionShrimpLiff');
+const { getShrimpSlipLiffOpenUrl } = require('../seafood-oa/provisionShrimpLiff');
 const {
   resolveCachedBillImageUrl,
   preRenderBillForSale,
 } = require('./shrimpBillPreRender');
-const { customerMatchesName } = require('./customerNameAliases');
-const { LINE_UID_RE, normalizeLineUserId } = require('./lineUserId');
+const { customerMatchesName } = require('../seafood-oa/customerNameAliases');
+const { LINE_UID_RE, normalizeLineUserId } = require('../seafood-oa/lineUserId');
 const {
   LINE_CONTACT_ROLE_BILLING,
   LINE_CONTACT_ROLE_ORDER,
@@ -13,7 +13,7 @@ const {
   customerHasLineUserId,
   legacyLineUserIdFromContacts,
   normalizeLineContacts,
-} = require('./lineCustomerContacts');
+} = require('../seafood-oa/lineCustomerContacts');
 
 function compact(s) {
   return String(s || '').replace(/\s+/g, '').toLowerCase();

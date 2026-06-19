@@ -9,45 +9,30 @@ const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const crypto = require('crypto');
-const {
-  todayBKK,
-  buildSummaryForDate,
-  buildRestockPurchaseForDate,
-  dispatchTeaSummary,
-  lineReply,
-  HELP_TEXT,
-  classifyTeaLineCommand,
-  getTeaLineConfig,
-} = require('./teaDailySummary');
-const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./webhookDedup');
-const { handleShrimpLineWebhookEvent } = require('./shrimpLineWebhookRouter');
+const { todayBKK, lineReply } = require('./shared/lineUtils');
+const { dispatchTeaSummary } = require('./tea/teaDailySummary');
+const { handleTeaLineWebhook } = require('./tea/teaWebhook');
+const { claimLineEvent, completeLineEvent, releaseLineEvent } = require('./shared/webhookDedup');
+const { handleShrimpLineWebhookEvent } = require('./seafood-oa/shrimpLineWebhookRouter');
 const {
   verifyShrimpStaff,
   pushShrimpBillToCustomer,
-} = require('./shrimpLinePush');
-const { handleShrimpLiffOrderRequest } = require('./shrimpLiffOrderSubmit');
-const { handleShrimpLiffSlipRequest } = require('./shrimpLiffSlip');
+} = require('./seafood-notify/shrimpLinePush');
+const { handleShrimpLiffOrderRequest } = require('./seafood-oa/shrimpLiffOrderSubmit');
+const { handleShrimpLiffSlipRequest } = require('./seafood-oa/shrimpLiffSlip');
 const {
   notifyShrimpLineOrder,
   notifyShrimpPaymentSlip,
   notifyShrimpSaleDeleteRequest,
   notifyTeaRestock,
-} = require('./instantLineNotify');
-const { aiChatAgent, aiChatAgentHttp } = require('./aiChatAgent');
-const {
-  aiWorkflowAgentHttp,
-  aiWorkflowStatusHttp,
-  handleCodeAction,
-} = require('./aiWorkflowAgent');
+} = require('./seafood-notify/instantLineNotify');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
   return getFirestore();
 }
 
-// ── LINE signature verification ───────────────────────────────────────────────
 function verifySignature(rawBody, signature, secret) {
-  // fail-closed: ถ้าไม่มี secret แสดงว่า misconfigure → ปฏิเสธทันที
   if (!secret) return false;
   const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
   return hash === signature;
@@ -97,89 +82,8 @@ exports.lineWebhookTea = functions
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     try {
-    if (req.method === 'GET') { res.status(200).send('ok'); return; }
-    if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
-
-    const rawBody   = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
-    const signature = req.headers['x-line-signature'] || '';
-    const token     = process.env.LINE_TEA_CHANNEL_ACCESS_TOKEN;
-    if (!verifySignature(rawBody, signature, process.env.LINE_TEA_CHANNEL_SECRET)) {
-      res.status(401).send('Invalid signature'); return;
-    }
-
-    const events = req.body.events || [];
-
-    for (const event of events) {
-      if (event.type !== 'message' || event.message.type !== 'text') continue;
-      if (event.deliveryContext?.isRedelivery) continue;
-      if (!(await claimLineEvent(db(), event))) continue;
-
-      try {
-        const text       = event.message.text.trim();
-        const replyToken = event.replyToken;
-        const userId     = event.source.userId;
-        const groupId    = event.source.groupId || event.source.roomId || null;
-
-        const teaConfig = await getTeaLineConfig(db());
-        const teaGroupId = (teaConfig.notifyGroupId || '').trim();
-        const cmd = classifyTeaLineCommand(text);
-        if (groupId && teaGroupId && groupId !== teaGroupId) {
-          if (cmd) {
-            await lineReply(
-              replyToken,
-              '⚠️ กลุ่ม LINE นี้ไม่ตรงกับกลุ่มร้านน้ำที่ตั้งในแอป (จัดการ → LINE)\n'
-              + 'ให้แอดมินเช็ก Group ID หรือพิมพ์ในกลุ่มร้านน้ำที่ถูกต้อง',
-              token,
-            );
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (cmd === 'help') {
-          await lineReply(replyToken, HELP_TEXT, token);
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (cmd === 'summary') {
-          const dateKey = todayBKK();
-          try {
-            const summary = await buildSummaryForDate(db(), dateKey);
-            await lineReply(replyToken, summary, token);
-          } catch (err) {
-            console.error('tea summary reply', err);
-            await lineReply(replyToken, '⚠️ ดึงสรุปไม่สำเร็จ ลองใหม่หรือตรวจสอบข้อมูลในแอป', token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        if (cmd === 'restock') {
-          const dateKey = todayBKK();
-          try {
-            const msg = await buildRestockPurchaseForDate(db(), dateKey);
-            await lineReply(replyToken, msg, token);
-          } catch (err) {
-            console.error('tea restock reply', err);
-            await lineReply(replyToken, '⚠️ ดึงรายการซื้อเข้าร้านไม่สำเร็จ ลองใหม่ครับ', token);
-          }
-          await completeLineEvent(db(), event);
-          continue;
-        }
-
-        await db().collection('line_messages').add({
-          userId, groupId, text,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        await completeLineEvent(db(), event);
-      } catch (err) {
-        await releaseLineEvent(db(), event);
-        throw err;
-      }
-    }
-
-    res.status(200).json({ status: 'ok' });
+      if (!admin.apps.length) admin.initializeApp();
+      await handleTeaLineWebhook(db(), admin, req, res);
     } catch (err) {
       console.error('lineWebhookTea', err);
       res.status(500).json({ error: 'internal' });
@@ -277,7 +181,7 @@ exports.shrimpRenderBill = functions
         res.status(400).json({ error: 'billData_required' });
         return;
       }
-      const { renderShrimpBillJpeg } = require('./shrimpBillRender');
+      const { renderShrimpBillJpeg } = require('./seafood-notify/shrimpBillRender');
       const buffer = await renderShrimpBillJpeg(billData);
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'private, max-age=60');
@@ -317,7 +221,7 @@ exports.shrimpPreRenderBill = functions
         res.status(400).json({ error: 'saleId_and_billData_required' });
         return;
       }
-      const { preRenderBillForSale } = require('./shrimpBillPreRender');
+      const { preRenderBillForSale } = require('./seafood-notify/shrimpBillPreRender');
       const result = await preRenderBillForSale(db(), admin, saleId, billData);
       res.json({ ok: true, ...result });
     } catch (err) {
@@ -425,6 +329,7 @@ exports.teaPushSummary = functions
     if (!idToken) { res.status(401).json({ error: 'unauthorized' }); return; }
 
     try {
+      if (!admin.apps.length) admin.initializeApp();
       const decoded = await admin.auth().verifyIdToken(idToken);
       const userSnap = await db().collection('users').doc(decoded.uid).get();
       const user = userSnap.data();
@@ -465,7 +370,7 @@ exports.teaPushSummary = functions
     }
   });
 
-// ── แจ้งเตือนทันที → กลุ่ม LINE ที่ตั้งในแอป (ออเดอร์กุ้ง / สั่งของชา) ─────────────
+// ── Firestore triggers — แจ้งเตือน LINE ─────────────────────────────────────
 exports.onShrimpLineOrderCreated = functions
   .region('asia-southeast1')
   .firestore.document('lineOrders/{orderId}')
@@ -527,9 +432,6 @@ exports.onShrimpAdminAlertCreated = functions
       console.error('onShrimpAdminAlertCreated', err);
     }
   });
-
-// สรุปอัตโนมัติ: ใช้ apps/webhook-core-scheduled (ต้องเปิด Cloud Scheduler API ใน GCP)
-// หรือส่งด้วยมือจากแอดมิน / พิมพ์ "สรุป" ในกลุ่ม LINE
 
 // ── AI Chat + Workflow Agent ──────────────────────────────────────────────────
 Object.assign(exports, require('./aiChatAgent'));
