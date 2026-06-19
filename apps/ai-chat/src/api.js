@@ -2,7 +2,7 @@
 // หน้าที่: ป้องกัน API Key รั่วไหล, จัดการ system prompt + scope ที่ backend
 
 const FUNCTION_URL = import.meta.env.VITE_AI_CHAT_FUNCTION_URL
-  || 'https://aiChatAgentHttp-asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp';
+  || 'https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp';
 
 /**
  * ส่งข้อความไปให้ AI แล้วรับคำตอบกลับ

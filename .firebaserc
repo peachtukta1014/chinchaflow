@@ -5,10 +5,17 @@
   "targets": {
     "chincha-eeed6": {
       "hosting": {
-        "tea": ["chincha-tea"],
-        "shrimp": ["chincha-shrimp"],
-        "ai-chat": ["chincha-ai-chat"]
+        "tea": [
+          "chincha-tea"
+        ],
+        "shrimp": [
+          "chincha-shrimp"
+        ],
+        "ai-chat": [
+          "chincha-ai-chat"
+        ]
       }
     }
-  }
+  },
+  "etags": {}
 }
