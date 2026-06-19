@@ -1,3 +1,11 @@
+## 2026-06-19 — PR#286: คำสั่ง แอด uid ในบอทชา
+
+- เพิ่มคำสั่ง `แอด uid` / `adduid` / `เพิ่ม uid` / `addme` ในกลุ่ม LINE ร้านน้ำชา
+- บอทบันทึก userId ลง `config/teaLine.notifyUserIds` → รับสรุปปิดวันส่วนตัวได้
+- ตอบยืนยันพร้อม UID ถ้ามีอยู่แล้วก็แจ้ง ไม่ซ้ำ
+- อัปเดต HELP_TEXT และ regex `ADD_UID_CMD` ใน `teaDailySummary.js`
+- ถ้าพังให้เช็ก `tea/teaDailySummary.js` (ADD_UID_CMD) · `tea/teaWebhook.js` (cmd === 'add_uid')
+
 ## 2026-06-19 — PR#285: ยกเลิก restock หาย + ดึง Group ID ชาได้
 
 - `RestockTab.jsx`: filter ตัด `cancelled` ออกจากลิสต์ด้วย (เดิมตัดแค่ `received`) → ยกเลิกแล้วหายทันที
