@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI } from './api';
+import { chatWithAI, checkWorkflowStatus } from './api';
 
 // ── Icons (inline lucide) ───────────────────────────────────────────────
 const IconSend = () => (
@@ -33,13 +33,14 @@ const AGENT_OPTIONS = [
 
 export default function App() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ 🙋‍♂️ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n• "กุ้งวันนี้มียอดขายเท่าไหร่"\n• "ช่วยดูสต็อกชาหน่อย"\n• "webhook มี error ไหม"' },
+    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n- "กุ้งวันนี้มียอดขายเท่าไหร่"\n- "ช่วยดูสต็อกชาหน่อย"\n- "webhook มี error ไหม"\n- "เด๊ฟ ช่วยแก้บั๊ก {ปัญหา}" (เปิด PR ให้!)' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [agentScope, setAgentScope] = useState('root');
   const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const [workflowRuns, setWorkflowRuns] = useState([]);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -56,12 +57,17 @@ export default function App() {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setLoading(true);
 
-    // Rough scope detection from message
     const scope = detectScope(text);
     if (scope !== agentScope) setAgentScope(scope);
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     const reply = await chatWithAI({ message: text, history, scope });
+
+    // If code-action started, track the workflow
+    if (reply.intent === 'code-action' && reply.runId) {
+      setWorkflowRuns(prev => [...prev, { runId: reply.runId, agentId: reply.agentId, scope: reply.scope }]);
+    }
+
     setMessages(prev => [...prev, { role: 'assistant', content: reply.reply }]);
     if (reply.scope) setAgentScope(reply.scope);
     setLoading(false);
@@ -112,7 +118,7 @@ export default function App() {
 
   // ── Clear chat ─────────────────────────────────────────────────────────
   const clearChat = () => {
-    setMessages([{ role: 'assistant', content: '🗑️ ล้างประวัติแล้ว — พร้อมคุยใหม่!' }]);
+    setMessages([{ role: 'assistant', content: 'ล้างประวัติแล้ว — พร้อมคุยใหม่!' }]);
   };
 
   // ── Handle Enter ───────────────────────────────────────────────────────
@@ -208,7 +214,7 @@ export default function App() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="พิมพ์หรือพูดคำสั่ง..."
+              placeholder="พิมพ์หรือพูดคำสั่ง... (แก้โค้ดได้ด้วย!)"
               rows={1}
               className="w-full resize-none bg-ai-bg border border-ai-border rounded-2xl px-4 py-2.5 text-sm text-ai-text placeholder-ai-muted outline-none focus:border-ai-accent transition-colors"
               style={{ maxHeight: '120px' }}

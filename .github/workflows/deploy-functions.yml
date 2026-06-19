@@ -92,6 +92,7 @@ jobs:
             echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
             echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
             echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
+            echo "CURSOR_API_KEY=${{ secrets.CURSOR_API_KEY }}"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions

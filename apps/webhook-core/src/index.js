@@ -34,6 +34,11 @@ const {
   notifyTeaRestock,
 } = require('./instantLineNotify');
 const { aiChatAgent, aiChatAgentHttp } = require('./aiChatAgent');
+const {
+  aiWorkflowAgentHttp,
+  aiWorkflowStatusHttp,
+  handleCodeAction,
+} = require('./aiWorkflowAgent');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -526,5 +531,9 @@ exports.onShrimpAdminAlertCreated = functions
 // สรุปอัตโนมัติ: ใช้ apps/webhook-core-scheduled (ต้องเปิด Cloud Scheduler API ใน GCP)
 // หรือส่งด้วยมือจากแอดมิน / พิมพ์ "สรุป" ในกลุ่ม LINE
 
-// ── AI Chat Agent ──────────────────────────────────────────────────────────
+// ── AI Chat + Workflow Agent ──────────────────────────────────────────────────
 Object.assign(exports, require('./aiChatAgent'));
+Object.assign(exports, {
+  aiWorkflowAgentHttp: require('./aiWorkflowAgent').aiWorkflowAgentHttp,
+  aiWorkflowStatusHttp: require('./aiWorkflowAgent').aiWorkflowStatusHttp,
+});

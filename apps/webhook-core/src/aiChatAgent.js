@@ -3,6 +3,7 @@
  *
  * Acts as a router + intent classifier:
  *   user message → detect scope → pick system prompt → call OpenRouter → reply
+ *   if intent is "code-action" → route to aiWorkflowAgent (Cursor SDK Cloud Agent)
  *
  * 5 Agent Scopes:
  *   - root:    AI Admin (general)
@@ -34,11 +35,21 @@ const SYSTEM_PROMPTS = {
 คุณรู้จักระบบนี้ดี ดูแลทั้งแอปชา แอปกุ้ง และ LINE Bot
 ตอบเป็นกันเองเหมือนเพื่อนร่วมงาน senior ภาษาไทยธรรมชาติ ตรงไปตรงมา ไม่ยืด ไม่engagement bait
 
+CAPABILITIES ของคุณ:
+- 💬 ตอบคำถามทั่วไปเกี่ยวกับระบบ: แนะนำการใช้แอป, อธิบายโครงสร้าง, วิเคราะห์ปัญหา
+- 🔧 แก้โค้ดอัตโนมัติ: รับคำสั่ง "แก้บั๊ก" / "สร้าง feature" / "refactor" — คุณจะเรียก Cursor Cloud Agent ให้ clone repo, แก้โค้ด, รัน smoke test, และเปิด PR โดยอัตโนมัติ
+- 📊 ดูสถานะ PR: "status PR" เพื่อเช็ค PR ที่กำลังทำงาน
+
 เมื่อพี่ (เจ้าของร้าน) ต้องการทำงานในแอปใด ให้ถาม scope ก่อน:
 - "tea" (ร้านชินชา)
 - "seafood" (โกอ้วนซีฟู้ด)
 - "webhook" (LINE Bot)
 - "scheduled" (งานอัตโนมัติ)
+
+ถ้าพี่ต้องการให้แก้โค้ด ให้บอกชัดๆ เช่น:
+- "เด๊ฟ ช่วยแก้บั๊ก {อธิบายปัญหา}"
+- "เด๊ฟ ช่วยสร้าง feature {อธิบาย}"
+- "เด๊ฟ refactor {ไฟล์/โมดูล}"
 
 เอกสารที่คุณรู้: AGENTS.md, docs/PROJECT_STRUCTURE.md, docs/ARCHITECTURE_TH.md, docs/LINE_OA_PARTITION_TH.md`,
 
@@ -153,6 +164,21 @@ exports.aiChatAgent = https.onCall(
   }
 );
 
+// ── Intent detection: is this a code-action? ────────────────────────────
+function isCodeAction(text) {
+  const t = text.toLowerCase();
+  const codePatterns = [
+    /แก้โค้ด/, /แก้bug/, /แก้บั๊ก/, /fix code/, /fix bug/,
+    /สร้างfeature/, /สร้างฟีเจอร์/, /add feature/, /add code/,
+    /refactor/, /ปรับโครงสร้าง/, /rewrite/,
+    /deploy/, /ดีพลอย/, /merge/,
+    /ทำ pr/, /open pr/, /สร้าง pr/, /เปิด pr/,
+    /ช่วยเขียน/, /implement/,
+    /อัปเดตโค้ด/, /update code/,
+  ];
+  return codePatterns.some(p => p.test(t));
+}
+
 // ── V1 onRequest fallback (for direct HTTP calls from PWA) ────────────────
 exports.aiChatAgentHttp = functions
   .runWith({ memory: '256MB', timeoutSeconds: 60 })
@@ -187,6 +213,24 @@ exports.aiChatAgentHttp = functions
 
     const currentScope = scope || 'root';
     const resolvedScope = detectScope(message, currentScope);
+
+    // ── Code-action routing: forward to aiWorkflowAgent ───────────────────
+    if (isCodeAction(message)) {
+      try {
+        const { handleCodeAction } = require('./aiWorkflowAgent');
+        const result = await handleCodeAction({
+          message,
+          history: history || [],
+          scope: resolvedScope,
+        });
+        res.status(result.statusCode || 200).json(result.body);
+        return;
+      } catch (err) {
+        console.error('aiChatAgentHttp: code-action routing error:', err);
+        // Fall through to normal chat reply on error
+      }
+    }
+
     const systemContent = SYSTEM_PROMPTS[resolvedScope] || SYSTEM_PROMPTS.root;
 
     const messages = [
