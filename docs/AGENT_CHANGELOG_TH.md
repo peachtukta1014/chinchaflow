@@ -1,3 +1,13 @@
+## 2026-06-19 — ชา: PR282 แก้บั๊ก 4 จุด + รูปสินค้า + เวอร์ชัน TEA-DDMMYY
+
+- **AdminPanel white screen**: แก้ชื่อ state ผิด `teaGroupId`/`setteaGroupId` → `shrimpGroupId`/`setShrimpGroupId` ทำให้ ReferenceError → หน้าขาว
+- **Cup carry-forward**: `ExpensesTab.reloadDay()` เดิมตั้ง `EMPTY_CUPS` เมื่อไม่มี cupDoc วันนี้ แก้เป็นดึง `dailyCupStocks/{prevDateKey}` แล้วใช้ `remainingCups` เป็น `openingCups` วันถัดไป
+- **ลบ "วงสรุปจากแชท"**: ลบ amber box textarea ออกจากแท็บปิดวันใน `ExpensesTab`
+- **ซ่อนรายการที่รับแล้ว**: `RestockTab` filter `isRestockReceived(r)` ออกจาก `recentRequests` ไม่ให้โชว์รายการที่ยืนยันเข้าสต๊อกแล้ว
+- **รูปสินค้า catalog**: admin อัปโหลดรูปผ่านปุ่ม 📷 ใน RestockTab manage mode → บีบอัด → อัปโหลด Firebase Storage `catalogImages/{id}.jpg` → `patchRestockCatalogItem` เซฟ `imageUrl` → แสดง thumbnail ใน StockTab และ RestockTab
+- **เวอร์ชัน TEA-DDMMYY**: `appBuildInfo.js` เพิ่ม `teaDateCode()` + `formatAppBuildDate()` + `getAppBuildLabel()` รูปแบบ `TEA-190669 · อัปเดต 19 มิ.ย. 69` (ปีพุทธศักราช 2 หลัก)
+- ถ้าพังให้เช็ก `AdminPanel.jsx`, `ExpensesTab.jsx`, `RestockTab.jsx`, `StockTab.jsx`, `apps/chincha-tea/src/lib/appBuildInfo.js`
+
 ## 2026-06-19 — AI Chat PWA + LINE Partition + Docs รอบใหญ่
 - เพิ่ม `apps/ai-chat` — PWA แชทคุย AI ด้วยเสียง/พิมพ์ ปัก home screen ได้
 - เพิ่ม `apps/webhook-core/src/aiChatAgent.js` — Cloud Function 5 agent scopes (root/tea/seafood/webhook/scheduled) classifier + system prompt + OpenRouter
