@@ -1,15 +1,17 @@
 /**
  * AI Chat Agent — Cloud Function for CHINCHA FLOW
  *
- * Acts as a router + intent classifier:
+ * เลขาส่วนตัวพีช: เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน ก่อนรับหน้าที่สรุปความเข้าใจก่อนเสมอ
+ *
+ * Router + intent classifier:
  *   user message → detect scope → pick system prompt → call OpenRouter → reply
  *   if intent is "code-action" → route to aiWorkflowAgent (OpenRouter + GitHub API)
  *
  * 5 Agent Scopes:
- *   - root:    AI Admin (general)
- *   - tea:     ร้านชินชา Tea POS
- *   - seafood: โกอ้วนซีฟู้ด Shrimp POS
- *   - webhook: LINE Bot / Webhook
+ *   - root:      AI Admin (ทั่วไป)
+ *   - tea:       ร้านชินชา Tea POS
+ *   - seafood:   โกอ้วนซีฟู้ด Shrimp POS
+ *   - webhook:   LINE Bot / Webhook
  *   - scheduled: Cron / Automation
  */
 
@@ -18,6 +20,7 @@ const https = require('firebase-functions/v2/https');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const DEFAULT_MODEL = 'deepseek/deepseek-chat';
+const VISION_MODEL = 'openai/gpt-4o-mini';
 
 // ── Scope detection from user message ────────────────────────────────────
 function detectScope(text, currentScope) {
@@ -29,88 +32,122 @@ function detectScope(text, currentScope) {
   return currentScope || 'root';
 }
 
-// ── System prompts per scope — บุคลิก "เด๊ฟ" (Dev) เหมือนพี่เซอ ──────────────
+// ── System prompts per scope — บุคลิก "เลขา" เลขาส่วนตัวพีช ──────────────
 const SYSTEM_PROMPTS = {
-  root: `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ผู้ดูแลระบบ CHINCHA FLOW (Tea POS + Shrimp POS + LINE Bot)
-คุณรู้จักระบบนี้ดี ดูแลทั้งแอปชา แอปกุ้ง และ LINE Bot
-ตอบเป็นกันเองเหมือนเพื่อนร่วมงาน senior ภาษาไทยธรรมชาติ ตรงไปตรงมา ไม่ยืด ไม่engagement bait
+  root: `คุณคือ "เลขา" — เลขาส่วนตัวของพี่พีช (เจ้าของร้าน) ผู้ดูแลระบบ CHINCHA FLOW (Tea POS + Shrimp POS + LINE Bot)
+บทบาท: เพื่อนคู่คิด รู้ใจ คอยแนะนำ ตักเตือน ช่วยตัดสินใจ ไม่ใช่แค่ทำตามสั่ง
 
-CAPABILITIES ของคุณ:
-- 💬 ตอบคำถามทั่วไปเกี่ยวกับระบบ: แนะนำการใช้แอป, อธิบายโครงสร้าง, วิเคราะห์ปัญหา
-- 🔧 แก้โค้ดอัตโนมัติ (ผ่าน OpenRouter + GitHub API): รับคำสั่ง "แก้บั๊ก" / "สร้าง feature" / "refactor" — AI deepseek วิเคราะห์โค้ด → สร้าง branch → commit → เปิด PR ให้อัตโนมัติ
-- 📊 ดูสถานะ PR: "status PR" เพื่อเช็ค PR ที่กำลังทำงาน
+สไตล์การตอบ:
+- ภาษาไทยกันเอง เหมือนคุยกับผู้ช่วยส่วนตัว ไม่ formal ไม่ยืด
+- กล้าแนะนำ กล้าทักท้วง ถ้าเห็นว่าไม่เหมาะสม
+- ถ้าพี่ขอทำสิ่งที่อาจมีผลเสีย ให้บอกตรงๆ พร้อมเหตุผล
 
-เมื่อพี่ (เจ้าของร้าน) ต้องการทำงานในแอปใด ให้ถาม scope ก่อน:
-- "tea" (ร้านชินชา)
-- "seafood" (โกอ้วนซีฟู้ด)
-- "webhook" (LINE Bot)
-- "scheduled" (งานอัตโนมัติ)
+⚠️ ก่อนรับหน้าที่ทุกครั้ง ให้สรุปความเข้าใจก่อน:
+1. **หัวข้อ:** สิ่งที่ต้องทำ
+2. **รายละเอียด:** ขอบเขต ขั้นตอนสำคัญ
+3. **ประเมิน:** ✅ ทำได้ / ⚠️ ต้องระวัง / ❌ มีปัญหา — พร้อมเหตุผล
+4. **แนะนำ:** ความเห็นส่วนตัว หรือทางเลือกที่ดีกว่า
+แล้วรอการยืนยัน ก่อนลงมือ (โดยเฉพาะงานแก้โค้ดหรืองานใหญ่)
 
-ถ้าพี่ต้องการให้แก้โค้ด ให้บอกชัดๆ เช่น:
-- "เด๊ฟ ช่วยแก้บั๊ก {อธิบายปัญหา}"
-- "เด๊ฟ ช่วยสร้าง feature {อธิบาย}"
-- "เด๊ฟ refactor {ไฟล์/โมดูล}"
+CAPABILITIES:
+- 💬 ตอบคำถาม วิเคราะห์ปัญหา แนะนำแนวทาง
+- 🔧 แก้โค้ดอัตโนมัติ (OpenRouter + GitHub API): "แก้บั๊ก" / "สร้าง feature" / "refactor" → AI วิเคราะห์ → branch → commit → เปิด PR
+- 📸 วิเคราะห์รูปภาพที่แนบมา (screenshot, สลิป, error)
+- 📊 ดูสถานะ PR: พิมพ์ "status PR"
 
-เอกสารที่คุณรู้: AGENTS.md, docs/PROJECT_STRUCTURE.md, docs/ARCHITECTURE_TH.md, docs/LINE_OA_PARTITION_TH.md`,
+Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Cron)
+เอกสาร: AGENTS.md, docs/PROJECT_STRUCTURE.md, docs/ARCHITECTURE_TH.md, docs/LINE_OA_PARTITION_TH.md`,
 
-  tea: `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ดูแลร้านชินชา (Tea POS)
-คุณมีความรู้เรื่อง:
-- เมนูชาไข่มุก ราคา โปรโมชั่น
-- ระบบ POS: ขาย, ปิดวัน, สินค้าคงคลัง, ประวัติ
-- พนักงาน กะ การทำงาน
-- LINE OA สำหรับร้านชา
-- dailySummaryService, restockCatalog, dailyCupStocks
+  tea: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลร้านชินชา (Tea POS) เป็นพิเศษ
+บทบาท: เพื่อนคู่คิดเรื่องร้านชา รู้ใจ แนะนำ ตักเตือน
 
-ตอบเป็นกันเอง ภาษาชาวบ้าน ช่วยพี่ทำงานร้าน
-ตัวอย่าง: "พี่อยากได้ราคาเมนูใหม่" → ไปดู/แก้ catalog, "ปิดวันให้หน่อย" → สรุปยอด + ส่ง LINE`,
+ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
 
-  seafood: `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ดูแลโกอ้วนซีฟู้ด (Shrimp POS)
-คุณมีความรู้เรื่อง:
-- สินค้ากุ้ง/ซีฟู้ด ราคา น้ำหนัก การสั่งของ
-- ระบบ POS: ขาย, สต็อก FIFO (stockBatches), ลูกค้า, จัดส่ง
-- LINE OA: LIFF สั่งออเดอร์, ฝากสลิป, LINE แจ้งเตือน
+ความรู้เรื่องร้านชินชา:
+- เมนูชาไข่มุก ราคา โปรโมชั่น ท็อปปิ้ง
+- POS: ขาย ปิดวัน สต๊อกแก้ว สั่งของ ประวัติ
+- พนักงาน กะ ระบบ 3 ภาษา (TH/MY/EN)
+- LINE OA ร้านชา: บอทสรุป กลุ่มร้าน config
+- Collections: teaOrders, dailyExpenses, dailyCupStocks, restocks, config/teaLine
+
+ตอบกันเองภาษาชาวบ้าน ช่วยพี่ทำงานร้าน`,
+
+  seafood: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลโกอ้วนซีฟู้ด (Shrimp POS) เป็นพิเศษ
+บทบาท: เพื่อนคู่คิดเรื่องร้านกุ้ง รู้ใจ แนะนำ ตักเตือน
+
+ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
+
+ความรู้เรื่องร้านกุ้ง:
+- สินค้ากุ้ง/ซีฟู้ด ราคา น้ำหนัก การสั่งซื้อ
+- POS: ขาย สต๊อก FIFO (stockBatches) ลูกค้า จัดส่ง ลูกหนี้
+- LINE OA: LIFF สั่งออเดอร์ ฝากสลิป แจ้งเตือน
 - ลูกค้าประจำ โซนจัดส่ง (customerRiverDefault)
-- shrimpLineConfig, instantLineNotify
+- Collections: sales, stockBatches, lineOrders, customerDebts, customers, config/shrimpLine
 
-ตอบแบบกันเอง ใช้ภาษาเดียวกับพี่
-ตัวอย่าง: "กุ้งลูกค้าโวยวายเรื่องน้ำหนัก" → ตรวจสอบออเดอร์, "สต็อกกุ้งขาวเหลือเท่าไหร่" → เช็ค inventory`,
+ตอบกันเองภาษาชาวบ้าน ช่วยพี่ทำงานร้าน`,
 
-  webhook: `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ดูแลระบบ LINE Bot และ Webhook ของ CHINCHA FLOW
-คุณรู้เรื่อง:
-- LINE Messaging API: webhook events, reply, push
+  webhook: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลระบบ LINE Bot / Webhook
+บทบาท: เพื่อนคู่คิดเรื่อง LINE เข้าใจ technical รู้ใจ แนะนำ
+
+ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
+
+ความรู้เรื่อง LINE Bot / Webhook:
+- LINE Messaging API: webhook events, reply, push, signature
+- โครงสร้าง webhook-core/src/: seafood-oa/, seafood-notify/, tea/, shared/
 - LIFF: order form (liff-order.html), slip upload (liff-slip.html)
-- LINE Login, Notify
-- Debug webhook, dedup events (webhookDedup)
-- teaLineConfig, shrimpLineConfig, LINE_OA_PARTITION
+- Debug: webhookDedup (กัน event ซ้ำ), signature validation
+- Config: config/teaLine (ชา), config/shrimpLine (กุ้ง)
+- Functions: lineWebhook (กุ้ง), lineWebhookTea (ชา), teaPushSummary, aiChatAgentHttp
 
-ตอบแบบเทคนิค เข้าใจ error logs
-ตัวอย่าง: "webhook ไม่ตอบสนอง" → เช็ค signature / timeout, "push LINE ไม่ไป" → เช็ค quota / token`,
+ตอบเทคนิค เข้าใจ error logs วิเคราะห์ปัญหา LINE`,
 
-  scheduled: `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ดูแลงาน Scheduled / Automation ใน CHINCHA FLOW
-คุณรู้เรื่อง:
-- Cloud Functions scheduled (cron)
-- สรุปยอดอัตโนมัติส่ง LINE (teaDailySummary)
+  scheduled: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลงาน Scheduled / Automation
+บทบาท: เพื่อนคู่คิดเรื่องงาน cron รู้ใจ แนะนำ
+
+ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
+
+ความรู้เรื่องงาน Scheduled:
+- Cloud Functions scheduled (cron) — firebase-functions/v2/scheduler
+- สรุปยอดอัตโนมัติส่ง LINE: tea/teaDailySummary.js (dispatchTeaSummary)
 - ล้าง cache / data housekeeping
-- การแจ้งเตือนพนักงาน
+- การแจ้งเตือนพนักงาน กะ
 
-ตอบ concise เหมาะกับ dev ops
-ตัวอย่าง: "ตั้ง cron ให้สรุปยอดทุกเที่ยง" → กำหนด schedule + action`,
+ตอบ concise เหมาะกับ devops วิเคราะห์ schedule / cron expression`,
 };
 
-// ── Call OpenRouter ──────────────────────────────────────────────────────
-async function callOpenRouter(apiKey, messages) {
+// ── Call OpenRouter (รองรับ vision เมื่อมี imageBase64) ──────────────────
+async function callOpenRouter(apiKey, messages, { imageBase64 } = {}) {
+  const model = imageBase64
+    ? (process.env.VISION_MODEL || VISION_MODEL)
+    : (process.env.DEFAULT_MODEL || DEFAULT_MODEL);
+
+  let finalMessages = messages;
+  if (imageBase64) {
+    finalMessages = messages.map((m, idx) => {
+      if (idx === messages.length - 1 && m.role === 'user') {
+        return {
+          ...m,
+          content: [
+            { type: 'text', text: typeof m.content === 'string' ? m.content : '' },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+          ],
+        };
+      }
+      return m;
+    });
+  }
+
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      // Required by OpenRouter for ranking
       'HTTP-Referer': 'https://chincha-flow.web.app',
       'X-Title': 'CHINCHA FLOW AI Admin',
     },
     body: JSON.stringify({
-      model: process.env.DEFAULT_MODEL || DEFAULT_MODEL,
-      messages,
+      model,
+      messages: finalMessages,
       temperature: 0.3,
       max_tokens: 2048,
     }),
@@ -168,7 +205,6 @@ exports.aiChatAgent = https.onCall(
 function isCodeAction(text) {
   if (!text || typeof text !== 'string') return false;
   const t = text.toLowerCase();
-  // Use string .includes() for Thai text (regex Unicode can fail on GCF Node 20)
   if (
     t.includes('แก้โค้ด') || t.includes('แก้bug') || t.includes('แก้บั๊ก') ||
     t.includes('fix code') || t.includes('fix bug') || t.includes('fix this') ||
@@ -189,7 +225,6 @@ exports.aiChatAgentHttp = functions
   .runWith({ memory: '256MB', timeoutSeconds: 60 })
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
-    // CORS
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -203,7 +238,7 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
-    const { message, history, scope } = req.body || {};
+    const { message, history, scope, imageBase64 } = req.body || {};
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       res.status(400).json({ error: 'ต้องมีข้อความ (message)' });
@@ -245,7 +280,7 @@ exports.aiChatAgentHttp = functions
     ];
 
     try {
-      const reply = await callOpenRouter(apiKey, messages);
+      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null });
       res.json({ reply, scope: resolvedScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);

@@ -22,9 +22,14 @@ const IconTrash = () => (
     <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><rect x="5" y="6" width="14" height="16" rx="2" /><path d="M10 11v6" /><path d="M14 11v6" />
   </svg>
 );
+const IconImage = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" />
+  </svg>
+);
 
 const AGENT_OPTIONS = [
-  { id: 'root', label: '💬 เด๊ฟ', desc: 'ทั่วไป' },
+  { id: 'root', label: '🗂 เลขา', desc: 'ทั่วไป' },
   { id: 'tea', label: '🧋 ชินชา', desc: 'ร้านชา' },
   { id: 'seafood', label: '🦐 โกอ้วน', desc: 'ร้านกุ้ง' },
   { id: 'webhook', label: '🤖 LINE', desc: 'Bot' },
@@ -33,16 +38,18 @@ const AGENT_OPTIONS = [
 
 export default function App() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n- "กุ้งวันนี้มียอดขายเท่าไหร่"\n- "ช่วยดูสต็อกชาหน่อย"\n- "webhook มี error ไหม"\n- "เด๊ฟ ช่วยแก้บั๊ก {ปัญหา}" (AI deepseek แก้โค้ด + เปิด PR ให้!)' },
+    { role: 'assistant', content: 'สวัสดีพี่พีช! หนูเลขา เลขาส่วนตัวพีชครับ 🗂\n\nพร้อมช่วยพี่เสมอ ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะครับ' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [agentScope, setAgentScope] = useState('root');
   const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -50,23 +57,27 @@ export default function App() {
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if ((!text && !imagePreview) || loading) return;
+
+    const imageBase64 = imagePreview ? imagePreview.split(',')[1] : null;
+    const displayText = text || '📸';
 
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    setImagePreview(null);
+    setMessages(prev => [...prev, { role: 'user', content: displayText, imageUrl: imagePreview }]);
     setLoading(true);
 
     const scope = detectScope(text);
     if (scope !== agentScope) setAgentScope(scope);
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
-    const reply = await chatWithAI({ message: text, history, scope });
+    const reply = await chatWithAI({ message: displayText, history, scope, imageBase64 });
 
     setMessages(prev => [...prev, { role: 'assistant', content: reply.reply }]);
     if (reply.scope) setAgentScope(reply.scope);
     setLoading(false);
     inputRef.current?.focus();
-  }, [input, loading, messages, agentScope]);
+  }, [input, loading, messages, agentScope, imagePreview]);
 
   // ── Voice input ────────────────────────────────────────────────────────
   const toggleVoice = useCallback(() => {
@@ -100,9 +111,19 @@ export default function App() {
     setListening(true);
   }, [listening]);
 
+  // ── Image picker ───────────────────────────────────────────────────────
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setImagePreview(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   // ── Scope detection ────────────────────────────────────────────────────
   function detectScope(text) {
-    const t = text.toLowerCase();
+    const t = (text || '').toLowerCase();
     if (t.includes('กุ้ง') || t.includes('shrimp') || t.includes('seafood') || t.includes('โกอ้วน')) return 'seafood';
     if (t.includes('ชา') || t.includes('tea') || t.includes('ชินชา')) return 'tea';
     if (t.includes('webhook') || t.includes('line') || t.includes('ไลน์')) return 'webhook';
@@ -112,7 +133,8 @@ export default function App() {
 
   // ── Clear chat ─────────────────────────────────────────────────────────
   const clearChat = () => {
-    setMessages([{ role: 'assistant', content: 'ล้างประวัติแล้ว — พร้อมคุยใหม่!' }]);
+    setMessages([{ role: 'assistant', content: 'ล้างประวัติแล้วครับพี่ — พร้อมช่วยใหม่!' }]);
+    setImagePreview(null);
   };
 
   // ── Handle Enter ───────────────────────────────────────────────────────
@@ -128,9 +150,9 @@ export default function App() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-ai-border bg-ai-card shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🤖</span>
+          <span className="text-lg">🗂</span>
           <div>
-            <h1 className="text-sm font-semibold leading-tight">เด๊ฟ</h1>
+            <h1 className="text-sm font-semibold leading-tight">เลขา</h1>
             <p className="text-[10px] text-ai-muted">CHINCHA FLOW</p>
           </div>
         </div>
@@ -173,11 +195,19 @@ export default function App() {
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 ${msg.role === 'user' ? 'bg-ai-user' : 'bg-ai-agent border border-ai-border'}`}>
-              {msg.role === 'user' ? '👤' : '🤖'}
+              {msg.role === 'user' ? '👤' : '🗂'}
             </div>
             {/* Bubble */}
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-ai-user text-white rounded-br-md' : 'bg-ai-card border border-ai-border text-ai-text rounded-bl-md'}`}>
-              {msg.content}
+              {msg.imageUrl && (
+                <img
+                  src={msg.imageUrl}
+                  alt="แนบรูป"
+                  className="max-w-full rounded-lg mb-2"
+                  style={{ maxHeight: '240px', objectFit: 'contain' }}
+                />
+              )}
+              {msg.content !== '📸' && msg.content}
             </div>
           </div>
         ))}
@@ -185,7 +215,7 @@ export default function App() {
         {/* Typing indicator */}
         {loading && (
           <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-ai-agent border border-ai-border shrink-0">🤖</div>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-ai-agent border border-ai-border shrink-0">🗂</div>
             <div className="bg-ai-card border border-ai-border rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex gap-1">
                 <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -201,6 +231,19 @@ export default function App() {
 
       {/* ── Input bar ─────────────────────────────────────────────────── */}
       <div className="px-3 py-3 border-t border-ai-border bg-ai-card shrink-0">
+        {/* Image preview */}
+        {imagePreview && (
+          <div className="relative inline-block mb-2">
+            <img src={imagePreview} alt="preview" className="h-16 rounded-lg border border-ai-border object-cover" />
+            <button
+              onClick={() => setImagePreview(null)}
+              className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center leading-none hover:bg-red-600"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -208,13 +251,22 @@ export default function App() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="พิมพ์หรือพูดคำสั่ง... (AI deepseek แก้โค้ด + PR ได้!)"
+              placeholder="พิมพ์หรือพูดคำสั่ง... หรือแนบรูปได้เลย"
               rows={1}
               className="w-full resize-none bg-ai-bg border border-ai-border rounded-2xl px-4 py-2.5 text-sm text-ai-text placeholder-ai-muted outline-none focus:border-ai-accent transition-colors"
               style={{ maxHeight: '120px' }}
               onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
             />
           </div>
+
+          {/* Image button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className={`p-2.5 rounded-full transition-colors shrink-0 ${imagePreview ? 'bg-ai-accent text-white' : 'bg-ai-bg border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent'}`}
+            title="แนบรูปภาพ"
+          >
+            <IconImage />
+          </button>
 
           {/* Voice button */}
           <button
@@ -228,12 +280,21 @@ export default function App() {
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={!input.trim() || loading}
-            className={`p-2.5 rounded-full transition-colors shrink-0 ${input.trim() && !loading ? 'bg-ai-accent text-white hover:brightness-110' : 'bg-ai-bg border border-ai-border text-ai-muted cursor-not-allowed'}`}
+            disabled={(!input.trim() && !imagePreview) || loading}
+            className={`p-2.5 rounded-full transition-colors shrink-0 ${(input.trim() || imagePreview) && !loading ? 'bg-ai-accent text-white hover:brightness-110' : 'bg-ai-bg border border-ai-border text-ai-muted cursor-not-allowed'}`}
           >
             <IconSend />
           </button>
         </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
       </div>
 
     </div>

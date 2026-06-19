@@ -1,0 +1,43 @@
+# CHANGELOG — webhook-core
+
+บันทึกการเปลี่ยนแปลงของ Cloud Functions (LINE Bot + AI Agent)  
+รูปแบบ: `วันที่ | PR | รายละเอียด`
+
+---
+
+## 2026-06
+
+### 2026-06-19 | PR #287
+**feat: อัปเดต AI persona → เลขาส่วนตัวพีช + รองรับ image vision**
+- `aiChatAgent.js` — เปลี่ยน persona จาก "เด๊ฟ" เป็น "เลขา" (เลขาส่วนตัวพีช เพื่อนคู่คิด รู้ใจ)
+- เพิ่ม system prompt สรุป-ก่อนรับหน้าที่ (หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ)
+- เพิ่ม `VISION_MODEL = 'openai/gpt-4o-mini'` สำหรับ message ที่มีรูปแนบ
+- `callOpenRouter()` รองรับ multimodal content array เมื่อมี `imageBase64`
+- `aiChatAgentHttp` รับ `imageBase64` จาก request body ส่งต่อไป OpenRouter
+
+### 2026-06-19 | PR #286
+**feat: เพิ่มคำสั่ง "แอด uid" ใน LINE Bot ชา**
+- `tea/teaDailySummary.js` — เพิ่ม `ADD_UID_CMD` regex + `classifyTeaLineCommand` คืน `'add_uid'`
+- `tea/teaWebhook.js` — handler `add_uid` เพิ่ม userId เข้า `config/teaLine.notifyUserIds`
+- อัปเดต `HELP_TEXT` แสดงคำสั่งใหม่
+
+### 2026-06-19 | PR #285
+**fix: บันทึก line_messages แม้ groupId ไม่ตรง (แก้ chicken-and-egg)**
+- `tea/teaWebhook.js` — เพิ่ม `line_messages.add()` ก่อน `continue` ในกรณีกลุ่มไม่ตรง
+- ทำให้ปุ่ม "📥 ดึง Group ID" ใน admin panel ดึง groupId ได้ครั้งแรก
+
+### 2026-06-17 | PR #284
+**fix: ย้าย prepareOrderInput.js ไป seafood-oa/ + แก้ paths ใน aiWorkflowAgent**
+- `seafood-oa/prepareOrderInput.js` — ย้ายมาจาก `src/` root (แก้ deploy failure)
+- `aiWorkflowAgent.js` — อัปเดต SCOPE_FILE_TREE ให้ชี้ paths ใหม่ 4-โฟลเดอร์
+
+### 2026-06-17 | PR #283
+**refactor: แยก webhook-core/src/ เป็น 4 โฟลเดอร์ตาม scope**
+- `seafood-oa/` — LINE webhook กุ้ง + parser + summary
+- `seafood-notify/` — instant notify กุ้ง
+- `tea/` — LINE webhook ชา + daily summary
+- `shared/` — lineUtils, webhookDedup (ใช้ร่วม)
+
+---
+
+> รายละเอียด system-wide ดูได้ที่ [docs/AGENT_CHANGELOG_TH.md](../../docs/AGENT_CHANGELOG_TH.md)

@@ -5,20 +5,20 @@ const CHAT_FUNCTION_URL = import.meta.env.VITE_AI_CHAT_FUNCTION_URL
   || 'https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp';
 
 /**
- * ส่งข้อความไปให้ AI แล้วรับคำตอบกลับ (chat + code-action routing)
- * Code-action uses OpenRouter as brain + GitHub API to create PR (no Cursor Cloud)
+ * ส่งข้อความ (+ รูปภาพถ้ามี) ไปให้ AI แล้วรับคำตอบกลับ
  * @param {object} opts
- * @param {string} opts.message - ข้อความผู้ใช้
- * @param {Array}  opts.history - [{role, content}] ประวัติแชท
- * @param {string} opts.scope   - 'root'|'tea'|'seafood'|'webhook'|'scheduled'
+ * @param {string} opts.message     - ข้อความผู้ใช้
+ * @param {Array}  opts.history     - [{role, content}] ประวัติแชท
+ * @param {string} opts.scope       - 'root'|'tea'|'seafood'|'webhook'|'scheduled'
+ * @param {string} [opts.imageBase64] - base64 string (ไม่รวม data: prefix)
  * @returns {Promise<{reply: string, scope: string, intent?: string, status?: string, prUrl?: string, branchName?: string}>}
  */
-export async function chatWithAI({ message, history = [], scope = 'root' }) {
+export async function chatWithAI({ message, history = [], scope = 'root', imageBase64 = null }) {
   try {
     const res = await fetch(CHAT_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history, scope }),
+      body: JSON.stringify({ message, history, scope, ...(imageBase64 ? { imageBase64 } : {}) }),
     });
 
     if (!res.ok) {
