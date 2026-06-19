@@ -12,6 +12,8 @@
  *
  * No Cursor Cloud — uses OpenRouter + GitHub PAT only (low cost).
  * Model: deepseek/deepseek-chat (or DEFAULT_MODEL from env).
+ *
+ * Deploy note: requires GH_PAT (GitHub Personal Access Token) for PR creation.
  */
 
 const functions = require('firebase-functions/v1');
