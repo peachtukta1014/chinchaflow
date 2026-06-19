@@ -7,6 +7,7 @@ on:
     paths:
       - 'apps/seafood-pos/**'
       - 'apps/chincha-tea/**'
+      - 'apps/ai-chat/**'
       - 'package.json'
       - 'package-lock.json'
       - 'firebase.json'
@@ -22,6 +23,10 @@ on:
         description: 'Deploy Chincha Tea hosting'
         type: boolean
         default: true
+      deploy_ai_chat:
+        description: 'Deploy AI Chat hosting'
+        type: boolean
+        default: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -33,6 +38,7 @@ jobs:
     outputs:
       shrimp: ${{ steps.filter.outputs.shrimp }}
       tea: ${{ steps.filter.outputs.tea }}
+      ai_chat: ${{ steps.filter.outputs.ai_chat }}
       shared: ${{ steps.filter.outputs.shared }}
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +51,8 @@ jobs:
               - 'apps/seafood-pos/**'
             tea:
               - 'apps/chincha-tea/**'
+            ai_chat:
+              - 'apps/ai-chat/**'
             shared:
               - 'package.json'
               - 'package-lock.json'
@@ -177,3 +185,34 @@ jobs:
           target:                 tea
           channelId:              live
         continue-on-error: true
+
+  deploy_ai_chat:
+    name: Deploy AI Chat
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.deploy_ai_chat ||
+      github.event_name == 'push' && (needs.changes.outputs.ai_chat == 'true' || needs.changes.outputs.shared == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build ai-chat
+        run: npm run build --workspace=apps/ai-chat
+        env:
+          VITE_AI_CHAT_FUNCTION_URL: https://aiChatAgentHttp-asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp
+
+      - name: Deploy to Firebase Hosting (ai-chat)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken:              ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId:              chincha-eeed6
+          target:                 ai-chat
+          channelId:              live

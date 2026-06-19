@@ -6,7 +6,8 @@
     "chincha-eeed6": {
       "hosting": {
         "tea": ["chincha-tea"],
-        "shrimp": ["chincha-shrimp"]
+        "shrimp": ["chincha-shrimp"],
+        "ai-chat": ["chincha-ai-chat"]
       }
     }
   }

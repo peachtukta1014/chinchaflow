@@ -33,6 +33,7 @@ const {
   notifyShrimpSaleDeleteRequest,
   notifyTeaRestock,
 } = require('./instantLineNotify');
+const { aiChatAgent, aiChatAgentHttp } = require('./aiChatAgent');
 
 function db() {
   if (!admin.apps.length) admin.initializeApp();
@@ -524,3 +525,6 @@ exports.onShrimpAdminAlertCreated = functions
 
 // สรุปอัตโนมัติ: ใช้ apps/webhook-core-scheduled (ต้องเปิด Cloud Scheduler API ใน GCP)
 // หรือส่งด้วยมือจากแอดมิน / พิมพ์ "สรุป" ในกลุ่ม LINE
+
+// ── AI Chat Agent ──────────────────────────────────────────────────────────
+Object.assign(exports, require('./aiChatAgent'));

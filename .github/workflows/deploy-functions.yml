@@ -91,6 +91,7 @@ jobs:
             echo "LINE_TEA_CHANNEL_SECRET=${{ secrets.LINE_TEA_CHANNEL_SECRET }}"
             echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
             echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
+            echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions
