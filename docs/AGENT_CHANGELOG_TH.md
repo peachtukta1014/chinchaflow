@@ -1,3 +1,18 @@
+## 2026-06-19 — Hotfix PR#284: prepareOrderInput.js + aiWorkflowAgent paths
+
+- ย้าย `prepareOrderInput.js` จาก `src/` root → `src/seafood-oa/` (ถูกลืมตอน refactor PR #283)
+- แก้ error: `Cannot find module './prepareOrderInput'` ใน `shrimpLineOrderHandler.js` ที่ทำให้ deploy พัง
+- อัปเดต `aiWorkflowAgent.js` SCOPE_FILE_TREE ให้ชี้ path ใหม่หลัง refactor 4 โฟลเดอร์ครบทุกไฟล์
+- ถ้าพังอีกให้เช็ก `seafood-oa/shrimpLineOrderHandler.js` → `seafood-oa/prepareOrderInput.js`
+
+## 2026-06-19 — PR#283: Refactor webhook-core 4 โฟลเดอร์ตาม scope
+
+- แก้ root cause: `seafood-oa` files import `todayBKK`/`lineReply`/`linePush` จาก `teaDailySummary.js` (ไฟล์ชา) → แยกออกเป็น `shared/lineUtils.js`
+- จัดโฟลเดอร์ใหม่ 50 ไฟล์ แบ่งเป็น `seafood-oa/` · `seafood-notify/` · `tea/` · `shared/`
+- เพิ่ม `SCOPE.md` ทุก folder: personality บอท, ตารางคำสั่ง, env vars, debug guide
+- เพิ่ม `tea/teaWebhook.js` — handler webhook ชาแยกออกจาก index.js
+- ถ้าพังอีกให้เช็ก `index.js` (entry point) → `seafood-oa/shrimpLineWebhookRouter.js` / `tea/teaWebhook.js`
+
 ## 2026-06-19 — AI Chat PWA + LINE Partition + Docs รอบใหญ่
 - เพิ่ม `apps/ai-chat` — PWA แชทคุย AI ด้วยเสียง/พิมพ์ ปัก home screen ได้
 - เพิ่ม `apps/webhook-core/src/aiChatAgent.js` — Cloud Function 5 agent scopes (root/tea/seafood/webhook/scheduled) classifier + system prompt + OpenRouter
