@@ -8,6 +8,7 @@
     "node": "20"
   },
   "scripts": {
+"lint:guidelines": "markdownlint DEVELOPER_GUIDELINES.md",
     "start": "node src/index.js",
     "deploy": "firebase deploy --only functions"
   },
