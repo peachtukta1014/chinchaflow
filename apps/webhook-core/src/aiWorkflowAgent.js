@@ -333,8 +333,26 @@ function extractJson(aiResponse) {
   return JSON.parse(jsonMatch[1] || jsonMatch[0]);
 }
 
+// ── Fetch agent guidelines from repo ─────────────────────────────────────
+// เจ้าของเขียนกฎการทำงานไว้ใน repo — AI ต้องอ่านก่อนทุก session
+async function fetchAgentDocs(ghPat) {
+  const docs = [
+    { path: 'AGENTS.md', label: 'กฎ monorepo (AGENTS.md)', maxLen: 4000 },
+    { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'วิธีสื่อสารกับพี่ (PEACH_WORKING_STYLE_TH.md)', maxLen: 3000 },
+    { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือเอเจนต์ (AGENT_HANDBOOK_TH.md)', maxLen: 2000 },
+  ];
+  let result = '';
+  for (const d of docs) {
+    try {
+      const file = await fetchRepoFile(ghPat, d.path, 'main');
+      if (file?.content) result += `\n\n=== ${d.label} ===\n${file.content.slice(0, d.maxLen)}\n`;
+    } catch { /* skip if unavailable */ }
+  }
+  return result;
+}
+
 // ── Round 1 prompt: ให้ AI เลือกไฟล์ที่ต้องอ่านจริง (ไม่ใช่เดาจาก snippet) ──
-function buildFileSelectionPrompt(scopeInfo, message) {
+function buildFileSelectionPrompt(scopeInfo, message, agentDocs) {
   return `คุณคือเด๊ฟ (Dev) — Senior Full-stack Developer ของ CHINCHA FLOW monorepo
 ก่อนจะแก้โค้ดทุกครั้ง คุณต้อง "อ่านโค้ดจริงก่อน" ห้ามเดาเนื้อไฟล์เด็ดขาด
 
@@ -349,7 +367,7 @@ ${scopeInfo.files.map((f) => `- ${f}`).join('\n')}
 - เลือกเท่าที่จำเป็น แต่ต้องครบ — ถ้าบั๊กเกี่ยวกับ UI ให้รวมไฟล์ screen/component ที่เกี่ยวด้วย ไม่ใช่แค่ไฟล์ lib
 - ถ้าไม่แน่ใจว่าไฟล์ไหนเกี่ยวข้อง ให้เลือกมาดูก่อนดีกว่าพลาด (สูงสุด 8 ไฟล์)
 - ห้ามเลือกไฟล์ที่ไม่อยู่ในรายชื่อด้านบน
-
+${agentDocs ? '\n=== กฎและแนวทางการทำงาน (เจ้าของเขียน — อ่านด้วย) ===\n' + agentDocs : ''}
 ตอบ JSON เท่านั้น รูปแบบนี้:
 \`\`\`json
 {
@@ -361,8 +379,9 @@ ${scopeInfo.files.map((f) => `- ${f}`).join('\n')}
 }
 
 // ── Round 2 prompt: ให้แผนแก้ไขจากเนื้อไฟล์จริงที่อ่านแล้ว ────────────────
-function buildFixPlanPrompt(scopeInfo, message, fileContents) {
+function buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) {
   const filesBlock = Object.entries(fileContents)
+    .filter(([p]) => p !== 'docs/AGENT_CHANGELOG_TH.md') // จัดการ changelog แยก
     .map(([p, content]) => `--- FILE: ${p} ---\n${content === null ? '(ไฟล์นี้ยังไม่มีอยู่ — เป็นไฟล์ใหม่)' : content}\n--- END FILE ---`)
     .join('\n\n');
 
@@ -373,6 +392,7 @@ function buildFixPlanPrompt(scopeInfo, message, fileContents) {
 
 ${filesBlock}
 
+${agentDocs ? '=== กฎและแนวทางการทำงาน (เจ้าของเขียน — ต้องปฏิบัติตาม) ===\n' + agentDocs + '\n' : ''}
 กฎสำคัญ — ฝ่าฝืนไม่ได้:
 1. diff เล็กที่สุด — แก้เฉพาะส่วนที่เกี่ยวกับคำสั่ง ห้ามแตะส่วนอื่นของไฟล์ที่ไม่เกี่ยว
 2. "old" และ "find" ต้องเป็นข้อความที่ copy มาจากไฟล์จริงด้านบน "เป๊ะตัวต่อตัว" (รวม whitespace/indent) — ถ้าไม่ตรงเป๊ะ ระบบจะปฏิเสธการแก้ไขนี้ทันที
@@ -402,7 +422,8 @@ ${filesBlock}
     }
   ],
   "pr_title": "ชื่อ PR",
-  "pr_body": "อธิบายว่าแก้ไขอะไร ทำไม"
+  "pr_body": "อธิบายว่าแก้ไขอะไร ทำไม",
+  "changelog_entry": "สรุปสั้นๆภาษาไทย 1 บรรทัด — จะถูก prepend เข้า docs/AGENT_CHANGELOG_TH.md อัตโนมัติ"
 }
 \`\`\`
 
@@ -602,13 +623,16 @@ async function openPR(pat, branchName, prTitle, prBody) {
   return pr.html_url;
 }
 
-// ── Main handler (v2: 2-round "อ่านก่อนเขียน") ────────────────────────────
+// ── Main handler (v2: 2-round "อ่านก่อนเขียน" + อ่านกฎเจ้าของก่อนทุกรอบ) ─────
 async function executeCodeAction(openRouterKey, ghPat, { message, history, scope }) {
   const scopeInfo = SCOPE_FILE_TREE[scope] || SCOPE_FILE_TREE.root;
 
+  // ── อ่านกฎการทำงานที่เจ้าของเขียนไว้ใน repo ──────────────────────────────
+  const agentDocs = await fetchAgentDocs(ghPat);
+
   // ── Round 1: AI เลือกไฟล์ที่ต้องอ่านจริงจาก file tree ──────────────────
   const round1Messages = [
-    { role: 'system', content: buildFileSelectionPrompt(scopeInfo, message) },
+    { role: 'system', content: buildFileSelectionPrompt(scopeInfo, message, agentDocs) },
     ...(history || []).slice(-5),
     { role: 'user', content: `คำสั่ง: ${message}\n\nเลือกไฟล์ที่ต้องอ่านก่อนวางแผนแก้ไข` },
   ];
@@ -619,13 +643,13 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   // กรองให้เหลือเฉพาะไฟล์ที่อยู่ใน scope จริง (กัน AI หลอนชื่อไฟล์ที่ไม่มีอยู่)
   needFiles = needFiles.filter((f) => scopeInfo.files.includes(f)).slice(0, 8);
   if (needFiles.length === 0) {
-    // กันเคส AI ไม่เลือกไฟล์มา — ใช้ entry point หลักของ scope เป็น fallback ขั้นต่ำ
     needFiles = scopeInfo.files.slice(0, 1);
   }
 
-  // ── ดึงเนื้อไฟล์เต็มๆตามที่ AI ขอ ─────────────────────────────────────
+  // ── ดึงเนื้อไฟล์เต็มๆตามที่ AI ขอ + CHANGELOG เสมอ (สำหรับ prepend entry) ─
+  const allFilesToFetch = [...new Set([...needFiles, 'docs/AGENT_CHANGELOG_TH.md'])];
   const fileContents = {};
-  for (const filePath of needFiles) {
+  for (const filePath of allFilesToFetch) {
     try {
       const file = await fetchRepoFile(ghPat, filePath, 'main');
       fileContents[filePath] = file ? file.content : null;
@@ -636,7 +660,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
 
   // ── Round 2: AI สร้างแผนแก้จากเนื้อไฟล์จริง ───────────────────────────
   const round2Messages = [
-    { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents) },
+    { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) },
     { role: 'user', content: `คำสั่ง: ${message}\nScope: ${scope}\n\nสร้างแผนแก้ไขจากไฟล์จริงด้านบนตามรูปแบบ JSON ที่กำหนด` },
   ];
   const round2Response = await callOpenRouter(openRouterKey, round2Messages, 4096);
@@ -646,6 +670,32 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     const err = new Error(changePlan.need_more_info);
     err.needMoreInfo = true;
     throw err;
+  }
+
+  // ── Auto-inject CHANGELOG entry (บังคับบันทึกทุก PR) ────────────────────
+  if (changePlan.changelog_entry && !changePlan.changes.some(c => c.path === 'docs/AGENT_CHANGELOG_TH.md')) {
+    const changelogContent = fileContents['docs/AGENT_CHANGELOG_TH.md'];
+    const today = new Date().toISOString().slice(0, 10);
+    const changedPaths = (changePlan.changes || []).map(c => c.path).join(', ');
+    const newEntry = `## ${today} — ${changePlan.changelog_entry}\n- Scope: ${scopeInfo.label}\n- ไฟล์ที่แก้: ${changedPaths}\n- ถ้าพังอีกให้เช็ก: ${changedPaths}`;
+
+    if (changelogContent) {
+      const firstEntryLine = changelogContent.split('\n').find(l => l.startsWith('## '));
+      if (firstEntryLine) {
+        changePlan.changes.push({
+          path: 'docs/AGENT_CHANGELOG_TH.md',
+          action: 'patch_replace',
+          find: firstEntryLine,
+          replace_with: newEntry + '\n\n' + firstEntryLine,
+        });
+      }
+    } else {
+      changePlan.changes.push({
+        path: 'docs/AGENT_CHANGELOG_TH.md',
+        action: 'create',
+        content: newEntry + '\n',
+      });
+    }
   }
 
   // ── Apply changes via GitHub API (strict exact-match) ─────────────────
