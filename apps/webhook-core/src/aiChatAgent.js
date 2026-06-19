@@ -166,17 +166,22 @@ exports.aiChatAgent = https.onCall(
 
 // ── Intent detection: is this a code-action? ────────────────────────────
 function isCodeAction(text) {
+  if (!text || typeof text !== 'string') return false;
   const t = text.toLowerCase();
-  const codePatterns = [
-    /แก้โค้ด/, /แก้bug/, /แก้บั๊ก/, /fix code/, /fix bug/,
-    /สร้างfeature/, /สร้างฟีเจอร์/, /add feature/, /add code/,
-    /refactor/, /ปรับโครงสร้าง/, /rewrite/,
-    /deploy/, /ดีพลอย/, /merge/,
-    /ทำ pr/, /open pr/, /สร้าง pr/, /เปิด pr/,
-    /ช่วยเขียน/, /implement/,
-    /อัปเดตโค้ด/, /update code/,
-  ];
-  return codePatterns.some(p => p.test(t));
+  // Use string .includes() for Thai text (regex Unicode can fail on GCF Node 20)
+  if (
+    t.includes('แก้โค้ด') || t.includes('แก้bug') || t.includes('แก้บั๊ก') ||
+    t.includes('fix code') || t.includes('fix bug') || t.includes('fix this') ||
+    t.includes('สร้าง') && (t.includes('feature') || t.includes('ฟีเจอร์')) ||
+    t.includes('add feature') || t.includes('add code') ||
+    t.includes('refactor') || t.includes('ปรับโครงสร้าง') || t.includes('rewrite') ||
+    t.includes('deploy') || t.includes('ดีพลอย') || t.includes('merge') ||
+    t.includes('pr') || t.includes('pull request') ||
+    t.includes('ช่วยเขียน') || t.includes('implement') ||
+    t.includes('อัปเดตโค้ด') || t.includes('update code') ||
+    t.includes('ช่วยแก้')
+  ) return true;
+  return false;
 }
 
 // ── V1 onRequest fallback (for direct HTTP calls from PWA) ────────────────
