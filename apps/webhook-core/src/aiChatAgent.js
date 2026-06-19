@@ -3,7 +3,7 @@
  *
  * Acts as a router + intent classifier:
  *   user message → detect scope → pick system prompt → call OpenRouter → reply
- *   if intent is "code-action" → route to aiWorkflowAgent (Cursor SDK Cloud Agent)
+ *   if intent is "code-action" → route to aiWorkflowAgent (OpenRouter + GitHub API)
  *
  * 5 Agent Scopes:
  *   - root:    AI Admin (general)
@@ -37,7 +37,7 @@ const SYSTEM_PROMPTS = {
 
 CAPABILITIES ของคุณ:
 - 💬 ตอบคำถามทั่วไปเกี่ยวกับระบบ: แนะนำการใช้แอป, อธิบายโครงสร้าง, วิเคราะห์ปัญหา
-- 🔧 แก้โค้ดอัตโนมัติ: รับคำสั่ง "แก้บั๊ก" / "สร้าง feature" / "refactor" — คุณจะเรียก Cursor Cloud Agent ให้ clone repo, แก้โค้ด, รัน smoke test, และเปิด PR โดยอัตโนมัติ
+- 🔧 แก้โค้ดอัตโนมัติ (ผ่าน OpenRouter + GitHub API): รับคำสั่ง "แก้บั๊ก" / "สร้าง feature" / "refactor" — AI deepseek วิเคราะห์โค้ด → สร้าง branch → commit → เปิด PR ให้อัตโนมัติ
 - 📊 ดูสถานะ PR: "status PR" เพื่อเช็ค PR ที่กำลังทำงาน
 
 เมื่อพี่ (เจ้าของร้าน) ต้องการทำงานในแอปใด ให้ถาม scope ก่อน:

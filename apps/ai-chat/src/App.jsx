@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI, checkWorkflowStatus } from './api';
+import { chatWithAI } from './api';
 
 // ── Icons (inline lucide) ───────────────────────────────────────────────
 const IconSend = () => (
@@ -33,14 +33,13 @@ const AGENT_OPTIONS = [
 
 export default function App() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n- "กุ้งวันนี้มียอดขายเท่าไหร่"\n- "ช่วยดูสต็อกชาหน่อย"\n- "webhook มี error ไหม"\n- "เด๊ฟ ช่วยแก้บั๊ก {ปัญหา}" (เปิด PR ให้!)' },
+    { role: 'assistant', content: 'สวัสดีพี่! ผมเด๊ฟ Senior Full-stack ผู้ดูแลระบบนี้\n\nลองพูดหรือพิมพ์คำสั่งได้เลย เช่น:\n- "กุ้งวันนี้มียอดขายเท่าไหร่"\n- "ช่วยดูสต็อกชาหน่อย"\n- "webhook มี error ไหม"\n- "เด๊ฟ ช่วยแก้บั๊ก {ปัญหา}" (AI deepseek แก้โค้ด + เปิด PR ให้!)' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [agentScope, setAgentScope] = useState('root');
   const [showAgentPicker, setShowAgentPicker] = useState(false);
-  const [workflowRuns, setWorkflowRuns] = useState([]);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -62,11 +61,6 @@ export default function App() {
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     const reply = await chatWithAI({ message: text, history, scope });
-
-    // If code-action started, track the workflow
-    if (reply.intent === 'code-action' && reply.runId) {
-      setWorkflowRuns(prev => [...prev, { runId: reply.runId, agentId: reply.agentId, scope: reply.scope }]);
-    }
 
     setMessages(prev => [...prev, { role: 'assistant', content: reply.reply }]);
     if (reply.scope) setAgentScope(reply.scope);
@@ -214,7 +208,7 @@ export default function App() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="พิมพ์หรือพูดคำสั่ง... (แก้โค้ดได้ด้วย!)"
+              placeholder="พิมพ์หรือพูดคำสั่ง... (AI deepseek แก้โค้ด + PR ได้!)"
               rows={1}
               className="w-full resize-none bg-ai-bg border border-ai-border rounded-2xl px-4 py-2.5 text-sm text-ai-text placeholder-ai-muted outline-none focus:border-ai-accent transition-colors"
               style={{ maxHeight: '120px' }}

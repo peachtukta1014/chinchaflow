@@ -207,7 +207,6 @@ jobs:
         run: npm run build --workspace=apps/ai-chat
         env:
           VITE_AI_CHAT_FUNCTION_URL: https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp
-          VITE_AI_WORKFLOW_STATUS_URL: https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiWorkflowStatusHttp
 
       - name: Deploy to Firebase Hosting (ai-chat)
         uses: FirebaseExtended/action-hosting-deploy@v0
