@@ -7,6 +7,10 @@
 
 ## 2026-06
 
+### 2026-06-19 | PR #289
+**fix: แก้ font path ใน shrimpBillRender หลัง ย้ายไป seafood-notify/**
+- `seafood-notify/shrimpBillRender.js` — `FONT_DIR` เปลี่ยนจาก `../assets/fonts` → `../../assets/fonts`
+
 ### 2026-06-19 | PR #288
 **feat: 3-tier model — Flash/Pro/Vision (DeepSeek V4)**
 - `aiChatAgent.js` — แทน `DEFAULT_MODEL` ด้วย 3-tier อัตโนมัติ

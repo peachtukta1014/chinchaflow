@@ -1,3 +1,10 @@
+## 2026-06-19 — PR#289: แก้ font path ใน shrimpBillRender หลัง refactor
+
+- `seafood-notify/shrimpBillRender.js` — แก้ `FONT_DIR` จาก `../assets/fonts` → `../../assets/fonts`
+- สาเหตุ: ย้ายไฟล์จาก `src/` → `src/seafood-notify/` ทำให้ `__dirname` เปลี่ยน
+- ผล: smoke test `shrimpBillServerRender` ติด CI ด้วย "โหลดฟอนต์ Sarabun ไม่สำเร็จ"
+- ถ้าพังอีกให้เช็ก `seafood-notify/shrimpBillRender.js` บรรทัด `FONT_DIR`
+
 ## 2026-06-19 — PR#288: 3-tier model DeepSeek V4 + smoke-test paths
 
 - `aiChatAgent.js` — เปลี่ยนจาก 1 model → 3-tier อัตโนมัติ: Flash (แชท) / Pro (โค้ด) / Vision (รูป)
