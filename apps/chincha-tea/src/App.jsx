@@ -39,6 +39,11 @@ import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import { useAppShellChrome } from './lib/useAppShellChrome';
 
 export default function App() {
+function App() {
+  // ... existing code ...
+}
+
+export default App;
   const { lang, setLang, t } = useLang();
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
