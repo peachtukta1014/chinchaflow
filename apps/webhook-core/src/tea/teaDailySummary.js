@@ -219,6 +219,8 @@ const HELP_TEXT = [
   '   → สรุปยอดขาย สด/โอน แก้ว ค่าใช้จ่าย สั่งของ',
   '• ซื้อเข้าร้าน / ซื้อของ / restock',
   '   → รายการสั่งของวันนี้ + ยอดที่ซื้อแล้ว',
+  '• แอด uid / adduid / เพิ่ม uid',
+  '   → เพิ่ม User ID ตัวเองเข้ารับสรุปส่วนตัว',
   '• help / ช่วยเหลือ / คำสั่ง / menu',
   '',
   'คีย์ลัด (กลุ่มร้านน้ำ):',
@@ -232,6 +234,7 @@ const HELP_TEXT = [
 const SUMMARY_CMD = /^(สรุป|สรุปวันนี้|ปิดวัน|ยอดขาย|ยอดขายวันนี้|summary|daily|รายงาน)(\s|$)/i;
 const RESTOCK_PURCHASE_CMD = /^(ซื้อเข้าร้าน|ซื้อของเข้าร้าน|ซื้อของ|restock|buy[\s-]?in)(\s|$)/i;
 const HELP_CMD = /^(help|ช่วยเหลือ|ช่วย|คำสั่ง|menu|เมนู|คีย์|\?|h)(\s|$)/i;
+const ADD_UID_CMD = /^(แอด\s*uid|add\s*uid|เพิ่ม\s*uid|adduid|addme|เพิ่มuid)(\s|$)/i;
 
 /** จำแนกคำสั่งข้อความ LINE ชา — รวมคีย์ลัดตัวเลข */
 function classifyTeaLineCommand(text) {
@@ -241,6 +244,7 @@ function classifyTeaLineCommand(text) {
   if (/^2$/.test(raw)) return 'restock';
   if (/^3$/.test(raw)) return 'help';
   if (HELP_CMD.test(raw)) return 'help';
+  if (ADD_UID_CMD.test(raw)) return 'add_uid';
   if (SUMMARY_CMD.test(raw)) return 'summary';
   if (RESTOCK_PURCHASE_CMD.test(raw)) return 'restock';
   if (/ยอดขาย.*(วันนี้|สรุป)|(สรุป|ปิดวัน).*ยอดขาย/i.test(raw)) return 'summary';
@@ -263,6 +267,7 @@ module.exports = {
   SUMMARY_CMD,
   RESTOCK_PURCHASE_CMD,
   HELP_CMD,
+  ADD_UID_CMD,
   classifyTeaLineCommand,
   isTeaLineCommand,
 };

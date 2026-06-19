@@ -89,6 +89,38 @@ async function handleTeaLineWebhook(db, admin, req, res) {
         continue;
       }
 
+      if (cmd === 'add_uid') {
+        if (!userId) {
+          await lineReply(replyToken, '⚠️ ไม่พบ User ID ของคุณในข้อความนี้', token);
+          await completeLineEvent(db, event);
+          continue;
+        }
+        try {
+          const cfg = await getTeaLineConfig(db);
+          const existing = cfg.notifyUserIds;
+          const currentIds = Array.isArray(existing)
+            ? existing.map((id) => String(id).trim()).filter(Boolean)
+            : typeof existing === 'string'
+              ? existing.split(/[,;\s]+/).map((id) => id.trim()).filter(Boolean)
+              : [];
+          if (currentIds.includes(userId)) {
+            await lineReply(replyToken, `✅ UID ของคุณมีอยู่แล้วในรายชื่อรับสรุป\n(${userId})`, token);
+          } else {
+            const nextIds = [...currentIds, userId];
+            await db.collection('config').doc('teaLine').set(
+              { notifyUserIds: nextIds },
+              { merge: true },
+            );
+            await lineReply(replyToken, `✅ เพิ่ม UID ของคุณแล้ว จะได้รับสรุปส่วนตัวด้วย\n(${userId})`, token);
+          }
+        } catch (err) {
+          console.error('tea add_uid', err);
+          await lineReply(replyToken, '⚠️ เพิ่ม UID ไม่สำเร็จ ลองใหม่ครับ', token);
+        }
+        await completeLineEvent(db, event);
+        continue;
+      }
+
       await db.collection('line_messages').add({
         userId, groupId, text,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
