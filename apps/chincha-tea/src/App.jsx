@@ -39,6 +39,17 @@ import { ensureNotifyPermission, showWebNotify } from './lib/webNotify';
 import { useAppShellChrome } from './lib/useAppShellChrome';
 
 export default function App() {
+
+  const [appReady, setAppReady] = useState(false);
+  useEffect(() => {
+    const init = async () => {
+      await fbReady;
+      setAppReady(true);
+    };
+    init();
+  }, []);
+
+  if (!appReady) return null;
   const { lang, setLang, t } = useLang();
   const [member, setMember] = useState(undefined);
   const [authPending, setAuthPending] = useState(false);
