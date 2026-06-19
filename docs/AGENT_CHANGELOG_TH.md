@@ -1,3 +1,15 @@
+## 2026-06-19 — webhook-core: แบ่งโฟลเดอร์ตาม scope + แก้ cross-contamination
+
+- **root cause fix**: `shrimpDirectLineWebhook`, `shrimpGroupLineWebhook`, `instantLineNotify` เคย import `lineReply`/`linePush` จาก `teaDailySummary.js` ทำให้แก้ชาแล้วกระทบกุ้ง — แยกออกเป็น `shared/lineUtils.js` แล้วทุก scope import จากที่เดียวกัน
+- **จัดโฟลเดอร์ใหม่** ย้าย ~45 ไฟล์ใน `src/` แบน → 4 โฟลเดอร์:
+  - `seafood-oa/` — webhook handler กุ้ง (OA + กลุ่มครอบครัว), intent, order parser, LIFF
+  - `seafood-notify/` — Firestore triggers, bill render (Satori), outbound LINE push
+  - `tea/` — `teaDailySummary.js` + `teaWebhook.js` (แยก handler ออกจาก index.js)
+  - `shared/` — `lineUtils.js`, `webhookDedup.js`
+- **index.js บางลง** เหลือแค่ Cloud Function export declarations
+- **เพิ่ม SCOPE.md** ทุก folder: personality บอท, ตารางคำสั่ง, env vars, จุด debug
+- ถ้าพังให้เช็ก `index.js` → import path ถูกต้องหรือไม่ → `shared/lineUtils.js` มี `todayBKK`/`lineReply`/`linePush` ครบหรือไม่
+
 ## 2026-06-19 — AI Chat PWA + LINE Partition + Docs รอบใหญ่
 - เพิ่ม `apps/ai-chat` — PWA แชทคุย AI ด้วยเสียง/พิมพ์ ปัก home screen ได้
 - เพิ่ม `apps/webhook-core/src/aiChatAgent.js` — Cloud Function 5 agent scopes (root/tea/seafood/webhook/scheduled) classifier + system prompt + OpenRouter
