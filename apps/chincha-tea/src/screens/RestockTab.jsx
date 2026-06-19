@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ref as stRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
+import { compressImageFile } from '../lib/compressImage';
 import { fsPost, fsQueryRestocks } from '../lib/firestoreRest';
 import { dateKeyBangkok } from '../lib/constants';
 import { uploadOrderSlip } from '../lib/orderSlipService';
@@ -88,7 +91,10 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
   const [catalogSaving, setCatalogSaving] = useState(false);
   const [nameEditId, setNameEditId] = useState(null);
   const [nameDraft, setNameDraft] = useState({ nameEn: '', nameMy: '', voiceAliases: '' });
+  const [imageUploadId, setImageUploadId] = useState(null);
   const fileRef = useRef(null);
+  const imageFileRef = useRef(null);
+  const imageTargetRef = useRef(null);
   const dateKey = dateKeyBangkok();
   const isAdmin = member?.role === 'admin';
 
@@ -215,6 +221,25 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
     } catch (e) {
       console.error(e);
       alert(t('saveFailed'));
+    }
+  };
+
+  const handleCatalogImageUpload = async (catItem, file) => {
+    if (!file || !storage) return;
+    setImageUploadId(catItem.id);
+    try {
+      const compressed = await compressImageFile(file, { maxWidth: 400, maxHeight: 400, quality: 0.8 });
+      const path = `catalogImages/${catItem.id}.jpg`;
+      await uploadBytes(stRef(storage, path), compressed, { contentType: 'image/jpeg' });
+      const url = await getDownloadURL(stRef(storage, path));
+      await patchRestockCatalogItem(catItem.id, { imageUrl: url });
+      setCatalog((prev) => prev.map((c) => (c.id === catItem.id ? { ...c, imageUrl: url } : c)));
+    } catch (e) {
+      console.error(e);
+      alert(t('uploadFailed'));
+    } finally {
+      setImageUploadId(null);
+      if (imageFileRef.current) imageFileRef.current.value = '';
     }
   };
 
@@ -662,6 +687,9 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
+                        {catItem.imageUrl && (
+                          <img src={catItem.imageUrl} alt="" className="w-14 h-14 rounded-xl object-cover mb-2 border border-stone-200" />
+                        )}
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-bold text-stone-700 min-w-0">
                             <RestockItemName name={catItem.name} lang={lang} catalogItem={catItem} />
@@ -693,6 +721,14 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
                               className="text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-1 rounded-lg active:scale-95"
                             >
                               {t('restockEditNames')}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={catalogSaving || imageUploadId === catItem.id}
+                              onClick={() => { imageTargetRef.current = catItem; imageFileRef.current?.click(); }}
+                              className="text-[10px] font-bold text-stone-600 bg-stone-50 border border-stone-200 px-2 py-1 rounded-lg active:scale-95 disabled:opacity-50"
+                            >
+                              {imageUploadId === catItem.id ? '⏳' : catItem.imageUrl ? '🖼️' : '📷'}
                             </button>
                           </div>
                         )}
@@ -780,6 +816,7 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadOrderPhoto(f); e.target.value = ''; }} />
+      <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && imageTargetRef.current) handleCatalogImageUpload(imageTargetRef.current, f); }} />
       <button
         type="button"
         disabled={uploading}
@@ -856,11 +893,11 @@ export function RestockTab({ member, t, lang = 'th', onRestockListChange }) {
         {saving ? '⏳...' : `📋 ${t('submitRestock')}${items.length ? ` (${items.length})` : ''}`}
       </button>
 
-      {recentRequests.length > 0 && (
+      {recentRequests.filter((r) => !isRestockReceived(r)).length > 0 && (
         <div className="mt-4">
           <p className="font-black text-xs text-stone-500 uppercase mb-2">{t('recentRestocks')}</p>
           <div className="space-y-2">
-            {recentRequests.map((req) => {
+            {recentRequests.filter((r) => !isRestockReceived(r)).map((req) => {
               const canDel = canManageRestock(req, member);
               const canPurchase = canMarkRestockPurchased(req, member);
               const canReceive = canConfirmRestockReceived(req, member);

@@ -7,6 +7,7 @@ import {
   fsQueryExpenses,
   fsQueryRestocksByDate,
   fsUpsertDoc,
+  fsGetDoc,
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
 import { fetchTeaDailySummary, intValue, moneyValue } from '../lib/dailySummaryService';
@@ -239,12 +240,25 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       manualBulkTotal: loadedBulkSummary.manualBulkTotal ? String(loadedBulkSummary.manualBulkTotal) : '',
       manualCupsSold: loadedBulkSummary.manualCupsSold ? String(loadedBulkSummary.manualCupsSold) : '',
     });
-    setCupForm(cups ? {
-      openingCups: cups.openingCups ? String(cups.openingCups) : '',
-      refillCups: cups.refillCups ? String(cups.refillCups) : '',
-      remainingCups: cups.remainingCups || cups.remainingCups === 0 ? String(cups.remainingCups) : '',
-      note: cups.note || '',
-    } : EMPTY_CUPS);
+    if (cups) {
+      setCupForm({
+        openingCups: cups.openingCups ? String(cups.openingCups) : '',
+        refillCups: cups.refillCups ? String(cups.refillCups) : '',
+        remainingCups: cups.remainingCups || cups.remainingCups === 0 ? String(cups.remainingCups) : '',
+        note: cups.note || '',
+      });
+    } else {
+      try {
+        const prevDateKey = shiftDateKey(dateKey, -1);
+        const prevCups = await fsGetDoc(`dailyCupStocks/${prevDateKey}`);
+        const prevRemaining = prevCups?.remainingCups;
+        setCupForm(prevRemaining != null && prevRemaining >= 0
+          ? { ...EMPTY_CUPS, openingCups: String(prevRemaining) }
+          : EMPTY_CUPS);
+      } catch {
+        setCupForm(EMPTY_CUPS);
+      }
+    }
   };
 
   useEffect(() => {
@@ -507,14 +521,6 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
               </div>
               <p className="text-[11px] text-stone-500 bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-2">{t('cupNetFormula')}</p>
             </SectionCard>
-
-            <div className="rounded-2xl bg-amber-50 border border-amber-100 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-black text-amber-800">{t('expenseSummaryTitle')}</p>
-                <button type="button" onClick={fillFromSummary} disabled={!summaryText.trim()} className="min-h-11 px-4 rounded-2xl bg-white text-[11px] font-black text-amber-800 border border-amber-200 disabled:opacity-40 active:scale-95">{t('expenseFillFromSummary')}</button>
-              </div>
-              <textarea value={summaryText} onChange={(e) => setSummaryText(e.target.value)} placeholder={t('expenseSummaryPlaceholder')} rows={3} className="w-full px-3 py-3 rounded-2xl border-2 border-amber-100 bg-white text-sm font-semibold outline-none focus:border-amber-300 resize-none" />
-            </div>
 
             <textarea value={dayForm.note} onChange={(e) => setDayForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('dailyNotePlaceholder')} rows={2} className="w-full px-4 py-3 rounded-2xl border-2 border-stone-200 text-sm font-semibold outline-none resize-none" />
 

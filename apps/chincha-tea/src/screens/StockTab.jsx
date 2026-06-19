@@ -81,8 +81,10 @@ export function StockTab({ member, t, lang = 'th' }) {
                 const showNick = names.displayNick && names.displayNick !== primary;
                 return (
                   <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="w-11 h-11 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-lg shrink-0">
-                      📦
+                    <div className="w-11 h-11 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                      {item.imageUrl
+                        ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                        : '📦'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-stone-800 truncate">{primary}</p>
