@@ -640,7 +640,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     ...(history || []).slice(-5),
     { role: 'user', content: `คำสั่ง: ${message}\n\nเลือกไฟล์ที่ต้องอ่านก่อนวางแผนแก้ไข` },
   ];
-  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 1024, process.env.FLASH_MODEL || FLASH_MODEL);
+  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 4096, process.env.FLASH_MODEL || FLASH_MODEL);
   const round1Json = extractJson(round1Response);
 
   let needFiles = Array.isArray(round1Json.need_files) ? round1Json.need_files : [];
@@ -673,7 +673,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) },
     { role: 'user', content: `คำสั่ง: ${message}\nScope: ${scope}\n\nสร้างแผนแก้ไขจากไฟล์จริงด้านบนตามรูปแบบ JSON ที่กำหนด` },
   ];
-  const round2Response = await callOpenRouter(openRouterKey, round2Messages, 4096, codeModel);
+  const round2Response = await callOpenRouter(openRouterKey, round2Messages, 8192, codeModel);
   const changePlan = extractJson(round2Response);
 
   if (changePlan.need_more_info) {

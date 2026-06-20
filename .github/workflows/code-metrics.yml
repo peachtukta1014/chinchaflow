@@ -6,7 +6,7 @@ on:
     - cron: '0 1 * * 1'
 
 permissions:
-  contents: read
+  contents: write
 
 defaults:
   run:
@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,6 +31,20 @@ jobs:
       - name: Generate code metrics
         run: npm run code:metrics
 
+      - name: Write GitHub Step Summary
+        if: success()
+        run: cat reports/code-metrics.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Commit metrics to docs/
+        if: success()
+        run: |
+          cp reports/code-metrics.md docs/CODE_METRICS.md
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/CODE_METRICS.md
+          git diff --staged --quiet && echo "no changes" || git commit -m "chore: อัปเดต code metrics $(date +%Y-%m-%d) [skip ci]"
+          git push origin HEAD:main
+
       - name: Upload code metrics report
         uses: actions/upload-artifact@v4
         with:
@@ -37,71 +53,3 @@ jobs:
             reports/code-metrics.json
             reports/code-metrics.md
           if-no-files-found: error
-
-      - name: Send Slack summary
-        if: ${{ always() }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          JOB_STATUS: ${{ job.status }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
-            echo "SLACK_WEBHOOK_URL is not set; skipping Slack summary."
-            exit 0
-          fi
-
-          node <<'NODE'
-          const fs = require('node:fs');
-
-          const reportPath = 'reports/code-metrics.json';
-          const report = fs.existsSync(reportPath)
-            ? JSON.parse(fs.readFileSync(reportPath, 'utf8'))
-            : null;
-
-          const status = process.env.JOB_STATUS === 'success' ? '✅ success' : `❌ ${process.env.JOB_STATUS}`;
-          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-          const languageSummary = report?.languages
-            ?.slice(0, 5)
-            .map((item) => `${item.language}: ${item.lines.toLocaleString('en-US')} lines`)
-            .join('\n') ?? 'Report was not generated.';
-
-          const payload = {
-            text: `Code metrics ${status} — ${process.env.GITHUB_REPOSITORY}`,
-            blocks: [
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `*Code metrics ${status}*\nRepo: ${process.env.GITHUB_REPOSITORY}\nBranch: ${process.env.GITHUB_REF_NAME}`,
-                },
-              },
-              {
-                type: 'section',
-                fields: [
-                  { type: 'mrkdwn', text: `*Files*\n${(report?.totals.files ?? 0).toLocaleString('en-US')}` },
-                  { type: 'mrkdwn', text: `*Lines*\n${(report?.totals.lines ?? 0).toLocaleString('en-US')}` },
-                  { type: 'mrkdwn', text: `*Non-blank*\n${(report?.totals.nonBlankLines ?? 0).toLocaleString('en-US')}` },
-                  { type: 'mrkdwn', text: `*Languages*\n${report?.languages.length ?? 0}` },
-                ],
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: `*Top languages*\n${languageSummary}` },
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: `<${runUrl}|Open workflow run and artifact>` },
-              },
-            ],
-          };
-
-          fs.writeFileSync('slack-payload.json', JSON.stringify(payload));
-          NODE
-          curl --fail --show-error --silent \
-            --request POST \
-            --header 'Content-Type: application/json' \
-            --data @slack-payload.json \
-            "$SLACK_WEBHOOK_URL"
