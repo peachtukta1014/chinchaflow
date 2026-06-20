@@ -61,8 +61,8 @@ async function fetchCodeMetrics(ghPat) {
 // ── Scope detection from user message ────────────────────────────────────
 function detectScope(text, currentScope) {
   const t = text.toLowerCase();
-  if (/(กุ้ง|shrimp|seafood|โกอ้วน)/.test(t)) return 'seafood';
-  if (/(ชา|tea|ชินชา)/.test(t)) return 'tea';
+  if (/(กุ้ง|shrimp|seafood|โกอ้วน|ร้านกุ้ง)/.test(t)) return 'seafood';
+  if (/(ชา|tea|ชินชา|ร้านน้ำ|chincha|bubble)/.test(t)) return 'tea';
   if (/(webhook|line|ไลน์)/.test(t)) return 'webhook';
   if (/(cron|scheduled|schedule|automation|auto)/.test(t)) return 'scheduled';
   return currentScope || 'root';
@@ -163,17 +163,26 @@ function isCodeRelated(text) {
   if (!text || typeof text !== 'string') return false;
   const t = text.toLowerCase();
   return (
-    t.includes('โค้ด') || t.includes('code') || t.includes('บั๊ก') || t.includes('bug') ||
-    t.includes('error') || t.includes('แก้') || t.includes('fix') ||
-    t.includes('feature') || t.includes('ฟีเจอร์') || t.includes('refactor') ||
+    // คำ tech ทั่วไป
+    t.includes('โค้ด') || t.includes('code') || t.includes('บั๊ก') || t.includes('บัค') || t.includes('bug') ||
+    t.includes('error') || t.includes('fix') || t.includes('refactor') ||
+    t.includes('feature') || t.includes('ฟีเจอร์') ||
     t.includes('ฟังก์ชัน') || t.includes('function') || t.includes('component') ||
     t.includes('api') || t.includes('deploy') || t.includes('ดีพลอย') ||
     t.includes('import') || t.includes('export') || t.includes('logic') ||
-    t.includes('อธิบายโค้ด') || t.includes('วิเคราะห์') || t.includes('implement') ||
-    t.includes('script') || t.includes('สคริปต์') || t.includes('ไฟล์') ||
+    t.includes('implement') || t.includes('script') || t.includes('สคริปต์') ||
     t.includes('firestore') || t.includes('firebase') || t.includes('webhook') ||
-    t.includes('pr') || t.includes('pull request') || t.includes('branch') ||
-    t.includes('commit') || t.includes('merge')
+    t.includes('pull request') || t.includes('branch') || t.includes('commit') || t.includes('merge') ||
+    // "pr" เฉพาะ (ไม่ใช่ substring ของคำไทย)
+    /\bpr\b/.test(t) ||
+    // คำไทยที่เป็น action บน code/ระบบ
+    t.includes('แก้โค้ด') || t.includes('แก้บั๊ก') || t.includes('แก้บัค') || t.includes('แก้ bug') ||
+    t.includes('แก้ error') || t.includes('แก้ระบบ') || t.includes('แก้ไฟล์') ||
+    t.includes('อัปเดตโค้ด') || t.includes('อัปเดตระบบ') || t.includes('update code') ||
+    t.includes('เพิ่มฟีเจอร์') || t.includes('เพิ่มฟังก์ชัน') || t.includes('เพิ่ม feature') ||
+    t.includes('สร้างฟีเจอร์') || t.includes('สร้างฟังก์ชัน') || t.includes('สร้าง feature') ||
+    t.includes('อธิบายโค้ด') || t.includes('วิเคราะห์โค้ด') || t.includes('วิเคราะห์บั๊ก') || t.includes('วิเคราะห์ระบบ') ||
+    t.includes('ไฟล์') && (t.includes('แก้') || t.includes('อ่าน') || t.includes('เปิด') || t.includes('ดู'))
   );
 }
 
@@ -205,6 +214,12 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
     });
   }
 
+  // Pro → แม่นยำ ตอบยาว | Flash → เร็ว ตอบปานกลาง | Vision → อธิบายรูป
+  const isProModel = model.includes('pro') || model.includes('v4-pro');
+  const isVisionModel = model.includes('gpt-4o') || model.includes('vision');
+  const maxTokens = isProModel ? 4096 : isVisionModel ? 1024 : 2048;
+  const temperature = isProModel ? 0.15 : 0.3;
+
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -216,8 +231,8 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
     body: JSON.stringify({
       model,
       messages: finalMessages,
-      temperature: 0.3,
-      max_tokens: 2048,
+      temperature,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -307,8 +322,8 @@ exports.aiChatAgent = https.onCall(
 // รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ว่าต้องการแก้ระบบหรือแค่ถาม → แปลเป็น technical spec
 async function classifyAndTranslate(apiKey, message, history, currentScope) {
   const systemPrompt = `คุณคือตัวแปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ สำหรับ CHINCHA FLOW:
-- ร้านชินชา (scope: tea) — แอปขายชา, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
-- โกอ้วนซีฟู้ด (scope: seafood) — แอปขายกุ้ง, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
+- ร้านชินชา / ร้านน้ำ / ชา (scope: tea) — แอปขายชา apps/chincha-tea/, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
+- โกอ้วนซีฟู้ด / ร้านกุ้ง / กุ้ง (scope: seafood) — แอปขายกุ้ง apps/seafood-pos/, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
 - LINE Bot (scope: webhook) — บอทกลุ่ม LINE, webhook, notify, การส่งข้อความ
 - ทั่วไป (scope: root) — หลายส่วนหรือไม่ชัดเจน
 
