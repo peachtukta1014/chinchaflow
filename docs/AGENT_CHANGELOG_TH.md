@@ -1,3 +1,15 @@
+## 2026-06-20 — PR#291: รับออเดอร์สั้นในกลุ่ม LINE (ชื่อ+เลข ไม่มีคำว่ากุ้ง/หน่วย)
+
+- `customerRiverDefault.js` — ลบ `if (groupId) return null` → `resolveRiverDefaultProduct` lookup `defaultRiverSize` ด้วย customerName ในกลุ่มได้
+- `shrimpLineOrderHandler.js` — pending+group: auto-resolve product จาก `defaultRiverSize`
+  - พิมพ์ "ตาจุ้ยสอง" ในกลุ่ม → แยกชื่อ "ตาจุ้ย" + qty 2 → หา customer + defaultRiverSize → บันทึกออเดอร์ทันที
+  - ถ้าไม่พบ customer หรือไม่มี defaultRiverSize → เงียบ (ไม่ถามขนาด ไม่ตอบ error)
+  - riverPending ในกลุ่มที่ไม่มี default → เงียบแทน (ไม่ถามเล็ก/กลาง/ใหญ่)
+  - items empty ในกลุ่ม → เงียบ (ไม่ส่ง error message)
+- `shrimpGroupLineWebhook.js` — guard `if (result.reply)` ก่อน lineReply → ไม่ส่ง empty text
+- `smoke-test.mjs` — เพิ่ม 5 assertion: short order intent, group intent, parseSimpleOrderLine, source guards
+- ถ้าพังให้เช็ก `shrimpLineOrderHandler.js` (pending branch) · `customerRiverDefault.js` (resolveRiverDefaultProduct)
+
 ## 2026-06-19 — PR#289: แก้ font path ใน shrimpBillRender หลัง refactor
 
 - `seafood-notify/shrimpBillRender.js` — แก้ `FONT_DIR` จาก `../assets/fonts` → `../../assets/fonts`

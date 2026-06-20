@@ -521,6 +521,21 @@ try {
     intent.isShrimpOrderCommand('พี่อ้อม กุ้งเล็ก4'),
     'intent รับออเดอร์กุ้งแบบติดเลขไม่ใส่หน่วย',
   );
+  assert(
+    intent.isShrimpOrderCommand('ตาจุ้ยสอง'),
+    'intent รับออเดอร์สั้น ชื่อ+เลข ไม่มีคำว่ากุ้ง ไม่มีหน่วย',
+  );
+  assert(
+    intent.classifyShrimpLineMessage('ตาจุ้ยสอง', null, { groupId: 'Caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1' }) === 'order',
+    'group intent ตาจุ้ยสอง → order (ไม่ใช่ ignore)',
+  );
+  const shortOrderPending = parser.parseSimpleOrderLine('ตาจุ้ยสอง');
+  assert(
+    shortOrderPending?.kind === 'pending'
+      && shortOrderPending.customerName === 'ตาจุ้ย'
+      && shortOrderPending.qty === 2,
+    'parseSimpleOrderLine ตาจุ้ยสอง → pending customerName=ตาจุ้ย qty=2',
+  );
   assert(typeof router.handleShrimpLineWebhookEvent === 'function', 'LINE webhook has router entrypoint');
 
   const indexSrc = fs.readFileSync(path.join(root, '../../apps/webhook-core/src/index.js'), 'utf8');
@@ -547,6 +562,15 @@ try {
   assert(groupSrc.includes('allowGroup: Boolean(context.chatId && isShrimpGroupChat(context.chatId))'), 'group image uses group guard');
   assert(!groupSrc.includes("'help'"), 'group flow ไม่ตอบ help');
   assert(!groupSrc.includes('SHRIMP_GROUP_HELP_TEXT'), 'group ไม่มี help text');
+  assert(groupSrc.includes('if (result.reply)'), 'group เงียบเมื่อไม่มี reply (ไม่ส่ง empty message)');
+  const riverDefaultSrc = fs.readFileSync(
+    path.join(root, '../../apps/webhook-core/src/seafood-oa/customerRiverDefault.js'),
+    'utf8',
+  );
+  assert(
+    !riverDefaultSrc.includes('if (groupId) return null'),
+    'resolveRiverDefaultProduct รองรับ group lookup ด้วย customerName',
+  );
   assert(slipSrc.includes('group_image_without_open_bill'), 'group image without open bill is guarded');
   assert(directSrc.includes('allowGroup: false'), 'direct image ไม่เปิด group guard');
   assert(!directSrc.includes('group_image_without_open_bill'), 'direct image ไม่ถูกบังคับด้วย group_image_without_open_bill');

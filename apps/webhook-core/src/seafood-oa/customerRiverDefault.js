@@ -29,10 +29,8 @@ function riverDefaultToProduct(raw) {
  * @returns {Promise<string|null>}
  */
 async function resolveRiverDefaultProduct(db, { lineUserId, customerName, groupId }) {
-  if (groupId) return null;
-
   let customer = null;
-  if (lineUserId) {
+  if (!groupId && lineUserId) {
     customer = await findCustomerByLineUserId(db, lineUserId);
   }
   if (!customer && customerName) {
