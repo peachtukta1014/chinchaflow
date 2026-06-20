@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-20 | PR #291
+**feat: รับออเดอร์สั้นในกลุ่ม LINE — ชื่อ+เลข ไม่ต้องมีคำว่ากุ้ง/หน่วย**
+- `seafood-oa/customerRiverDefault.js` — ลบ `if (groupId) return null` → lookup `defaultRiverSize` ด้วย customerName ในกลุ่มได้
+- `seafood-oa/shrimpLineOrderHandler.js` — `pending`+groupId → auto-resolve ด้วย defaultRiverSize
+  - เจอ customer → บันทึกออเดอร์ทันที / ไม่เจอ → เงียบ (ไม่ถามขนาด)
+  - riverPending ในกลุ่มไม่มี default → เงียบ; items empty → เงียบ
+- `seafood-oa/shrimpGroupLineWebhook.js` — `if (result.reply)` guard ก่อน lineReply
+
 ### 2026-06-19 | PR #289
 **fix: แก้ font path ใน shrimpBillRender หลัง ย้ายไป seafood-notify/**
 - `seafood-notify/shrimpBillRender.js` — `FONT_DIR` เปลี่ยนจาก `../assets/fonts` → `../../assets/fonts`
