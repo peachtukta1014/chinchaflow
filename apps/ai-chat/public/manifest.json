@@ -9,15 +9,15 @@
   "theme_color": "#0f172a",
   "orientation": "portrait",
   "icons": [
-    { "src": "/chincha-logo.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" },
-    { "src": "/chincha-logo.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any maskable" }
+    { "src": "/jiji-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/jiji-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
     {
       "name": "คุยกับจีจี้",
       "short_name": "จีจี้",
       "url": "/?source=shortcut",
-      "icons": [{ "src": "/chincha-logo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
+      "icons": [{ "src": "/jiji-icon.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }
