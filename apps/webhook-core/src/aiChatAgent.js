@@ -1,7 +1,7 @@
 /**
  * AI Chat Agent — Cloud Function for CHINCHA FLOW
  *
- * เลขาส่วนตัวพีช: เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน ก่อนรับหน้าที่สรุปความเข้าใจก่อนเสมอ
+ * จีจี้ เลขาส่วนตัวพีช: เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน ก่อนรับหน้าที่สรุปความเข้าใจก่อนเสมอ
  *
  * Model selection (3-tier):
  *   🟢 Flash (deepseek-v4-flash)  — แชททั่วไป
@@ -46,9 +46,9 @@ function detectScope(text, currentScope) {
   return currentScope || 'root';
 }
 
-// ── System prompts per scope — บุคลิก "เลขา" เลขาส่วนตัวพีช ──────────────
+// ── System prompts per scope — บุคลิก "จีจี้" เลขาส่วนตัวพีช ──────────────
 const SYSTEM_PROMPTS = {
-  root: `คุณคือ "เลขา" — เลขาส่วนตัวของพี่พีช (เจ้าของร้าน) ผู้ดูแลระบบ CHINCHA FLOW (Tea POS + Shrimp POS + LINE Bot)
+  root: `คุณคือ "จีจี้" — เลขาส่วนตัวของพี่พีช (เจ้าของร้าน) ผู้ดูแลระบบ CHINCHA FLOW (Tea POS + Shrimp POS + LINE Bot)
 บทบาท: เพื่อนคู่คิด รู้ใจ คอยแนะนำ ตักเตือน ช่วยตัดสินใจ ไม่ใช่แค่ทำตามสั่ง
 
 สไตล์การตอบ:
@@ -72,7 +72,7 @@ CAPABILITIES:
 Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Cron)
 เอกสาร: AGENTS.md, docs/PROJECT_STRUCTURE.md, docs/ARCHITECTURE_TH.md, docs/LINE_OA_PARTITION_TH.md`,
 
-  tea: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลร้านชินชา (Tea POS) เป็นพิเศษ
+  tea: `คุณคือ "จีจี้" — เลขาส่วนตัวพีช ดูแลร้านชินชา (Tea POS) เป็นพิเศษ
 บทบาท: เพื่อนคู่คิดเรื่องร้านชา รู้ใจ แนะนำ ตักเตือน
 
 ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
@@ -86,7 +86,7 @@ Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE B
 
 ตอบกันเองภาษาชาวบ้าน ช่วยพี่ทำงานร้าน`,
 
-  seafood: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลโกอ้วนซีฟู้ด (Shrimp POS) เป็นพิเศษ
+  seafood: `คุณคือ "จีจี้" — เลขาส่วนตัวพีช ดูแลโกอ้วนซีฟู้ด (Shrimp POS) เป็นพิเศษ
 บทบาท: เพื่อนคู่คิดเรื่องร้านกุ้ง รู้ใจ แนะนำ ตักเตือน
 
 ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
@@ -100,7 +100,7 @@ Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE B
 
 ตอบกันเองภาษาชาวบ้าน ช่วยพี่ทำงานร้าน`,
 
-  webhook: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลระบบ LINE Bot / Webhook
+  webhook: `คุณคือ "จีจี้" — เลขาส่วนตัวพีช ดูแลระบบ LINE Bot / Webhook
 บทบาท: เพื่อนคู่คิดเรื่อง LINE เข้าใจ technical รู้ใจ แนะนำ
 
 ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
@@ -115,7 +115,7 @@ Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE B
 
 ตอบเทคนิค เข้าใจ error logs วิเคราะห์ปัญหา LINE`,
 
-  scheduled: `คุณคือ "เลขา" — เลขาส่วนตัวพีช ดูแลงาน Scheduled / Automation
+  scheduled: `คุณคือ "จีจี้" — เลขาส่วนตัวพีช ดูแลงาน Scheduled / Automation
 บทบาท: เพื่อนคู่คิดเรื่องงาน cron รู้ใจ แนะนำ
 
 ก่อนรับหน้าที่: สรุป หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ แล้วรอยืนยัน
@@ -130,8 +130,8 @@ Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE B
 };
 
 // ── เลือก model จากประเภทงาน ─────────────────────────────────────────────
-function pickModel(text, { imageBase64 } = {}) {
-  if (imageBase64) return process.env.VISION_MODEL || VISION_MODEL;
+function pickModel(text, { imageBase64, images } = {}) {
+  if (imageBase64 || (images && images.length > 0)) return process.env.VISION_MODEL || VISION_MODEL;
   if (isCodeRelated(text)) return process.env.CODE_MODEL || PRO_MODEL;
   return process.env.FLASH_MODEL || FLASH_MODEL;
 }
@@ -155,19 +155,27 @@ function isCodeRelated(text) {
   );
 }
 
-// ── Call OpenRouter (รองรับ vision เมื่อมี imageBase64) ──────────────────
-async function callOpenRouter(apiKey, messages, { imageBase64, text } = {}) {
-  const model = pickModel(text || '', { imageBase64 });
+// ── Call OpenRouter (รองรับ vision เมื่อมี imageBase64 หรือ images[]) ─────
+async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = {}) {
+  const model = pickModel(text || '', { imageBase64, images });
 
   let finalMessages = messages;
-  if (imageBase64) {
+  const hasImages = imageBase64 || (images && images.length > 0);
+  if (hasImages) {
+    const imageItems = [];
+    if (imageBase64) {
+      imageItems.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } });
+    }
+    if (images && images.length > 0) {
+      images.forEach(b64 => imageItems.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }));
+    }
     finalMessages = messages.map((m, idx) => {
       if (idx === messages.length - 1 && m.role === 'user') {
         return {
           ...m,
           content: [
             { type: 'text', text: typeof m.content === 'string' ? m.content : '' },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+            ...imageItems,
           ],
         };
       }
@@ -347,7 +355,7 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
-    const { message, history, scope, imageBase64 } = req.body || {};
+    const { message, history, scope, imageBase64, images } = req.body || {};
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       res.status(400).json({ error: 'ต้องมีข้อความ (message)' });
@@ -377,7 +385,7 @@ exports.aiChatAgentHttp = functions
           force: true,
         });
         const prefix = classified.confirmation
-          ? `เลขาเข้าใจแล้วครับ: "${classified.confirmation}"\n\n`
+          ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';
         const body = { ...result.body, reply: prefix + (result.body?.reply || ''), scope: finalScope };
         res.status(result.statusCode || 200).json(body);
@@ -403,7 +411,7 @@ exports.aiChatAgentHttp = functions
     ];
 
     try {
-      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, text: message });
+      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, images: images || null, text: message });
       res.json({ reply, scope: finalScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);

@@ -1,6 +1,6 @@
 {
-  "name": "เด๊ฟ · CHINCHA FLOW",
-  "short_name": "เด๊ฟ",
+  "name": "จีจี้ · CHINCHA FLOW",
+  "short_name": "จีจี้",
   "description": "CHINCHA FLOW — ผู้ช่วย AI สำหรับร้านชินชาและโกอ้วน",
   "start_url": "/?source=pwa",
   "scope": "/",
@@ -14,8 +14,8 @@
   ],
   "shortcuts": [
     {
-      "name": "คุยกับเด๊ฟ",
-      "short_name": "เด๊ฟ",
+      "name": "คุยกับจีจี้",
+      "short_name": "จีจี้",
       "url": "/?source=shortcut",
       "icons": [{ "src": "/chincha-logo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
     }
