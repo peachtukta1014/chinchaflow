@@ -166,7 +166,10 @@ export default function App() {
     <div className="flex flex-col h-full bg-ai-bg text-ai-text">
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-ai-border bg-ai-card shrink-0">
+      <header
+        className="flex items-center justify-between px-4 border-b border-ai-border bg-ai-card shrink-0"
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))', paddingBottom: '0.75rem' }}
+      >
         <div className="flex items-center gap-2">
           <span className="text-lg">🌸</span>
           <div>
