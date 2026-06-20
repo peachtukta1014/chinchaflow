@@ -98,7 +98,9 @@ async function handleShrimpGroupTextEvent(db, admin, { event, token, context }) 
   }
 
   const result = await processShrimpLineOrder(db, admin, { text, userId, groupId });
-  await lineReply(replyToken, result.reply, token);
+  if (result.reply) {
+    await lineReply(replyToken, result.reply, token);
+  }
   return { ok: true, handled: 'order' };
 }
 

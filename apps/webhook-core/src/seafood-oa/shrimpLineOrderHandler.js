@@ -306,6 +306,9 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
         { ...riverPending, customerName: linkedName },
         autoProduct,
       );
+    } else if (groupId) {
+      // กลุ่ม: ไม่ถามขนาดกุ้งแม่น้ำ → เงียบ
+      return { ok: false, reply: '' };
     } else {
       await setLineOrderSession(
         db,
@@ -328,33 +331,49 @@ async function processShrimpLineOrder(db, admin, { text, userId, groupId }) {
       };
     }
   } else if (simple?.kind === 'pending') {
-    await setLineOrderSession(
-      db,
-      session.id,
-      {
-        deliveryDate,
-        replyLang,
-        pending: {
-          customerName: simple.customerName,
-          qty: simple.qty,
-          unit: simple.unit || 'กก',
+    if (groupId) {
+      // กลุ่ม: ลองใช้ defaultRiverSize ของลูกค้า ถ้าไม่เจอ → เงียบ (ไม่ถามขนาด)
+      const autoProduct = simple.customerName
+        ? await resolveRiverDefaultProduct(db, { customerName: simple.customerName, groupId })
+        : null;
+      if (autoProduct) {
+        items = pendingToItems(
+          { qty: simple.qty, unit: simple.unit || 'กก', customerName: simple.customerName },
+          autoProduct,
+        );
+      } else {
+        return { ok: false, reply: '' };
+      }
+    } else {
+      await setLineOrderSession(
+        db,
+        session.id,
+        {
+          deliveryDate,
+          replyLang,
+          pending: {
+            customerName: simple.customerName,
+            qty: simple.qty,
+            unit: simple.unit || 'กก',
+          },
         },
-      },
-      ts,
-    );
-    return {
-      ok: true,
-      reply: replySimplePending(
-        replyLang,
-        simple.customerName,
-        simple.qty,
-        simple.unit || 'กก',
-        deliveryDate,
-      ),
-    };
+        ts,
+      );
+      return {
+        ok: true,
+        reply: replySimplePending(
+          replyLang,
+          simple.customerName,
+          simple.qty,
+          simple.unit || 'กก',
+          deliveryDate,
+        ),
+      };
+    }
   }
 
   if (items.length === 0) {
+    if (groupId) return { ok: false, reply: '' };
     if (simple?.kind === 'size_only') {
       return {
         ok: false,
