@@ -7,6 +7,15 @@
 
 ## 2026-06
 
+### 2026-06-20 | PR #293
+**feat: AI แปลภาษาชาวบ้านเป็น technical spec — ไม่ต้องรู้ศัพท์โปรแกรมเมอร์**
+- `aiChatAgent.js` — แทน `isCodeAction()` keyword check ด้วย `classifyAndTranslate()` (flash model)
+  - วิเคราะห์ intent + หา scope อัตโนมัติ (tea/seafood/webhook/root)
+  - แปลภาษาชาวบ้าน → technical description ส่งต่อ `aiWorkflowAgent`
+  - fallback เป็น chat ถ้าไม่แน่ใจ (ปลอดภัย)
+  - เพิ่ม timeout 120s, memory 512MB
+- `aiWorkflowAgent.js` — เพิ่ม `force` param ใน `handleCodeAction` — ข้าม isCodeAction เมื่อ classifier ยืนยันแล้ว
+
 ### 2026-06-20 | PR #291
 **feat: รับออเดอร์สั้นในกลุ่ม LINE — ชื่อ+เลข ไม่ต้องมีคำว่ากุ้ง/หน่วย**
 - `seafood-oa/customerRiverDefault.js` — ลบ `if (groupId) return null` → lookup `defaultRiverSize` ด้วย customerName ในกลุ่มได้

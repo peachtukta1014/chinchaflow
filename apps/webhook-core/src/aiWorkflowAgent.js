@@ -25,7 +25,8 @@ const functions = require('firebase-functions/v1');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
-const DEFAULT_MODEL = 'deepseek/deepseek-chat';
+const FLASH_MODEL = 'deepseek/deepseek-v4-flash'; // เร็ว ถูก — เลือกไฟล์ / งานง่าย
+const PRO_MODEL   = 'deepseek/deepseek-v4-pro';   // แม่นยำ — เขียนโค้ด / งานซับซ้อน
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 
@@ -301,7 +302,7 @@ SCOPE_FILE_TREE.root = {
 };
 
 // ── Call OpenRouter ──────────────────────────────────────────────────────
-async function callOpenRouter(apiKey, messages, maxTokens) {
+async function callOpenRouter(apiKey, messages, maxTokens, model) {
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -311,7 +312,7 @@ async function callOpenRouter(apiKey, messages, maxTokens) {
       'X-Title': 'CHINCHA FLOW AI Workflow',
     },
     body: JSON.stringify({
-      model: process.env.DEFAULT_MODEL || DEFAULT_MODEL,
+      model: model || process.env.DEFAULT_MODEL || FLASH_MODEL,
       messages,
       temperature: 0.2,
       max_tokens: maxTokens || 4096,
@@ -374,7 +375,8 @@ ${agentDocs ? '\n=== กฎและแนวทางการทำงาน (
 \`\`\`json
 {
   "need_files": ["path1", "path2"],
-  "reasoning": "อธิบายสั้นๆว่าทำไมต้องอ่านไฟล์เหล่านี้"
+  "reasoning": "อธิบายสั้นๆว่าทำไมต้องอ่านไฟล์เหล่านี้",
+  "complexity": "simple หรือ complex — simple ถ้าแก้ไม่เกิน 2 ไฟล์และตรงไปตรงมา, complex ถ้าต้องเข้าใจ logic ลึกหรือกระทบหลายไฟล์"
 }
 \`\`\`
 `;
@@ -632,13 +634,13 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   // ── อ่านกฎการทำงานที่เจ้าของเขียนไว้ใน repo ──────────────────────────────
   const agentDocs = await fetchAgentDocs(ghPat);
 
-  // ── Round 1: AI เลือกไฟล์ที่ต้องอ่านจริงจาก file tree ──────────────────
+  // ── Round 1: Flash — เลือกไฟล์ + ประเมินความซับซ้อน ──────────────────
   const round1Messages = [
     { role: 'system', content: buildFileSelectionPrompt(scopeInfo, message, agentDocs) },
     ...(history || []).slice(-5),
     { role: 'user', content: `คำสั่ง: ${message}\n\nเลือกไฟล์ที่ต้องอ่านก่อนวางแผนแก้ไข` },
   ];
-  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 1024);
+  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 1024, process.env.FLASH_MODEL || FLASH_MODEL);
   const round1Json = extractJson(round1Response);
 
   let needFiles = Array.isArray(round1Json.need_files) ? round1Json.need_files : [];
@@ -647,6 +649,12 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   if (needFiles.length === 0) {
     needFiles = scopeInfo.files.slice(0, 1);
   }
+
+  // ── เลือก model สำหรับ Round 2 จาก complexity ที่ AI ประเมินใน Round 1 ──
+  const isComplex = round1Json.complexity === 'complex' || needFiles.length > 3;
+  const codeModel = isComplex
+    ? (process.env.PRO_MODEL || PRO_MODEL)
+    : (process.env.FLASH_MODEL || FLASH_MODEL);
 
   // ── ดึงเนื้อไฟล์เต็มๆตามที่ AI ขอ + CHANGELOG เสมอ (สำหรับ prepend entry) ─
   const allFilesToFetch = [...new Set([...needFiles, 'docs/AGENT_CHANGELOG_TH.md'])];
@@ -660,12 +668,12 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     }
   }
 
-  // ── Round 2: AI สร้างแผนแก้จากเนื้อไฟล์จริง ───────────────────────────
+  // ── Round 2: Pro/Flash ตามความซับซ้อน — สร้างแผนแก้จากเนื้อไฟล์จริง ──
   const round2Messages = [
     { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) },
     { role: 'user', content: `คำสั่ง: ${message}\nScope: ${scope}\n\nสร้างแผนแก้ไขจากไฟล์จริงด้านบนตามรูปแบบ JSON ที่กำหนด` },
   ];
-  const round2Response = await callOpenRouter(openRouterKey, round2Messages, 4096);
+  const round2Response = await callOpenRouter(openRouterKey, round2Messages, 4096, codeModel);
   const changePlan = extractJson(round2Response);
 
   if (changePlan.need_more_info) {
@@ -706,7 +714,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   // ── Open PR — pr-verify.yml จะรันตรวจสอบ + comment ผลอัตโนมัติ ────────
   const prUrl = await openPR(ghPat, branchName, changePlan.pr_title, changePlan.pr_body);
 
-  return { branchName, prUrl, changePlan, filesRead: needFiles };
+  return { branchName, prUrl, changePlan, filesRead: needFiles, codeModel };
 }
 
 // ── Direct handler for aiChatAgent.js ────────────────────────────────────
@@ -760,8 +768,8 @@ async function handleCodeAction({ message, history, scope, force = false }) {
     return {
       statusCode: 200,
       body: {
-        reply: `PR แล้วครับ! ${result.prUrl}\n\nBranch: ${result.branchName}\nไฟล์ที่อ่านก่อนแก้: ${result.filesRead.join(', ')}\n\n` +
-          `AI (deepseek) อ่านโค้ดจริง → วิเคราะห์ → แก้เฉพาะส่วนที่เกี่ยว → เปิด PR\n\n` +
+        reply: `PR แล้วครับ! ${result.prUrl}\n\nBranch: ${result.branchName}\nไฟล์ที่อ่านก่อนแก้: ${result.filesRead.join(', ')}\nModel ที่ใช้: ${result.codeModel}\n\n` +
+          `AI อ่านโค้ดจริง → วิเคราะห์ → แก้เฉพาะส่วนที่เกี่ยว → เปิด PR\n\n` +
           `⏳ รอ smoke test + build อัตโนมัติ (pr-verify.yml) คอมเมนต์ผลกลับเข้า PR ก่อนนะครับ — ถ้าเขียวค่อย merge`,
         scope: currentScope,
         intent: 'code-action',
