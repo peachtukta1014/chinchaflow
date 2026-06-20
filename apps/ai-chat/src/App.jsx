@@ -212,9 +212,9 @@ export default function App() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
-            <div className={`w-7 h-7 rounded-full overflow-hidden shrink-0 mt-0.5 ${msg.role === 'user' ? 'bg-ai-user flex items-center justify-center text-xs' : 'border border-ai-border'}`}>
+            <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 mt-0.5 border border-ai-border">
               {msg.role === 'user'
-                ? '👤'
+                ? <img src="/peach-avatar.jpg" alt="พีช" className="w-full h-full object-cover object-top" />
                 : <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />}
             </div>
             {/* Bubble */}
