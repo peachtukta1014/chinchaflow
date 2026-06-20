@@ -93,6 +93,7 @@ jobs:
             echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
             echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
             echo "GH_PAT=${{ secrets.GH_PAT }}"
+            echo "LINE_LOGIN_CHANNEL_ID=${{ secrets.LINE_LOGIN_CHANNEL_ID }}"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions
