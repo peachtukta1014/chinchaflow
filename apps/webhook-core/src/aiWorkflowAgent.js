@@ -22,6 +22,7 @@
  */
 
 const functions = require('firebase-functions/v1');
+const { writeProgress } = require('./shared/progressTracker');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -638,13 +639,15 @@ async function openPR(pat, branchName, prTitle, prBody) {
 }
 
 // ── Main handler (v2: 2-round "อ่านก่อนเขียน" + อ่านกฎเจ้าของก่อนทุกรอบ) ─────
-async function executeCodeAction(openRouterKey, ghPat, { message, history, scope }) {
+async function executeCodeAction(openRouterKey, ghPat, { message, history, scope, requestId = null }) {
   const scopeInfo = SCOPE_FILE_TREE[scope] || SCOPE_FILE_TREE.root;
 
   // ── อ่านกฎการทำงานที่เจ้าของเขียนไว้ใน repo ──────────────────────────────
+  await writeProgress(requestId, 'กำลังโหลดกฎการทำงาน...');
   const agentDocs = await fetchAgentDocs(ghPat);
 
   // ── Round 1: Flash — เลือกไฟล์ + ประเมินความซับซ้อน ──────────────────
+  await writeProgress(requestId, 'กำลังเลือกไฟล์ที่เกี่ยวข้อง...');
   const round1Messages = [
     { role: 'system', content: buildFileSelectionPrompt(scopeInfo, message, agentDocs) },
     ...(history || []).slice(-5),
@@ -667,6 +670,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     : (process.env.FLASH_MODEL || FLASH_MODEL);
 
   // ── ดึงเนื้อไฟล์เต็มๆตามที่ AI ขอ + CHANGELOG เสมอ (สำหรับ prepend entry) ─
+  await writeProgress(requestId, 'กำลังอ่านโค้ด: ' + needFiles.join(', '));
   const allFilesToFetch = [...new Set([...needFiles, 'docs/AGENT_CHANGELOG_TH.md'])];
   const fileContents = {};
   for (const filePath of allFilesToFetch) {
@@ -679,6 +683,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   }
 
   // ── Round 2: Pro/Flash ตามความซับซ้อน — สร้างแผนแก้จากเนื้อไฟล์จริง ──
+  await writeProgress(requestId, `กำลังวิเคราะห์โค้ดและวางแผนแก้ไข (${isComplex ? 'Pro' : 'Flash'} model)...`);
   const round2Messages = [
     { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) },
     { role: 'user', content: `คำสั่ง: ${message}\nScope: ${scope}\n\nสร้างแผนแก้ไขจากไฟล์จริงด้านบนตามรูปแบบ JSON ที่กำหนด` },
@@ -719,16 +724,18 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
   }
 
   // ── Apply changes via GitHub API (strict exact-match) ─────────────────
+  await writeProgress(requestId, 'กำลัง commit และสร้าง branch...');
   const branchName = await applyCodeChanges(ghPat, changePlan);
 
   // ── Open PR — pr-verify.yml จะรันตรวจสอบ + comment ผลอัตโนมัติ ────────
+  await writeProgress(requestId, 'กำลังเปิด PR...');
   const prUrl = await openPR(ghPat, branchName, changePlan.pr_title, changePlan.pr_body);
 
   return { branchName, prUrl, changePlan, filesRead: needFiles, codeModel };
 }
 
 // ── Direct handler for aiChatAgent.js ────────────────────────────────────
-async function handleCodeAction({ message, history, scope, force = false }) {
+async function handleCodeAction({ message, history, scope, force = false, requestId = null }) {
   if (!force && !isCodeAction(message)) {
     return {
       statusCode: 200,
@@ -773,6 +780,7 @@ async function handleCodeAction({ message, history, scope, force = false }) {
       message,
       history: history || [],
       scope: currentScope,
+      requestId,
     });
 
     return {

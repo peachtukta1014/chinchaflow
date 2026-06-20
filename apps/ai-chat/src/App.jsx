@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI } from './api';
+import { chatWithAI, pollProgress } from './api';
 
 // ── Icons (inline lucide) ───────────────────────────────────────────────
 const IconSend = () => (
@@ -48,10 +48,12 @@ export default function App() {
   const [agentScope, setAgentScope] = useState('root');
   const [showAgentPicker, setShowAgentPicker] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [progressStep, setProgressStep] = useState(null);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
+  const pollIntervalRef = useRef(null);
 
   // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -63,14 +65,24 @@ export default function App() {
 
     const images = imagePreviews.map(p => p.split(',')[1]);
     const displayText = text || '📸';
+    const requestId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now().toString(36) + Math.random().toString(36).slice(2);
 
     setInput('');
     setImagePreviews([]);
+    setProgressStep(null);
     setMessages(prev => [...prev, { role: 'user', content: displayText, imageUrls: [...imagePreviews] }]);
     setLoading(true);
 
     const scope = detectScope(text);
     if (scope !== agentScope) setAgentScope(scope);
+
+    // Start progress polling
+    pollIntervalRef.current = setInterval(async () => {
+      const data = await pollProgress(requestId);
+      if (data.step) setProgressStep(data.step);
+    }, 2000);
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
     const reply = await chatWithAI({
@@ -78,8 +90,12 @@ export default function App() {
       history,
       scope,
       images: images.length > 0 ? images : undefined,
+      requestId,
     });
 
+    clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = null;
+    setProgressStep(null);
     setMessages(prev => [...prev, { role: 'assistant', content: reply.reply }]);
     if (reply.scope) setAgentScope(reply.scope);
     setLoading(false);
@@ -141,12 +157,15 @@ export default function App() {
   // ── Scope detection ────────────────────────────────────────────────────
   function detectScope(text) {
     const t = (text || '').toLowerCase();
-    if (t.includes('กุ้ง') || t.includes('shrimp') || t.includes('seafood') || t.includes('โกอ้วน')) return 'seafood';
-    if (t.includes('ชา') || t.includes('tea') || t.includes('ชินชา')) return 'tea';
+    if (t.includes('กุ้ง') || t.includes('shrimp') || t.includes('seafood') || t.includes('โกอ้วน') || t.includes('ร้านกุ้ง')) return 'seafood';
+    if (t.includes('ชา') || t.includes('tea') || t.includes('ชินชา') || t.includes('ร้านน้ำ') || t.includes('chincha') || t.includes('bubble')) return 'tea';
     if (t.includes('webhook') || t.includes('line') || t.includes('ไลน์')) return 'webhook';
     if (t.includes('cron') || t.includes('scheduled') || t.includes('schedule') || t.includes('automation') || t.includes('auto')) return 'scheduled';
     return agentScope;
   }
+
+  // ── Cleanup polling on unmount ─────────────────────────────────────────
+  useEffect(() => () => { clearInterval(pollIntervalRef.current); }, []);
 
   // ── Clear chat ─────────────────────────────────────────────────────────
   const clearChat = () => {
@@ -252,7 +271,9 @@ export default function App() {
                 <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <p className="text-[10px] text-ai-muted">กำลังดำเนินการ... งานแก้โค้ดอาจใช้ถึง 3 นาที</p>
+              <p className="text-[10px] text-ai-muted">
+                {progressStep || 'กำลังดำเนินการ... งานแก้โค้ดอาจใช้ถึง 3 นาที'}
+              </p>
             </div>
           </div>
         )}

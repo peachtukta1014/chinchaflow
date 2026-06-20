@@ -22,6 +22,7 @@
 
 const functions = require('firebase-functions/v1');
 const https = require('firebase-functions/v2/https');
+const { writeProgress, clearProgress, readProgress } = require('./shared/progressTracker');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FLASH_MODEL = 'deepseek/deepseek-v4-flash';   // แชททั่วไป — ถูก เร็ว
@@ -91,7 +92,9 @@ CAPABILITIES:
 - 📸 วิเคราะห์รูปภาพที่แนบมา (screenshot, สลิป, error)
 - 📊 ดูสถานะ PR: พิมพ์ "status PR"
 
-Scopes: tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Cron)
+🔐 จีจี้มี GH_PAT (GitHub Admin token) พร้อมใช้งานเสมอ — สามารถแก้โค้ด สร้าง branch commit และเปิด PR ได้ทันทีโดยอัตโนมัติ ไม่ต้องรอพี่พีชอนุมัติหรือทำเองทุกขั้นตอน เหมาะสำหรับเวลาพี่ขับรถส่งกุ้งหรือยุ่งอยู่
+
+Scopes: tea (ชินชา/ร้านน้ำ) · seafood (โกอ้วน/ร้านกุ้ง) · webhook (LINE Bot) · scheduled (Cron)
 เอกสาร: AGENTS.md, docs/PROJECT_STRUCTURE.md, docs/ARCHITECTURE_TH.md, docs/LINE_OA_PARTITION_TH.md`,
 
   tea: `คุณคือ "จีจี้" — เลขาส่วนตัวพีช ดูแลร้านชินชา (Tea POS) เป็นพิเศษ
@@ -217,7 +220,7 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
   // Pro → แม่นยำ ตอบยาว | Flash → เร็ว ตอบปานกลาง | Vision → อธิบายรูป
   const isProModel = model.includes('pro') || model.includes('v4-pro');
   const isVisionModel = model.includes('gpt-4o') || model.includes('vision');
-  const maxTokens = isProModel ? 4096 : isVisionModel ? 1024 : 2048;
+  const maxTokens = isProModel ? 8192 : isVisionModel ? 1024 : 2048;
   const temperature = isProModel ? 0.15 : 0.3;
 
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
@@ -387,12 +390,19 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
+    // ── Progress polling endpoint: GET ?action=progress&requestId=xxx ────
+    if (req.method === 'GET' && req.query.action === 'progress' && req.query.requestId) {
+      const data = await readProgress(req.query.requestId);
+      res.json(data);
+      return;
+    }
+
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'ใช้ POST เท่านั้น' });
       return;
     }
 
-    const { message, history, scope, imageBase64, images } = req.body || {};
+    const { message, history, scope, imageBase64, images, requestId } = req.body || {};
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       res.status(400).json({ error: 'ต้องมีข้อความ (message)' });
@@ -422,6 +432,7 @@ exports.aiChatAgentHttp = functions
     }
 
     // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
+    await writeProgress(requestId, 'กำลังวิเคราะห์คำสั่ง...');
     const classified = await classifyAndTranslate(apiKey, message, history, resolvedScope);
     const finalScope = classified.scope || resolvedScope;
 
@@ -433,7 +444,9 @@ exports.aiChatAgentHttp = functions
           history: history || [],
           scope: finalScope,
           force: true,
+          requestId: requestId || null,
         });
+        await clearProgress(requestId);
         const prefix = classified.confirmation
           ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';
