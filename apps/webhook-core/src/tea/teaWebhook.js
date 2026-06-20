@@ -40,15 +40,8 @@ async function handleTeaLineWebhook(db, admin, req, res) {
       const teaConfig = await getTeaLineConfig(db);
       const teaGroupId = (teaConfig.notifyGroupId || '').trim();
       const cmd = classifyTeaLineCommand(text);
+      // teaGroupId ไม่ตรง → เงียบ (ยังบันทึก line_messages ให้ admin ดึง Group ID ได้)
       if (groupId && teaGroupId && groupId !== teaGroupId) {
-        if (cmd) {
-          await lineReply(
-            replyToken,
-            '⚠️ กลุ่ม LINE นี้ไม่ตรงกับกลุ่มร้านน้ำที่ตั้งในแอป (จัดการ → LINE)\n'
-            + 'ให้แอดมินเช็ก Group ID หรือพิมพ์ในกลุ่มร้านน้ำที่ถูกต้อง',
-            token,
-          );
-        }
         await db.collection('line_messages').add({
           userId, groupId, text,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
