@@ -212,8 +212,10 @@ export default function App() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 ${msg.role === 'user' ? 'bg-ai-user' : 'bg-ai-agent border border-ai-border'}`}>
-              {msg.role === 'user' ? '👤' : '🌸'}
+            <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 mt-0.5 border border-ai-border">
+              {msg.role === 'user'
+                ? <img src="/peach-avatar.jpg" alt="พีช" className="w-full h-full object-cover object-top" />
+                : <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />}
             </div>
             {/* Bubble */}
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-ai-user text-white rounded-br-md' : 'bg-ai-card border border-ai-border text-ai-text rounded-bl-md'}`}>
@@ -238,7 +240,9 @@ export default function App() {
         {/* Typing indicator */}
         {loading && (
           <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-ai-agent border border-ai-border shrink-0">🌸</div>
+            <div className="w-7 h-7 rounded-full overflow-hidden border border-ai-border shrink-0">
+              <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />
+            </div>
             <div className="bg-ai-card border border-ai-border rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex gap-1">
                 <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
