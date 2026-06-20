@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-20 | PR #295
+**feat: Layer 1 อ่านกฎ repo + สไตล์พี่พีช จาก GitHub ก่อนทุก session**
+- `aiChatAgent.js` — เพิ่ม `fetchChatAgentDocs()` ดึง 3 ไฟล์จาก GitHub live
+  - `AGENTS.md` — กฎ monorepo + กฎเฉพาะแต่ละแอป
+  - `docs/PEACH_WORKING_STYLE_TH.md` — สไตล์พี่พีช (มือถือ, ภาษาพูด, ทบทวนก่อนลงมือ)
+  - `docs/AGENT_HANDBOOK_TH.md` — แผนที่ repo + คู่มือ agent
+  - cache 10 นาที ไม่กระทบ latency
+
 ### 2026-06-20 | PR #294
 **feat: aiWorkflowAgent เลือก Flash/Pro อัตโนมัติตามความซับซ้อนของงาน**
 - `aiWorkflowAgent.js` — เปลี่ยนจาก `deepseek/deepseek-chat` เป็น v4 Flash + v4 Pro
