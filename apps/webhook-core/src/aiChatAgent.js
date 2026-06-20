@@ -61,8 +61,8 @@ async function fetchCodeMetrics(ghPat) {
 // ── Scope detection from user message ────────────────────────────────────
 function detectScope(text, currentScope) {
   const t = text.toLowerCase();
-  if (/(กุ้ง|shrimp|seafood|โกอ้วน)/.test(t)) return 'seafood';
-  if (/(ชา|tea|ชินชา)/.test(t)) return 'tea';
+  if (/(กุ้ง|shrimp|seafood|โกอ้วน|ร้านกุ้ง)/.test(t)) return 'seafood';
+  if (/(ชา|tea|ชินชา|ร้านน้ำ|chincha|bubble)/.test(t)) return 'tea';
   if (/(webhook|line|ไลน์)/.test(t)) return 'webhook';
   if (/(cron|scheduled|schedule|automation|auto)/.test(t)) return 'scheduled';
   return currentScope || 'root';
@@ -307,8 +307,8 @@ exports.aiChatAgent = https.onCall(
 // รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ว่าต้องการแก้ระบบหรือแค่ถาม → แปลเป็น technical spec
 async function classifyAndTranslate(apiKey, message, history, currentScope) {
   const systemPrompt = `คุณคือตัวแปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ สำหรับ CHINCHA FLOW:
-- ร้านชินชา (scope: tea) — แอปขายชา, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
-- โกอ้วนซีฟู้ด (scope: seafood) — แอปขายกุ้ง, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
+- ร้านชินชา / ร้านน้ำ / ชา (scope: tea) — แอปขายชา apps/chincha-tea/, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
+- โกอ้วนซีฟู้ด / ร้านกุ้ง / กุ้ง (scope: seafood) — แอปขายกุ้ง apps/seafood-pos/, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
 - LINE Bot (scope: webhook) — บอทกลุ่ม LINE, webhook, notify, การส่งข้อความ
 - ทั่วไป (scope: root) — หลายส่วนหรือไม่ชัดเจน
 
