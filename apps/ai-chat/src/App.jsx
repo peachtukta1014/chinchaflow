@@ -28,8 +28,10 @@ const IconImage = () => (
   </svg>
 );
 
+const MAX_IMAGES = 5;
+
 const AGENT_OPTIONS = [
-  { id: 'root', label: '🗂 เลขา', desc: 'ทั่วไป' },
+  { id: 'root', label: '🌸 จีจี้', desc: 'ทั่วไป' },
   { id: 'tea', label: '🧋 ชินชา', desc: 'ร้านชา' },
   { id: 'seafood', label: '🦐 โกอ้วน', desc: 'ร้านกุ้ง' },
   { id: 'webhook', label: '🤖 LINE', desc: 'Bot' },
@@ -38,14 +40,14 @@ const AGENT_OPTIONS = [
 
 export default function App() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'สวัสดีพี่พีช! หนูเลขา เลขาส่วนตัวพีชครับ 🗂\n\nพร้อมช่วยพี่เสมอ ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะครับ' },
+    { role: 'assistant', content: 'สวัสดีพี่พีช! จีจี้เลขาส่วนตัวพีชเองนะคะ 🌸\n\nพร้อมช่วยพี่เสมอเลย ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู (แนบได้ถึง 5 รูปต่อครั้งเลย)\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะคะ' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [agentScope, setAgentScope] = useState('root');
   const [showAgentPicker, setShowAgentPicker] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -57,27 +59,32 @@ export default function App() {
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if ((!text && !imagePreview) || loading) return;
+    if ((!text && imagePreviews.length === 0) || loading) return;
 
-    const imageBase64 = imagePreview ? imagePreview.split(',')[1] : null;
+    const images = imagePreviews.map(p => p.split(',')[1]);
     const displayText = text || '📸';
 
     setInput('');
-    setImagePreview(null);
-    setMessages(prev => [...prev, { role: 'user', content: displayText, imageUrl: imagePreview }]);
+    setImagePreviews([]);
+    setMessages(prev => [...prev, { role: 'user', content: displayText, imageUrls: [...imagePreviews] }]);
     setLoading(true);
 
     const scope = detectScope(text);
     if (scope !== agentScope) setAgentScope(scope);
 
     const history = messages.map(m => ({ role: m.role, content: m.content }));
-    const reply = await chatWithAI({ message: displayText, history, scope, imageBase64 });
+    const reply = await chatWithAI({
+      message: displayText,
+      history,
+      scope,
+      images: images.length > 0 ? images : undefined,
+    });
 
     setMessages(prev => [...prev, { role: 'assistant', content: reply.reply }]);
     if (reply.scope) setAgentScope(reply.scope);
     setLoading(false);
     inputRef.current?.focus();
-  }, [input, loading, messages, agentScope, imagePreview]);
+  }, [input, loading, messages, agentScope, imagePreviews]);
 
   // ── Voice input ────────────────────────────────────────────────────────
   const toggleVoice = useCallback(() => {
@@ -111,13 +118,23 @@ export default function App() {
     setListening(true);
   }, [listening]);
 
-  // ── Image picker ───────────────────────────────────────────────────────
+  // ── Image picker (multiple, max 5) ─────────────────────────────────────
   const handleImageSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result);
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const slots = MAX_IMAGES - imagePreviews.length;
+    const toProcess = files.slice(0, slots);
+
+    const readers = toProcess.map(file => new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    }));
+
+    Promise.all(readers).then(results => {
+      setImagePreviews(prev => [...prev, ...results].slice(0, MAX_IMAGES));
+    });
     e.target.value = '';
   };
 
@@ -133,8 +150,8 @@ export default function App() {
 
   // ── Clear chat ─────────────────────────────────────────────────────────
   const clearChat = () => {
-    setMessages([{ role: 'assistant', content: 'ล้างประวัติแล้วครับพี่ — พร้อมช่วยใหม่!' }]);
-    setImagePreview(null);
+    setMessages([{ role: 'assistant', content: 'ล้างประวัติแล้วนะคะพี่ — พร้อมช่วยใหม่ได้เลย 🌸' }]);
+    setImagePreviews([]);
   };
 
   // ── Handle Enter ───────────────────────────────────────────────────────
@@ -143,6 +160,7 @@ export default function App() {
   };
 
   const currentAgent = AGENT_OPTIONS.find(a => a.id === agentScope) || AGENT_OPTIONS[0];
+  const canSend = (input.trim() || imagePreviews.length > 0) && !loading;
 
   return (
     <div className="flex flex-col h-full bg-ai-bg text-ai-text">
@@ -150,9 +168,9 @@ export default function App() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-ai-border bg-ai-card shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🗂</span>
+          <span className="text-lg">🌸</span>
           <div>
-            <h1 className="text-sm font-semibold leading-tight">เลขา</h1>
+            <h1 className="text-sm font-semibold leading-tight">จีจี้</h1>
             <p className="text-[10px] text-ai-muted">CHINCHA FLOW</p>
           </div>
         </div>
@@ -195,17 +213,22 @@ export default function App() {
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 ${msg.role === 'user' ? 'bg-ai-user' : 'bg-ai-agent border border-ai-border'}`}>
-              {msg.role === 'user' ? '👤' : '🗂'}
+              {msg.role === 'user' ? '👤' : '🌸'}
             </div>
             {/* Bubble */}
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-ai-user text-white rounded-br-md' : 'bg-ai-card border border-ai-border text-ai-text rounded-bl-md'}`}>
-              {msg.imageUrl && (
-                <img
-                  src={msg.imageUrl}
-                  alt="แนบรูป"
-                  className="max-w-full rounded-lg mb-2"
-                  style={{ maxHeight: '240px', objectFit: 'contain' }}
-                />
+              {msg.imageUrls && msg.imageUrls.length > 0 && (
+                <div className={`mb-2 ${msg.imageUrls.length > 1 ? 'grid grid-cols-2 gap-1' : ''}`}>
+                  {msg.imageUrls.map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`รูปที่ ${idx + 1}`}
+                      className="rounded-lg object-cover w-full"
+                      style={{ maxHeight: '160px' }}
+                    />
+                  ))}
+                </div>
               )}
               {msg.content !== '📸' && msg.content}
             </div>
@@ -215,7 +238,7 @@ export default function App() {
         {/* Typing indicator */}
         {loading && (
           <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-ai-agent border border-ai-border shrink-0">🗂</div>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-ai-agent border border-ai-border shrink-0">🌸</div>
             <div className="bg-ai-card border border-ai-border rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex gap-1">
                 <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -230,17 +253,31 @@ export default function App() {
       </div>
 
       {/* ── Input bar ─────────────────────────────────────────────────── */}
-      <div className="px-3 py-3 border-t border-ai-border bg-ai-card shrink-0">
-        {/* Image preview */}
-        {imagePreview && (
-          <div className="relative inline-block mb-2">
-            <img src={imagePreview} alt="preview" className="h-16 rounded-lg border border-ai-border object-cover" />
-            <button
-              onClick={() => setImagePreview(null)}
-              className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center leading-none hover:bg-red-600"
-            >
-              ×
-            </button>
+      <div
+        className="px-3 py-3 border-t border-ai-border bg-ai-card shrink-0"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        {/* Image previews grid */}
+        {imagePreviews.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-2 items-end">
+            {imagePreviews.map((preview, idx) => (
+              <div key={idx} className="relative shrink-0">
+                <img
+                  src={preview}
+                  alt={`preview ${idx + 1}`}
+                  className="h-14 w-14 rounded-lg border border-ai-border object-cover"
+                />
+                <button
+                  onClick={() => setImagePreviews(prev => prev.filter((_, i) => i !== idx))}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center leading-none hover:bg-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <span className="text-[10px] text-ai-muted pb-1">
+              {imagePreviews.length}/{MAX_IMAGES}
+            </span>
           </div>
         )}
 
@@ -259,13 +296,19 @@ export default function App() {
             />
           </div>
 
-          {/* Image button */}
+          {/* Image button with count badge */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className={`p-2.5 rounded-full transition-colors shrink-0 ${imagePreview ? 'bg-ai-accent text-white' : 'bg-ai-bg border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent'}`}
-            title="แนบรูปภาพ"
+            disabled={imagePreviews.length >= MAX_IMAGES}
+            className={`p-2.5 rounded-full transition-colors shrink-0 relative ${imagePreviews.length > 0 ? 'bg-ai-accent text-white' : 'bg-ai-bg border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent'} ${imagePreviews.length >= MAX_IMAGES ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={`แนบรูปภาพ (${imagePreviews.length}/${MAX_IMAGES})`}
           >
             <IconImage />
+            {imagePreviews.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
+                {imagePreviews.length}
+              </span>
+            )}
           </button>
 
           {/* Voice button */}
@@ -280,18 +323,19 @@ export default function App() {
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={(!input.trim() && !imagePreview) || loading}
-            className={`p-2.5 rounded-full transition-colors shrink-0 ${(input.trim() || imagePreview) && !loading ? 'bg-ai-accent text-white hover:brightness-110' : 'bg-ai-bg border border-ai-border text-ai-muted cursor-not-allowed'}`}
+            disabled={!canSend}
+            className={`p-2.5 rounded-full transition-colors shrink-0 ${canSend ? 'bg-ai-accent text-white hover:brightness-110' : 'bg-ai-bg border border-ai-border text-ai-muted cursor-not-allowed'}`}
           >
             <IconSend />
           </button>
         </div>
 
-        {/* Hidden file input */}
+        {/* Hidden file input — multiple */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handleImageSelect}
         />

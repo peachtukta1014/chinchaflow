@@ -13,12 +13,18 @@ const CHAT_FUNCTION_URL = import.meta.env.VITE_AI_CHAT_FUNCTION_URL
  * @param {string} [opts.imageBase64] - base64 string (ไม่รวม data: prefix)
  * @returns {Promise<{reply: string, scope: string, intent?: string, status?: string, prUrl?: string, branchName?: string}>}
  */
-export async function chatWithAI({ message, history = [], scope = 'root', imageBase64 = null }) {
+export async function chatWithAI({ message, history = [], scope = 'root', images = null, imageBase64 = null }) {
   try {
+    const body = { message, history, scope };
+    if (images && images.length > 0) {
+      body.images = images;
+    } else if (imageBase64) {
+      body.imageBase64 = imageBase64;
+    }
     const res = await fetch(CHAT_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history, scope, ...(imageBase64 ? { imageBase64 } : {}) }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
