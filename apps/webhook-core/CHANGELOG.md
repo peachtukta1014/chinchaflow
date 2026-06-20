@@ -7,6 +7,13 @@
 
 ## 2026-06
 
+### 2026-06-20 | PR #294
+**feat: aiWorkflowAgent เลือก Flash/Pro อัตโนมัติตามความซับซ้อนของงาน**
+- `aiWorkflowAgent.js` — เปลี่ยนจาก `deepseek/deepseek-chat` เป็น v4 Flash + v4 Pro
+  - Round 1 (เลือกไฟล์): Flash เสมอ + ประเมิน `complexity: simple|complex`
+  - Round 2 (เขียนโค้ด): Flash ถ้า simple/≤3 ไฟล์, Pro ถ้า complex
+  - reply บอกพี่ว่าใช้ model ไหน
+
 ### 2026-06-20 | PR #293
 **feat: AI แปลภาษาชาวบ้านเป็น technical spec — ไม่ต้องรู้ศัพท์โปรแกรมเมอร์**
 - `aiChatAgent.js` — แทน `isCodeAction()` keyword check ด้วย `classifyAndTranslate()` (flash model)
