@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-20 | PR #296
+**docs: อัปเดต PEACH_WORKING_STYLE_TH.md — ตัวตนพีช + stack ปัจจุบัน + protocol**
+- เพิ่มบริบทพีช: 4 เดือน, 60,000 บรรทัด, ความรู้ศูนย์, ทำคนเดียว, มือถือ 100%
+- เพิ่มตาราง "ทำได้เลย vs รอยืนยัน"
+- อัปเดต stack ปัจจุบัน (ลบ Cursor/Slack, เพิ่ม DeepSeek v4 + ai-chat PWA)
+
 ### 2026-06-20 | PR #295
 **feat: Layer 1 อ่านกฎ repo + สไตล์พี่พีช จาก GitHub ก่อนทุก session**
 - `aiChatAgent.js` — เพิ่ม `fetchChatAgentDocs()` ดึง 3 ไฟล์จาก GitHub live
