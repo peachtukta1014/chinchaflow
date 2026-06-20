@@ -339,7 +339,7 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
 
 // ── V1 onRequest fallback (for direct HTTP calls from PWA) ────────────────
 exports.aiChatAgentHttp = functions
-  .runWith({ memory: '512MB', timeoutSeconds: 120 })
+  .runWith({ memory: '512MB', timeoutSeconds: 540 })
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
