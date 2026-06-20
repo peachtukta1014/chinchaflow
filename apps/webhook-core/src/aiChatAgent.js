@@ -427,7 +427,18 @@ exports.aiChatAgentHttp = functions
         return;
       } catch (err) {
         console.error('aiChatAgentHttp: code-action routing error:', err);
-        // Fall through to normal chat reply on error
+        res.status(500).json({
+          reply: `จีจี้พยายามแก้โค้ดแล้วแต่เกิด error ครับพี่ 🌸\n\n` +
+            `**สาเหตุ:** ${err.message || 'unknown'}\n\n` +
+            `**ตรวจสอบ:**\n` +
+            `• GH_PAT ตั้งค่าใน GitHub Secrets แล้วหรือยัง?\n` +
+            `• OPENROUTER_API_KEY ยังใช้งานได้อยู่ไหม?\n` +
+            `• ดู Firebase Functions logs ที่ Google Cloud Console`,
+          scope: finalScope,
+          intent: 'code-action',
+          status: 'error',
+        });
+        return;
       }
     }
 

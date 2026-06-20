@@ -723,7 +723,7 @@ async function handleCodeAction({ message, history, scope, force = false }) {
     return {
       statusCode: 200,
       body: {
-        reply: 'คำสั่งนี้ดูไม่ใช่การแก้โค้ด — ลองพิมพ์ให้ชัดขึ้น เช่น "เด๊ฟ ช่วยแก้บั๊ก..." หรือ "เด๊ฟ ช่วยสร้าง feature..."',
+        reply: 'คำสั่งนี้ดูไม่ใช่การแก้โค้ด — ลองพิมพ์ให้ชัดขึ้น เช่น "จีจี้ ช่วยแก้บั๊ก..." หรือ "จีจี้ ช่วยสร้าง feature..."',
         scope: scope || 'root',
         intent: 'chat',
       },
