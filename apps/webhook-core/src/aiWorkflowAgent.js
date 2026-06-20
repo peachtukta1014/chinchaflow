@@ -640,7 +640,7 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     ...(history || []).slice(-5),
     { role: 'user', content: `คำสั่ง: ${message}\n\nเลือกไฟล์ที่ต้องอ่านก่อนวางแผนแก้ไข` },
   ];
-  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 1024, process.env.FLASH_MODEL || FLASH_MODEL);
+  const round1Response = await callOpenRouter(openRouterKey, round1Messages, 2048, process.env.FLASH_MODEL || FLASH_MODEL);
   const round1Json = extractJson(round1Response);
 
   let needFiles = Array.isArray(round1Json.need_files) ? round1Json.need_files : [];
