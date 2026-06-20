@@ -710,8 +710,8 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
 }
 
 // ── Direct handler for aiChatAgent.js ────────────────────────────────────
-async function handleCodeAction({ message, history, scope }) {
-  if (!isCodeAction(message)) {
+async function handleCodeAction({ message, history, scope, force = false }) {
+  if (!force && !isCodeAction(message)) {
     return {
       statusCode: 200,
       body: {

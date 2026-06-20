@@ -231,28 +231,65 @@ exports.aiChatAgent = https.onCall(
   }
 );
 
-// ── Intent detection: is this a code-action? ────────────────────────────
-function isCodeAction(text) {
-  if (!text || typeof text !== 'string') return false;
-  const t = text.toLowerCase();
-  if (
-    t.includes('แก้โค้ด') || t.includes('แก้bug') || t.includes('แก้บั๊ก') ||
-    t.includes('fix code') || t.includes('fix bug') || t.includes('fix this') ||
-    t.includes('สร้าง') && (t.includes('feature') || t.includes('ฟีเจอร์')) ||
-    t.includes('add feature') || t.includes('add code') ||
-    t.includes('refactor') || t.includes('ปรับโครงสร้าง') || t.includes('rewrite') ||
-    t.includes('deploy') || t.includes('ดีพลอย') || t.includes('merge') ||
-    t.includes('pr') || t.includes('pull request') ||
-    t.includes('ช่วยเขียน') || t.includes('implement') ||
-    t.includes('อัปเดตโค้ด') || t.includes('update code') ||
-    t.includes('ช่วยแก้')
-  ) return true;
-  return false;
+// ── AI Intent Classifier + Thai→Technical Translator ─────────────────────
+// รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ว่าต้องการแก้ระบบหรือแค่ถาม → แปลเป็น technical spec
+async function classifyAndTranslate(apiKey, message, history, currentScope) {
+  const systemPrompt = `คุณคือตัวแปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ สำหรับ CHINCHA FLOW:
+- ร้านชินชา (scope: tea) — แอปขายชา, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
+- โกอ้วนซีฟู้ด (scope: seafood) — แอปขายกุ้ง, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
+- LINE Bot (scope: webhook) — บอทกลุ่ม LINE, webhook, notify, การส่งข้อความ
+- ทั่วไป (scope: root) — หลายส่วนหรือไม่ชัดเจน
+
+วิเคราะห์ว่าพี่พีช (เจ้าของ) ต้องการแก้ไขระบบ หรือแค่ถามข้อมูล ตอบ JSON เท่านั้น:
+
+ถ้าต้องการแก้/เพิ่ม/เปลี่ยนพฤติกรรมของแอปหรือบอท:
+{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[อธิบายเป็นภาษาเทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค ว่าเข้าใจว่าพี่ต้องการอะไร]"}
+
+ถ้าแค่ถาม, คุยทั่วไป, ขอข้อมูล, หรือคำสั่งไม่ชัดพอ:
+{"intent":"chat"}
+
+ถ้าไม่แน่ใจ ให้เลือก chat เสมอ (ปลอดภัยกว่า)`;
+
+  try {
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://chincha-flow.web.app',
+        'X-Title': 'CHINCHA FLOW Intent Classifier',
+      },
+      body: JSON.stringify({
+        model: process.env.FLASH_MODEL || FLASH_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...(history || []).slice(-3),
+          { role: 'user', content: message },
+        ],
+        temperature: 0.1,
+        max_tokens: 400,
+      }),
+    });
+    if (!res.ok) return { intent: 'chat' };
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { intent: 'chat' };
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      intent: parsed.intent || 'chat',
+      scope: parsed.scope || currentScope || 'root',
+      translatedMessage: parsed.translatedMessage || message,
+      confirmation: parsed.confirmation || '',
+    };
+  } catch {
+    return { intent: 'chat' };
+  }
 }
 
 // ── V1 onRequest fallback (for direct HTTP calls from PWA) ────────────────
 exports.aiChatAgentHttp = functions
-  .runWith({ memory: '256MB', timeoutSeconds: 60 })
+  .runWith({ memory: '512MB', timeoutSeconds: 120 })
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -284,16 +321,24 @@ exports.aiChatAgentHttp = functions
     const currentScope = scope || 'root';
     const resolvedScope = detectScope(message, currentScope);
 
-    // ── Code-action routing: forward to aiWorkflowAgent ───────────────────
-    if (isCodeAction(message)) {
+    // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
+    const classified = await classifyAndTranslate(apiKey, message, history, resolvedScope);
+    const finalScope = classified.scope || resolvedScope;
+
+    if (classified.intent === 'code-action') {
       try {
         const { handleCodeAction } = require('./aiWorkflowAgent');
         const result = await handleCodeAction({
-          message,
+          message: classified.translatedMessage,
           history: history || [],
-          scope: resolvedScope,
+          scope: finalScope,
+          force: true,
         });
-        res.status(result.statusCode || 200).json(result.body);
+        const prefix = classified.confirmation
+          ? `เลขาเข้าใจแล้วครับ: "${classified.confirmation}"\n\n`
+          : '';
+        const body = { ...result.body, reply: prefix + (result.body?.reply || ''), scope: finalScope };
+        res.status(result.statusCode || 200).json(body);
         return;
       } catch (err) {
         console.error('aiChatAgentHttp: code-action routing error:', err);
@@ -301,7 +346,7 @@ exports.aiChatAgentHttp = functions
       }
     }
 
-    const systemContent = SYSTEM_PROMPTS[resolvedScope] || SYSTEM_PROMPTS.root;
+    const systemContent = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
 
     const messages = [
       { role: 'system', content: systemContent },
@@ -311,7 +356,7 @@ exports.aiChatAgentHttp = functions
 
     try {
       const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, text: message });
-      res.json({ reply, scope: resolvedScope });
+      res.json({ reply, scope: finalScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);
       res.status(500).json({ error: `AI Error: ${err.message}` });
