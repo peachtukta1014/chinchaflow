@@ -36,6 +36,28 @@ let _docsCache = null;
 let _docsCacheTime = 0;
 const DOCS_TTL_MS = 10 * 60 * 1000;
 
+// ── ตรวจว่าถามเรื่อง code metrics ──────────────────────────────────────────
+function isCodeMetricsQuery(text) {
+  const t = (text || '').toLowerCase();
+  return /(นับบรรทัด|กี่บรรทัด|code metric|metrics|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน)/.test(t);
+}
+
+// ── อ่าน CODE_METRICS.md จาก GitHub ───────────────────────────────────────
+async function fetchCodeMetrics(ghPat) {
+  try {
+    const res = await fetch(`${GH_API}/repos/${GH_REPO}/contents/docs/CODE_METRICS.md?ref=main`, {
+      headers: {
+        'Authorization': `token ${ghPat}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'CF-AI',
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Buffer.from(data.content, 'base64').toString('utf-8');
+  } catch { return null; }
+}
+
 // ── Scope detection from user message ────────────────────────────────────
 function detectScope(text, currentScope) {
   const t = text.toLowerCase();
@@ -370,6 +392,19 @@ exports.aiChatAgentHttp = functions
 
     const currentScope = scope || 'root';
     const resolvedScope = detectScope(message, currentScope);
+
+    // ── Code Metrics shortcut: ถ้าถามเรื่องบรรทัด ตอบจาก docs/CODE_METRICS.md ──
+    if (isCodeMetricsQuery(message)) {
+      const ghPat = process.env.GH_PAT;
+      const metrics = ghPat ? await fetchCodeMetrics(ghPat).catch(() => null) : null;
+      if (metrics) {
+        res.json({ reply: `📊 **Code Metrics ล่าสุด**\n\n${metrics}`, scope: currentScope });
+        return;
+      }
+      // ถ้ายังไม่มีไฟล์ (ยังไม่เคยรัน workflow) บอกพี่
+      res.json({ reply: 'ยังไม่มีข้อมูล metrics ครับพี่ — ไปกด Run ที่ GitHub Actions → Code Metrics ก่อนนะคะ แล้วจีจี้จะอ่านได้เลย 🌸', scope: currentScope });
+      return;
+    }
 
     // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
     const classified = await classifyAndTranslate(apiKey, message, history, resolvedScope);
