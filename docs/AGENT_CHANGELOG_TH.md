@@ -1,3 +1,10 @@
+## 2026-06-21 — PR#316: fix: จีจี้ (ai-chat) รู้จักขอบเขตตัวเอง
+
+- `aiChatAgent.js` — เพิ่ม "❌ ทำไม่ได้ใน ai-chat" ใน root scope system prompt: /auto-shrimp, /auto-tea ฯลฯ คือ Claude Code skills ไม่ใช่คำสั่งแชท
+- `aiChatAgent.js` — catch block ส่ง `reply` key แทน `error` key เดี่ยว → PWA แสดงข้อความไทยแทน error ดิบ
+- `JIIJI.md` — ลบ `trigger_deploy` + `get_skill` (tools ที่ไม่มีใน aiChatAgentHttp จริง), เพิ่ม "❌ ทำไม่ได้" table, แก้ Skills section ระบุชัดว่าใช้ใน Claude Code/Cursor เท่านั้น
+- ถ้าพังให้เช็ก `aiChatAgent.js` (SYSTEM_PROMPTS.root + catch block)
+
 ## 2026-06-21 — PR#313: feat: เพิ่มโฟลเดอร์ .jiiji — ตัวตน AI agent จีจี้
 
 - `.jiiji/IDENTITY.md` — บันทึกบทบาท กฎการทำงาน ประวัติโปรเจกต์ และความสัมพันธ์ในทีม

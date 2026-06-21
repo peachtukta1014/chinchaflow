@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-21 | PR #316
+**fix: จีจี้ (ai-chat) รู้จักขอบเขตตัวเอง — เพิ่ม ❌ section + แก้ error response**
+- `src/aiChatAgent.js` — root scope system prompt: เพิ่ม "❌ ทำไม่ได้ใน ai-chat" (/auto-shrimp, /auto-tea ฯลฯ คือ Claude Code skills ไม่ใช่คำสั่งแชท · ดู logs real-time ไม่ได้ · deploy เองไม่ได้)
+- `src/aiChatAgent.js` — catch block: ส่ง `reply` key แทน `error` key → PWA แสดงข้อความไทยได้แทนที่จะขึ้น "ไม่สามารถติดต่อ AI Server"
+- `JIIJI.md` — ลบ tools ที่ไม่มีจริง (trigger_deploy, get_skill), เพิ่ม "❌ ทำไม่ได้" table, Skills section ระบุชัดว่าใช้ใน Claude Code/Cursor เท่านั้น
+
 ### 2026-06-21 | PR #312
 **fix: LINE OA DM "กุ้ง2โล" → บันทึกตาม defaultRiverSize อัตโนมัติ**
 - `src/seafood-oa/shrimpLineOrderHandler.js` — `tryCompleteOrder`: item.product === 'กุ้ง' (bare) ใน DM → resolve ผ่าน `resolveRiverDefaultProduct` → effectiveItems ด้วยขนาดที่ถูก
