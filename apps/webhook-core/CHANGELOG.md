@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-21 | PR #312
+**fix: LINE OA DM "กุ้ง2โล" → บันทึกตาม defaultRiverSize อัตโนมัติ**
+- `src/seafood-oa/shrimpLineOrderHandler.js` — `tryCompleteOrder`: item.product === 'กุ้ง' (bare) ใน DM → resolve ผ่าน `resolveRiverDefaultProduct` → effectiveItems ด้วยขนาดที่ถูก
+
+### 2026-06-21 | PR #311
+**fix: riverDefaultToProduct รองรับ 'กุ้งแม่น้ำกลาง' (full-phrase)**
+- `src/seafood-oa/customerRiverDefault.js` — strip prefix 'กุ้งแม่น้ำ' + 'กุ้ง' ก่อน SIZE_ALIASES lookup
+
 ### 2026-06-20 | PR #296
 **docs: อัปเดต PEACH_WORKING_STYLE_TH.md — ตัวตนพีช + stack ปัจจุบัน + protocol**
 - เพิ่มบริบทพีช: 4 เดือน, 60,000 บรรทัด, ความรู้ศูนย์, ทำคนเดียว, มือถือ 100%
