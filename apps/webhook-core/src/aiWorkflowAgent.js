@@ -336,15 +336,28 @@ async function callOpenRouter(apiKey, messages, maxTokens, model) {
   }
 
   const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
+  const choice = data?.choices?.[0];
+  const content = choice?.message?.content || choice?.message?.reasoning_content || '';
+  if (!content) {
+    const reason = choice?.finish_reason || 'unknown';
+    throw new Error(`AI ตอบว่างเปล่า (finish_reason: ${reason}) — อาจ prompt ยาวเกิน หรือ model ถูก filter`);
+  }
+  return content;
 }
 
 function extractJson(aiResponse) {
+  if (!aiResponse || !aiResponse.trim()) {
+    throw new Error('AI ตอบว่างเปล่า');
+  }
   const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('AI ไม่ได้ตอบ JSON ที่ใช้ได้: ' + aiResponse.slice(0, 200));
+    throw new Error('AI ไม่ได้ตอบ JSON ที่ใช้ได้: ' + aiResponse.slice(0, 300));
   }
-  return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  try {
+    return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  } catch {
+    throw new Error('JSON parse ล้มเหลว (อาจถูกตัด): ' + (jsonMatch[1] || jsonMatch[0]).slice(0, 200));
+  }
 }
 
 // ── Fetch agent guidelines from repo ─────────────────────────────────────
@@ -688,7 +701,15 @@ async function executeCodeAction(openRouterKey, ghPat, { message, history, scope
     { role: 'system', content: buildFixPlanPrompt(scopeInfo, message, fileContents, agentDocs) },
     { role: 'user', content: `คำสั่ง: ${message}\nScope: ${scope}\n\nสร้างแผนแก้ไขจากไฟล์จริงด้านบนตามรูปแบบ JSON ที่กำหนด` },
   ];
-  const round2Response = await callOpenRouter(openRouterKey, round2Messages, 8192, codeModel);
+  let round2Response;
+  try {
+    round2Response = await callOpenRouter(openRouterKey, round2Messages, 8192, codeModel);
+  } catch (firstErr) {
+    // Retry ครั้งเดียวด้วย Flash model ถ้า Pro ตอบว่างหรือ error
+    console.warn('Round 2 first attempt failed:', firstErr.message, '— retrying with Flash...');
+    await writeProgress(requestId, 'กำลัง retry ด้วย Flash model...');
+    round2Response = await callOpenRouter(openRouterKey, round2Messages, 8192, process.env.FLASH_MODEL || FLASH_MODEL);
+  }
   const changePlan = extractJson(round2Response);
 
   if (changePlan.need_more_info) {
