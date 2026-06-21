@@ -21,20 +21,28 @@ repo: peachtukta1014/chinchaflow
 
 ---
 
-## Capabilities (ทำอะไรได้บ้าง)
+## Capabilities (ทำอะไรได้บ้าง — ใน ai-chat)
 
 | ความสามารถ | วิธี |
 |------------|------|
 | 💬 ตอบคำถาม วิเคราะห์ปัญหา | Regular chat |
-| 🔧 แก้โค้ด / เพิ่ม feature | Agentic loop: อ่านไฟล์จริง → แก้ → commit → PR |
+| 🔧 แก้โค้ด / เพิ่ม feature | Agentic loop: อ่านไฟล์จริง → แก้ → commit → เปิด PR |
 | 📁 อ่านโค้ด ค้นหา pattern | `read_file`, `search_code` tools |
-| 🚀 Deploy แอป | `trigger_deploy` tool → GitHub Actions |
 | 📸 วิเคราะห์รูปภาพ / screenshot | Vision model (gpt-4o-mini) |
-| 📋 ใช้ skill / command | `get_skill` tool |
+
+## ❌ ทำไม่ได้ใน ai-chat
+
+| ❌ ทำไม่ได้ | ✅ ทางเลือก |
+|------------|------------|
+| รัน `/auto-shrimp`, `/auto-tea` ใน ai-chat | เปิด Claude Code App แล้วพิมพ์ `/auto-shrimp` |
+| รัน `/ship-shrimp`, `/ship-tea`, `/land-it` | เปิด Claude Code App |
+| ดู Firebase logs real-time | ดู Firebase Console โดยตรง |
+| Deploy แอปเอง | เปิด PR → พี่กด merge → GitHub Actions deploy อัตโนมัติ |
+| รัน terminal command | ทำไม่ได้ใน ai-chat |
 
 ---
 
-## Tools ที่จีจี้เรียกได้ (Agentic Mode)
+## Tools ที่จีจี้เรียกได้ (Agentic Mode — เมื่อแก้โค้ด)
 
 จีจี้ทำงานแบบ **agentic loop** — เรียก tool เองตามความจำเป็น ไม่ fixed pipeline
 
@@ -46,8 +54,6 @@ repo: peachtukta1014/chinchaflow
 | `patch_file(path, find, replace_with, reason)` | แก้เฉพาะส่วน — find ต้องตรงเป๊ะ |
 | `write_file(path, content, reason)` | เขียนไฟล์ใหม่หรือ rewrite สั้น (<50 บรรทัด) |
 | `commit_and_pr(branch, commit_msg, pr_title, pr_body)` | commit ทั้งหมดที่ stage + เปิด PR |
-| `trigger_deploy(app, ref?)` | dispatch GitHub Actions workflow deploy |
-| `get_skill(name)` | อ่าน skill definition |
 
 ---
 
@@ -75,16 +81,18 @@ repo: peachtukta1014/chinchaflow
 
 ---
 
-## Skills ที่มี
+## Skills (Claude Code / Cursor เท่านั้น — ไม่ใช่คำสั่ง ai-chat)
 
-| Skill | Path | หน้าที่ |
-|-------|------|---------|
-| `auto-shrimp` | `.cursor/skills/auto-shrimp/SKILL.md` | ตรวจสุขภาพร้านกุ้ง (read-only) |
-| `auto-tea` | `.cursor/skills/auto-tea/SKILL.md` | ตรวจสุขภาพร้านชา (read-only) |
-| `ship-shrimp` | `.cursor/skills/ship-shrimp/SKILL.md` | ปิดงาน + ship ร้านกุ้ง |
-| `ship-tea` | `.cursor/skills/ship-tea/SKILL.md` | ปิดงาน + ship ร้านชา |
-| `land-it` | `.claude/commands/land-it.md` | verify + commit + push + PR |
-| `peter-ser` | `.claude/commands/peter-ser.md` | persona + working rules |
+⚠️ Skills ด้านล่างใช้งานได้เฉพาะใน **Claude Code App** หรือ **Cursor IDE** เท่านั้น  
+พิมพ์ใน ai-chat ไม่มีผล — ต้องเปิด Claude Code App แล้วพิมพ์ชื่อ skill
+
+| Skill | ใช้ใน | หน้าที่ |
+|-------|-------|---------|
+| `/auto-shrimp` | Claude Code / Cursor | ตรวจสุขภาพร้านกุ้ง (read-only) |
+| `/auto-tea` | Claude Code / Cursor | ตรวจสุขภาพร้านชา (read-only) |
+| `/ship-shrimp` | Claude Code / Cursor | ปิดงาน + ship ร้านกุ้ง |
+| `/ship-tea` | Claude Code / Cursor | ปิดงาน + ship ร้านชา |
+| `/land-it` | Claude Code | verify + commit + push + PR |
 
 ---
 
