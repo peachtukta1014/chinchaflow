@@ -18,7 +18,13 @@ const SIZE_ALIASES = {
 
 /** @returns {string|null} ชื่อสินค้าในออเดอร์ เช่น กุ้งเล็ก */
 function riverDefaultToProduct(raw) {
-  const s = String(raw || '').trim().toLowerCase();
+  // Strip 'กุ้งแม่น้ำ' or 'กุ้ง' prefix so stored values like 'กุ้งแม่น้ำกลาง' or 'กุ้งกลาง'
+  // normalise to the size word ('กลาง') before lookup.
+  const s = String(raw || '').trim()
+    .replace(/^กุ้ง\s*แม่น้ำ\s*/i, '')
+    .replace(/^กุ้ง\s*/i, '')
+    .trim()
+    .toLowerCase();
   if (!s || s === 'ask' || s === 'ถาม' || s === 'prompt') return null;
   const word = SIZE_ALIASES[s] || s;
   return sizeWordToProduct(word);
