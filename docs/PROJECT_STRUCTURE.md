@@ -18,91 +18,139 @@
 <!-- TREE_START -->
 ```
 chinchaflow/
-├── apps/                          # แอปหลัก (npm workspaces)
-│   ├── seafood-pos/               # POS กุ้ง
-│   ├── chincha-tea/               # POS ร้านชา/กาแฟ/ปั่น
-│   ├── ai-chat/                   # AI Admin Chat PWA (Vite + React + tailwind)
-│   ├── webhook-core/              # LINE webhook + AI Chat Agent + LIFF (Functions)
-│   └── webhook-core-scheduled/    # สรุปชาอัตโนมัติ (ถ้า deploy แยก codebase)
-│
-├── packages/                      # shared packages (npm workspaces)
-│   └── app-credits/               # AppCredits component (version badge)
-│
-├── scripts/                       # สคริปต์ดูแลข้อมูล (รันจาก root)
-│   ├── code-metrics.mjs           # วัดขนาด repo / ความซับซ้อน → reports/
-│   ├── materialize-cloud-env.sh   # สร้าง .env.local จาก Secret Manager
-│   ├── shrimp-fix-customer-line.mjs   # แก้ LINE userId ลูกค้ากุ้ง
-│   ├── shrimp-line-orders-prune.mjs   # ลบออเดอร์ LINE เก่า
-│   ├── shrimp-stock-reset.mjs     # รีเซ็ตสต๊อก/ข้อมูลกุ้ง
-│   ├── sync-project-tree.mjs      # re-gen tree section ใน PROJECT_STRUCTURE.md
-│   └── tea-db-reset.mjs           # เคลียร์ข้อมูลร้านชา
-│
-├── reports/                       # ผลลัพธ์ auto-generated (จาก code-metrics workflow)
-│   ├── code-metrics.json
-│   └── code-metrics.md
-│
-├── docs/                          # คู่มือ / โครงสร้าง (อ้างอิงใน repo)
-│   ├── PROJECT_STRUCTURE.md       # ไฟล์นี้ — อัปเดตทุกครั้งที่ไฟล์/โฟลเดอร์เปลี่ยน
-│   ├── AGENT_CHANGELOG_TH.md      # log รอบที่แก้ (central)
-│   ├── AGENT_HANDBOOK_TH.md
-│   ├── ARCHITECTURE_TH.md
-│   ├── CHINCHA_FLOW_NAMING_TH.md
-│   ├── CLOUD_STATUS.md
-│   ├── CODE_METRICS.md
-│   ├── CURSOR_AGENT_SETUP_TH.md
-│   ├── ENABLE_CLOUD_SCHEDULER.md
-│   ├── LINE_LIFF_SETUP_TH.md
-│   ├── LINE_OA_ORDER_SCOPE_TH.md
-│   ├── LINE_OA_PARTITION_TH.md
-│   ├── LINE_RICH_MENU_TH.md
-│   └── PEACH_WORKING_STYLE_TH.md
-│
-├── .jiiji/                        # ตัวตน AI agent จีจี้ (Claude Code)
-│   └── IDENTITY.md
-│
-├── .claude/                       # Claude Code slash commands (repo-wide)
-│   └── commands/
-│       ├── auto-shrimp.md
-│       ├── auto-tea.md
-│       ├── land-it.md
-│       ├── peter-ser.md
-│       ├── ship-shrimp.md
-│       └── ship-tea.md
-│
-├── .cursor/                       # ตัวตน AI agent พี่เซอ (Cursor/Peter)
-│   ├── environment.json
-│   └── skills/                    # repo-wide skills
-│       ├── auto-shrimp/SKILL.md
-│       ├── auto-tea/SKILL.md
-│       ├── land-it/SKILL.md
-│       ├── peter-ser/SKILL.md
-│       ├── ship-shrimp/SKILL.md
-│       └── ship-tea/SKILL.md
-│
-├── .github/workflows/             # CI/CD (deploy แยกตาม path)
-│   ├── code-metrics.yml           # วัด code metrics อัตโนมัติ → reports/
-│   ├── sync-project-tree.yml      # auto-sync ต้นไม้ใน PROJECT_STRUCTURE.md
-│   ├── deploy-hosting.yml         # build + deploy กุ้ง/ชา/ai-chat
-│   ├── deploy-functions.yml       # deploy webhook-core
-│   ├── deploy-rules.yml           # Firestore + Storage rules
-│   ├── pr-verify.yml              # smoke test + build check บน PR
-│   ├── shrimp-fix-line-customer.yml
-│   ├── shrimp-full-reset-on-demand.yml
-│   ├── shrimp-stock-reset.yml
-│   └── tea-db-reset.yml
-│
-├── 00_peach/                      # โน้ตส่วนตัวพีช (ไม่ใช่ production code)
-├── firebase.json                  # Hosting, Functions, Firestore config
-├── firestore.rules                # rules DB (default) — ชา + กุ้ง
-├── firestore.indexes.json
-├── firestore-chincha.rules        # rules DB chincha (ชา legacy)
+├── .claude
+│   └── commands
+│       ├── auto-shrimp.md
+│       ├── auto-tea.md
+│       ├── land-it.md
+│       ├── peter-ser.md
+│       ├── ship-shrimp.md
+│       └── ship-tea.md
+├── .cursor
+│   ├── skills
+│   │   ├── auto-shrimp
+│   │   ├── auto-tea
+│   │   ├── land-it
+│   │   ├── peter-ser
+│   │   ├── ship-shrimp
+│   │   └── ship-tea
+│   └── environment.json
+├── .github
+│   └── workflows
+│       ├── code-metrics.yml
+│       ├── deploy-functions.yml
+│       ├── deploy-hosting.yml
+│       ├── deploy-rules.yml
+│       ├── pr-verify.yml
+│       ├── shrimp-fix-line-customer.yml
+│       ├── shrimp-full-reset-on-demand.yml
+│       ├── shrimp-stock-reset.yml
+│       ├── sync-project-tree.yml
+│       └── tea-db-reset.yml
+├── .jiiji
+│   └── IDENTITY.md
+├── 00_peach
+│   └── i18n-3ภาษาเพิ่มเติม.md
+├── apps
+│   ├── ai-chat
+│   │   ├── public
+│   │   ├── src
+│   │   ├── CHANGELOG.md
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── chincha-tea
+│   │   ├── .cursor
+│   │   ├── lib
+│   │   ├── public
+│   │   ├── src
+│   │   ├── AGENTS.md
+│   │   ├── CHANGELOG.md
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── seafood-pos
+│   │   ├── .cursor
+│   │   ├── docs
+│   │   ├── public
+│   │   ├── scripts
+│   │   ├── src
+│   │   ├── .env.example
+│   │   ├── AGENTS.md
+│   │   ├── CHANGELOG.md
+│   │   ├── PATCH_SEAFOOD_DATEKEY.md
+│   │   ├── index.html
+│   │   ├── liff-order.html
+│   │   ├── liff-slip.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── webhook-core
+│   │   ├── assets
+│   │   ├── scripts
+│   │   ├── src
+│   │   ├── CHANGELOG.md
+│   │   ├── DEVELOPER_GUIDELINES.md
+│   │   ├── package.json
+│   │   ├── shrimp-liff-id.json
+│   │   ├── shrimp-liff-id.json.example
+│   │   └── shrimp-liff-slip-id.json
+│   └── webhook-core-scheduled
+│       ├── src
+│       └── package.json
+├── docs
+│   ├── AGENT_CHANGELOG_TH.md
+│   ├── AGENT_HANDBOOK_TH.md
+│   ├── ARCHITECTURE_TH.md
+│   ├── CHINCHA_FLOW_NAMING_TH.md
+│   ├── CLOUD_STATUS.md
+│   ├── CODE_METRICS.md
+│   ├── CURSOR_AGENT_SETUP_TH.md
+│   ├── ENABLE_CLOUD_SCHEDULER.md
+│   ├── LINE_LIFF_SETUP_TH.md
+│   ├── LINE_OA_ORDER_SCOPE_TH.md
+│   ├── LINE_OA_PARTITION_TH.md
+│   ├── LINE_RICH_MENU_TH.md
+│   ├── PEACH_WORKING_STYLE_TH.md
+│   └── PROJECT_STRUCTURE.md
+├── packages
+│   └── app-credits
+│       ├── src
+│       └── package.json
+├── reports
+│   ├── code-metrics.json
+│   └── code-metrics.md
+├── scripts
+│   ├── code-metrics.mjs
+│   ├── materialize-cloud-env.sh
+│   ├── shrimp-fix-customer-line.mjs
+│   ├── shrimp-line-orders-prune.mjs
+│   ├── shrimp-stock-reset.mjs
+│   ├── sync-project-tree.mjs
+│   └── tea-db-reset.mjs
+├── .env.example
+├── .firebaserc
+├── .gitignore
+├── 01-bug.yml
+├── 02-feature.yml
+├── 03-task.yml
+├── AGENTS.md
+├── CLAUDE.md
+├── JIIJI.md
+├── README.md
+├── config.yml
+├── firebase.json
 ├── firestore-chincha.indexes.json
-├── storage.rules
-├── AGENTS.md                      # กฎ monorepo + สิ่งที่มีอยู่แล้ว
-├── CLAUDE.md                      # กฎ Claude Code (พี่ซี)
-├── JIIJI.md                       # ตัวตน + ความสามารถของจีจี้ (AI chat)
-├── package.json                   # workspaces + scripts รวม
-└── README.md
+├── firestore-chincha.rules
+├── firestore.indexes.json
+├── firestore.rules
+├── package.json
+└── storage.rules
 ```
 <!-- TREE_END -->
 
