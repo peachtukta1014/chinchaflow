@@ -248,6 +248,26 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
   return data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
 }
 
+// ── โหลด JIIJI.md — ตัวตนและ skills ของจีจี้ (cache เดียวกัน) ───────────
+let _jiijiCache = null;
+let _jiijiCacheTime = 0;
+
+async function fetchJiijiDef(ghPat) {
+  const now = Date.now();
+  if (_jiijiCache && (now - _jiijiCacheTime) < DOCS_TTL_MS) return _jiijiCache;
+  try {
+    const res = await fetch(`${GH_API}/repos/${GH_REPO}/contents/JIIJI.md?ref=main`, {
+      headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'CF-AI' },
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    const content = Buffer.from(data.content, 'base64').toString('utf-8');
+    _jiijiCache = content.slice(0, 2000);
+    _jiijiCacheTime = now;
+    return _jiijiCache;
+  } catch { return ''; }
+}
+
 // ── โหลด project rules + Peach's style จาก GitHub (cache 10 นาที) ─────────
 // อ่านทุก session แรก จากนั้น cache ไว้ไม่ต้องยิง GitHub ทุกข้อความ
 async function fetchChatAgentDocs(ghPat) {
@@ -438,8 +458,9 @@ exports.aiChatAgentHttp = functions
 
     if (classified.intent === 'code-action') {
       try {
-        const { handleCodeAction } = require('./aiWorkflowAgent');
-        const result = await handleCodeAction({
+        // V2: agentic loop (tool calling) — fallback to V1 ถ้า error
+        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
+        const result = await handleCodeActionV2({
           message: classified.translatedMessage,
           history: history || [],
           scope: finalScope,
@@ -470,12 +491,19 @@ exports.aiChatAgentHttp = functions
       }
     }
 
-    // โหลด project docs (กฎ + สไตล์พี่พีช) — cache 10 นาที
+    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) — cache 10 นาที
     const ghPat = process.env.GH_PAT;
-    const agentDocs = ghPat ? await fetchChatAgentDocs(ghPat).catch(() => '') : '';
+    const [agentDocs, jiijiDocs] = ghPat
+      ? await Promise.all([
+          fetchChatAgentDocs(ghPat).catch(() => ''),
+          fetchJiijiDef(ghPat).catch(() => ''),
+        ])
+      : ['', ''];
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
-    const systemContent = agentDocs
-      ? basePrompt + '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo ล่าสุด)\n' + agentDocs
+    const systemContent = (agentDocs || jiijiDocs)
+      ? basePrompt +
+        (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
+        (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '')
       : basePrompt;
 
     const messages = [
