@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI, pollProgress } from './api';
+import { chatWithAI, pollProgress, fetchResult } from './api';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -84,6 +84,61 @@ export default function App() {
   const fileInputRef = useRef(null);
   const pollIntervalRef = useRef(null);
   const currentSessionId = useRef(null);
+  const loadingRef = useRef(false);
+
+  // ── Sync loadingRef ────────────────────────────────────────────────────
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  // ── Background result recovery ─────────────────────────────────────────
+  // เมื่อพี่กลับมา foreground หลัง connection ขาด → ดึงผลจาก Firestore
+  const PENDING_KEY = 'jiiji_pending_result';
+  useEffect(() => {
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (loadingRef.current) return;
+      const raw = localStorage.getItem(PENDING_KEY);
+      if (!raw) return;
+      let pending;
+      try { pending = JSON.parse(raw); } catch { localStorage.removeItem(PENDING_KEY); return; }
+      // หมดอายุ 30 นาที
+      if (Date.now() - (pending.ts || 0) > 30 * 60 * 1000) { localStorage.removeItem(PENDING_KEY); return; }
+
+      setLoading(true);
+      setProgressStep('กำลังดึงผลลัพธ์จากฉากหลัง...');
+
+      // ลอง 10 ครั้ง ห่าง 3 วิ (รวม 30 วิ)
+      let found = null;
+      for (let i = 0; i < 10; i++) {
+        found = await fetchResult(pending.requestId);
+        if (found) break;
+        await new Promise(r => setTimeout(r, 3000));
+      }
+
+      localStorage.removeItem(PENDING_KEY);
+      setProgressStep(null);
+      setLoading(false);
+
+      if (found) {
+        const replyMsg = { role: 'assistant', content: found.reply };
+        setMessages(prev => {
+          const updated = [...prev, replyMsg];
+          if (currentSessionId.current) {
+            updateSession(currentSessionId.current, updated, found.scope || pending.scope);
+            setSessions(listSessions());
+          }
+          return updated;
+        });
+        if (found.scope) setAgentScope(found.scope);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'จีจี้หาผลลัพธ์ในฉากหลังไม่เจอแล้วครับพี่ (อาจ timeout) — ลองส่งคำสั่งใหม่ได้เลย 🙏',
+        }]);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -155,6 +210,9 @@ export default function App() {
       setSessions(listSessions());
     }
 
+    // บันทึก pending เผื่อ connection ขาดระหว่างรอ
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, scope, ts: Date.now() }));
+
     // Start progress polling
     pollIntervalRef.current = setInterval(async () => {
       const data = await pollProgress(requestId);
@@ -175,6 +233,7 @@ export default function App() {
     clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = null;
     setProgressStep(null);
+    localStorage.removeItem(PENDING_KEY); // ได้รับ reply แล้ว ไม่ต้อง recover
 
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);

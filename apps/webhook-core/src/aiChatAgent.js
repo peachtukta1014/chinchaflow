@@ -22,7 +22,7 @@
 
 const functions = require('firebase-functions/v1');
 const https = require('firebase-functions/v2/https');
-const { writeProgress, clearProgress, readProgress } = require('./shared/progressTracker');
+const { writeProgress, clearProgress, readProgress, writeResult, clearResult } = require('./shared/progressTracker');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FLASH_MODEL = 'deepseek/deepseek-v4-flash';   // แชททั่วไป — ถูก เร็ว
@@ -426,6 +426,19 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
+    // ── Result recovery endpoint: GET ?action=result&requestId=xxx ───────
+    // ใช้เมื่อ client กลับมา foreground หลัง connection ขาด
+    if (req.method === 'GET' && req.query.action === 'result' && req.query.requestId) {
+      const data = await readResult(req.query.requestId);
+      if (data) {
+        await clearResult(req.query.requestId);
+        res.json({ found: true, reply: data.reply, scope: data.scope });
+      } else {
+        res.json({ found: false });
+      }
+      return;
+    }
+
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'ใช้ POST เท่านั้น' });
       return;
@@ -481,6 +494,9 @@ exports.aiChatAgentHttp = functions
           ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';
         const body = { ...result.body, reply: prefix + (result.body?.reply || ''), scope: finalScope };
+        if (result.statusCode === 200 || !result.statusCode) {
+          await writeResult(requestId, { reply: body.reply, scope: finalScope });
+        }
         res.status(result.statusCode || 200).json(body);
         return;
       } catch (err) {
@@ -523,6 +539,7 @@ exports.aiChatAgentHttp = functions
 
     try {
       const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, images: images || null, text: message });
+      await writeResult(requestId, { reply, scope: finalScope });
       res.json({ reply, scope: finalScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);
