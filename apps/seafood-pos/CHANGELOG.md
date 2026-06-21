@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-21 | PR #312
+**fix: voice record บันทึกครั้งเดียว → ออเดอร์ขึ้นสองรายการ**
+- `src/hooks/useVoice.js` — เพิ่ม `flushedRef` guard ป้องกัน `flushTranscript` ถูกเรียกซ้ำจาก `stop()` + `rec.onend`
+
+### 2026-06-21 | PR #311
+**fix: smoke-test เพิ่ม assertions สำหรับ riverDefaultToProduct full-phrase**
+- `scripts/smoke-test.mjs` — เพิ่ม 3 assertions: 'กุ้งแม่น้ำกลาง' → 'กุ้งกลาง', 'กุ้งแม่น้ำใหญ่' → 'กุ้งใหญ่', 'กลาง' → 'กุ้งกลาง'
+
 ### 2026-06-19 | PR #288
 **fix: อัปเดต smoke-test paths หลัง webhook-core refactor (PR #283)**
 - `scripts/smoke-test.mjs` — อัปเดต 35 `requireWebhook` / `fs.readFileSync` paths

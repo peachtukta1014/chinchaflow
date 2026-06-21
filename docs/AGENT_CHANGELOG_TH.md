@@ -1,3 +1,21 @@
+## 2026-06-21 — PR#313: feat: เพิ่มโฟลเดอร์ .jiiji — ตัวตน AI agent จีจี้
+
+- `.jiiji/IDENTITY.md` — บันทึกบทบาท กฎการทำงาน ประวัติโปรเจกต์ และความสัมพันธ์ในทีม
+- `CLAUDE.md` — เพิ่มกฎอัปเดต `apps/*/CHANGELOG.md` และ `PROJECT_STRUCTURE.md` ทุก PR
+- `docs/PROJECT_STRUCTURE.md` — อัปเดตให้ตรงกับโค้ดจริง (webhook-core subfolders, screens ใหม่, workflows)
+
+## 2026-06-21 — PR#312: fix: bare กุ้ง DM → defaultRiverSize + voice double-flush
+
+- `seafood-oa/shrimpLineOrderHandler.js` — `tryCompleteOrder`: ถ้า item.product === 'กุ้ง' ใน DM → resolve ผ่าน `resolveRiverDefaultProduct` → บันทึกเป็นกุ้งกลาง/ใหญ่/เล็ก อัตโนมัติ
+- `apps/seafood-pos/src/hooks/useVoice.js` — เพิ่ม `flushedRef` guard ป้องกัน `flushTranscript` ถูกเรียกสองครั้ง (stop + rec.onend) → แก้บั๊กออเดอร์เสียงขึ้นสองรายการ
+- ถ้าพังให้เช็ก `shrimpLineOrderHandler.js` (effectiveItems) · `useVoice.js` (flushedRef)
+
+## 2026-06-21 — PR#311: fix: riverDefaultToProduct รองรับ 'กุ้งแม่น้ำกลาง' (full-phrase stored value)
+
+- `seafood-oa/customerRiverDefault.js` — strip prefix 'กุ้งแม่น้ำ' และ 'กุ้ง' ก่อน lookup → รองรับทั้ง 'กุ้งแม่น้ำกลาง', 'กุ้งกลาง', 'กลาง'
+- `scripts/smoke-test.mjs` — เพิ่ม 3 assertion ตรวจ full-phrase stored values
+- ถ้าพังให้เช็ก `customerRiverDefault.js` (riverDefaultToProduct) · SIZE_ALIASES
+
 ## 2026-06-21 — fix: commit_and_pr re-fetch SHA จาก branch ก่อน commit (แก้ stale SHA mismatch)
 
 - `agentTools.js` — ใน `commit_and_pr`: re-fetch SHA ของแต่ละไฟล์จาก target branch จริง (ไม่ใช้ cache จาก read_file) ป้องกัน "does not match" error เมื่อ main ถูก update ระหว่าง loop
