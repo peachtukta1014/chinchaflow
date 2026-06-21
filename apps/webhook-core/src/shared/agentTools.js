@@ -362,26 +362,34 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       // Commit each staged file sequentially (GitHub Contents API)
       const committed = [];
       for (const [filePath, fileData] of Object.entries(stagedFiles)) {
-        // Re-fetch current SHA from the branch (not cached from main) to avoid stale SHA mismatches
-        const branchFileMeta = await fetchRepoFile(ghPat, filePath, branchName).catch(() => null);
-        const liveSha = branchFileMeta?.sha || null;
+        // Re-fetch current SHA from the branch to avoid stale SHA mismatches
+        let liveSha = (await fetchRepoFile(ghPat, filePath, branchName).catch(() => null))?.sha || null;
 
-        const commitBody = {
-          message: commitMsg,
-          content: Buffer.from(fileData.content).toString('base64'),
-          branch: branchName,
-          committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
-        };
-        if (liveSha) commitBody.sha = liveSha;
+        let commitRes;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const commitBody = {
+            message: commitMsg,
+            content: Buffer.from(fileData.content).toString('base64'),
+            branch: branchName,
+            committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
+          };
+          if (liveSha) commitBody.sha = liveSha;
 
-        const commitRes = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${filePath}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
-          body: JSON.stringify(commitBody),
-        });
-        if (!commitRes.ok) {
-          const err = await commitRes.json().catch(() => ({}));
-          throw new Error(`commit ${filePath} ล้มเหลว: ${err.message || commitRes.status}`);
+          commitRes = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${filePath}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
+            body: JSON.stringify(commitBody),
+          });
+
+          if (commitRes.ok) break;
+
+          const errData = await commitRes.json().catch(() => ({}));
+          // SHA mismatch — re-fetch live SHA and retry once
+          if (attempt === 0 && (commitRes.status === 409 || (errData.message || '').includes('does not match'))) {
+            liveSha = (await fetchRepoFile(ghPat, filePath, branchName).catch(() => null))?.sha || null;
+            continue;
+          }
+          throw new Error(`commit ${filePath} ล้มเหลว: ${errData.message || commitRes.status}`);
         }
         committed.push(filePath);
       }
