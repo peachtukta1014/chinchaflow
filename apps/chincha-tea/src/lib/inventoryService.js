@@ -76,9 +76,13 @@ export async function receiveRestockInventory(purchaseItems = []) {
 
 function findCupInventoryItem(catalog = []) {
   const active = (catalog || []).filter((item) => item.active !== false);
-  return active.find((item) => restockNameKey(item.name) === restockNameKey('แก้ว'))
+  const cupItem = active.find((item) => restockNameKey(item.name) === restockNameKey('แก้ว'))
     || active.find((item) => restockNameKey(item.name) === restockNameKey('cup'))
     || active.find((item) => CUP_NAME_RE.test(item.name || ''));
+  if (!cupItem) {
+    console.warn('[inventory] ไม่พบรายการแก้วใน restockCatalog — ข้ามการหักสต๊อก');
+  }
+  return cupItem;
 }
 
 export async function deductTeaOrderInventory(cart = []) {
