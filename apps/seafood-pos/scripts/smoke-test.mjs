@@ -571,6 +571,19 @@ try {
     !riverDefaultSrc.includes('if (groupId) return null'),
     'resolveRiverDefaultProduct รองรับ group lookup ด้วย customerName',
   );
+  const riverDefaultMod = requireWebhook('../../webhook-core/src/seafood-oa/customerRiverDefault.js');
+  assert(
+    riverDefaultMod.riverDefaultToProduct('กุ้งแม่น้ำกลาง') === 'กุ้งกลาง',
+    "riverDefaultToProduct('กุ้งแม่น้ำกลาง') → 'กุ้งกลาง' (full-phrase stored value)",
+  );
+  assert(
+    riverDefaultMod.riverDefaultToProduct('กุ้งแม่น้ำใหญ่') === 'กุ้งใหญ่',
+    "riverDefaultToProduct('กุ้งแม่น้ำใหญ่') → 'กุ้งใหญ่'",
+  );
+  assert(
+    riverDefaultMod.riverDefaultToProduct('กลาง') === 'กุ้งกลาง',
+    "riverDefaultToProduct('กลาง') → 'กุ้งกลาง' (short-form stored value)",
+  );
   assert(slipSrc.includes('group_image_without_open_bill'), 'group image without open bill is guarded');
   assert(directSrc.includes('allowGroup: false'), 'direct image ไม่เปิด group guard');
   assert(!directSrc.includes('group_image_without_open_bill'), 'direct image ไม่ถูกบังคับด้วย group_image_without_open_bill');
