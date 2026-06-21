@@ -1,3 +1,9 @@
+## 2026-06-21 — PR#317: feat: ai-chat ปุ่ม Refresh + เลขเวอร์ชัน auto-bump
+
+- `App.jsx` — ปุ่ม 🔄 Refresh ขวาสุด header (window.location.reload) + แสดง APP_VERSION ใต้ CHINCHA FLOW
+- `version.js` (ใหม่) — fallback `ai-dev`, ถูก inject ตอน deploy
+- `deploy-hosting.yml` — step "Bump version" ก่อน build ai-chat: คำนวณ DDMMYY ปีพศ + นับ runs วันนี้ผ่าน gh api → version.js อัตโนมัติ วันใหม่รีเซต .1
+
 ## 2026-06-21 — PR#316: fix: จีจี้ (ai-chat) รู้จักขอบเขตตัวเอง
 
 - `aiChatAgent.js` — เพิ่ม "❌ ทำไม่ได้ใน ai-chat" ใน root scope system prompt: /auto-shrimp, /auto-tea ฯลฯ คือ Claude Code skills ไม่ใช่คำสั่งแชท

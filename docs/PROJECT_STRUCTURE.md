@@ -81,6 +81,7 @@ apps/ai-chat/
 │   ├── main.jsx                   # entry
 │   ├── App.jsx                    # Chat UI — bubbles + voice input + scope picker + image attach
 │   ├── api.js                     # คุยกับ Cloud Function aiChatAgentHttp (+ imageBase64)
+│   ├── version.js                 # APP_VERSION (ai-DDMMYY.N) — inject อัตโนมัติตอน deploy
 │   └── index.css                  # Tailwind base + scrollbar
 ├── index.html
 ├── vite.config.js
