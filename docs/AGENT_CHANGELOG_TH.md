@@ -1,3 +1,8 @@
+## 2026-06-21 — fix: commit_and_pr re-fetch SHA จาก branch ก่อน commit (แก้ stale SHA mismatch)
+
+- `agentTools.js` — ใน `commit_and_pr`: re-fetch SHA ของแต่ละไฟล์จาก target branch จริง (ไม่ใช้ cache จาก read_file) ป้องกัน "does not match" error เมื่อ main ถูก update ระหว่าง loop
+- `agentTools.js` — changelog auto-add: fetch SHA จาก branch แทน main เพื่อป้องกัน SHA mismatch เดียวกัน
+
 ## 2026-06-21 — fix: จีจี้ agentic loop ใช้ tools จริง (model + system prompt + force tool_choice)
 
 - `agentTools.js` — เปลี่ยน AGENT_MODEL เป็น `openai/gpt-4o-mini` (confirmed tool calling support), เพิ่ม fallback ถ้า model ไม่ support tools, ใช้ `tool_choice:'required'` รอบแรกเพื่อบังคับเรียก tool

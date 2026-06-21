@@ -318,13 +318,17 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       // Commit each staged file sequentially (GitHub Contents API)
       const committed = [];
       for (const [filePath, fileData] of Object.entries(stagedFiles)) {
+        // Re-fetch current SHA from the branch (not cached from main) to avoid stale SHA mismatches
+        const branchFileMeta = await fetchRepoFile(ghPat, filePath, branchName).catch(() => null);
+        const liveSha = branchFileMeta?.sha || null;
+
         const commitBody = {
           message: commitMsg,
           content: Buffer.from(fileData.content).toString('base64'),
           branch: branchName,
           committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
         };
-        if (fileData.sha) commitBody.sha = fileData.sha;
+        if (liveSha) commitBody.sha = liveSha;
 
         const commitRes = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${filePath}`, {
           method: 'PUT',
@@ -340,7 +344,7 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
 
       // Auto-add changelog entry
       try {
-        const changelog = await fetchRepoFile(ghPat, 'docs/AGENT_CHANGELOG_TH.md');
+        const changelog = await fetchRepoFile(ghPat, 'docs/AGENT_CHANGELOG_TH.md', branchName);
         if (changelog) {
           const today = new Date().toISOString().slice(0, 10);
           const entry = `## ${today} — ${args.pr_title}\n- ไฟล์ที่แก้: ${committed.join(', ')}\n- Branch: ${branchName}`;
