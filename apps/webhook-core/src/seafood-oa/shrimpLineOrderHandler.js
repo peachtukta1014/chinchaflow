@@ -63,8 +63,20 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
   if (userId && !groupId) {
     linkedCustomerName = await findCustomerNameByLineUserId(db, userId);
   }
+
+  // DM from customer with defaultRiverSize: bare 'กุ้ง' (no size) → auto-resolve
+  let effectiveItems = items;
+  if (userId && !groupId && items.some((it) => it.product === 'กุ้ง')) {
+    const autoProduct = await resolveRiverDefaultProduct(db, { lineUserId: userId });
+    if (autoProduct) {
+      effectiveItems = items.map((it) =>
+        it.product === 'กุ้ง' ? { ...it, product: autoProduct } : it,
+      );
+    }
+  }
+
   const { items: replyItems } = applySyncedCustomerNameToItems({
-    items,
+    items: effectiveItems,
     groupId,
     linkedCustomerName,
   });
@@ -87,7 +99,7 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
           deliveryDate,
           replyLang,
           pending: null,
-          orderDraft: { items, text, userId, groupId, deliveryDate, replyLang },
+          orderDraft: { items: effectiveItems, text, userId, groupId, deliveryDate, replyLang },
           profileCollect: {
             missing,
             customerId: customer?.id || null,
@@ -107,7 +119,7 @@ async function tryCompleteOrder(db, admin, session, ts, ctx) {
   }
 
   const orderCount = await saveLineOrders(db, admin, {
-    items,
+    items: effectiveItems,
     text,
     userId,
     groupId,

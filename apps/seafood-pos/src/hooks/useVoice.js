@@ -9,9 +9,12 @@ export function useVoice(onText) {
   const committedRef = useRef('');
   const displayRef = useRef('');
   const wantListenRef = useRef(false);
+  const flushedRef = useRef(false);
   onTextRef.current = onText;
 
   const flushTranscript = useCallback(() => {
+    if (flushedRef.current) return;
+    flushedRef.current = true;
     const text = displayRef.current.trim();
     committedRef.current = '';
     displayRef.current = '';
@@ -33,6 +36,7 @@ export function useVoice(onText) {
       return;
     }
     wantListenRef.current = true;
+    flushedRef.current = false;
     committedRef.current = '';
     displayRef.current = '';
     const rec = new SR();
