@@ -1,3 +1,8 @@
+## 2026-06-21 — fix: จีจี้ agentic loop ใช้ tools จริง (model + system prompt + force tool_choice)
+
+- `agentTools.js` — เปลี่ยน AGENT_MODEL เป็น `openai/gpt-4o-mini` (confirmed tool calling support), เพิ่ม fallback ถ้า model ไม่ support tools, ใช้ `tool_choice:'required'` รอบแรกเพื่อบังคับเรียก tool
+- `aiWorkflowAgent.js` — แก้ `buildAgentSystemPrompt` ให้สั่ง "ใช้ tool ทันที ห้ามถามยืนยัน", ลบ JIIJI.md injection ที่มีคำสั่งขัดแย้ง (สรุปก่อนลงมือ)
+
 ## 2026-06-20 — PR#291: รับออเดอร์สั้นในกลุ่ม LINE (ชื่อ+เลข ไม่มีคำว่ากุ้ง/หน่วย)
 
 - `customerRiverDefault.js` — ลบ `if (groupId) return null` → `resolveRiverDefaultProduct` lookup `defaultRiverSize` ด้วย customerName ในกลุ่มได้

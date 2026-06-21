@@ -21,7 +21,8 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
-const AGENT_MODEL = 'deepseek/deepseek-v4-pro';
+// gpt-4o-mini: fast + confirmed OpenAI-style tool calling support via OpenRouter
+const AGENT_MODEL = 'openai/gpt-4o-mini';
 
 // ── Tool definitions (OpenAI function-calling format) ─────────────────────
 const TOOL_DEFINITIONS = [
@@ -460,7 +461,11 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
 }
 
 // ── Call OpenRouter with function calling support ─────────────────────────
-async function callOpenRouterWithTools(apiKey, messages, tools, model) {
+// forceToolUse=true → tool_choice:'required' บังคับให้เรียก tool (ใช้ใน iteration แรก)
+async function callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse = false) {
+  const useModel = model || process.env.CODE_MODEL || AGENT_MODEL;
+  const toolChoice = forceToolUse ? 'required' : 'auto';
+
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -470,18 +475,24 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model) {
       'X-Title': 'CHINCHA FLOW AI Agent (จีจี้)',
     },
     body: JSON.stringify({
-      model: model || process.env.CODE_MODEL || AGENT_MODEL,
+      model: useModel,
       messages,
       tools,
-      tool_choice: 'auto',
+      tool_choice: toolChoice,
       temperature: 0.1,
       max_tokens: 4096,
     }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`OpenRouter ${res.status}: ${err?.error?.message || 'Unknown'}`);
+    const errBody = await res.json().catch(() => ({}));
+    const errMsg = errBody?.error?.message || `HTTP ${res.status}`;
+    // ถ้า model ไม่ support tools ให้ fallback ไป gpt-4o-mini
+    if (res.status === 400 && useModel !== AGENT_MODEL) {
+      console.warn(`Model ${useModel} tool-calling error — retrying with ${AGENT_MODEL}`);
+      return callOpenRouterWithTools(apiKey, messages, tools, AGENT_MODEL, forceToolUse);
+    }
+    throw new Error(`OpenRouter ${res.status} (${useModel}): ${errMsg}`);
   }
 
   const data = await res.json();
@@ -512,7 +523,8 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       : `จีจี้กำลังดำเนินการ (รอบ ${iterations})...`;
     await writeProgress(requestId, stepLabel);
 
-    const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS);
+    // รอบแรก: บังคับ tool_choice='required' ให้เริ่มใช้ tool ทันที ไม่ถามยืนยัน
+    const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, iterations === 1);
     const assistantMessage = choice.message;
 
     // Always push assistant turn to conversation

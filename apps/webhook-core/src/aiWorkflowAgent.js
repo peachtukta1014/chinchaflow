@@ -23,7 +23,7 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress } = require('./shared/progressTracker');
-const { runAgentLoop, fetchRepoFile: fetchRepoFileFromTools } = require('./shared/agentTools');
+const { runAgentLoop } = require('./shared/agentTools');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -838,35 +838,36 @@ async function handleCodeAction({ message, history, scope, force = false, reques
 }
 
 // ── Build system prompt for agentic loop ─────────────────────────────────
-function buildAgentSystemPrompt(scopeInfo, agentDocs, jiijiDef) {
+function buildAgentSystemPrompt(scopeInfo, agentDocs) {
   const fileList = scopeInfo.files.slice(0, 25).join('\n');
   const overflow = scopeInfo.files.length > 25
     ? `\n... (และอีก ${scopeInfo.files.length - 25} ไฟล์ — เรียก list_files เพื่อดูทั้งหมด)`
     : '';
 
-  return `คุณคือ "จีจี้" — Senior Full-stack Developer + เลขาส่วนตัวพี่พีช สำหรับ CHINCHA FLOW monorepo
-ขับเคลื่อนด้วย DeepSeek V4 Pro — ทำงานแบบ agentic: เลือก tool เอง ทำทีละขั้น จนงานเสร็จ
+  return `คุณคือ "จีจี้" — AI Developer สำหรับ CHINCHA FLOW monorepo ของพี่พีช
+ทำงานแบบ agentic loop: เรียก tool ต่อเนื่องทีละขั้น จนงานเสร็จจริง
+
+## ⚡ กฎเหล็ก — ห้ามฝ่าฝืน
+1. **ใช้ tool ทันที** — ห้ามตอบด้วยข้อความล้วนจนกว่างานจะเสร็จ ห้ามถามยืนยัน ห้ามสรุปก่อนลงมือ
+2. ถ้าไม่รู้ว่าต้องแก้ไฟล์ไหน → เรียก list_files หรือ read_file ก่อน แล้วตัดสินใจเอง
+3. **patch_file**: "find" ต้อง copy มาจากผล read_file เป๊ะตัวต่อตัว (รวม whitespace/indent)
+4. ถ้า find ไม่เจอ → read_file ไฟล์นั้นอีกครั้ง แล้วตรวจ ห้ามเดา
+5. diff เล็กที่สุด — แก้เฉพาะส่วนที่เกี่ยว ไม่แตะส่วนอื่น
+6. ห้าม expose API key / token / secret ในโค้ด
+7. **commit_and_pr เป็นขั้นตอนสุดท้ายเสมอ** (หลัง stage ครบทุกไฟล์แล้ว)
+
+## ลำดับการทำงาน
+ขั้น 1 → list_files (ถ้าไม่รู้ว่าไฟล์ไหนเกี่ยว)
+ขั้น 2 → read_file (อ่านโค้ดจริงก่อนแก้ทุกครั้ง)
+ขั้น 3 → patch_file หรือ write_file
+ขั้น 4 → ถ้าแก้หลายไฟล์ ทำซ้ำขั้น 2-3 จนครบ
+ขั้น 5 → commit_and_pr (commit ทุกไฟล์ + เปิด PR ทีเดียว)
+ขั้น 6 → trigger_deploy (ถ้าพี่ขอ)
 
 ## Scope ปัจจุบัน: ${scopeInfo.label}
-ไฟล์ที่มีอยู่ (เรียก list_files หรือ read_file เพื่อดูเนื้อหา):
+ไฟล์ที่มีอยู่:
 ${fileList}${overflow}
-
-## วิธีทำงาน (ลำดับนี้เสมอ)
-1. list_files (ถ้ายังไม่รู้ว่าไฟล์ไหนเกี่ยว)
-2. read_file → อ่านโค้ดจริงก่อนแก้ทุกครั้ง ห้ามเดา
-3. patch_file (ไฟล์เดิม) หรือ write_file (ไฟล์ใหม่/สั้น)
-4. ถ้าต้องแก้หลายไฟล์ → ทำซ้ำขั้น 2-3 จนครบ
-5. commit_and_pr → สร้าง branch + commit ทั้งหมด + เปิด PR
-6. (optional) trigger_deploy ถ้าพี่ขอ deploy ด้วย
-
-## กฎสำคัญ (ฝ่าฝืนไม่ได้)
-- patch_file: "find" ต้อง copy มาจากผล read_file เป๊ะตัวต่อตัว รวม whitespace/indent
-- ถ้า find ไม่เจอ → read_file อีกครั้งแล้วตรวจ ห้ามเดา
-- diff เล็กที่สุด — แก้เฉพาะส่วนที่เกี่ยว ไม่แตะส่วนอื่น
-- ห้าม expose API key / token / secret ในโค้ด
-- commit_and_pr เป็นขั้นตอนสุดท้ายเสมอ (หลัง stage ครบทุกไฟล์แล้ว)
-${jiijiDef ? '\n## จากไฟล์ JIIJI.md (ตัวตน + skills ที่มี)\n' + jiijiDef.slice(0, 1500) : ''}
-${agentDocs ? '\n## กฎจากเจ้าของ repo (ต้องปฏิบัติตาม)\n' + agentDocs : ''}`;
+${agentDocs ? '\n## กฎจากเจ้าของ repo\n' + agentDocs : ''}`;
 }
 
 // ── V2 handler: agentic loop (tool calling) ───────────────────────────────
@@ -897,12 +898,11 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
   const scopeInfo = SCOPE_FILE_TREE[currentScope] || SCOPE_FILE_TREE.root;
 
   try {
-    // โหลด context: กฎ repo + JIIJI.md
+    // โหลด context: กฎ repo
     await writeProgress(requestId, 'กำลังโหลดบริบทระบบ...');
     const agentDocs = await fetchAgentDocs(ghPat);
-    const jiijiFile = await fetchRepoFileFromTools(ghPat, 'JIIJI.md', 'main').catch(() => null);
 
-    const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs, jiijiFile?.content || '');
+    const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs);
 
     // รัน agentic loop — จีจี้เลือก tool เองจนงานเสร็จ
     const result = await runAgentLoop(openRouterKey, ghPat, {
