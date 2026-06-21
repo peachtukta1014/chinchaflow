@@ -21,8 +21,8 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
-// gpt-4o-mini: fast + confirmed OpenAI-style tool calling support via OpenRouter
-const AGENT_MODEL = 'openai/gpt-4o-mini';
+// deepseek-v4-pro: แม่นยำสูง + รองรับ tool calling ผ่าน OpenRouter
+const AGENT_MODEL = 'deepseek/deepseek-v4-pro';
 
 // ── Tool definitions (OpenAI function-calling format) ─────────────────────
 const TOOL_DEFINITIONS = [
