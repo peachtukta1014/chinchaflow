@@ -565,28 +565,39 @@ async function applyCodeChanges(pat, changePlan) {
       throw new Error(`ไม่รู้จัก action "${change.action}" สำหรับ ${change.path}`);
     }
 
-    // Step 5: Commit the file via GitHub Contents API
-    const commitBody = {
-      message: commitMsg,
-      content: Buffer.from(newContent).toString('base64'),
-      branch: branchName,
-      committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
-    };
-    if (file && file.sha) commitBody.sha = file.sha;
+    // Step 5: Commit the file via GitHub Contents API (retry once on SHA mismatch)
+    let fileSha = file?.sha || null;
+    let commitRes;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const commitBody = {
+        message: commitMsg,
+        content: Buffer.from(newContent).toString('base64'),
+        branch: branchName,
+        committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
+      };
+      if (fileSha) commitBody.sha = fileSha;
 
-    const commitRes = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${change.path}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${pat}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'CF-AI',
-      },
-      body: JSON.stringify(commitBody),
-    });
-    if (!commitRes.ok) {
-      const err = await commitRes.json().catch(() => ({}));
-      const detail = err.message || `HTTP ${commitRes.status}`;
+      commitRes = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${change.path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${pat}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'CF-AI',
+        },
+        body: JSON.stringify(commitBody),
+      });
+
+      if (commitRes.ok) break;
+
+      const errData = await commitRes.json().catch(() => ({}));
+      // SHA mismatch — re-fetch live SHA from branch and retry once
+      if (attempt === 0 && (commitRes.status === 409 || (errData.message || '').includes('does not match'))) {
+        const fresh = await fetchRepoFile(pat, change.path, branchName).catch(() => null);
+        fileSha = fresh?.sha || null;
+        continue;
+      }
+      const detail = errData.message || `HTTP ${commitRes.status}`;
       throw new Error(`GitHub commit ${change.path} failed: ${detail}`);
     }
   }
