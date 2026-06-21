@@ -18,6 +18,18 @@
 const { writeProgress } = require('./progressTracker');
 const { execSync } = require('child_process');
 
+// ── Strip DeepSeek internal DSML markup from text ─────────────────────────
+// DeepSeek V4 Pro sometimes leaks <｜DSML｜...> tags in the text content
+// alongside structured tool_calls — strip before surfacing to user/history
+function stripDsml(text) {
+  if (!text) return text;
+  // Remove complete DSML blocks: <｜DSML｜tag>...</｜DSML｜tag>
+  let out = text.replace(/<[|｜]DSML[|｜][^>]*>[\s\S]*?<\/[|｜]DSML[|｜][^>]*>/g, '');
+  // Strip any remaining DSML content from first opening tag to end
+  out = out.replace(/\n?<[|｜]DSML[|｜][\s\S]*$/g, '');
+  return out.trim();
+}
+
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
@@ -581,10 +593,10 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, iterations === 1);
     const assistantMessage = choice.message;
 
-    // Always push assistant turn to conversation
+    // Always push assistant turn to conversation (strip DSML leak from text)
     messages.push({
       role: 'assistant',
-      content: assistantMessage.content || null,
+      content: stripDsml(assistantMessage.content) || null,
       tool_calls: assistantMessage.tool_calls || undefined,
     });
 
@@ -624,7 +636,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       }
     } else {
       // finish_reason === 'stop' — จีจี้ตอบจบแล้ว
-      const finalContent = assistantMessage.content || '';
+      const finalContent = stripDsml(assistantMessage.content || '');
       return {
         reply: finalContent,
         iterations,
