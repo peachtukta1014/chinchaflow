@@ -46,6 +46,14 @@ export function intValue(v) {
 }
 
 function hasMoneyField(row, keys) {
+function previousDateKey(dateKey) {
+  if (!dateKey) return '';
+  const d = new Date(dateKey + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function hasMoneyField(row, keys) {
   return keys.some((key) => Number(row?.[key] || 0) > 0);
 }
 
