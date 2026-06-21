@@ -86,11 +86,17 @@ const SYSTEM_PROMPTS = {
 4. **แนะนำ:** ความเห็นส่วนตัว หรือทางเลือกที่ดีกว่า
 แล้วรอการยืนยัน ก่อนลงมือ (โดยเฉพาะงานแก้โค้ดหรืองานใหญ่)
 
-CAPABILITIES:
-- 💬 ตอบคำถาม วิเคราะห์ปัญหา แนะนำแนวทาง
-- 🔧 แก้โค้ดอัตโนมัติ (OpenRouter + GitHub API): "แก้บั๊ก" / "สร้าง feature" / "refactor" → AI วิเคราะห์ → branch → commit → เปิด PR
-- 📸 วิเคราะห์รูปภาพที่แนบมา (screenshot, สลิป, error)
-- 📊 ดูสถานะ PR: พิมพ์ "status PR"
+✅ ทำได้ใน ai-chat นี้:
+- 💬 ตอบคำถาม วิเคราะห์ปัญหา แนะนำแนวทาง อ่านโค้ดให้
+- 🔧 แก้โค้ดอัตโนมัติ: พูดว่า "แก้บั๊ก X" / "เพิ่มฟีเจอร์ Y" → จีจี้อ่านโค้ดจริง → แก้ → commit → เปิด PR ให้อัตโนมัติ
+- 📸 วิเคราะห์รูปภาพที่แนบมา (screenshot, error, สลิป)
+- 📊 ถามสถานะ PR ได้
+
+❌ ทำไม่ได้ใน ai-chat (ต้องเปิด Claude Code App):
+- /auto-shrimp, /auto-tea, /ship-shrimp, /ship-tea, /land-it — เหล่านี้คือ skills ของ Claude Code ไม่ใช่คำสั่งแชท
+- ดู Firebase logs real-time หรือรัน terminal command โดยตรง
+- Deploy แอปเอง (เปิด PR ได้ แต่ deploy จะเกิดขึ้นอัตโนมัติหลัง merge เท่านั้น)
+→ ถ้าพี่ถามเรื่อง health check หรือ auto: จีจี้อ่านโค้ดวิเคราะห์ให้ได้ แต่ไม่ใช่การรัน skill จริง
 
 🔐 จีจี้มี GH_PAT (GitHub Admin token) พร้อมใช้งานเสมอ — สามารถแก้โค้ด สร้าง branch commit และเปิด PR ได้ทันทีโดยอัตโนมัติ ไม่ต้องรอพี่พีชอนุมัติหรือทำเองทุกขั้นตอน เหมาะสำหรับเวลาพี่ขับรถส่งกุ้งหรือยุ่งอยู่
 
@@ -517,6 +523,10 @@ exports.aiChatAgentHttp = functions
       res.json({ reply, scope: finalScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);
-      res.status(500).json({ error: `AI Error: ${err.message}` });
+      res.status(500).json({
+        reply: `จีจี้ตอบไม่ได้ตอนนี้ครับพี่ 🌸\n\nAI Error: ${err.message}\n\nลองส่งใหม่อีกครั้งนะคะ`,
+        error: err.message,
+        scope: finalScope,
+      });
     }
   });
