@@ -264,6 +264,26 @@ export async function fsQueryToppings() {
   return fsListCollection('toppings');
 }
 
+/**
+ * ดึง dailyCupStocks ล่าสุดที่มี dateKey < beforeDateKey (1 รายการ)
+ * ใช้สำหรับ carry-forward ยอดแก้วข้ามวันที่ไม่มีการบันทึก
+ */
+export async function fsQueryLatestCupStockBefore(beforeDateKey) {
+  const docs = await fsRunQuery({
+    from: [{ collectionId: 'dailyCupStocks' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'dateKey' },
+        op: 'LESS_THAN',
+        value: { stringValue: beforeDateKey },
+      },
+    },
+    orderBy: [{ field: { fieldPath: 'dateKey' }, direction: 'DESCENDING' }],
+    limit: 1,
+  });
+  return docs[0] || null;
+}
+
 /** ข้อความจาก LINE webhook ชา — ใช้ดึง Group / User ID ล่าสุด */
 export async function fsQueryLineMessages(limit = 80) {
   const docs = await fsListCollection('line_messages', limit);

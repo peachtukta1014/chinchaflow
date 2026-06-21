@@ -8,6 +8,7 @@ import {
   fsQueryRestocksByDate,
   fsUpsertDoc,
   fsGetDoc,
+  fsQueryLatestCupStockBefore,
 } from '../lib/firestoreRest';
 import { sumPurchasedRestocks } from '../lib/restockService';
 import { fetchTeaDailySummary, intValue, moneyValue } from '../lib/dailySummaryService';
@@ -249,8 +250,7 @@ export function ExpensesTab({ member, t, lang = 'th', viewDateKey, setViewDateKe
       });
     } else {
       try {
-        const prevDateKey = shiftDateKey(dateKey, -1);
-        const prevCups = await fsGetDoc(`dailyCupStocks/${prevDateKey}`);
+        const prevCups = await fsQueryLatestCupStockBefore(dateKey);
         const prevRemaining = prevCups?.remainingCups;
         setCupForm(prevRemaining != null && prevRemaining >= 0
           ? { ...EMPTY_CUPS, openingCups: String(prevRemaining) }
