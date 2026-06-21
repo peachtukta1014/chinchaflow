@@ -5,6 +5,20 @@ export const CHAT_FUNCTION_URL = import.meta.env.VITE_AI_CHAT_FUNCTION_URL
   || 'https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp';
 
 /**
+ * ดึงผลลัพธ์สุดท้ายจาก Firestore (ใช้เมื่อ client กลับมา foreground)
+ * @param {string} requestId
+ * @returns {Promise<{reply: string, scope: string}|null>}
+ */
+export async function fetchResult(requestId) {
+  try {
+    const res = await fetch(`${CHAT_FUNCTION_URL}?action=result&requestId=${encodeURIComponent(requestId)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.found ? { reply: data.reply, scope: data.scope } : null;
+  } catch { return null; }
+}
+
+/**
  * ดึงสถานะ progress ของ request ที่กำลังรัน
  * @param {string} requestId
  * @returns {Promise<{step: string|null, ts: number|null}>}

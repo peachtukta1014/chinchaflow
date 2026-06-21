@@ -56,4 +56,45 @@ async function readProgress(requestId) {
   }
 }
 
-module.exports = { writeProgress, clearProgress, readProgress };
+/**
+ * เขียนผลลัพธ์สุดท้ายลง Firestore (เผื่อ client disconnect ระหว่างรัน)
+ * TTL 30 นาที — client จะลบเองเมื่ออ่านแล้ว
+ * @param {string|null} requestId
+ * @param {object} data  — { reply, scope, ... }
+ */
+async function writeResult(requestId, data) {
+  if (!requestId) return;
+  try {
+    const expiresAt = Date.now() + 30 * 60 * 1000;
+    await getDb().doc(`aiResults/${requestId}`).set({ ...data, ts: Date.now(), expiresAt });
+  } catch { /* non-critical */ }
+}
+
+/**
+ * อ่านผลลัพธ์ (ใช้ใน recovery endpoint)
+ * @param {string} requestId
+ * @returns {Promise<object|null>}
+ */
+async function readResult(requestId) {
+  try {
+    const doc = await getDb().doc(`aiResults/${requestId}`).get();
+    if (!doc.exists) return null;
+    const data = doc.data();
+    if (data.expiresAt && Date.now() > data.expiresAt) {
+      await getDb().doc(`aiResults/${requestId}`).delete();
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+/**
+ * ลบผลลัพธ์หลัง client อ่านแล้ว
+ * @param {string|null} requestId
+ */
+async function clearResult(requestId) {
+  if (!requestId) return;
+  try { await getDb().doc(`aiResults/${requestId}`).delete(); } catch { /* ignore */ }
+}
+
+module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult };
