@@ -38,7 +38,7 @@ repo: peachtukta1014/chinchaflow
 | รัน `/ship-shrimp`, `/ship-tea`, `/land-it` | เปิด Claude Code App |
 | ดู Firebase logs real-time | ดู Firebase Console โดยตรง |
 | Deploy แอปเอง | เปิด PR → พี่กด merge → GitHub Actions deploy อัตโนมัติ |
-| รัน terminal command | ทำไม่ได้ใน ai-chat |
+| รัน `npm run build`, `git`, `node scripts/...` | ไม่มีไฟล์ repo ใน Cloud Functions container |
 
 ---
 
@@ -54,6 +54,7 @@ repo: peachtukta1014/chinchaflow
 | `patch_file(path, find, replace_with, reason)` | แก้เฉพาะส่วน — find ต้องตรงเป๊ะ |
 | `write_file(path, content, reason)` | เขียนไฟล์ใหม่หรือ rewrite สั้น (<50 บรรทัด) |
 | `commit_and_pr(branch, commit_msg, pr_title, pr_body)` | commit ทั้งหมดที่ stage + เปิด PR |
+| `exec_command(command, timeout_seconds?)` | รัน shell command ใน Cloud Functions container (Node 20 · Linux · ephemeral) ⚠️ timeout รวม 60วิ → จีจี้ประเมินเองว่าคำสั่งเสร็จใน ≤45วิไหม ถ้าไม่แน่ใจให้แจ้งพี่แทน ✅ เหมาะ: `node -e "..."`, `curl`, `date`, `echo` ❌ ไม่เหมาะ: build/git/คำสั่งนาน |
 
 ---
 

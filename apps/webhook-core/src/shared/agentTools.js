@@ -16,6 +16,7 @@
  */
 
 const { writeProgress } = require('./progressTracker');
+const { execSync } = require('child_process');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const GH_API = 'https://api.github.com';
@@ -183,6 +184,37 @@ const TOOL_DEFINITIONS = [
           },
         },
         required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'exec_command',
+      description: `รัน shell command ใน Cloud Functions container (Node 20 · Linux · ephemeral)
+
+⚠️ ข้อจำกัดสำคัญ — ประเมินก่อนเรียกทุกครั้ง:
+• Cloud Functions timeout รวม 60 วิ — เหลือให้ command ≤ 45 วิ
+• ไม่มีไฟล์โปรเจกต์ใน container (ห้ามรัน npm run build / git / node scripts/...)
+• Ephemeral — ไม่มี state ข้ามการเรียก ผลลัพธ์ครั้งเดียว
+
+✅ เหมาะ: node -e "...", curl, date, echo, การคำนวณ, ทดสอบ logic สั้น
+❌ ไม่เหมาะ: build, git, คำสั่งที่ต้องไฟล์ repo, คำสั่งนาน >45 วิ
+
+ถ้าไม่แน่ใจว่าเสร็จใน 45 วิหรือไม่ → แจ้งพี่แทน อย่าเดา`,
+      parameters: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'shell command ที่จะรัน เช่น node -e "console.log(1+1)" หรือ curl https://...',
+          },
+          timeout_seconds: {
+            type: 'number',
+            description: 'timeout (วินาที) สูงสุด 45, default 20 — เผื่อ buffer ก่อน Cloud Functions หมดเวลา',
+          },
+        },
+        required: ['command'],
       },
     },
   },
@@ -459,8 +491,26 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
         : `❌ ไม่พบไฟล์ skill: ${skillPath}`;
     }
 
+    case 'exec_command': {
+      const timeoutSec = Math.min(Number(args.timeout_seconds) || 20, 45);
+      try {
+        const output = execSync(args.command, {
+          timeout: timeoutSec * 1000,
+          encoding: 'utf8',
+          maxBuffer: 512 * 1024,
+        });
+        return `✅ output:\n${output.trim() || '(ไม่มี output)'}`;
+      } catch (err) {
+        if (err.killed || err.signal === 'SIGTERM') {
+          return `❌ timeout (>${timeoutSec}วิ): command ใช้เวลานานเกินไป — ไม่เหมาะกับ Cloud Functions`;
+        }
+        const msg = ((err.stdout || '') + (err.stderr || '') || err.message).slice(0, 1000);
+        return `❌ error (exit ${err.status}):\n${msg}`;
+      }
+    }
+
     default:
-      return `❌ ไม่รู้จัก tool "${name}" — tools ที่มี: read_file, list_files, search_code, patch_file, write_file, commit_and_pr, trigger_deploy, get_skill`;
+      return `❌ ไม่รู้จัก tool "${name}" — tools ที่มี: read_file, list_files, search_code, patch_file, write_file, commit_and_pr, trigger_deploy, get_skill, exec_command`;
   }
 }
 
@@ -554,6 +604,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
           commit_and_pr: 'กำลัง commit และเปิด PR...',
           trigger_deploy: `กำลัง trigger deploy: ${args.app || ''}`,
           get_skill: `กำลังอ่าน skill: ${args.name || ''}`,
+          exec_command: `กำลังรัน: ${(args.command || '').slice(0, 60)}`,
         }[toolName] || `กำลังใช้ tool: ${toolName}`;
 
         await writeProgress(requestId, progressMsg);
