@@ -22,7 +22,8 @@
  */
 
 const functions = require('firebase-functions/v1');
-const { writeProgress } = require('./shared/progressTracker');
+const { writeProgress, clearProgress } = require('./shared/progressTracker');
+const { runAgentLoop, fetchRepoFile: fetchRepoFileFromTools } = require('./shared/agentTools');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -836,6 +837,118 @@ async function handleCodeAction({ message, history, scope, force = false, reques
   }
 }
 
+// ── Build system prompt for agentic loop ─────────────────────────────────
+function buildAgentSystemPrompt(scopeInfo, agentDocs, jiijiDef) {
+  const fileList = scopeInfo.files.slice(0, 25).join('\n');
+  const overflow = scopeInfo.files.length > 25
+    ? `\n... (และอีก ${scopeInfo.files.length - 25} ไฟล์ — เรียก list_files เพื่อดูทั้งหมด)`
+    : '';
+
+  return `คุณคือ "จีจี้" — Senior Full-stack Developer + เลขาส่วนตัวพี่พีช สำหรับ CHINCHA FLOW monorepo
+ขับเคลื่อนด้วย DeepSeek V4 Pro — ทำงานแบบ agentic: เลือก tool เอง ทำทีละขั้น จนงานเสร็จ
+
+## Scope ปัจจุบัน: ${scopeInfo.label}
+ไฟล์ที่มีอยู่ (เรียก list_files หรือ read_file เพื่อดูเนื้อหา):
+${fileList}${overflow}
+
+## วิธีทำงาน (ลำดับนี้เสมอ)
+1. list_files (ถ้ายังไม่รู้ว่าไฟล์ไหนเกี่ยว)
+2. read_file → อ่านโค้ดจริงก่อนแก้ทุกครั้ง ห้ามเดา
+3. patch_file (ไฟล์เดิม) หรือ write_file (ไฟล์ใหม่/สั้น)
+4. ถ้าต้องแก้หลายไฟล์ → ทำซ้ำขั้น 2-3 จนครบ
+5. commit_and_pr → สร้าง branch + commit ทั้งหมด + เปิด PR
+6. (optional) trigger_deploy ถ้าพี่ขอ deploy ด้วย
+
+## กฎสำคัญ (ฝ่าฝืนไม่ได้)
+- patch_file: "find" ต้อง copy มาจากผล read_file เป๊ะตัวต่อตัว รวม whitespace/indent
+- ถ้า find ไม่เจอ → read_file อีกครั้งแล้วตรวจ ห้ามเดา
+- diff เล็กที่สุด — แก้เฉพาะส่วนที่เกี่ยว ไม่แตะส่วนอื่น
+- ห้าม expose API key / token / secret ในโค้ด
+- commit_and_pr เป็นขั้นตอนสุดท้ายเสมอ (หลัง stage ครบทุกไฟล์แล้ว)
+${jiijiDef ? '\n## จากไฟล์ JIIJI.md (ตัวตน + skills ที่มี)\n' + jiijiDef.slice(0, 1500) : ''}
+${agentDocs ? '\n## กฎจากเจ้าของ repo (ต้องปฏิบัติตาม)\n' + agentDocs : ''}`;
+}
+
+// ── V2 handler: agentic loop (tool calling) ───────────────────────────────
+// แทน 2-round fixed pipeline ด้วย loop จริง — จีจี้เลือก tool เองจนงานเสร็จ
+async function handleCodeActionV2({ message, history, scope, force = false, requestId = null }) {
+  if (!force && !isCodeAction(message)) {
+    return {
+      statusCode: 200,
+      body: {
+        reply: 'คำสั่งนี้ดูไม่ใช่การแก้โค้ด — ลองพิมพ์ให้ชัดขึ้น เช่น "จีจี้ ช่วยแก้บั๊ก..." หรือ "จีจี้ ช่วยสร้าง feature..."',
+        scope: scope || 'root',
+        intent: 'chat',
+      },
+    };
+  }
+
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const ghPat = process.env.GH_PAT || process.env.GITHUB_TOKEN;
+
+  if (!openRouterKey) {
+    return { statusCode: 500, body: { reply: 'OPENROUTER_API_KEY ไม่ได้ตั้งค่า', scope: scope || 'root', intent: 'code-action', status: 'config_error' } };
+  }
+  if (!ghPat) {
+    return { statusCode: 500, body: { reply: 'GH_PAT ไม่ได้ตั้งค่า — ต้องมี GitHub Personal Access Token', scope: scope || 'root', intent: 'code-action', status: 'config_error' } };
+  }
+
+  const currentScope = scope || 'root';
+  const scopeInfo = SCOPE_FILE_TREE[currentScope] || SCOPE_FILE_TREE.root;
+
+  try {
+    // โหลด context: กฎ repo + JIIJI.md
+    await writeProgress(requestId, 'กำลังโหลดบริบทระบบ...');
+    const agentDocs = await fetchAgentDocs(ghPat);
+    const jiijiFile = await fetchRepoFileFromTools(ghPat, 'JIIJI.md', 'main').catch(() => null);
+
+    const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs, jiijiFile?.content || '');
+
+    // รัน agentic loop — จีจี้เลือก tool เองจนงานเสร็จ
+    const result = await runAgentLoop(openRouterKey, ghPat, {
+      message,
+      history: history || [],
+      requestId,
+      scopeFileTree: SCOPE_FILE_TREE,
+      systemPrompt,
+    });
+
+    await clearProgress(requestId);
+
+    return {
+      statusCode: 200,
+      body: {
+        reply: result.reply,
+        scope: currentScope,
+        intent: 'code-action',
+        status: 'completed',
+        iterations: result.iterations,
+        stagedFiles: result.stagedFiles,
+      },
+    };
+  } catch (err) {
+    console.error('handleCodeActionV2 error:', err);
+    await clearProgress(requestId);
+
+    // Fallback: ถ้า agentic loop ล้มเหลว ให้ลอง 2-round pipeline เดิม
+    if (!err.message?.includes('MAX_ITERATIONS')) {
+      console.warn('Falling back to 2-round pipeline...');
+      return handleCodeAction({ message, history, scope, force, requestId });
+    }
+
+    return {
+      statusCode: 500,
+      body: {
+        reply: `จีจี้เจอปัญหา: ${err.message}\n\nลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อยครับพี่ 🙏`,
+        scope: currentScope,
+        intent: 'code-action',
+        status: 'error',
+        error: err.message,
+      },
+    };
+  }
+}
+
 // ── V1 onRequest — HTTP endpoint ─────────────────────────────────────────
 exports.aiWorkflowAgentHttp = functions
   .runWith({ memory: '512MB', timeoutSeconds: 120 })
@@ -851,3 +964,4 @@ exports.aiWorkflowAgentHttp = functions
   });
 
 exports.handleCodeAction = handleCodeAction;
+exports.handleCodeActionV2 = handleCodeActionV2;
