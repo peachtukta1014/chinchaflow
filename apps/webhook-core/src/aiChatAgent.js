@@ -90,7 +90,7 @@ const SYSTEM_PROMPTS = {
 
 จีจี้ทำงานเป็น 3 ชั้น สลับกันไปทีละข้อความของพี่ ไม่ใช่มีความสามารถทั้งหมดพร้อมกันตลอดเวลา:
 1. ระบบ classify ข้อความพี่ก่อนเสมอ (พี่ไม่เห็นขั้นนี้) ว่าเป็นคำขอ "แก้/อ่านโค้ดจริง" หรือ "คุยทั่วไป/ถามความเห็น"
-2. ถ้าเป็นคำขอแก้/อ่านโค้ดจริง → จีจี้สวมหมวก "นักพัฒนา" มี tool จริงครบชุด (อ่านไฟล์, ค้นโค้ด, แก้ไฟล์, commit, เปิด PR, รัน command สั้นๆ) — นี่คือตอนที่จีจี้ "ลงมือทำจริง" ได้
+2. ถ้าเป็นคำขอแก้/อ่านโค้ดจริง → จีจี้สวมหมวก "นักพัฒนา" มี tool จริงครบชุด (อ่านไฟล์, ค้นโค้ด, แก้ไฟล์, commit, เปิด PR, รัน command สั้นๆ) — นี่คือตอนที่จีจี้ "ลงมือทำจริง" ได้ มีระบบเดียวเท่านั้น (agentic loop) ไม่มี fallback pipeline อื่น และมี retry อัตโนมัติถ้า network ขัดข้องชั่วคราว
 3. ถ้าเป็นคำถามทั่วไป → จีจี้สวมหมวก "ที่ปรึกษา" ตอบเป็นข้อความอธิบาย แนะนำ แต่ไม่มี tool เลย แตะไฟล์จริงไม่ได้ในโหมดนี้
 
 ดังนั้นถ้าพี่ขอให้ "ตรวจสอบไฟล์ X" หรือ "ดูโค้ด Y" จีจี้ต้องเข้าโหมด 2 (มี tool จริง) ไม่ใช่ตอบจากความจำหรือเดา — ถ้าจีจี้พบว่าตอบแบบไม่มี tool จริงในมือ (เช่นจำเป็นต้องเดาเนื้อไฟล์) ต้องบอกพี่ตรงๆว่า "ต้องขอเข้าโหมดตรวจโค้ดก่อน" แทนการเดาหรือพิมพ์ชื่อ tool เป็นข้อความเฉยๆ
@@ -318,45 +318,6 @@ async function fetchChatAgentDocs(ghPat) {
   _docsCacheTime = now;
   return result;
 }
-
-// ── V2 onCall function (callable from client SDK or fetch) ────────────────
-exports.aiChatAgent = https.onCall(
-  {
-    region: 'asia-southeast1',
-    memory: '256MiB',
-    timeoutSeconds: 60,
-  },
-  async (request) => {
-    const { message, history, scope } = request.data;
-
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      throw new https.HttpsError('invalid-argument', 'ต้องมีข้อความ (message)');
-    }
-
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new https.HttpsError('failed-precondition', 'OPENROUTER_API_KEY ไม่ได้ตั้งค่า');
-    }
-
-    const currentScope = scope || 'root';
-    const resolvedScope = detectScope(message, currentScope);
-    const systemContent = SYSTEM_PROMPTS[resolvedScope] || SYSTEM_PROMPTS.root;
-
-    const messages = [
-      { role: 'system', content: systemContent },
-      ...(history || []).slice(-20),
-      { role: 'user', content: message },
-    ];
-
-    try {
-      const reply = await callOpenRouter(apiKey, messages, { text: message });
-      return { reply, scope: resolvedScope };
-    } catch (err) {
-      console.error('aiChatAgent error:', err);
-      throw new https.HttpsError('internal', `AI Error: ${err.message}`);
-    }
-  }
-);
 
 // ── AI Intent Classifier + Thai→Technical Translator ─────────────────────
 // รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ว่าต้องการแก้ระบบหรือแค่ถาม → แปลเป็น technical spec

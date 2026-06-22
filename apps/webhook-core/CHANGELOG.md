@@ -7,6 +7,13 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-architecture-sync
+**refactor: ลบ V1 pipeline + dead endpoints ออก ให้เหลือแค่ agentic loop V2 เดียว + retry network**
+- `src/aiWorkflowAgent.js` — ลบ V1 ทั้งก้อน (`callOpenRouter`, `extractJson`, `buildFileSelectionPrompt`, `buildFixPlanPrompt`, `applyCodeChanges`, `openPR`, `executeCodeAction`, `handleCodeAction`, `exports.aiWorkflowAgentHttp`); ปรับ catch block `handleCodeActionV2` แยก error 3 ประเภท แทน fallback ไป V1
+- `src/aiChatAgent.js` — ลบ `exports.aiChatAgent` (onCall) dead endpoint + เพิ่ม "มีระบบเดียวเท่านั้น" ใน SYSTEM_PROMPTS
+- `src/index.js` — ลบ Object.assign `aiWorkflowAgentHttp` + `aiWorkflowStatusHttp`
+- `src/shared/agentTools.js` — เพิ่ม auto-retry ครั้งเดียวสำหรับ fetch error + HTTP 429/503
+
 ### 2026-06-22 | dev/ai-fix-self-awareness
 **fix: จีจี้เข้าใจหน้าที่จริงและรูปแบบการทำงาน 3 ชั้นถูกต้อง + เลิกพูดถึง Claude Code App ที่ไม่มีอยู่แล้ว**
 - `src/aiChatAgent.js` — `SYSTEM_PROMPTS.root`: เปลี่ยนทั้งก้อน
