@@ -15,7 +15,7 @@
  *   get_skill     — อ่าน skill definition
  */
 
-const { writeProgress } = require('./progressTracker');
+const { writeProgress, appendRunLog } = require('./progressTracker');
 const { execSync } = require('child_process');
 
 // ── Strip DeepSeek internal DSML markup from text ─────────────────────────
@@ -34,7 +34,14 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
-// deepseek-v4-pro: แม่นยำสูง + รองรับ tool calling ผ่าน OpenRouter
+// deepseek-v4-pro: แม่นยำสูง สำหรับเขียนโค้ด/agentic loop โดยเฉพาะ
+// (gpt-4o-mini ใช้แยกสำหรับ vision เท่านั้น — ดู aiChatAgent.js VISION_MODEL)
+//
+// ⚠ ก่อนเปลี่ยนค่านี้ — อ่านก่อน: ห้ามเปลี่ยน model เพื่อแก้ "agent นิ่ง/หยุดกลางทาง"
+// ปัญหานั้นไม่ได้อยู่ที่ตัวโมเดล แต่อยู่ที่ runAgentLoop ด้านล่าง (forceToolUse ต้องบังคับ
+// จนกว่า taskCompleted=true ไม่ใช่แค่ iteration แรก) — เคยสลับ AGENT_MODEL ไปมา 2 รอบ
+// (deepseek → gpt-4o-mini → deepseek) ในวันเดียวกันโดยไม่ได้แก้ตรงจุดนี้ บั๊กก็กลับมาอีก
+// ดู docs/AGENT_CHANGELOG_TH.md หัวข้อ "agentic loop ใช้ tools จริง" + "เปลี่ยน AGENT_MODEL → deepseek/deepseek-v4-pro"
 const AGENT_MODEL = 'deepseek/deepseek-v4-pro';
 
 // ── Tool definitions (OpenAI function-calling format) ─────────────────────
@@ -227,6 +234,33 @@ const TOOL_DEFINITIONS = [
           },
         },
         required: ['command'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'report_no_action_needed',
+      description: `เรียก tool นี้เมื่อสรุปแล้วว่า "ไม่ต้องแก้/เขียนโค้ดจริง" สำหรับคำสั่งนี้
+ใช้เฉพาะกรณีนี้เท่านั้น:
+- พี่แค่ขอให้ดูข้อมูล/อธิบาย/วิเคราะห์ (ไม่ใช่ขอให้แก้)
+- ข้อมูลที่มีไม่พอจะแก้โค้ดได้ ต้องถามพี่เพิ่มก่อน
+- ตรวจสอบแล้วพบว่าสิ่งที่ขอมีอยู่แล้ว ไม่ต้องทำอะไรเพิ่ม
+
+ห้ามเรียก tool นี้แทนการแก้โค้ดจริงเพื่อความง่าย — ถ้างานต้องแก้โค้ด ต้องทำให้ครบจนถึง commit_and_pr เท่านั้น`,
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: {
+            type: 'string',
+            description: 'สรุปสั้นๆให้พี่อ่านบนมือถือ — ภาษาไทยชาวบ้าน ไม่ใช้ศัพท์เทค',
+          },
+          need_more_info: {
+            type: 'boolean',
+            description: 'true ถ้าต้องถามพี่ก่อนทำต่อ',
+          },
+        },
+        required: ['summary'],
       },
     },
   },
@@ -529,8 +563,13 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       }
     }
 
+    case 'report_no_action_needed': {
+      const prefix = args.need_more_info ? 'ขอข้อมูลเพิ่มก่อนนะครับพี่ 🙏' : 'รายงานผลครับพี่';
+      return `ℹ️ ${prefix}\n\n${args.summary || ''}`;
+    }
+
     default:
-      return `❌ ไม่รู้จัก tool "${name}" — tools ที่มี: read_file, list_files, search_code, patch_file, write_file, commit_and_pr, trigger_deploy, get_skill, exec_command`;
+      return `❌ ไม่รู้จัก tool "${name}" — tools ที่มี: read_file, list_files, search_code, patch_file, write_file, commit_and_pr, trigger_deploy, get_skill, exec_command, report_no_action_needed`;
   }
 }
 
@@ -577,6 +616,12 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 
 // ── Main agentic loop ──────────────────────────────────────────────────────
 // จีจี้เรียก tool เองในแต่ละรอบ จนงานเสร็จหรือเกิน MAX_ITERATIONS
+//
+// ⚠️ จุดสำคัญ (อ่านก่อนแก้): "งานเสร็จ" ต้องเป็น fact ที่ระบบกำหนด (taskCompleted)
+// ไม่ใช่สิ่งที่อนุมานจาก finish_reason ของโมเดล — โมเดล (ไม่ว่าตัวไหน) มีโอกาส
+// finish_reason === 'stop' ทั้งที่ยังไม่ได้ลงมือจริง (เช่น พิมพ์ tool call เป็น text
+// เปล่าๆ แทนการยิง structured tool_calls) ถ้าเชื่อ finish_reason เฉยๆ จะได้ผลลัพธ์
+// "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
 async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt }) {
   const MAX_ITERATIONS = 15;
   const stagedFiles = {};
@@ -588,6 +633,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   ];
 
   let iterations = 0;
+  let taskCompleted = false; // set โดยระบบเท่านั้น เมื่อเจอ tool ที่นับว่า "จบงานจริง"
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -597,9 +643,18 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       : `จีจี้กำลังดำเนินการ (รอบ ${iterations})...`;
     await writeProgress(requestId, stepLabel);
 
-    // รอบแรก: บังคับ tool_choice='required' ให้เริ่มใช้ tool ทันที ไม่ถามยืนยัน
-    const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, iterations === 1);
+    // บังคับ tool_choice='required' ทุกรอบ จนกว่าระบบจะยืนยันว่างานจบจริง (taskCompleted)
+    // ไม่ใช่แค่รอบแรก — มิฉะนั้นโมเดลมีสิทธิ์ "ตอบ text เฉยๆ" ตั้งแต่รอบ 2 เป็นต้นไป
+    const forceTools = !taskCompleted;
+    const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, forceTools);
     const assistantMessage = choice.message;
+
+    await appendRunLog(requestId, {
+      iteration: iterations,
+      finishReason: choice.finish_reason,
+      forcedTools: forceTools,
+      toolCallCount: assistantMessage.tool_calls?.length || 0,
+    });
 
     // Always push assistant turn to conversation (strip DSML leak from text)
     messages.push({
@@ -625,6 +680,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
           trigger_deploy: `กำลัง trigger deploy: ${args.app || ''}`,
           get_skill: `กำลังอ่าน skill: ${args.name || ''}`,
           exec_command: `กำลังรัน: ${(args.command || '').slice(0, 60)}`,
+          report_no_action_needed: 'กำลังสรุปผล...',
         }[toolName] || `กำลังใช้ tool: ${toolName}`;
 
         await writeProgress(requestId, progressMsg);
@@ -636,14 +692,38 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
           toolResult = `❌ Tool error (${toolName}): ${err.message}`;
         }
 
+        // ระบบยืนยัน "จบงานจริง" เฉพาะ 2 เคสนี้เท่านั้น — ไม่ใช่โมเดลเป็นคนบอก
+        const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+        if (toolName === 'commit_and_pr' && resultText.startsWith('✅')) {
+          taskCompleted = true;
+        } else if (toolName === 'report_no_action_needed') {
+          taskCompleted = true;
+        }
+
+        await appendRunLog(requestId, {
+          iteration: iterations,
+          toolName,
+          ok: !resultText.startsWith('❌'),
+          taskCompleted,
+        });
+
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
-          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+          content: resultText,
         });
       }
+    } else if (!taskCompleted) {
+      // โมเดลพยายามตอบ text/หยุดเฉยๆ ทั้งที่ยังไม่มีหลักฐานว่างานจบ (เช่น พิมพ์
+      // tool call ปลอมเป็น text) — ไม่ยอมให้ return ทันที บังคับให้เรียก tool จริงต่อ
+      messages.push({
+        role: 'user',
+        content: '⚠️ งานยังไม่เสร็จ — ยังไม่เห็น commit_and_pr สำเร็จ หรือ report_no_action_needed ' +
+          'ต้องเรียก tool จริง (ไม่ใช่พิมพ์ชื่อ tool เป็นข้อความ) ต่อจนกว่างานจะเสร็จ',
+      });
+      continue;
     } else {
-      // finish_reason === 'stop' — จีจี้ตอบจบแล้ว
+      // taskCompleted=true และโมเดลตอบ text ปกติ (สรุปผลให้พี่อ่าน) — จบ loop ได้จริง
       const finalContent = stripDsml(assistantMessage.content || '');
       return {
         reply: finalContent,

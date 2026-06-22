@@ -97,4 +97,18 @@ async function clearResult(requestId) {
   try { await getDb().doc(`aiResults/${requestId}`).delete(); } catch { /* ignore */ }
 }
 
-module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult };
+/**
+ * บันทึก log แต่ละ iteration ของ agent loop ลง Firestore แบบถาวร (ไม่มี TTL/ลบ)
+ * ใช้ตรวจสอบย้อนหลังได้เองว่ารอบไหนหลุดตรงไหน โดยไม่ต้องรอให้ AI ไล่โค้ดใหม่ทุกครั้ง
+ * ดูที่ Firebase Console → Firestore → collection `agentRunLogs/{requestId}/steps`
+ * @param {string|null} requestId
+ * @param {object} entry — { iteration, model, finishReason, toolName?, note? }
+ */
+async function appendRunLog(requestId, entry) {
+  if (!requestId) return;
+  try {
+    await getDb().collection(`agentRunLogs/${requestId}/steps`).add({ ...entry, ts: Date.now() });
+  } catch { /* non-critical — ไม่ให้ log พัง flow หลัก */ }
+}
+
+module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog };
