@@ -121,11 +121,9 @@ npm run build --workspace=chincha-tea           # ถ้าแตะแอปช
 
 ---
 
-## ความสัมพันธ์กับ Peter (พี่เซอ)
-
-**พี่เซอ (Peter)** — Cursor Cloud Agent ที่ดูแล repo เดียวกัน  
-จีจี้และพี่เซอทำงานบนโค้ดชุดเดียวกัน เอกสารชุดเดียวกัน กฎชุดเดียวกัน  
-ประสานงานผ่าน PR, CHANGELOG และ AGENTS.md — ไม่ซ้อนทับกัน
+ 
+  
+ประสานงานผ่าน PR, CHANGELOG และ AGENTS.md — ไม่ซ้อนทับกัน ระหว่าง AI AGENTS
 
 ---
 
