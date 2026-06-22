@@ -34,8 +34,8 @@ repo: peachtukta1014/chinchaflow
 
 | ❌ ทำไม่ได้ | ✅ ทางเลือก |
 |------------|------------|
-| รัน `/auto-shrimp`, `/auto-tea` ใน ai-chat | เปิด Claude Code App แล้วพิมพ์ `/auto-shrimp` |
-| รัน `/ship-shrimp`, `/ship-tea`, `/land-it` | เปิด Claude Code App |
+| รัน `/auto-shrimp`, `/auto-tea` ใน ai-chat | Skills เหล่านี้ใช้ได้เฉพาะใน Claude Code CLI remote session |
+| รัน `/ship-shrimp`, `/ship-tea`, `/land-it` | ใช้ผ่าน Claude Code CLI remote session เท่านั้น |
 | ดู Firebase logs real-time | ดู Firebase Console โดยตรง |
 | Deploy แอปเอง | เปิด PR → พี่กด merge → GitHub Actions deploy อัตโนมัติ |
 | รัน `npm run build`, `git`, `node scripts/...` | ไม่มีไฟล์ repo ใน Cloud Functions container |
@@ -89,18 +89,18 @@ repo: peachtukta1014/chinchaflow
 
 ---
 
-## Skills (Claude Code / Cursor เท่านั้น — ไม่ใช่คำสั่ง ai-chat)
+## Skills (Claude Code CLI — ไม่ใช่คำสั่ง ai-chat)
 
-⚠️ Skills ด้านล่างใช้งานได้เฉพาะใน **Claude Code App** หรือ **Cursor IDE** เท่านั้น  
-พิมพ์ใน ai-chat ไม่มีผล — ต้องเปิด Claude Code App แล้วพิมพ์ชื่อ skill
+⚠️ Skills ด้านล่างใช้งานได้เฉพาะผ่าน **Claude Code CLI** (remote session หรือ dev session) เท่านั้น  
+พิมพ์ใน ai-chat ไม่มีผล — ไม่มีแอปอื่นนอกจาก ai-chat ที่จีจี้ทำงานอยู่
 
-| Skill | ใช้ใน | หน้าที่ |
-|-------|-------|---------|
-| `/auto-shrimp` | Claude Code / Cursor | ตรวจสุขภาพร้านกุ้ง (read-only) |
-| `/auto-tea` | Claude Code / Cursor | ตรวจสุขภาพร้านชา (read-only) |
-| `/ship-shrimp` | Claude Code / Cursor | ปิดงาน + ship ร้านกุ้ง |
-| `/ship-tea` | Claude Code / Cursor | ปิดงาน + ship ร้านชา |
-| `/land-it` | Claude Code | verify + commit + push + PR |
+| Skill | หน้าที่ |
+|-------|---------|
+| `/auto-shrimp` | ตรวจสุขภาพร้านกุ้ง (read-only) |
+| `/auto-tea` | ตรวจสุขภาพร้านชา (read-only) |
+| `/ship-shrimp` | ปิดงาน + ship ร้านกุ้ง |
+| `/ship-tea` | ปิดงาน + ship ร้านชา |
+| `/land-it` | verify + commit + push + PR |
 
 ---
 
