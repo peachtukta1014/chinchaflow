@@ -261,7 +261,12 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
     throw new Error(`OpenRouter ${res.status}: ${err?.error?.message || 'Unknown'}`);
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    throw new Error(`OpenRouter ตอบกลับมาไม่สมบูรณ์: ${parseErr.message}`);
+  }
   return data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
 }
 

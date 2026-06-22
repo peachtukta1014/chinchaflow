@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-json-parse-error
+**fix: res.json() ไม่มี error handling ทำให้ Error 500 unexpected end of JSON input ไม่ถูก retry**
+- `src/shared/agentTools.js` — `callOpenRouterWithTools`: ห่อ `res.json()` ด้วย try/catch + retry ครั้งเดียว (รอ 2s) เมื่อ JSON parse ล้มเหลว
+- `src/aiChatAgent.js` — `callOpenRouter`: ห่อ `res.json()` ด้วย try/catch + throw error ที่อ่านได้
+
 ### 2026-06-22 | dev/ai-fix-token-waste-and-stale-docs
 **fix: 5 จุดเสีย token/ทรัพยากร + header ภาษาไทยทำแก้โค้ดพัง 100%**
 - `src/shared/agentTools.js` — (1) `X-Title` header มี `จีจี้` (ไทย/non-Latin-1) → fetch throw `TypeError` ทันทีก่อนส่ง request → เปลี่ยนเป็น `(Jiji)`; (4) `get_skill` เพิ่ม warning ท้าย return ว่า npm/git/node scripts รันไม่ได้ใน Cloud Functions container

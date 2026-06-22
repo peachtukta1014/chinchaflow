@@ -629,7 +629,17 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
     throw new Error(`OpenRouter ${res.status} (${useModel}): ${errMsg}`);
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    if (!_retried) {
+      console.warn('OpenRouter response JSON parse error — retrying once:', parseErr.message);
+      await new Promise(r => setTimeout(r, 2000));
+      return callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse, true);
+    }
+    throw new Error(`OpenRouter ตอบกลับมาไม่สมบูรณ์ (JSON parse ล้มเหลว): ${parseErr.message}`);
+  }
   const choice = data?.choices?.[0];
   if (!choice) throw new Error('OpenRouter ไม่ตอบกลับ');
   return choice;
