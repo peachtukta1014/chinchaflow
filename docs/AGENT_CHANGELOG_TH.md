@@ -1,3 +1,9 @@
+## 2026-06-22 — fix: agent loop วนจนครบ 15 รอบเปล่าๆ เมื่อโมเดลพิมพ์ tool call ปลอมซ้ำ
+
+- **สาเหตุ:** `taskCompleted` guard (PR #324) ป้องกัน "นิ่งกลางทางเงียบๆ" ได้ผล แต่สร้างผลข้างเคียงใหม่ — เมื่อ DeepSeek Pro พิมพ์ tool call ผิด syntax ซ้ำๆ (เช่น `<read_file path="docs/" />` เป็นข้อความธรรมดา) loop วนต่อทุกรอบ warning เดิม ("งานยังไม่เสร็จ") ไม่บอกว่า syntax ผิดตรงไหน → โมเดลไม่แก้ → วนจนครบ 15 รอบแล้ว throw MAX_ITERATIONS
+- `agentTools.js` — `runAgentLoop`: เพิ่ม `consecutiveTextOnlyReplies` counter; ถ้าพิมพ์ text ผิดรูปแบบ ≥ 3 รอบติดกัน → throw error ระบุสาเหตุชัดเจนแทนรอครบ 15 รอบ; เปลี่ยน warning ให้แสดงข้อความที่โมเดลพิมพ์จริง (200 ตัวอักษรแรก) และบอกชัดว่าต้องใช้ function calling ไม่ใช่ text; reset counter เมื่อ tool_calls สำเร็จ
+- ถ้าพังให้เช็ก: `agentTools.js` (runAgentLoop, consecutiveTextOnlyReplies)
+
 ## 2026-06-22 — fix: res.json() ไม่มี error handling ทำให้ Error 500 "unexpected end of JSON input" ไม่ถูก retry
 
 - **สาเหตุ:** `callOpenRouterWithTools` (agentTools.js) และ `callOpenRouter` (aiChatAgent.js) เรียก `res.json()` โดยไม่มี try/catch — เมื่อ OpenRouter ตอบ 200 OK แต่ body ขาดครึ่ง (connection หลุดกลางทาง) จะ throw `SyntaxError: Unexpected end of JSON input` ซึ่งไม่ตรง pattern retry เดิม (ECONNRESET/ETIMEDOUT/429/503) → error ส่งถึง user เลย
