@@ -60,7 +60,10 @@ export async function fsGetDoc(path) {
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  return { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
+  const doc = { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
+  doc._updateTime = json.updateTime || null;
+  doc._createTime = json.createTime || null;
+  return doc;
 }
 
 export async function fsPost(col, data) {
