@@ -435,7 +435,3 @@ exports.onShrimpAdminAlertCreated = functions
 
 // ── AI Chat + Workflow Agent ──────────────────────────────────────────────────
 Object.assign(exports, require('./aiChatAgent'));
-Object.assign(exports, {
-  aiWorkflowAgentHttp: require('./aiWorkflowAgent').aiWorkflowAgentHttp,
-  aiWorkflowStatusHttp: require('./aiWorkflowAgent').aiWorkflowStatusHttp,
-});

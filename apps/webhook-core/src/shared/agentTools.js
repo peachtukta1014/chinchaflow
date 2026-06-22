@@ -575,31 +575,48 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
 
 // ── Call OpenRouter with function calling support ─────────────────────────
 // forceToolUse=true → tool_choice:'required' บังคับให้เรียก tool (ใช้ใน iteration แรก)
-async function callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse = false) {
+async function callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse = false, _retried = false) {
   const useModel = model || process.env.CODE_MODEL || AGENT_MODEL;
   const toolChoice = forceToolUse ? 'required' : 'auto';
 
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://chincha-flow.web.app',
-      'X-Title': 'CHINCHA FLOW AI Agent (จีจี้)',
-    },
-    body: JSON.stringify({
-      model: useModel,
-      messages,
-      tools,
-      tool_choice: toolChoice,
-      temperature: 0.1,
-      max_tokens: 4096,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://chincha-flow.web.app',
+        'X-Title': 'CHINCHA FLOW AI Agent (จีจี้)',
+      },
+      body: JSON.stringify({
+        model: useModel,
+        messages,
+        tools,
+        tool_choice: toolChoice,
+        temperature: 0.1,
+        max_tokens: 4096,
+      }),
+    });
+  } catch (fetchErr) {
+    // Retry once on transient network errors (ECONNRESET, ETIMEDOUT, fetch failed)
+    if (!_retried) {
+      console.warn('callOpenRouterWithTools fetch error — retrying once:', fetchErr.message);
+      await new Promise(r => setTimeout(r, 2000));
+      return callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse, true);
+    }
+    throw fetchErr;
+  }
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
     const errMsg = errBody?.error?.message || `HTTP ${res.status}`;
+    // Retry once on transient HTTP errors (429 rate-limit, 503 unavailable)
+    if (!_retried && (res.status === 429 || res.status === 503)) {
+      console.warn(`OpenRouter ${res.status} — retrying once after 2s`);
+      await new Promise(r => setTimeout(r, 2000));
+      return callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse, true);
+    }
     // ถ้า model ไม่ support tools ให้ fallback ไป gpt-4o-mini
     if (res.status === 400 && useModel !== AGENT_MODEL) {
       console.warn(`Model ${useModel} tool-calling error — retrying with ${AGENT_MODEL}`);

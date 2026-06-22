@@ -1,3 +1,12 @@
+## 2026-06-22 — refactor: ลบ V1 pipeline + dead endpoints ออกจาก webhook-core ให้เหลือแค่ agentic loop V2 เดียว
+
+- **สาเหตุ:** มีสองระบบ parallel — V2 (agentic loop, tool calling) และ V1 (2-round JSON text, ไม่มี taskCompleted guard) โดย `handleCodeActionV2` catch block fallback ไปรัน V1 ทุกครั้งที่ error ทำให้ V2 พังแล้วดิ่งไป V1 แบบ silent; endpoints `aiWorkflowAgentHttp` + `aiChatAgent` (onCall) ก็ไม่มี frontend ไหน call เลย
+- `apps/webhook-core/src/aiWorkflowAgent.js` — ลบ V1 ทั้งก้อน: `callOpenRouter`, `extractJson`, `buildFileSelectionPrompt`, `buildFixPlanPrompt`, `applyCodeChanges`, `openPR`, `executeCodeAction`, `handleCodeAction`, `exports.aiWorkflowAgentHttp`; เปลี่ยน catch block ของ `handleCodeActionV2` ให้แยก error 3 ประเภท (MAX_ITERATIONS / transient network / อื่น) ส่ง message ตรงๆ แทน fallback
+- `apps/webhook-core/src/aiChatAgent.js` — ลบ `exports.aiChatAgent` (https.onCall) ทั้งบล็อก + เพิ่มประโยค "มีระบบเดียวเท่านั้น" ใน SYSTEM_PROMPTS.root
+- `apps/webhook-core/src/index.js` — ลบ Object.assign aiWorkflowAgentHttp + aiWorkflowStatusHttp
+- `apps/webhook-core/src/shared/agentTools.js` — เพิ่ม retry ครั้งเดียวใน `callOpenRouterWithTools` สำหรับ fetch error + HTTP 429/503
+- ถ้าพังให้เช็ก: `aiWorkflowAgent.js` (handleCodeActionV2), `agentTools.js` (callOpenRouterWithTools)
+
 ## 2026-06-22 — fix: จีจี้เข้าใจหน้าที่จริงและรูปแบบการทำงาน 3 ชั้นถูกต้อง + เลิกพูดถึง Claude Code App ที่ไม่มีอยู่แล้ว
 
 - **สาเหตุ:** `SYSTEM_PROMPTS.root` ใน `aiChatAgent.js` มีหัวข้อ "❌ ทำไม่ได้ใน ai-chat (ต้องเปิด Claude Code App)" ซึ่งชี้ไป Claude Code App / Cursor Cloud Agent ที่เลิกใช้ไปแล้ว (ตาม `PEACH_WORKING_STYLE_TH.md`: "ไม่ใช้แล้ว: Cursor Cloud, Slack agent, เครื่องคอม") และไม่ได้อธิบายว่าจีจี้ทำงานเป็น 3 ชั้นสลับกัน ทำให้บางครั้งบอกพี่ว่าตัวเองทำอะไรไม่ได้ทั้งที่จริงทำได้เมื่อเข้าโหมดที่ถูกต้อง
