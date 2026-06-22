@@ -1,3 +1,12 @@
+## 2026-06-22 — fix: จีจี้ agent loop นิ่งกลางทาง — บังคับ tool จนกว่างานจบจริง (taskCompleted)
+
+- **สาเหตุที่แท้จริง:** `agentTools.js` `runAgentLoop` บังคับ `tool_choice:'required'` เฉพาะ iteration แรก (`iterations === 1`) ตั้งแต่รอบ 2 ปล่อยเป็น `auto` → โมเดล (deepseek-v4-pro) มีสิทธิ์ "พิมพ์ tool call เป็น text เปล่าๆ" ทำให้ `finish_reason === 'stop'` แล้ว loop คิดว่างานจบ ส่ง reply ดิบ (มี XML tag) กลับทันที = นิ่งกลางทาง
+- **เคยแก้ด้วยการสลับ AGENT_MODEL → gpt-4o-mini** (ดูหัวข้อ "agentic loop ใช้ tools จริง") แต่ภายหลังมีคนสลับกลับเป็น deepseek-v4-pro โดยไม่แก้ tool_choice logic บั๊กเดิมจึงกลับมา — ครั้งนี้แก้ที่ loop logic ไม่ใช่สลับโมเดล (ปัญหานี้เกิดได้กับทุกโมเดลตราบใดที่ loop เชื่อ finish_reason)
+- `agentTools.js` — `runAgentLoop` ใช้ flag `taskCompleted` ที่ระบบเซ็ตเอง (เฉพาะ `commit_and_pr` คืน ✅ หรือเรียก `report_no_action_needed`) แทนการเชื่อ `finish_reason`; บังคับ `forceTools = !taskCompleted` ทุกรอบ; ถ้าโมเดลตอบ text ทั้งที่ยังไม่ taskCompleted → เตือนแล้ววนต่อ ไม่ปล่อยให้ return
+- `agentTools.js` — เพิ่ม tool `report_no_action_needed` (ใช้ตอนแค่ขอดูข้อมูล/ต้องถามเพิ่ม/มีอยู่แล้ว) + comment กัน regression เหนือ `AGENT_MODEL` (ห้ามแก้บั๊กนิ่งด้วยการสลับโมเดล)
+- `progressTracker.js` — เพิ่ม `appendRunLog(requestId, entry)` เขียน log ทุก iteration ลง `agentRunLogs/{requestId}/steps` แบบถาวร (ไม่มี TTL) เพื่อตรวจย้อนหลัง
+- ถ้าพังให้เช็ก `agentTools.js` (`runAgentLoop` taskCompleted) · `progressTracker.js` (`appendRunLog`)
+
 ## 2026-06-21 — PR#317: feat: ai-chat ปุ่ม Refresh + เลขเวอร์ชัน auto-bump
 
 - `App.jsx` — ปุ่ม 🔄 Refresh ขวาสุด header (window.location.reload) + แสดง APP_VERSION ใต้ CHINCHA FLOW

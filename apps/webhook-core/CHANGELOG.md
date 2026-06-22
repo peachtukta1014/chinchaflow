@@ -7,6 +7,15 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-agent-loop-completion
+**fix: agent loop นิ่งกลางทาง — บังคับ tool จนกว่างานจบจริง**
+- `src/shared/agentTools.js` — `runAgentLoop`: เลิกเชื่อ `finish_reason` ของโมเดล เปลี่ยนมาใช้ flag `taskCompleted` ที่ระบบเซ็ตเอง (เฉพาะ `commit_and_pr` คืน ✅ หรือเรียก `report_no_action_needed`)
+  - บังคับ `tool_choice:'required'` ทุกรอบ (`forceTools = !taskCompleted`) ไม่ใช่แค่ iteration แรก — กันโมเดลพิมพ์ tool call เป็น text เปล่าๆ ตั้งแต่รอบ 2
+  - ถ้าโมเดลตอบ text ทั้งที่ยังไม่ taskCompleted → push คำเตือนแล้ววน loop ต่อ ไม่ return ทันที
+  - สาเหตุเดิม: บังคับ tool แค่รอบแรก รอบหลังเป็น `auto` → `finish_reason === 'stop'` ทำให้ loop คิดว่างานจบ; เคยแก้ด้วยสลับ AGENT_MODEL แต่กลับมาเมื่อสลับโมเดลคืน
+- `src/shared/agentTools.js` — เพิ่ม tool `report_no_action_needed` (ขอดูข้อมูล/ต้องถามเพิ่ม/มีอยู่แล้ว) + comment กัน regression เหนือ `AGENT_MODEL`
+- `src/shared/progressTracker.js` — เพิ่ม `appendRunLog()` เขียน log ทุก iteration ลง `agentRunLogs/{requestId}/steps` (ไม่มี TTL) เพื่อตรวจย้อนหลัง
+
 ### 2026-06-21 | PR #316
 **fix: จีจี้ (ai-chat) รู้จักขอบเขตตัวเอง — เพิ่ม ❌ section + แก้ error response**
 - `src/aiChatAgent.js` — root scope system prompt: เพิ่ม "❌ ทำไม่ได้ใน ai-chat" (/auto-shrimp, /auto-tea ฯลฯ คือ Claude Code skills ไม่ใช่คำสั่งแชท · ดู logs real-time ไม่ได้ · deploy เองไม่ได้)
