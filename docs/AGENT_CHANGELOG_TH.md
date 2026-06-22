@@ -1,3 +1,10 @@
+## 2026-06-22 — fix: classifier ส่ง "ดูโค้ด/ตรวจไฟล์" เข้า code-action + กันจีจี้พิมพ์ tool call ปลอมใน chat mode
+
+- **สาเหตุ:** `classifyAndTranslate` ใน `aiChatAgent.js` classify คำสั่ง "ตรวจสอบไฟล์ X" / "ดูโค้ด Y" เป็น `chat` (ไม่ใช่ code-action) → model เข้า plain chat ไม่มี tool จริง แต่เคยเห็น `JIIJI.md` ที่ลิสต์ tool names จึงพิมพ์ `<read_file>` เป็น text ออกมาให้ user เห็น
+- `aiChatAgent.js` — `classifyAndTranslate` system prompt: เพิ่มเงื่อนไข "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง" เป็น code-action ควบคู่กับ "แก้/เพิ่ม/เปลี่ยน" — เพราะทั้งสองแบบต้องใช้ tool อ่านโค้ดจริงเหมือนกัน
+- `JIIJI.md` — เพิ่ม warning block หลัง tools table: tools ใช้ได้จริงเฉพาะ agentic loop (code-action) เท่านั้น; ถ้า intent=chat ห้ามพิมพ์ชื่อ tool เป็นข้อความ; ถ้าต้องอ่านโค้ดจริงให้แจ้งพี่ว่า "ต้องขอให้จีจี้เข้าโหมดตรวจโค้ดก่อน"
+- ถ้าพังให้เช็ก `aiChatAgent.js` (classifyAndTranslate systemPrompt)
+
 ## 2026-06-22 — fix: จีจี้ agent loop นิ่งกลางทาง — บังคับ tool จนกว่างานจบจริง (taskCompleted)
 
 - **สาเหตุที่แท้จริง:** `agentTools.js` `runAgentLoop` บังคับ `tool_choice:'required'` เฉพาะ iteration แรก (`iterations === 1`) ตั้งแต่รอบ 2 ปล่อยเป็น `auto` → โมเดล (deepseek-v4-pro) มีสิทธิ์ "พิมพ์ tool call เป็น text เปล่าๆ" ทำให้ `finish_reason === 'stop'` แล้ว loop คิดว่างานจบ ส่ง reply ดิบ (มี XML tag) กลับทันที = นิ่งกลางทาง

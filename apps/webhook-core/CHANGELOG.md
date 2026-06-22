@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-chat-tool-confusion
+**fix: classifier ส่ง "ดูโค้ด/ตรวจไฟล์" เข้า code-action + กันจีจี้พิมพ์ tool call ปลอมใน chat mode**
+- `src/aiChatAgent.js` — `classifyAndTranslate` system prompt: ขยาย trigger เป็น code-action ครอบคลุม "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง" (เช่น "ตรวจสอบไฟล์ X", "อธิบายว่า Z ทำงานยังไง") — เดิมถูก classify เป็น chat → model ไม่มี tool จริงแต่พิมพ์ tool call เป็น text
+- `JIIJI.md` — เพิ่ม warning หลัง tools table: tools ใช้ได้จริงเฉพาะ agentic loop (code-action) ถ้า intent=chat ห้ามพิมพ์ชื่อ tool เป็นข้อความ ให้แจ้งพี่ขอเข้าโหมดตรวจโค้ดก่อน
+
 ### 2026-06-22 | dev/ai-fix-agent-loop-completion
 **fix: agent loop นิ่งกลางทาง — บังคับ tool จนกว่างานจบจริง**
 - `src/shared/agentTools.js` — `runAgentLoop`: เลิกเชื่อ `finish_reason` ของโมเดล เปลี่ยนมาใช้ flag `taskCompleted` ที่ระบบเซ็ตเอง (เฉพาะ `commit_and_pr` คืน ✅ หรือเรียก `report_no_action_needed`)
