@@ -665,6 +665,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
 
   let iterations = 0;
   let taskCompleted = false; // set โดยระบบเท่านั้น เมื่อเจอ tool ที่นับว่า "จบงานจริง"
+  let consecutiveTextOnlyReplies = 0; // นับรอบที่โมเดลตอบ text ล้วนๆติดกัน (ไม่มี tool_calls)
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -695,6 +696,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     });
 
     if (choice.finish_reason === 'tool_calls' && assistantMessage.tool_calls?.length > 0) {
+      consecutiveTextOnlyReplies = 0; // เรียก tool ถูกแล้ว รีเซ็ตตัวนับ
       // Execute each tool call and feed results back
       for (const toolCall of assistantMessage.tool_calls) {
         const toolName = toolCall.function.name;
@@ -745,12 +747,29 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
         });
       }
     } else if (!taskCompleted) {
-      // โมเดลพยายามตอบ text/หยุดเฉยๆ ทั้งที่ยังไม่มีหลักฐานว่างานจบ (เช่น พิมพ์
-      // tool call ปลอมเป็น text) — ไม่ยอมให้ return ทันที บังคับให้เรียก tool จริงต่อ
+      consecutiveTextOnlyReplies++;
+
+      // หยุด early ถ้าพิมพ์ text ผิดรูปแบบซ้ำเกิน 3 รอบติดกัน — ไม่มีประโยชน์
+      // ที่จะวนต่อจนครบ MAX_ITERATIONS เพราะโมเดลไม่ได้ "เรียนรู้" จาก warning
+      // เดิม (เคยเจอจริง: สั่งงานเล็กๆอย่าง "list_files ที่ docs/" ก็วนจน 15
+      // รอบเพราะพิมพ์ <read_file path="docs/" /> ซ้ำๆ)
+      if (consecutiveTextOnlyReplies >= 3) {
+        throw new Error(
+          `จีจี้พยายามเรียก tool แต่พิมพ์รูปแบบผิดซ ${consecutiveTextOnlyReplies} รอบติดกัน ` +
+          `(โมเดลพิมพ์ syntax คล้าย tool call เป็นข้อความธรรมดา ไม่ใช่เรียกจริง) ` +
+          `ลองสั่งงานใหม่อีกครั้ง หรือลองใช้คำสั่งที่ตรงชื่อ tool มากขึ้น เช่น "list_files docs/" ` +
+          `แทน "list_files ที่ docs/ ก่อน"`
+        );
+      }
+
+      // ระบุปัญหาเจาะจงขึ้น (ไม่ใช่แค่ "ยังไม่เสร็จ") ให้โมเดลเห็นว่าปัญหาคือ
+      // syntax ผิด ไม่ใช่ยังไม่เริ่มทำ — เพิ่มโอกาสที่รอบถัดไปจะเรียกถูก
+      const leakedText = (assistantMessage.content || '').slice(0, 200);
       messages.push({
         role: 'user',
-        content: '⚠️ งานยังไม่เสร็จ — ยังไม่เห็น commit_and_pr สำเร็จ หรือ report_no_action_needed ' +
-          'ต้องเรียก tool จริง (ไม่ใช่พิมพ์ชื่อ tool เป็นข้อความ) ต่อจนกว่างานจะเสร็จ',
+        content: `⚠️ คุณพิมพ์ "${leakedText}" เป็นข้อความธรรมดา แต่นี่ไม่ใช่การเรียก tool จริง ` +
+          `ระบบไม่เห็นและไม่ execute ให้ — ต้องเรียกผ่าน function calling (tool_calls field) ` +
+          `เท่านั้น ห้ามพิมพ์ชื่อ tool หรือ XML/JSON เป็นข้อความในคำตอบเด็ดขาด`,
       });
       continue;
     } else {

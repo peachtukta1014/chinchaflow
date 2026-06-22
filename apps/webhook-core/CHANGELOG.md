@@ -7,6 +7,10 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-loop-early-exit
+**fix: agent loop วนจนครบ 15 รอบเปล่าๆ เมื่อโมเดลพิมพ์ tool call ปลอมซ้ำ**
+- `src/shared/agentTools.js` — `runAgentLoop`: เพิ่ม `consecutiveTextOnlyReplies` counter; early exit หลัง 3 รอบติดกัน; warning ใหม่แสดง text ที่โมเดลพิมพ์จริงและบอกว่าต้องใช้ function calling; reset เมื่อ tool_calls สำเร็จ
+
 ### 2026-06-22 | dev/ai-fix-json-parse-error
 **fix: res.json() ไม่มี error handling ทำให้ Error 500 unexpected end of JSON input ไม่ถูก retry**
 - `src/shared/agentTools.js` — `callOpenRouterWithTools`: ห่อ `res.json()` ด้วย try/catch + retry ครั้งเดียว (รอ 2s) เมื่อ JSON parse ล้มเหลว
