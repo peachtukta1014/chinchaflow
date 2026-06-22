@@ -60,10 +60,7 @@ export async function fsGetDoc(path) {
   if (!r.ok) throw new Error(`GET ${path} HTTP ${r.status}`);
   const json = await r.json();
   const parts = json.name.split('/');
-  const doc = { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
-  doc._updateTime = json.updateTime || null;
-  doc._createTime = json.createTime || null;
-  return doc;
+  return { id: parts[parts.length - 1], ...fromFsFields(json.fields || {}) };
 }
 
 export async function fsPost(col, data) {
@@ -85,6 +82,38 @@ export async function fsPatch(path, data) {
     method: 'PATCH',
     headers: await authHeaders(),
     body: JSON.stringify({ fields }),
+  });
+  if (!r.ok) throw new Error(`PATCH ${path} HTTP ${r.status}`);
+}
+
+/** PATCH ด้วย field transforms (atomic increment) เพื่อป้องกัน race condition */
+export async function fsAtomicUpdate(path, { fields = {}, increments = {} }) {
+  const fieldEntries = Object.entries(fields).filter(([, v]) => v !== undefined);
+  const hasFields = fieldEntries.length > 0;
+  const body = {};
+  const qsParts = [];
+  if (hasFields) {
+    body.fields = fsObj(Object.fromEntries(fieldEntries));
+    qsParts.push(...fieldEntries.map(([k]) => `updateMask.fieldPaths=${encodeURIComponent(k)}`));
+  }
+  const incEntries = Object.entries(increments).filter(([, v]) => v !== undefined && v !== null);
+  if (incEntries.length > 0) {
+    body.fieldTransforms = incEntries.map(([fieldPath, value]) => {
+      if (typeof value === 'number') {
+        return {
+          fieldPath,
+          increment: Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value },
+        };
+      }
+      return { fieldPath, increment: fsVal(value) };
+    });
+    // increment field ไม่ต้องใส่ใน updateMask
+  }
+  const qs = qsParts.join('&');
+  const r = await fetch(`${FS_BASE}/${path}?${qs}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`PATCH ${path} HTTP ${r.status}`);
 }
