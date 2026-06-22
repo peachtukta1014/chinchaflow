@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-token-waste-and-stale-docs
+**fix: 5 จุดเสีย token/ทรัพยากร + header ภาษาไทยทำแก้โค้ดพัง 100%**
+- `src/shared/agentTools.js` — (1) `X-Title` header มี `จีจี้` (ไทย/non-Latin-1) → fetch throw `TypeError` ทันทีก่อนส่ง request → เปลี่ยนเป็น `(Jiji)`; (4) `get_skill` เพิ่ม warning ท้าย return ว่า npm/git/node scripts รันไม่ได้ใน Cloud Functions container
+- `src/aiChatAgent.js` — (2) `fetchJiijiDef` slice จาก 2000 → 3500 (คำเตือนอยู่ที่ ~2440); (3) `fetchChatAgentDocs` maxLen 3000/2500/1500 → 6000/5000/5000; (5.1) comment `V1 onRequest fallback` → `Main HTTP endpoint`; (5.2) comment `V2: agentic loop — fallback to V1` → ตรงกับสถานะจริงหลัง PR #327
+- `src/aiWorkflowAgent.js` — (3) `fetchAgentDocs` maxLen 4000/3000/2000 → 6000/5000/5000
+
 ### 2026-06-22 | dev/ai-fix-architecture-sync
 **refactor: ลบ V1 pipeline + dead endpoints ออก ให้เหลือแค่ agentic loop V2 เดียว + retry network**
 - `src/aiWorkflowAgent.js` — ลบ V1 ทั้งก้อน (`callOpenRouter`, `extractJson`, `buildFileSelectionPrompt`, `buildFixPlanPrompt`, `applyCodeChanges`, `openPR`, `executeCodeAction`, `handleCodeAction`, `exports.aiWorkflowAgentHttp`); ปรับ catch block `handleCodeActionV2` แยก error 3 ประเภท แทน fallback ไป V1

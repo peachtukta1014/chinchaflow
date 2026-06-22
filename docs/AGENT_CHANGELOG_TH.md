@@ -1,3 +1,12 @@
+## 2026-06-22 — fix: 5 จุดเสีย token/ทรัพยากรโดยเปล่าประโยชน์ใน webhook-core
+
+- **เรื่อง 1 (เร่งด่วน):** `X-Title: 'CHINCHA FLOW AI Agent (จีจี้)'` ใน `agentTools.js` มีตัวอักษรไทยนอก Latin-1 → Node.js fetch() throw `TypeError: Cannot convert argument to a ByteString` ทันทีก่อนส่ง request จริง → แก้โค้ดพัง 100% ทุก request → เปลี่ยนเป็น `(Jiji)` (ASCII)
+- **เรื่อง 2:** `fetchJiijiDef` ตัดด้วย `.slice(0, 2000)` แต่คำเตือน "ห้ามพิมพ์ tool call ปลอม" ที่เพิ่มใน PR #325 อยู่ที่ตัวอักษร ~2440 → โมเดลไม่เคยเห็นคำเตือนนั้นเลย → ขยาย slice เป็น 3500
+- **เรื่อง 3:** `fetchChatAgentDocs` (aiChatAgent.js) maxLen 3000/2500/1500 และ `fetchAgentDocs` (aiWorkflowAgent.js) maxLen 4000/3000/2000 ตัดทิ้งเกินครึ่งของ AGENTS.md (~11300 ตัวอักษร) และ PEACH_WORKING_STYLE_TH.md (~11000) ทำให้กฎท้ายไฟล์ (เช่น "อย่าเพิ่มซ้ำ", "อัปเดต PROJECT_STRUCTURE.md") หายไป → ปรับเป็น 6000/5000/5000 เท่ากันทั้ง 2 ฟังก์ชัน
+- **เรื่อง 4:** `get_skill` case ใน `agentTools.js` คืน skill เก่าที่มีคำสั่ง npm/git โดยไม่มีคำเตือน → โมเดลอาจลอง exec_command แล้วพัง เสีย iteration → เพิ่ม warning ท้าย return ว่า "คำสั่งพวกนี้รันไม่ได้ใน Cloud Functions container"
+- **เรื่อง 5:** comment เก่า "V1 onRequest fallback" และ "V2: agentic loop — fallback to V1" ใน `aiChatAgent.js` ขัดแย้งกับ PR #327 ที่ลบ V1 ไปแล้ว → แก้ให้ตรงกับสถานะจริง
+- ถ้าพังให้เช็ก: `agentTools.js` (callOpenRouterWithTools header, get_skill), `aiChatAgent.js` (fetchJiijiDef, fetchChatAgentDocs)
+
 ## 2026-06-22 — refactor: ลบ V1 pipeline + dead endpoints ออกจาก webhook-core ให้เหลือแค่ agentic loop V2 เดียว
 
 - **สาเหตุ:** มีสองระบบ parallel — V2 (agentic loop, tool calling) และ V1 (2-round JSON text, ไม่มี taskCompleted guard) โดย `handleCodeActionV2` catch block fallback ไปรัน V1 ทุกครั้งที่ error ทำให้ V2 พังแล้วดิ่งไป V1 แบบ silent; endpoints `aiWorkflowAgentHttp` + `aiChatAgent` (onCall) ก็ไม่มี frontend ไหน call เลย

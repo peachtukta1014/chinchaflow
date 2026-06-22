@@ -540,9 +540,13 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       const skillPath = skillPaths[args.name];
       if (!skillPath) return `❌ ไม่รู้จัก skill "${args.name}"`;
       const file = await fetchRepoFile(ghPat, skillPath);
-      return file
-        ? `=== Skill: ${args.name} (${skillPath}) ===\n${file.content}`
-        : `❌ ไม่พบไฟล์ skill: ${skillPath}`;
+      if (!file) return `❌ ไม่พบไฟล์ skill: ${skillPath}`;
+      return `=== Skill: ${args.name} (${skillPath}) ===\n${file.content}\n\n` +
+        `⚠️ หมายเหตุสำคัญ: skill นี้เขียนไว้สมัยที่ agent รันบนเครื่องที่มีไฟล์ repo เต็ม ` +
+        `แต่ container ปัจจุบัน (Cloud Functions) ไม่มีไฟล์โปรเจกต์เลย คำสั่ง npm run build / git / ` +
+        `node scripts/... ในเนื้อหาด้านบนรันไม่ได้จริงผ่าน exec_command — ใช้เนื้อหานี้เป็นแค่ ` +
+        `"แนวคิด/ขั้นตอนอ้างอิง" สำหรับเข้าใจว่าควรทำอะไรเป็นลำดับ แล้วใช้ tool จริงที่มี ` +
+        `(patch_file, write_file, commit_and_pr) ทำงานแทน ไม่ใช่พยายาม exec_command ตามตัวอักษร`;
     }
 
     case 'exec_command': {
@@ -587,7 +591,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://chincha-flow.web.app',
-        'X-Title': 'CHINCHA FLOW AI Agent (จีจี้)',
+        'X-Title': 'CHINCHA FLOW AI Agent (Jiji)',
       },
       body: JSON.stringify({
         model: useModel,

@@ -279,7 +279,7 @@ async function fetchJiijiDef(ghPat) {
     if (!res.ok) return '';
     const data = await res.json();
     const content = Buffer.from(data.content, 'base64').toString('utf-8');
-    _jiijiCache = content.slice(0, 2000);
+    _jiijiCache = content.slice(0, 3500);
     _jiijiCacheTime = now;
     return _jiijiCache;
   } catch { return ''; }
@@ -292,9 +292,9 @@ async function fetchChatAgentDocs(ghPat) {
   if (_docsCache && (now - _docsCacheTime) < DOCS_TTL_MS) return _docsCache;
 
   const files = [
-    { path: 'AGENTS.md', label: 'กฎ monorepo + กฎแต่ละแอป', maxLen: 3000 },
-    { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'สไตล์การทำงานของพี่พีช', maxLen: 2500 },
-    { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือ agent + แผนที่ repo', maxLen: 1500 },
+    { path: 'AGENTS.md', label: 'กฎ monorepo + กฎแต่ละแอป', maxLen: 6000 },
+    { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'สไตล์การทำงานของพี่พีช', maxLen: 5000 },
+    { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือ agent + แผนที่ repo', maxLen: 5000 },
   ];
 
   let result = '';
@@ -375,7 +375,7 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
   }
 }
 
-// ── V1 onRequest fallback (for direct HTTP calls from PWA) ────────────────
+// ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
 exports.aiChatAgentHttp = functions
   .runWith({ memory: '512MB', timeoutSeconds: 540 })
   .region('asia-southeast1')
@@ -449,7 +449,7 @@ exports.aiChatAgentHttp = functions
 
     if (classified.intent === 'code-action') {
       try {
-        // V2: agentic loop (tool calling) — fallback to V1 ถ้า error
+        // agentic loop (tool calling) — เส้นทางเดียวสำหรับแก้โค้ด ไม่มี fallback ไประบบอื่นแล้ว (ลบ V1 ทิ้งใน PR #327)
         const { handleCodeActionV2 } = require('./aiWorkflowAgent');
         const result = await handleCodeActionV2({
           message: classified.translatedMessage,

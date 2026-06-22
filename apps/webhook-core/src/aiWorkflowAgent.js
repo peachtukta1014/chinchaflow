@@ -317,9 +317,9 @@ SCOPE_FILE_TREE.root = {
 // เจ้าของเขียนกฎการทำงานไว้ใน repo — AI ต้องอ่านก่อนทุก session
 async function fetchAgentDocs(ghPat) {
   const docs = [
-    { path: 'AGENTS.md', label: 'กฎ monorepo (AGENTS.md)', maxLen: 4000 },
-    { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'วิธีสื่อสารกับพี่ (PEACH_WORKING_STYLE_TH.md)', maxLen: 3000 },
-    { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือเอเจนต์ (AGENT_HANDBOOK_TH.md)', maxLen: 2000 },
+    { path: 'AGENTS.md', label: 'กฎ monorepo (AGENTS.md)', maxLen: 6000 },
+    { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'วิธีสื่อสารกับพี่ (PEACH_WORKING_STYLE_TH.md)', maxLen: 5000 },
+    { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือเอเจนต์ (AGENT_HANDBOOK_TH.md)', maxLen: 5000 },
   ];
   let result = '';
   for (const d of docs) {
