@@ -1,3 +1,10 @@
+## 2026-06-22 — fix: res.json() ไม่มี error handling ทำให้ Error 500 "unexpected end of JSON input" ไม่ถูก retry
+
+- **สาเหตุ:** `callOpenRouterWithTools` (agentTools.js) และ `callOpenRouter` (aiChatAgent.js) เรียก `res.json()` โดยไม่มี try/catch — เมื่อ OpenRouter ตอบ 200 OK แต่ body ขาดครึ่ง (connection หลุดกลางทาง) จะ throw `SyntaxError: Unexpected end of JSON input` ซึ่งไม่ตรง pattern retry เดิม (ECONNRESET/ETIMEDOUT/429/503) → error ส่งถึง user เลย
+- `agentTools.js` — `callOpenRouterWithTools`: ห่อ `res.json()` ด้วย try/catch + retry ครั้งเดียว (รอ 2s) เมื่อ parse ล้มเหลว เหมือน pattern retry อื่นในฟังก์ชันเดียวกัน
+- `aiChatAgent.js` — `callOpenRouter`: ห่อ `res.json()` ด้วย try/catch + throw error ที่อ่านได้ (chat mode ไม่มี retry เพราะไม่มี `_retried` flag)
+- ถ้าพังให้เช็ก: `agentTools.js` (callOpenRouterWithTools), `aiChatAgent.js` (callOpenRouter)
+
 ## 2026-06-22 — fix: 5 จุดเสีย token/ทรัพยากรโดยเปล่าประโยชน์ใน webhook-core
 
 - **เรื่อง 1 (เร่งด่วน):** `X-Title: 'CHINCHA FLOW AI Agent (จีจี้)'` ใน `agentTools.js` มีตัวอักษรไทยนอก Latin-1 → Node.js fetch() throw `TypeError: Cannot convert argument to a ByteString` ทันทีก่อนส่ง request จริง → แก้โค้ดพัง 100% ทุก request → เปลี่ยนเป็น `(Jiji)` (ASCII)
