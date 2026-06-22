@@ -1,4 +1,4 @@
-import { fsListCollection, fsPatch, fsPost } from './firestoreRest';
+import { fsListCollection, fsPatch, fsPost, fsAtomicUpdate } from './firestoreRest';
 import { guessRestockCategory, restockNameKey } from './restockCatalogService';
 import {
   buildInventoryReceivePreview,
