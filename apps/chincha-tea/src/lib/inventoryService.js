@@ -1,4 +1,4 @@
-import { fsListCollection, fsPatch, fsPost } from './firestoreRest';
+import { fsListCollection, fsPatch, fsPost, fsAtomicUpdate } from './firestoreRest';
 import { guessRestockCategory, restockNameKey } from './restockCatalogService';
 import {
   buildInventoryReceivePreview,
@@ -94,13 +94,27 @@ export async function deductTeaOrderInventory(cart = []) {
   if (!item?.id || item.stock_base_qty === undefined) return null;
 
   const currentStock = nonNegativeInt(item.stock_base_qty, 0);
-  const nextStock = deductBaseQty(currentStock, baseQtyToDeduct);
-  const patch = {
-    ...normalizeInventoryFields(item),
-    stock_base_qty: nextStock,
+  const normalized = normalizeInventoryFields(item);
+  // ⚠️ atomic decrement ผ่าน Firestore increment (ค่าลบ) — กันสต๊อกตัดผิดเวลา
+  // ขายพร้อมกันหลายคน แต่ Firestore increment ไม่รองรับ clamp ขั้นต่ำที่ 0
+  // ในระดับ field transform เหมือน deductBaseQty เดิมที่ใช้ Math.max(0, ...)
+  // ฝั่ง client ดังนั้นถ้าขายเกินสต๊อกจริงพร้อมกันหลายเครื่อง ค่าอาจติดลบ
+  // ชั่วคราวใน Firestore ได้ — ให้ UI ฝั่งแสดงผล clamp ที่ 0 เองตอน render
+  // (ดู nonNegativeInt ตอนอ่านค่ากลับมาแสดง) ไม่ต้องแก้จุดนี้เพิ่มถ้า UI
+  // ที่แสดงสต๊อกอยู่แล้วเรียก nonNegativeInt ก่อนโชว์
+  await fsAtomicUpdate(`restockCatalog/${item.id}`, {
+    fields: {
+      ...normalized,
+      latestDeductedBaseQty: baseQtyToDeduct,
+      latestDeductedAt: new Date().toISOString(),
+    },
+    increments: { stock_base_qty: -baseQtyToDeduct },
+  });
+  return {
+    id: item.id,
+    previous_stock_base_qty: currentStock,
+    ...normalized,
+    stock_base_qty: deductBaseQty(currentStock, baseQtyToDeduct),
     latestDeductedBaseQty: baseQtyToDeduct,
-    latestDeductedAt: new Date().toISOString(),
   };
-  await fsPatch(`restockCatalog/${item.id}`, patch);
-  return { id: item.id, previous_stock_base_qty: currentStock, ...patch };
 }
