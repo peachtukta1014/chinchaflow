@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-reasoning-content-loop
+**fix: reasoning_content ไม่ถูกส่งกลับใน multi-turn → OpenRouter 400 + isTransient false-positive**
+- `src/shared/agentTools.js` — `runAgentLoop`: เพิ่ม `reasoning_content` (fallback `reasoning`) ใน assistant message push — DeepSeek V4 Pro thinking mode ต้องการ field นี้ทุก turn ไม่งั้น OpenRouter ตอบ `400: reasoning_content in the thinking mode must be passed back`
+- `src/aiWorkflowAgent.js` — `handleCodeActionV2`: เพิ่ม `isReasoningContentError` check ก่อน `isTransient` regex เพื่อป้องกัน 400 นี้ถูกแปลผิดว่าเป็น network error แล้ว user เห็น "ลองใหม่" แทน error จริง
+
 ### 2026-06-22 | dev/ai-fix-loop-early-exit
 **fix: agent loop วนจนครบ 15 รอบเปล่าๆ เมื่อโมเดลพิมพ์ tool call ปลอมซ้ำ**
 - `src/shared/agentTools.js` — `runAgentLoop`: เพิ่ม `consecutiveTextOnlyReplies` counter; early exit หลัง 3 รอบติดกัน; warning ใหม่แสดง text ที่โมเดลพิมพ์จริงและบอกว่าต้องใช้ function calling; reset เมื่อ tool_calls สำเร็จ

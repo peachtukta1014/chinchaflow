@@ -689,9 +689,11 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     });
 
     // Always push assistant turn to conversation (strip DSML leak from text)
+    // reasoning_content must be echoed back every turn for DeepSeek thinking-mode models
     messages.push({
       role: 'assistant',
       content: stripDsml(assistantMessage.content) || null,
+      reasoning_content: assistantMessage.reasoning_content ?? assistantMessage.reasoning ?? undefined,
       tool_calls: assistantMessage.tool_calls || undefined,
     });
 

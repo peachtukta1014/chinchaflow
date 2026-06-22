@@ -1,3 +1,11 @@
+## 2026-06-22 — fix: reasoning_content ไม่ถูกส่งกลับใน multi-turn → OpenRouter 400 + isTransient false-positive
+
+- **สาเหตุ:** DeepSeek V4 Pro thinking mode กำหนดว่าทุก turn ของ assistant ต้องมี `reasoning_content` ส่งกลับมาด้วย — `runAgentLoop` ใน `agentTools.js` push assistant message โดยไม่ใส่ field นี้ → OpenRouter ตอบ `400: The reasoning_content in the thinking mode must be passed back to the API` ตั้งแต่ iteration ที่ 2 เป็นต้นไป ทำให้ทุก multi-turn tool-call พัง
+- **isTransient false-positive:** regex `/OpenRouter \d{3}/` match กับ 400 error นี้ → ระบบแปลผิดว่าเป็น network error → user เห็น "เชื่อมต่อ OpenRouter ไม่สำเร็จชั่วคราว ลองใหม่" แทน error จริง
+- `agentTools.js` — `runAgentLoop`: เพิ่ม `reasoning_content: assistantMessage.reasoning_content ?? assistantMessage.reasoning ?? undefined` ใน assistant message push
+- `aiWorkflowAgent.js` — `handleCodeActionV2`: เพิ่ม `isReasoningContentError` check ก่อน `isTransient` regex
+- ถ้าพังให้เช็ก: `agentTools.js` (runAgentLoop, assistant messages.push), `aiWorkflowAgent.js` (isReasoningContentError, isTransient)
+
 ## 2026-06-22 — fix: agent loop วนจนครบ 15 รอบเปล่าๆ เมื่อโมเดลพิมพ์ tool call ปลอมซ้ำ
 
 - **สาเหตุ:** `taskCompleted` guard (PR #324) ป้องกัน "นิ่งกลางทางเงียบๆ" ได้ผล แต่สร้างผลข้างเคียงใหม่ — เมื่อ DeepSeek Pro พิมพ์ tool call ผิด syntax ซ้ำๆ (เช่น `<read_file path="docs/" />` เป็นข้อความธรรมดา) loop วนต่อทุกรอบ warning เดิม ("งานยังไม่เสร็จ") ไม่บอกว่า syntax ผิดตรงไหน → โมเดลไม่แก้ → วนจนครบ 15 รอบแล้ว throw MAX_ITERATIONS
