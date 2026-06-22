@@ -1,4 +1,4 @@
-import { fsListCollection, fsPatch, fsPost, fsAtomicUpdate } from './firestoreRest';
+import { fsListCollection, fsPatch, fsPost } from './firestoreRest';
 import { guessRestockCategory, restockNameKey } from './restockCatalogService';
 import {
   buildInventoryReceivePreview,
@@ -56,7 +56,11 @@ export async function receiveRestockInventory(purchaseItems = []) {
     };
 
     if (previous?.id) {
-      await fsPatch(`restockCatalog/${previous.id}`, patch);
+      const { stock_base_qty: _, ...fieldsWithoutStock } = patch;
+      await fsAtomicUpdate(`restockCatalog/${previous.id}`, {
+        fields: fieldsWithoutStock,
+        increments: { stock_base_qty: patch.latestReceivedBaseQty },
+      });
       updates.push({ id: previous.id, ...previous, ...patch });
     } else {
       const created = await fsPost('restockCatalog', {
