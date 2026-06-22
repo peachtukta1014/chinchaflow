@@ -7,6 +7,14 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/ai-fix-self-awareness
+**fix: จีจี้เข้าใจหน้าที่จริงและรูปแบบการทำงาน 3 ชั้นถูกต้อง + เลิกพูดถึง Claude Code App ที่ไม่มีอยู่แล้ว**
+- `src/aiChatAgent.js` — `SYSTEM_PROMPTS.root`: เปลี่ยนทั้งก้อน
+  - เพิ่มหัวข้อ "🧠 รูปแบบการทำงานจริงของจีจี้" อธิบาย 3 ชั้น: classify → agentic loop (มี tool) / chat (ไม่มี tool)
+  - เปลี่ยน ❌ section: ลบ "ต้องเปิด Claude Code App" (เลิกใช้ไปแล้ว) → แทนด้วย "ไม่มีทางเลี่ยง ไม่มีอีกแอป" + เพิ่ม warning ห้ามแนะนำ Claude Code App/Cursor Cloud เด็ดขาด
+  - เพิ่ม docs/PEACH_WORKING_STYLE_TH.md เข้า Scopes/เอกสาร
+  - ปรับ 🔐 GH_PAT: ระบุว่าใช้ได้เฉพาะโหมดนักพัฒนา + ห้ามใช้นอกเหนือจากที่พี่สั่ง
+
 ### 2026-06-22 | dev/ai-fix-chat-tool-confusion
 **fix: classifier ส่ง "ดูโค้ด/ตรวจไฟล์" เข้า code-action + กันจีจี้พิมพ์ tool call ปลอมใน chat mode**
 - `src/aiChatAgent.js` — `classifyAndTranslate` system prompt: ขยาย trigger เป็น code-action ครอบคลุม "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง" (เช่น "ตรวจสอบไฟล์ X", "อธิบายว่า Z ทำงานยังไง") — เดิมถูก classify เป็น chat → model ไม่มี tool จริงแต่พิมพ์ tool call เป็น text

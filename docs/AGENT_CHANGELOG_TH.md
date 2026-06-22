@@ -1,3 +1,9 @@
+## 2026-06-22 — fix: จีจี้เข้าใจหน้าที่จริงและรูปแบบการทำงาน 3 ชั้นถูกต้อง + เลิกพูดถึง Claude Code App ที่ไม่มีอยู่แล้ว
+
+- **สาเหตุ:** `SYSTEM_PROMPTS.root` ใน `aiChatAgent.js` มีหัวข้อ "❌ ทำไม่ได้ใน ai-chat (ต้องเปิด Claude Code App)" ซึ่งชี้ไป Claude Code App / Cursor Cloud Agent ที่เลิกใช้ไปแล้ว (ตาม `PEACH_WORKING_STYLE_TH.md`: "ไม่ใช้แล้ว: Cursor Cloud, Slack agent, เครื่องคอม") และไม่ได้อธิบายว่าจีจี้ทำงานเป็น 3 ชั้นสลับกัน ทำให้บางครั้งบอกพี่ว่าตัวเองทำอะไรไม่ได้ทั้งที่จริงทำได้เมื่อเข้าโหมดที่ถูกต้อง
+- `aiChatAgent.js` — `SYSTEM_PROMPTS.root`: เพิ่มหัวข้อ "🧠 รูปแบบการทำงานจริงของจีจี้" อธิบาย 3 ชั้น (classify → agentic loop มี tool / chat ไม่มี tool); เปลี่ยน ❌ section ให้ถูกต้อง (ห้ามพูดถึง Claude Code App); เพิ่ม scope boundary + docs/PEACH_WORKING_STYLE_TH.md
+- ถ้าพังให้เช็ก `aiChatAgent.js` (SYSTEM_PROMPTS.root)
+
 ## 2026-06-22 — fix: classifier ส่ง "ดูโค้ด/ตรวจไฟล์" เข้า code-action + กันจีจี้พิมพ์ tool call ปลอมใน chat mode
 
 - **สาเหตุ:** `classifyAndTranslate` ใน `aiChatAgent.js` classify คำสั่ง "ตรวจสอบไฟล์ X" / "ดูโค้ด Y" เป็น `chat` (ไม่ใช่ code-action) → model เข้า plain chat ไม่มี tool จริง แต่เคยเห็น `JIIJI.md` ที่ลิสต์ tool names จึงพิมพ์ `<read_file>` เป็น text ออกมาให้ user เห็น
