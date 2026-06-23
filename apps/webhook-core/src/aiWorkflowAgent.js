@@ -444,7 +444,6 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     console.error('handleCodeActionV2 error:', err);
     await clearProgress(requestId);
 
-    // reasoning_content 400 is a model API contract error — not a transient network error
     const isReasoningContentError = /reasoning_content.*thinking mode/i.test(err.message || '');
     const isTransient = !isReasoningContentError && /GitHub \d{3}|OpenRouter \d{3}|fetch failed|ECONNRESET|ETIMEDOUT/.test(err.message || '');
     const isMaxIter = err.message?.includes('MAX_ITERATIONS');
@@ -458,6 +457,19 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
       userMsg = `จีจี้เจอปัญหาครับพี่: ${err.message}\n\nไม่มีการแก้โค้ดเกิดขึ้น (ไม่มีการเขียนทับแบบเดา) ลองอธิบายคำสั่งให้ชัดขึ้น หรือระบุไฟล์ที่ต้องการแก้`;
     }
 
+    // ✨ สั่งเขียนผลลัพธ์ลง Firestore ทันทีเมื่อเกิด Error เพื่อปลดล็อกให้หน้าจอแชทเลิกค้างเลิกหมุน
+    try {
+      const { writeResult } = require('./shared/progressTracker');
+      await writeResult(requestId, { 
+        reply: userMsg, 
+        scope: currentScope || 'root',
+        status: 'error'
+      });
+    } catch (writeErr) {
+      console.error('Failed to write error result to Firestore:', writeErr);
+    }
+
+    // โครงสร้างเดิมของระบบ ส่ง Payload กลับไปตามปกติ
     return {
       statusCode: 500,
       body: {
