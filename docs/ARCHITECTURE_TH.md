@@ -151,8 +151,17 @@ flowchart TB
 | `lineWebhook` | บอท LINE กุ้ง — entrypoint เดิมสำหรับ LINE Console; ทำแค่ verify signature, dedup event พื้นฐาน แล้วส่งเข้า router แยก direct/group |
 | `lineWebhookTea` | บอท LINE ชา — คำสั่ง `สรุป` / `help` (ไม่รับออเดอร์ลูกค้า), ignore กลุ่มที่ไม่ใช่ `notifyGroupId` |
 | `teaPushSummary` | HTTP POST สำหรับแอดมิน — ส่งสรุปยอดวันนั้นไปกลุ่ม LINE ที่ตั้งไว้ |
-| `aiChatAgent` | V2 onCall — AI Chat 5 agent scopes (root/tea/seafood/webhook/scheduled) ผ่าน OpenRouter |
-| `aiChatAgentHttp` | V1 onRequest — HTTP endpoint สำหรับ PWA `chincha-ai-chat.web.app` |
+| `aiChatAgentHttp` | V1 onRequest — AI Chat (Flash) สำหรับ PWA `chincha-ai-chat.web.app`; classify intent 5 scopes (root/tea/seafood/webhook/scheduled) ผ่าน OpenRouter (`OPENROUTER_API_KEY`). ถ้าเป็น code-action → ส่ง `repository_dispatch` ให้ Pro agent ทำเบื้องหลัง (ไม่รัน loop เอง) |
+| `deployNotifyHttp` | V1 onRequest — รับสถานะ deploy จาก GitHub Actions + รับ `action:'project_tree'` เก็บ tree ล่าสุดใน `systemConfig/projectTree` (ให้ chat agent อ่านโครงสร้างโปรเจกต์) |
+
+**AI agent — แยก 2 ฝ่าย (isolation จริง):**
+
+| ฝ่าย | อยู่ที่ | key | หน้าที่ |
+|------|--------|-----|--------|
+| Chat (Flash) | Cloud Function `aiChatAgentHttp` | `OPENROUTER_API_KEY` | คุยกับพี่พีช, classify intent, สรุปคำสั่ง, ส่งงานต่อ, รายงานผล — ไม่มี tool แก้ไฟล์ |
+| Workflow (Pro) | GitHub Actions `.github/workflows/ai-workflow-trigger.yml` (`scripts/run-github-agent.mjs` → `aiWorkflowAgent.js` → `runAgentLoop` agentic loop, MAX 15 รอบ) | `OPENROUTER_API_KEY_PRO` + `GH_PAT` | อ่าน/แก้โค้ด, commit, เปิด PR; เขียนผลกลับ Firestore (`progressTracker`) ให้ Flash แจ้งพี่ |
+
+flow: พีช → Flash classify → `repository_dispatch (ai-code-action)` → GitHub Actions รัน Pro → writeResult ลง Firestore → PWA polling อ่านผล. Flash CF ไม่รู้จัก `OPENROUTER_API_KEY_PRO` เลย
 
 LINE กุ้งแยกบริบทใน `apps/webhook-core/src/` ดังนี้:
 

@@ -1,3 +1,13 @@
+## 2026-06-23 — arch: แยก AI agent 2 ฝ่าย (Flash chat ↔ Pro GitHub Actions) + docs cleanup
+
+- **ที่มา:** เดิม Flash CF เรียก Pro agentic loop ใน process เดียวกัน → timeout 540s, key รวมกัน, รอค้างหน้าจอ. พีชต้องการแยก 2 ฝ่ายให้เสถียร/ประหยัด token + ปลอดภัยขึ้น
+- **PR #349** — ลด `MAX_ITERATIONS` 30→15 (`SUMMARY_CHECKPOINT` 8); แยก key: Flash=`OPENROUTER_API_KEY`, Pro=`OPENROUTER_API_KEY_PRO`; sync `PROJECT_STRUCTURE.md` → Firestore `systemConfig/projectTree` ให้ chat agent อ่านโครงสร้างจริง (ไม่ hallucinate)
+- **PR #351** — Flash CF ส่ง `repository_dispatch (ai-code-action)` → GitHub Actions (`ai-workflow-trigger.yml` + `scripts/run-github-agent.mjs`) รัน Pro loop เบื้องหลัง → เขียนผลกลับ Firestore → PWA polling. **Flash CF ไม่รู้จัก `OPENROUTER_API_KEY_PRO` เลย — isolation จริง 100%**
+- **cleanup** — ลบ `apps/webhook-core/src/seafood-notify/notify.js` (LINE Notify API เลิกบริการ 2025-03-31, ไม่มีใคร import); อัปเดต system prompt ใน `aiChatAgent.js` + `ARCHITECTURE_TH.md` + `AGENT_HANDBOOK_TH.md` ให้ตรง flow ใหม่
+- **Security model:** Flash (chat) = `OPENROUTER_API_KEY` เท่านั้น, ไม่มี Pro key. Pro (workflow) = `OPENROUTER_API_KEY_PRO` + `GH_PAT` อยู่ที่ GitHub Secrets — ถ้า Flash key หลุดทำได้แค่ chat แตะ repo ไม่ได้
+- **GitHub Secrets ที่ต้องมี:** `OPENROUTER_API_KEY` (Flash), `OPENROUTER_API_KEY_PRO` (Pro), `GH_PAT`, `FIREBASE_SERVICE_ACCOUNT`, `DEPLOY_NOTIFY_URL`
+- ถ้าพังให้เช็ก: `aiChatAgent.js` (`dispatchToProAgent`), `ai-workflow-trigger.yml` (secrets), `run-github-agent.mjs` (GOOGLE_APPLICATION_CREDENTIALS เขียน Firestore)
+
 ## 2026-06-23 — refactor: แยก agentTools.js เป็น 3 ไฟล์ (839 → 250/235/320 บรรทัด)
 
 - **ที่มา:** agentTools.js ใหญ่ 839 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะ tool definitions หรือ executor ได้
