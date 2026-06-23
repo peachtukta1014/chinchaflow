@@ -162,7 +162,8 @@
 | `LINE_TEA_CHANNEL_ACCESS_TOKEN` | สาย 3 (ชา) |
 | `LINE_TEA_CHANNEL_SECRET` | สาย 3 (verify) |
 | `LINE_LIFF_ID`, `LINE_LIFF_SLIP_ID` | สาย 1 (LIFF) |
-| `OPENROUTER_API_KEY` | สาย 5 (AI Chat) |
+| `OPENROUTER_API_KEY` | สาย 5 (Flash AI Chat · Cloud Function) |
+| `OPENROUTER_API_KEY_PRO` | Pro Agent agentic loop · GitHub Actions เท่านั้น |
 
 ---
 
