@@ -1,3 +1,19 @@
+## 2026-06-23 — feat: deploy notification banner + quick trigger keywords (PR B+C)
+
+- **PR B — Deploy Notification:**
+  - `deployNotify.js` (ใหม่): `writeDeployStatus` / `readDeployStatus` ลง Firestore `system/deploy_status`
+  - `index.js` — เพิ่ม Cloud Function `deployNotifyHttp`: GitHub Actions POST สถานะ deploy มา auth ด้วย GH_PAT
+  - `deploy-hosting.yml` — เพิ่ม notify step สุดท้ายใน job shrimp/tea/ai-chat (`if: always()`)
+  - `deploy-functions.yml` — เพิ่ม notify step สุดท้ายใน job deploy_functions
+  - `aiChatAgentHttp` — เพิ่ม `?action=deploy_status` endpoint (อ่าน Firestore แล้วตอบ JSON)
+  - `api.js` — เพิ่ม `fetchDeployStatus()`
+  - `App.jsx` — banner `✅ Deploy เสร็จแล้ว / ❌ ล้มเหลว` โชว์เมื่อเปิดแอป/กลับ foreground ภายใน 15 นาที
+
+- **PR C — Quick Trigger Keywords:**
+  - `aiChatAgent.js` — `detectQuickTrigger()`: ตรวจ keyword ก่อน classifier; `โอเคกุ้ง/ตรวจกุ้ง/auto-shrimp` → health check seafood; `โอเคชา/ตรวจชา/auto-tea` → health check tea; bypass confirmation, force=true, isHighRisk=false, ห้าม commit
+
+- ถ้าพังให้เช็ก: `deployNotify.js` (Firestore path system/deploy_status), `index.js` (deployNotifyHttp auth), `aiChatAgent.js` (detectQuickTrigger patterns, action=deploy_status)
+
 ## 2026-06-23 — feat: auto-merge low-risk PR หลัง CI ผ่าน (isHighRisk flag)
 
 - **ที่มา:** พีชต้องการให้ PR ที่ปลอดภัย (แก้ข้อความ/UI/doc) merge เองโดยไม่ต้องรอกด เพื่อให้ทำงานได้ขณะอยู่บนถนน/ฟาร์ม
