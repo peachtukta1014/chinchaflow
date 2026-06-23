@@ -1,3 +1,11 @@
+## 2026-06-23 — docs: sync README + PROJECT_STRUCTURE ให้ตรงโค้ดปัจจุบัน (เลิกซ้ำต้นไม้)
+
+- **ที่มา:** พีชก๊อปเนื้อหา PROJECT_STRUCTURE (ที่ข้อมูลเก่า) ไปวางใน README เอง → 2 ไฟล์เนื้อหาซ้ำและเก่าทั้งคู่; `sync-project-tree.yml` อัปเดตต้นไม้เฉพาะ `docs/PROJECT_STRUCTURE.md` → README ที่ก๊อปจะ drift ตลอด
+- `README.md` — เขียนใหม่เป็นหน้าแรกสั้นๆ (ภาพรวม + ตารางแอป URL ถูกต้อง + ฟีเจอร์ AI ปัจจุบัน + dev/deploy + ลิงก์เอกสาร) ไม่ก๊อปต้นไม้มาซ้ำ → ปล่อยให้ PROJECT_STRUCTURE เป็นแหล่งเดียว
+- `docs/PROJECT_STRUCTURE.md` — เพิ่ม `deployNotify.js` + `deployNotifyHttp` + ฟีเจอร์ ai-chat ใหม่ (file attach/deploy banner/quick trigger/auto-merge) + ตาราง Firestore collections ของ agent (aiProgress/aiResults/agentRunLogs/system/deploy_status) + อัปเดตตาราง deploy workflow
+- แก้ของผิด: URL ai-chat `chincha-flow.web.app` → `chincha-ai-chat.web.app`; ลบข้อมูลโมเดลเก่า (`deepseek-chat`/`DEFAULT_MODEL`) → 3-tier Flash/Pro/Vision
+- ถ้าพังให้เช็ก: ไม่มีโค้ดจริงเปลี่ยน แตะเฉพาะ `.md`
+
 ## 2026-06-23 — feat: deploy notification banner + quick trigger keywords (PR B+C)
 
 - **PR B — Deploy Notification:**
