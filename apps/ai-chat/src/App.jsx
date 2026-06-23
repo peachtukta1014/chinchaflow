@@ -52,8 +52,15 @@ const IconRefresh = () => (
     <path d="M8 16H3v5" />
   </svg>
 );
+const IconFile = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" />
+  </svg>
+);
 
 const MAX_IMAGES = 5;
+const MAX_FILE_CHARS = 8000;
+const ACCEPTED_FILES = '.txt,.md,.js,.jsx,.ts,.tsx,.json,.csv,.log,.py,.html,.css';
 const WELCOME_MSG = {
   role: 'assistant',
   content: 'สวัสดีพี่พีช! จีจี้เลขาส่วนตัวพีชเองนะคะ 🌸\n\nพร้อมช่วยพี่เสมอเลย ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู (แนบได้ถึง 5 รูปต่อครั้งเลย)\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะคะ',
@@ -76,12 +83,14 @@ export default function App() {
   const [showAgentPicker, setShowAgentPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [fileAttachment, setFileAttachment] = useState(null);
   const [progressStep, setProgressStep] = useState(null);
   const [sessions, setSessions] = useState(() => listSessions());
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
+  const fileInputRef2 = useRef(null);
   const pollIntervalRef = useRef(null);
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
@@ -158,6 +167,7 @@ export default function App() {
     currentSessionId.current = null;
     setMessages([{ role: 'assistant', content: 'แชทใหม่เริ่มแล้วนะคะพี่ 🌸 สั่งได้เลย' }]);
     setImagePreviews([]);
+    setFileAttachment(null);
     setProgressStep(null);
     setShowHistory(false);
     setSessions(listSessions());
@@ -186,10 +196,16 @@ export default function App() {
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if ((!text && imagePreviews.length === 0) || loading) return;
+    if ((!text && imagePreviews.length === 0 && !fileAttachment) || loading) return;
 
     const images = imagePreviews.map(p => p.split(',')[1]);
-    const displayText = text || '📸';
+    const displayText = text || (imagePreviews.length > 0 ? '📸' : `📎 ${fileAttachment?.name}`);
+
+    // ข้อความที่ส่งให้ AI — ต่อท้ายด้วยเนื้อไฟล์ถ้ามี
+    const aiText = fileAttachment
+      ? `${text || '(ดูไฟล์แนบด้านล่าง)'}\n\n---\n📎 ไฟล์แนบ: ${fileAttachment.name}\n\`\`\`\n${fileAttachment.text.slice(0, MAX_FILE_CHARS)}\n\`\`\`${fileAttachment.text.length > MAX_FILE_CHARS ? `\n\n⚠️ ไฟล์ยาวเกิน แสดงแค่ ${MAX_FILE_CHARS} ตัวอักษรแรก` : ''}`
+      : text;
+
     const requestId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -199,6 +215,7 @@ export default function App() {
 
     setInput('');
     setImagePreviews([]);
+    setFileAttachment(null);
     setProgressStep(null);
     setMessages(messagesWithUser);
     setLoading(true);
@@ -223,7 +240,7 @@ export default function App() {
     const historyForAI = messagesWithUser.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
     const reply = await chatWithAI({
-      message: displayText,
+      message: aiText,
       history: historyForAI,
       scope,
       images: images.length > 0 ? images : undefined,
@@ -281,6 +298,23 @@ export default function App() {
     setListening(true);
   }, [listening]);
 
+  // ── File picker (text files) ───────────────────────────────────────────
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      alert('ไฟล์ใหญ่เกิน 500KB — ลองตัดให้สั้นลงก่อนนะครับพี่');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFileAttachment({ name: file.name, text: reader.result, size: file.size });
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
   // ── Image picker (multiple, max 5) ─────────────────────────────────────
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files || []);
@@ -310,7 +344,7 @@ export default function App() {
   };
 
   const currentAgent = AGENT_OPTIONS.find(a => a.id === agentScope) || AGENT_OPTIONS[0];
-  const canSend = (input.trim() || imagePreviews.length > 0) && !loading;
+  const canSend = (input.trim() || imagePreviews.length > 0 || fileAttachment !== null) && !loading;
 
   return (
     <div className="flex flex-col h-full bg-ai-bg text-ai-text relative">
@@ -512,6 +546,23 @@ export default function App() {
           </div>
         )}
 
+        {/* File attachment chip */}
+        {fileAttachment && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-ai-bg border border-ai-accent/40 rounded-xl w-fit max-w-full">
+            <span className="text-ai-accent shrink-0"><IconFile /></span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-ai-text font-medium truncate">{fileAttachment.name}</p>
+              <p className="text-[10px] text-ai-muted">{(fileAttachment.size / 1024).toFixed(1)} KB</p>
+            </div>
+            <button
+              onClick={() => setFileAttachment(null)}
+              className="text-ai-muted hover:text-red-400 transition-colors shrink-0 p-0.5"
+            >
+              <IconX />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -542,6 +593,16 @@ export default function App() {
             )}
           </button>
 
+          {/* File attach button */}
+          <button
+            onClick={() => fileInputRef2.current?.click()}
+            disabled={fileAttachment !== null}
+            className={`p-2.5 rounded-full transition-colors shrink-0 ${fileAttachment ? 'bg-ai-accent text-white' : 'bg-ai-bg border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent'} ${fileAttachment ? 'opacity-70 cursor-not-allowed' : ''}`}
+            title="แนบไฟล์ข้อความ (.txt, .js, .json ฯลฯ)"
+          >
+            <IconFile />
+          </button>
+
           {/* Voice button */}
           <button
             onClick={toggleVoice}
@@ -561,7 +622,7 @@ export default function App() {
           </button>
         </div>
 
-        {/* Hidden file input — multiple */}
+        {/* Hidden file input — images */}
         <input
           ref={fileInputRef}
           type="file"
@@ -569,6 +630,14 @@ export default function App() {
           multiple
           className="hidden"
           onChange={handleImageSelect}
+        />
+        {/* Hidden file input — text files */}
+        <input
+          ref={fileInputRef2}
+          type="file"
+          accept={ACCEPTED_FILES}
+          className="hidden"
+          onChange={handleFileSelect}
         />
       </div>
 
