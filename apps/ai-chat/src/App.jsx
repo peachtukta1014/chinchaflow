@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI, pollProgress, fetchResult } from './api';
+import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -85,6 +85,7 @@ export default function App() {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [fileAttachment, setFileAttachment] = useState(null);
   const [progressStep, setProgressStep] = useState(null);
+  const [deployBanner, setDeployBanner] = useState(null);
   const [sessions, setSessions] = useState(() => listSessions());
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
@@ -145,6 +146,34 @@ export default function App() {
         }]);
       }
     };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  // ── Deploy notification ────────────────────────────────────────────────
+  const DEPLOY_SEEN_KEY = 'jiiji_deploy_seen';
+  const DEPLOY_APP_LABELS = { shrimp: '🦐 Seafood POS', tea: '🧋 Chincha Tea', 'ai-chat': '🌸 AI Chat', functions: '⚙️ Cloud Functions' };
+  useEffect(() => {
+    const checkDeploys = async () => {
+      const status = await fetchDeployStatus();
+      if (!status) return;
+      const lastSeen = parseInt(localStorage.getItem(DEPLOY_SEEN_KEY) || '0');
+      const now = Date.now();
+      localStorage.setItem(DEPLOY_SEEN_KEY, String(now));
+      let newest = null;
+      for (const [app, data] of Object.entries(status)) {
+        if (!data?.updatedAt) continue;
+        const updatedAt = new Date(data.updatedAt).getTime();
+        if (updatedAt > lastSeen && (now - updatedAt) < 15 * 60 * 1000) {
+          if (!newest || updatedAt > new Date(newest.updatedAt).getTime()) {
+            newest = { app, status: data.status, updatedAt: data.updatedAt, label: DEPLOY_APP_LABELS[app] || app };
+          }
+        }
+      }
+      if (newest) setDeployBanner(newest);
+    };
+    checkDeploys();
+    const onVisible = () => { if (document.visibilityState === 'visible') checkDeploys(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
@@ -464,6 +493,17 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* ── Deploy notification banner ────────────────────────────────── */}
+      {deployBanner && (
+        <div className={`flex items-center gap-2 px-4 py-2 text-sm shrink-0 border-b ${deployBanner.status === 'success' ? 'bg-green-900/30 border-green-700/30 text-green-300' : 'bg-red-900/30 border-red-700/30 text-red-300'}`}>
+          <span>{deployBanner.status === 'success' ? '✅' : '❌'}</span>
+          <span className="flex-1">Deploy <strong>{deployBanner.label}</strong> {deployBanner.status === 'success' ? 'เสร็จแล้ว 🎉' : 'ล้มเหลว — เช็ค Actions'}</span>
+          <button onClick={() => setDeployBanner(null)} className="text-current opacity-60 hover:opacity-100 shrink-0 transition-opacity p-0.5">
+            <IconX />
+          </button>
+        </div>
+      )}
 
       {/* ── Messages ──────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-thin">

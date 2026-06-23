@@ -37,6 +37,43 @@ let _docsCache = null;
 let _docsCacheTime = 0;
 const DOCS_TTL_MS = 10 * 60 * 1000;
 
+// ── Quick trigger keywords (bypass classifier — health check เท่านั้น ห้าม commit) ──
+function detectQuickTrigger(message) {
+  const m = (message || '').trim().toLowerCase();
+  if (/^(โอเคกุ้ง|ตรวจกุ้ง|auto-shrimp|เช็คกุ้ง|ok กุ้ง|okกุ้ง)$/.test(m)) {
+    return {
+      scope: 'seafood',
+      task: `ตรวจสุขภาพ seafood-pos (โกอ้วนซีฟู้ด/ร้านกุ้ง):
+1. อ่าน apps/seafood-pos/scripts/smoke-test.mjs ดู test cases ทั้งหมด
+2. อ่าน apps/seafood-pos/src/utils/pricing.js หรือไฟล์ logic ราคาหลัก ตรวจว่า logic ถูกต้อง
+3. อ่าน apps/seafood-pos/package.json ดู dependencies
+
+รายงานสรุปสั้น:
+- ✅ ปกติ: [ส่วนที่ดี]
+- ⚠️ ควรระวัง: [ถ้ามี]
+- ❌ มีปัญหา: [ถ้ามี]
+
+สำคัญ: ตรวจสอบและรายงานเท่านั้น ห้าม commit ห้ามแก้ไฟล์ ห้ามเปิด PR`,
+    };
+  }
+  if (/^(โอเคชา|ตรวจชา|auto-tea|เช็คชา|ok ชา|okชา)$/.test(m)) {
+    return {
+      scope: 'tea',
+      task: `ตรวจสุขภาพ chincha-tea (ร้านชินชา):
+1. อ่าน apps/chincha-tea/package.json ดู dependencies
+2. อ่าน apps/chincha-tea/src/ ดูไฟล์หลัก ตรวจว่าโครงสร้างปกติ
+
+รายงานสรุปสั้น:
+- ✅ ปกติ: [ส่วนที่ดี]
+- ⚠️ ควรระวัง: [ถ้ามี]
+- ❌ มีปัญหา: [ถ้ามี]
+
+สำคัญ: ตรวจสอบและรายงานเท่านั้น ห้าม commit ห้ามแก้ไฟล์ ห้ามเปิด PR`,
+    };
+  }
+  return null;
+}
+
 // ── ตรวจว่าถามเรื่อง code metrics ──────────────────────────────────────────
 function isCodeMetricsQuery(text) {
   const t = (text || '').toLowerCase();
@@ -388,6 +425,14 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
+    // ── Deploy status endpoint: GET ?action=deploy_status ────────────────
+    if (req.method === 'GET' && req.query.action === 'deploy_status') {
+      const { readDeployStatus } = require('./deployNotify');
+      const status = await readDeployStatus().catch(() => ({}));
+      res.json(status);
+      return;
+    }
+
     // ── Result recovery endpoint: GET ?action=result&requestId=xxx ───────
     // ใช้เมื่อ client กลับมา foreground หลัง connection ขาด
     if (req.method === 'GET' && req.query.action === 'result' && req.query.requestId) {
@@ -433,6 +478,34 @@ exports.aiChatAgentHttp = functions
       // ถ้ายังไม่มีไฟล์ (ยังไม่เคยรัน workflow) บอกพี่
       res.json({ reply: 'ยังไม่มีข้อมูล metrics ครับพี่ — ไปกด Run ที่ GitHub Actions → Code Metrics ก่อนนะคะ แล้วจีจี้จะอ่านได้เลย 🌸', scope: currentScope });
       return;
+    }
+
+    // ── Quick trigger: โอเคกุ้ง / โอเคชา / auto-shrimp / auto-tea ──────────
+    const quickTrigger = detectQuickTrigger(message);
+    if (quickTrigger) {
+      const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
+      await writeProgress(requestId, `กำลังตรวจสุขภาพ ${label}...`);
+      try {
+        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
+        const result = await handleCodeActionV2({
+          message: quickTrigger.task,
+          history: history || [],
+          scope: quickTrigger.scope,
+          force: true,
+          requestId: requestId || null,
+          isHighRisk: false,
+        });
+        await clearProgress(requestId);
+        const body = { ...result.body, scope: quickTrigger.scope };
+        await writeResult(requestId, { reply: body.reply, scope: quickTrigger.scope });
+        res.status(result.statusCode || 200).json(body);
+        return;
+      } catch (err) {
+        console.error('quick trigger error:', err);
+        await clearProgress(requestId);
+        res.status(500).json({ reply: `❌ ตรวจสอบไม่ได้ครับพี่: ${err.message}`, scope: quickTrigger.scope });
+        return;
+      }
     }
 
     // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
