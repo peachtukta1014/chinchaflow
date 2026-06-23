@@ -141,6 +141,50 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   const SUMMARY_CHECKPOINT = 8;     // รอบ 8: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
   const stagedFiles = {};
 
+  // ── Error boundary state ───────────────────────────────────────────────────
+  // recentCalls: circular buffer สำหรับ spin detection (same tool+args ซ้ำ ≥3 ใน 6 รอบล่าสุด)
+  const recentCalls = [];
+  let consecutiveToolErrors = 0; // นับ ❌ ติดกัน — ถ้าเกิน 3 หยุดป้องกัน token leak
+
+  // ── Helper: spin guard + error budget (ใช้ทั้ง structured และ XML path) ───
+  async function executeToolGuarded(toolName, args) {
+    const argsKey = JSON.stringify(args).slice(0, 200);
+    const last6 = recentCalls.slice(-6);
+    const spinCount = last6.filter(c => c.name === toolName && c.key === argsKey).length;
+    if (spinCount >= 3) {
+      throw new Error(
+        `🔄 Spin detected: "${toolName}" ถูกเรียกด้วย args เดิมซ้ำ ${spinCount} ครั้งใน 6 รอบล่าสุด — ` +
+        `หยุดป้องกัน token leak กรุณาสั่งงานใหม่หรือให้ข้อมูลเพิ่มเติม`
+      );
+    }
+
+    let toolResult;
+    try {
+      toolResult = await executeTool(toolName, args, { ghPat, scopeFileTree, stagedFiles, isHighRisk });
+    } catch (err) {
+      toolResult = `❌ Tool error (${toolName}): ${err.message}`;
+    }
+
+    const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+
+    recentCalls.push({ name: toolName, key: argsKey });
+    if (recentCalls.length > 10) recentCalls.shift();
+
+    if (resultText.startsWith('❌')) {
+      consecutiveToolErrors++;
+      if (consecutiveToolErrors >= 4) {
+        throw new Error(
+          `❌ Tool ล้มเหลวติดต่อกัน ${consecutiveToolErrors} ครั้ง — หยุดป้องกัน token leak\n` +
+          `ล่าสุด (${toolName}): ${resultText.slice(0, 300)}`
+        );
+      }
+    } else {
+      consecutiveToolErrors = 0;
+    }
+
+    return resultText;
+  }
+
   const messages = [
     { role: 'system', content: systemPrompt },
     ...(history || []).slice(-10),
@@ -234,15 +278,9 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
 
         await writeProgress(requestId, progressMsg);
 
-        let toolResult;
-        try {
-          toolResult = await executeTool(toolName, args, { ghPat, scopeFileTree, stagedFiles, isHighRisk });
-        } catch (err) {
-          toolResult = `❌ Tool error (${toolName}): ${err.message}`;
-        }
+        const resultText = await executeToolGuarded(toolName, args);
 
         // ระบบยืนยัน "จบงานจริง" เฉพาะ 2 เคสนี้เท่านั้น — ไม่ใช่โมเดลเป็นคนบอก
-        const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
         if (toolName === 'commit_and_pr' && resultText.startsWith('✅')) {
           taskCompleted = true;
         } else if (toolName === 'report_no_action_needed') {
@@ -297,14 +335,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
             report_no_action_needed: 'กำลังสรุปผล...',
           }[toolName] || `กำลังใช้ tool: ${toolName}`));
 
-          let toolResult;
-          try {
-            toolResult = await executeTool(toolName, args, { ghPat, scopeFileTree, stagedFiles, isHighRisk });
-          } catch (err) {
-            toolResult = `❌ Tool error (${toolName}): ${err.message}`;
-          }
-
-          const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+          const resultText = await executeToolGuarded(toolName, args);
           if (toolName === 'commit_and_pr' && resultText.startsWith('✅')) taskCompleted = true;
           else if (toolName === 'report_no_action_needed') taskCompleted = true;
 
@@ -350,9 +381,31 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     }
   }
 
+  // ── Emergency partial commit: ถ้ามีไฟล์ stage ค้างอยู่ → commit ก่อนหยุด ────
+  // ป้องกันงานสูญหายทั้งหมดเมื่อถึง limit — PR จะมี tag [WIP] ให้พีชตรวจเองได้
+  const stagedPaths = Object.keys(stagedFiles);
+  if (stagedPaths.length > 0) {
+    await writeProgress(requestId, `⚠️ ถึงขีดจำกัด ${MAX_ITERATIONS} รอบ — กำลัง commit งานที่ทำไปบางส่วน (${stagedPaths.length} ไฟล์)...`);
+    try {
+      await executeTool('commit_and_pr', {
+        branch: `dev/ai-partial-${Date.now().toString(36)}`,
+        commit_msg: `WIP: partial changes — hit ${MAX_ITERATIONS}-iteration limit`,
+        pr_title: `[WIP] งานค้าง: ${message.slice(0, 60)}`,
+        pr_body: `⚠️ Pro Agent ถึงขีดจำกัด ${MAX_ITERATIONS} iterations — งานยังไม่เสร็จสมบูรณ์\n\n` +
+          `**ไฟล์ที่ stage ไว้:** ${stagedPaths.join(', ')}\n\n` +
+          `กรุณาตรวจสอบ diff แล้วสั่งงานต่อหรือ merge ตามดุลพินิจ\n\n` +
+          `isHighRisk=true — ต้องตรวจก่อน merge`,
+      }, { ghPat, scopeFileTree, stagedFiles, isHighRisk: true });
+      console.log(`Emergency partial commit: ${stagedPaths.join(', ')}`);
+    } catch (partialErr) {
+      console.error('Emergency partial commit failed:', partialErr.message);
+    }
+  }
+
   throw new Error(
     `Agent loop เกิน ${MAX_ITERATIONS} รอบ — งานซับซ้อนเกินไปหรือ AI วนซ้ำ\n` +
     `(มี checkpoint สรุปที่รอบ ${SUMMARY_CHECKPOINT} แล้ว)\n` +
+    `${stagedPaths.length > 0 ? `งานที่ทำไปบางส่วน (${stagedPaths.join(', ')}) commit ไว้ใน PR [WIP] แล้ว\n` : ''}` +
     `ลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อย`
   );
 }

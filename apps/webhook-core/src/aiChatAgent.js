@@ -482,7 +482,8 @@ CHINCHA FLOW scopes:
       confirmationMessage: parsed.confirmationMessage || '',
       isHighRisk: parsed.isHighRisk !== false,
     };
-  } catch {
+  } catch (classifyErr) {
+    console.error('classifyAndTranslate failed — fallback to chat intent:', classifyErr.message);
     return { intent: 'chat' };
   }
 }
