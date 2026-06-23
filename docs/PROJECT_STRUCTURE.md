@@ -49,7 +49,8 @@ chinchaflow/
 │       ├── sync-project-tree.yml
 │       └── tea-db-reset.yml
 ├── .jiiji
-│   └── IDENTITY.md
+│   ├── IDENTITY.md
+│   └── PRO_AGENT.md
 ├── 00_peach
 │   └── i18n-3ภาษาเพิ่มเติม.md
 ├── apps
