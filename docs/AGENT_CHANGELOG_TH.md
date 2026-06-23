@@ -1,3 +1,23 @@
+## 2026-06-23 — refactor: แยก agentTools.js เป็น 3 ไฟล์ (839 → 250/235/320 บรรทัด)
+
+- **ที่มา:** agentTools.js ใหญ่ 839 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะ tool definitions หรือ executor ได้
+- `apps/webhook-core/src/shared/agentTools.js` — เหลือ orchestrator: stripDsml, callOpenRouterWithTools, runAgentLoop; re-export TOOL_DEFINITIONS/executeTool/fetchRepoFile ครบเหมือนเดิม
+- เพิ่ม `apps/webhook-core/src/shared/toolDefinitions.js` — TOOL_DEFINITIONS (10 tools) + constants (OPENROUTER_BASE/GH_API/GH_REPO/ADMIN_EMAIL/AGENT_MODEL)
+- เพิ่ม `apps/webhook-core/src/shared/toolExecutors.js` — fetchRepoFile + executeTool switch-case; แก้ implicit bug: isHighRisk ส่งผ่าน context object แทนการอาศัย closure ที่ไม่มีอยู่จริง
+- **ตรวจสอบความปลอดภัย:** smoke-test ผ่าน; `aiWorkflowAgent.js` import `runAgentLoop` จาก `./shared/agentTools` เหมือนเดิม
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต shared/ listing
+- ถ้าพังให้เช็ก: `agentTools.js` (re-export ครบ), `toolExecutors.js` (isHighRisk ใน context)
+
+## 2026-06-23 — refactor: แยก InventoryScreen.jsx เป็น 3 ไฟล์ (1,048 → 170/680/110 บรรทัด)
+
+- **ที่มา:** InventoryScreen.jsx ใหญ่ 1,048 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะส่วนฟอร์มหรือ display ได้
+- `apps/seafood-pos/src/screens/InventoryScreen.jsx` — เหลือ ~170 บรรทัด orchestrator: navigation state (stockLine/tab/lotViewDate), history state (pondHistory/deadInboundHistory), all useEffects, loadPondHistory/loadDeadInboundHistory callbacks; render `<StockFilter>` + `<StockBatchList>`; export default ไม่เปลี่ยน
+- เพิ่ม `apps/seafood-pos/src/screens/StockFilter.jsx` — ฟอร์มทุกอย่าง: live receive (by_size/mixed), pond transfer + ประวัติในบ่อ, dead spoilage + ประวัติ, dead receive (~680 บรรทัด)
+- เพิ่ม `apps/seafood-pos/src/screens/StockBatchList.jsx` — display: ล็อตไทม์ไลน์ (StockLotTimeline) + ประวัติรับตาย (dead/history tab) (~110 บรรทัด)
+- **ตรวจสอบความปลอดภัย:** `npm run build --workspace=seafood-pos` ผ่าน; smoke-test เดิมผ่าน 1 fail pre-existing (shrimpBillServerRender QR image)
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต screens/ listing
+- ถ้าพังให้เช็ก: `InventoryScreen.jsx` (props ที่ส่งลง), `StockFilter.jsx` (pondHistory/deadInboundHistory รับจาก parent), `StockBatchList.jsx` (deadInboundHistory object check .directReceives/.fromPond/.spoilageDead)
+
 ## 2026-06-23 — refactor: แยก RestockTab.jsx เป็น 3 ไฟล์ (1,081 → 132/581/446 บรรทัด)
 
 - **ที่มา:** RestockTab.jsx ใหญ่ 1,081 บรรทัด → AI agent อ่านเปลือง context ทั้งที่แก้เฉพาะ form หรือ list; แยกให้อ่านเฉพาะส่วนที่เกี่ยวได้

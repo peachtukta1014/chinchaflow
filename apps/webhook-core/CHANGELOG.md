@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-23 | PR (pending)
+**refactor: แยก agentTools.js → 3 ไฟล์ (webhook-core)**
+- `src/shared/agentTools.js` — orchestrator: stripDsml + callOpenRouterWithTools + runAgentLoop
+- เพิ่ม `src/shared/toolDefinitions.js` — TOOL_DEFINITIONS (10 tools) + constants
+- เพิ่ม `src/shared/toolExecutors.js` — fetchRepoFile + executeTool; แก้ isHighRisk context
+
 ### 2026-06-23 | dev/ai-confirm-before-code
 **feat: Flash ยืนยันความเข้าใจก่อน Pro loop — bullet ทำ/ไม่ทำ + รอ "ทำเลย"**
 - `src/aiChatAgent.js` — `classifyAndTranslate`: เพิ่ม `needsConfirmation` + `confirmationMessage` (Thai bullet ✅/❌); max_tokens 400→600
