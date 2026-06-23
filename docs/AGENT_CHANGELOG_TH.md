@@ -1,3 +1,11 @@
+## 2026-06-23 — feat: จีจี้ยืนยันความเข้าใจก่อน Pro loop ทุกครั้ง (Flash → confirm → Pro)
+
+- **ที่มา:** พีชต้องการให้ Flash วิเคราะห์คำพูดชาวบ้าน แปลง เป็น bullet ทำ/ไม่ทำ แล้วยืนยันก่อนส่งให้ Pro loop เขียนโค้ด
+- `aiChatAgent.js` — `classifyAndTranslate()`: เพิ่ม `needsConfirmation` (bool) + `confirmationMessage` (Thai bullet: ✅ ทำ / ❌ ไม่ทำ + ถาม); max_tokens 400→600
+- `aiChatAgent.js` — handler: ถ้า `needsConfirmation=true` → ส่ง confirmationMessage กลับทันที ไม่รัน Pro loop; พีชตอบ "ทำเลย" → รอบถัดไป `needsConfirmation=false` → Pro loop ทำงาน
+- default `needsConfirmation=true` เสมอ ยกเว้นมีคำ "ทำเลย/ได้เลย/ยืนยัน/เปิด PR/จัดการเลย" หรือ history แสดงว่ายืนยันแล้ว
+- ถ้าพังให้เช็ก: `aiChatAgent.js` (classifyAndTranslate return, handler needsConfirmation block)
+
 ## 2026-06-23 — docs: อัปเดต doc ให้ตรงโมเดลปัจจุบัน (flash=แชท, pro=loop, vision=gpt-4o-mini)
 
 - `docs/PEACH_WORKING_STYLE_TH.md` — Stack: แก้ "Flash งานง่าย / Pro งานซับซ้อน" → Pro=loop เท่านั้น, Flash=แชท; เพิ่มแถว Vision (gpt-4o-mini)
