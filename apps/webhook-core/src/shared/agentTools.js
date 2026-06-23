@@ -21,6 +21,45 @@ function stripDsml(text) {
   return out.trim();
 }
 
+// ── Tool names (shared by XML parser and stripper) ─────────────────────────
+const XML_TOOL_NAMES = [
+  'read_file', 'list_files', 'search_code', 'patch_file', 'write_file',
+  'commit_and_pr', 'trigger_deploy', 'get_skill', 'exec_command', 'report_no_action_needed',
+];
+
+// ── Strip XML tool call syntax from final reply ────────────────────────────
+// โมเดลบางครั้งใส่ <tool_name>...</tool_name> ในข้อความสรุปผล — ลบออกก่อนส่งให้พี่
+function stripXmlToolCalls(text) {
+  if (!text) return text;
+  const pattern = `<(${XML_TOOL_NAMES.join('|')})(?:\\s[^>]*)?>[\\s\\S]*?<\\/\\1>`;
+  return text.replace(new RegExp(pattern, 'g'), '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// ── Parse XML-format tool calls (DeepSeek V4 Pro fallback) ────────────────
+// DeepSeek บางครั้ง output <read_file><path>...</path></read_file> เป็น text
+// แทน structured tool_calls — parse แล้ว execute แทนการวนเตือน 3 รอบแล้ว throw
+function parseXmlToolCalls(text) {
+  if (!text) return [];
+  const results = [];
+  for (const toolName of XML_TOOL_NAMES) {
+    const re = new RegExp(`<${toolName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${toolName}>`, 'g');
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const args = {};
+      const paramRe = /<(\w+)>([\s\S]*?)<\/\1>/g;
+      let p;
+      while ((p = paramRe.exec(m[1])) !== null) {
+        args[p[1]] = p[2].trim();
+      }
+      results.push({
+        id: `xml-${Date.now()}-${results.length}`,
+        function: { name: toolName, arguments: JSON.stringify(args) },
+      });
+    }
+  }
+  return results;
+}
+
 // ── Call OpenRouter with function calling support ─────────────────────────
 // forceToolUse=true → tool_choice:'required' บังคับให้เรียก tool (ใช้ใน iteration แรก)
 async function callOpenRouterWithTools(apiKey, messages, tools, model, forceToolUse = false, _retried = false) {
@@ -230,6 +269,51 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
         continue;
       }
 
+      // ── XML fallback: DeepSeek บางครั้ง output tool call เป็น XML text ──
+      // แทนที่จะส่ง warning แล้วให้โมเดลแก้ตัวเอง (ซึ่งอาจไม่แก้) →
+      // parse XML แล้ว execute ตรงๆ เหมือน structured tool_calls จริง
+      const xmlCalls = parseXmlToolCalls(assistantMessage.content || '');
+      if (xmlCalls.length > 0) {
+        consecutiveTextOnlyReplies = 0;
+        // Patch ข้อความ assistant ที่ push ไปแล้ว: เปลี่ยนเป็น tool_calls format
+        messages[messages.length - 1].content = null;
+        messages[messages.length - 1].tool_calls = xmlCalls;
+
+        for (const toolCall of xmlCalls) {
+          const toolName = toolCall.function.name;
+          let args = {};
+          try { args = JSON.parse(toolCall.function.arguments || '{}'); } catch { /* use empty */ }
+
+          await writeProgress(requestId, ({
+            read_file: `กำลังอ่านไฟล์: ${args.path || ''}`,
+            list_files: 'กำลังดูรายชื่อไฟล์...',
+            search_code: `กำลังค้นหา: "${args.pattern || ''}"`,
+            patch_file: `กำลัง patch: ${args.path || ''}`,
+            write_file: `กำลังเตรียมไฟล์: ${args.path || ''}`,
+            commit_and_pr: 'กำลัง commit และเปิด PR...',
+            trigger_deploy: `กำลัง trigger deploy: ${args.app || ''}`,
+            get_skill: `กำลังอ่าน skill: ${args.name || ''}`,
+            exec_command: `กำลังรัน: ${(args.command || '').slice(0, 60)}`,
+            report_no_action_needed: 'กำลังสรุปผล...',
+          }[toolName] || `กำลังใช้ tool: ${toolName}`));
+
+          let toolResult;
+          try {
+            toolResult = await executeTool(toolName, args, { ghPat, scopeFileTree, stagedFiles, isHighRisk });
+          } catch (err) {
+            toolResult = `❌ Tool error (${toolName}): ${err.message}`;
+          }
+
+          const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+          if (toolName === 'commit_and_pr' && resultText.startsWith('✅')) taskCompleted = true;
+          else if (toolName === 'report_no_action_needed') taskCompleted = true;
+
+          await appendRunLog(requestId, { iteration: iterations, toolName, ok: !resultText.startsWith('❌'), taskCompleted, xmlFallback: true });
+          messages.push({ role: 'tool', tool_call_id: toolCall.id, content: resultText });
+        }
+        continue;
+      }
+
       consecutiveTextOnlyReplies++;
 
       // หยุด early ถ้าพิมพ์ text ผิดรูปแบบซ้ำเกิน 3 รอบติดกัน — ไม่มีประโยชน์
@@ -257,7 +341,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       continue;
     } else {
       // taskCompleted=true และโมเดลตอบ text ปกติ (สรุปผลให้พี่อ่าน) — จบ loop ได้จริง
-      const finalContent = stripDsml(assistantMessage.content || '');
+      const finalContent = stripXmlToolCalls(stripDsml(assistantMessage.content || ''));
       return {
         reply: finalContent,
         iterations,
