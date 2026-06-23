@@ -95,6 +95,7 @@ chinchaflow/
 │   │   ├── assets
 │   │   ├── scripts
 │   │   ├── src
+│   │   ├── AGENTS.md
 │   │   ├── CHANGELOG.md
 │   │   ├── DEVELOPER_GUIDELINES.md
 │   │   ├── package.json
