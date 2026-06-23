@@ -1,415 +1,457 @@
-# CHINCHA FLOW
+# โครงสร้างโปรเจกต์ (Project Tree)
 
-**ชื่อระบบรวม (แบรนด์):** CHINCHA FLOW · **ชื่อ repo (เทคนิค):** `chincha-business-os` · **GitHub repo:** `peachtukta1014/chinchaflow` · **คลาวด์:** Firebase `chincha-eeed6`
+**CHINCHA FLOW** (ระบบรวม) · monorepo **chincha-business-os** · Firebase `chincha-eeed6` — [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md)
 
-แพลตฟอร์มปฏิบัติการธุรกิจแบบ monorepo สำหรับร้านจริง 2 ฝั่ง: **โกอ้วนซีฟู้ด** + **ชินชา ไม้ขาว** + LINE backend หลังบ้าน อยู่ใน repo เดียวกัน
-
-→ ชื่อและคำเรียกสากล: [docs/CHINCHA_FLOW_NAMING_TH.md](docs/CHINCHA_FLOW_NAMING_TH.md)
-
-| แอปใน CHINCHA FLOW | โฟลเดอร์ | ลิงก์ | บทบาทหลัก |
-|---|---|---|---|
-| **โกอ้วน คลังซีฟู้ด** | `apps/seafood-pos` | https://ko-seafood.top | POS กุ้ง, สต๊อก, ลูกค้า, ลูกหนี้, LINE order, LIFF |
-| **ชินชา Tea POS ไม้ขาว** | `apps/chincha-tea` | https://chincha-tea.web.app | POS ร้านน้ำ, สรุปวัน, หลังร้าน, เติมของ, ค่าใช้จ่าย, พนักงาน, 3 ภาษา |
-| **LINE backend** | `apps/webhook-core` | Cloud Functions | webhook กุ้ง/ชา, สรุปยอด, แจ้งเตือน, กัน event ซ้ำ, AI chat agent |
-| **AI Admin Chat** | `apps/ai-chat` | PWA (chincha-flow.web.app) | แชทกับ "เลขา" AI ผู้ช่วยส่วนตัว — ถามข้อมูลร้าน, แก้โค้ด, ส่งรูป |
-| **Scheduled backend** | `apps/webhook-core-scheduled` | Cloud Functions / Scheduler | งานสรุปอัตโนมัติ ถ้า deploy แยก codebase |
+| แอป | URL Hosting | ผู้ใช้หลัก |
+|-----|-------------|-----------|
+| กุ้ง `seafood-pos` | https://ko-seafood.top | พนักงานร้านกุ้ง |
+| ชา `chincha-tea` | https://chincha-tea.web.app | พนักงานร้านชา + แอดมิน |
+| AI `ai-chat` | https://chincha-ai-chat.web.app | เจ้าของร้าน — คุย AI ผ่านเสียง/พิมพ์ |
+| LINE `webhook-core` | Cloud Functions | บอท LINE กุ้ง/ชา + AI Chat Agent |
 
 ---
 
-## โครงสร้างโปรเจกต์ (Project Tree ปัจจุบัน)
+## ต้นไม้โปรเจกต์ (ภาพรวม)
 
-```text
-chincha-business-os/
-├── apps/                              # แอปหลักทั้งหมดใน monorepo (npm workspaces)
-│   ├── seafood-pos/                   # โกอ้วนซีฟู้ด POS → ko-seafood.top
-│   │   ├── public/                    # logo, manifest, static assets
-│   │   ├── src/
-│   │   │   ├── main.jsx               # entry ของเว็บ POS
-│   │   │   ├── App.jsx                # auth, shell, tab navigation, stock realtime
-│   │   │   ├── firebase.js            # Firebase client config
-│   │   │   ├── screens/               # หน้าหลักของแอปกุ้ง
-│   │   │   │   ├── POSMobile.jsx      # ขายกุ้ง, ตะกร้า, รูปบิล, เสียง
-│   │   │   │   ├── SalesHubScreen.jsx # hub งานขาย / รายการขาย
-│   │   │   │   ├── Dashboard.jsx      # ภาพรวมรายวัน / ลูกหนี้
-│   │   │   │   ├── InventoryScreen.jsx# รับเข้า, ย้ายกุ้งตาย, สต๊อก
-│   │   │   │   ├── LineOrdersScreen.jsx
-│   │   │   │   ├── LineDeliveryConfirmSheet.jsx
-│   │   │   │   ├── MembersScreen.jsx
-│   │   │   │   ├── CustomerAccountsScreen.jsx
-│   │   │   │   ├── ExpensesScreen.jsx
-│   │   │   │   ├── LotCloseScreen.jsx
-│   │   │   │   ├── ProductSettingsScreen.jsx
-│   │   │   │   ├── AdminUsersScreen.jsx
-│   │   │   │   ├── MyProfileScreen.jsx
-│   │   │   │   └── LoginScreen.jsx
-│   │   │   ├── components/            # UI panels/buttons/sheets ของกุ้ง
-│   │   │   │   ├── AppHeaderMenu.jsx
-│   │   │   │   ├── NavButton.jsx
-│   │   │   │   ├── DateNavBar.jsx
-│   │   │   │   ├── BillImageSheet.jsx
-│   │   │   │   ├── SaleBillActions.jsx
-│   │   │   │   ├── StockCountPanel.jsx
-│   │   │   │   ├── StockLotTimeline.jsx
-│   │   │   │   ├── LotPortfolioPanel.jsx
-│   │   │   │   ├── LotReportPanel.jsx
-│   │   │   │   ├── LotExpensesPanel.jsx
-│   │   │   │   ├── LotExpensesSyncPanel.jsx
-│   │   │   │   ├── LineOaCustomersPanel.jsx
-│   │   │   │   ├── LineOrderRetentionPanel.jsx
-│   │   │   │   ├── LineShareButton.jsx
-│   │   │   │   ├── ShrimpLineNotifySettings.jsx
-│   │   │   │   ├── PosCustomLinesPanel.jsx
-│   │   │   │   ├── AdminAlertsBanner.jsx
-│   │   │   │   ├── OfflineBanner.jsx
-│   │   │   │   └── MemberAvatar.jsx
-│   │   │   ├── services/              # business logic แยกจาก UI
-│   │   │   ├── lib/                   # helper เช่น Firestore REST, date, LINE order mapping, voice parse
-│   │   │   ├── constants/             # สินค้า, ลูกค้าเริ่มต้น, การชำระเงิน
-│   │   │   ├── hooks/                 # custom hooks เช่น useVoice
-│   │   │   └── liff/                  # LIFF app สำหรับ LINE order/slip/customer flow
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   └── vite.config.js
-│   │
-│   ├── chincha-tea/                   # ชินชา Tea POS → chincha-tea.web.app
-│   │   ├── public/                    # โลโก้ + PWA manifest
-│   │   ├── src/
-│   │   │   ├── main.jsx               # entry ของเว็บร้านชา
-│   │   │   ├── App.jsx                # auth, tabs, cart, app shell
-│   │   │   ├── firebase.js            # Firebase client config
-│   │   │   ├── screens/               # หน้าหลัก/แท็บของร้านชา (Smart POS)
-│   │   │   │   ├── OrderTab.jsx       # ขายราคาแก้ว + ท็อปปิ้ง · ปิดวัน
-│   │   │   │   ├── CupsTab.jsx        # สต๊อกแก้ว / เติมแก้ว
-│   │   │   │   ├── RestockTab.jsx     # สั่งของ / ซื้อเข้าร้าน
-│   │   │   │   ├── HistoryScreen.jsx  # ประวัติบิล + ปิดกะ
-│   │   │   │   ├── ProfitTab.jsx      # แดชบอร์ดกำไร/สรุประบบ (เมนูแอดมิน)
-│   │   │   │   ├── StockTab.jsx       # เช็คสต๊อกคงเหลือ (เมนูแอดมิน)
-│   │   │   │   ├── AdminPanel.jsx     # สมาชิก · LINE · ประวัติออเดอร์
-│   │   │   │   ├── MyProfileScreen.jsx
-│   │   │   │   └── LoginScreen.jsx
-│   │   │   ├── components/            # UI ย่อยของร้านชา
-│   │   │   │   ├── AppHeader.jsx
-│   │   │   │   ├── DailySummaryStickyBar.jsx
-│   │   │   │   ├── TeaAppHeaderMenu.jsx   # เมนู ☰ แอดมิน
-│   │   │   │   ├── TabNav.jsx
-│   │   │   │   ├── CartSheet.jsx
-│   │   │   │   ├── ToppingSaleSettings.jsx
-│   │   │   │   ├── StockItemSettingsSheet.jsx
-│   │   │   │   ├── VoiceCommandBar.jsx
-│   │   │   │   ├── StaffGuidePanel.jsx
-│   │   │   │   ├── StaffLangNudge.jsx
-│   │   │   │   └── MemberAvatar.jsx
-│   │   │   └── lib/                   # Firestore REST, auth, order, restock, slip, i18n, LINE, constants
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   └── vite.config.js
-│   │
-│   ├── webhook-core/                  # Cloud Functions หลัก (LINE Bot + AI Agent)
-│   │   ├── src/
-│   │   │   ├── index.js               # exports functions: lineWebhook, lineWebhookTea, teaPushSummary, aiChatAgentHttp, ...
-│   │   │   ├── seafood-oa/            # LINE webhook + logic ฝั่งกุ้ง
-│   │   │   │   ├── shrimpDirectLineWebhook.js
-│   │   │   │   ├── shrimpLineOrderHandler.js
-│   │   │   │   ├── shrimpLineIntent.js
-│   │   │   │   ├── shrimpDailySummary.js
-│   │   │   │   ├── parseLineOrder.js
-│   │   │   │   ├── prepareOrderInput.js
-│   │   │   │   └── ...
-│   │   │   ├── seafood-notify/        # instant notify กุ้ง
-│   │   │   │   └── shrimpLinePush.js
-│   │   │   ├── tea/                   # LINE webhook + logic ฝั่งชา
-│   │   │   │   ├── teaWebhook.js
-│   │   │   │   └── teaDailySummary.js
-│   │   │   ├── shared/                # utils ใช้ร่วม
-│   │   │   │   ├── lineUtils.js
-│   │   │   │   └── webhookDedup.js
-│   │   │   ├── aiChatAgent.js         # AI "เลขา" — chat + vision + code-action routing
-│   │   │   └── aiWorkflowAgent.js     # code-action: OpenRouter + GitHub API → PR
-│   │   └── package.json
-│   │
-│   ├── ai-chat/                       # AI Admin Chat PWA
-│   │   ├── src/
-│   │   │   ├── App.jsx                # UI แชท: text + voice + image upload
-│   │   │   └── api.js                 # chatWithAI() → aiChatAgentHttp Cloud Function
-│   │   ├── index.html
-│   │   └── package.json
-│   │
-│   └── webhook-core-scheduled/        # งาน scheduled ถ้าแยก deploy/codebase
-│
-├── packages/                          # shared packages ใช้ร่วมกันข้ามแอป
-│   └── app-credits/                   # เครดิต/branding component package
-│
-├── scripts/                           # สคริปต์ดูแลข้อมูลจาก root
-│   ├── tea-db-reset.mjs               # เคลียร์/seed ข้อมูลร้านชา
-│   ├── shrimp-stock-reset.mjs         # รีเซ็ตสต๊อกกุ้ง/ล็อต/FIFO/LINE orders
-│   └── shrimp-fix-customer-line.mjs   # ซ่อมข้อมูลลูกค้า LINE ฝั่งกุ้ง
-│
-├── docs/                              # เอกสารโครงสร้าง/สถาปัตยกรรม/สถานะคลาวด์
-│   ├── PROJECT_STRUCTURE.md
-│   ├── ARCHITECTURE_TH.md
-│   ├── CHINCHA_FLOW_NAMING_TH.md
-│   ├── CLOUD_STATUS.md
-│   ├── LINE_OA_ORDER_SCOPE_TH.md
-│   └── ENABLE_CLOUD_SCHEDULER.md
-│
-├── .github/workflows/                 # CI/CD บน GitHub Actions
-│   ├── deploy-hosting.yml             # build + deploy hosting กุ้ง/ชา
-│   ├── deploy-functions.yml           # deploy webhook-core
-│   ├── deploy-rules.yml               # deploy Firestore/Storage rules
-│   ├── tea-db-reset.yml               # reset DB ร้านชาแบบ cloud
-│   └── shrimp-stock-reset.yml         # reset stock กุ้งแบบ cloud
-│
-├── .cursor/skills/                    # skill/context สำหรับ AI editor
-├── .ops/                              # trigger/ops files สำหรับงานดูแลระบบ
-├── firebase.json                      # Firebase hosting/functions/firestore config
-├── firestore.rules                    # Firestore rules DB default
-├── firestore-chincha.rules            # Firestore rules DB chincha legacy
-├── storage.rules                      # Storage rules
-├── package.json                       # npm workspaces + scripts รวม
-└── README.md                          # หน้าแนะนำ repo นี้
+> อัปเดตอัตโนมัติทุก push `main` โดย `sync-project-tree.yml` — ห้ามแก้มือระหว่าง markers
+
+<!-- TREE_START -->
+```
+chinchaflow/
+├── .claude
+│   └── commands
+│       ├── auto-shrimp.md
+│       ├── auto-tea.md
+│       ├── land-it.md
+│       ├── peter-ser.md
+│       ├── ship-shrimp.md
+│       └── ship-tea.md
+├── .cursor
+│   ├── skills
+│   │   ├── auto-shrimp
+│   │   ├── auto-tea
+│   │   ├── land-it
+│   │   ├── peter-ser
+│   │   ├── ship-shrimp
+│   │   └── ship-tea
+│   └── environment.json
+├── .github
+│   └── workflows
+│       ├── code-metrics.yml
+│       ├── deploy-functions.yml
+│       ├── deploy-hosting.yml
+│       ├── deploy-rules.yml
+│       ├── pr-verify.yml
+│       ├── shrimp-fix-line-customer.yml
+│       ├── shrimp-full-reset-on-demand.yml
+│       ├── shrimp-stock-reset.yml
+│       ├── sync-project-tree.yml
+│       └── tea-db-reset.yml
+├── .jiiji
+│   └── IDENTITY.md
+├── 00_peach
+│   └── i18n-3ภาษาเพิ่มเติม.md
+├── apps
+│   ├── ai-chat
+│   │   ├── public
+│   │   ├── src
+│   │   ├── CHANGELOG.md
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── chincha-tea
+│   │   ├── .cursor
+│   │   ├── lib
+│   │   ├── public
+│   │   ├── src
+│   │   ├── AGENTS.md
+│   │   ├── CHANGELOG.md
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── seafood-pos
+│   │   ├── .cursor
+│   │   ├── docs
+│   │   ├── public
+│   │   ├── scripts
+│   │   ├── src
+│   │   ├── .env.example
+│   │   ├── AGENTS.md
+│   │   ├── CHANGELOG.md
+│   │   ├── PATCH_SEAFOOD_DATEKEY.md
+│   │   ├── index.html
+│   │   ├── liff-order.html
+│   │   ├── liff-slip.html
+│   │   ├── package.json
+│   │   ├── postcss.config.js
+│   │   ├── tailwind.config.js
+│   │   └── vite.config.js
+│   ├── webhook-core
+│   │   ├── assets
+│   │   ├── scripts
+│   │   ├── src
+│   │   ├── CHANGELOG.md
+│   │   ├── DEVELOPER_GUIDELINES.md
+│   │   ├── package.json
+│   │   ├── shrimp-liff-id.json
+│   │   ├── shrimp-liff-id.json.example
+│   │   └── shrimp-liff-slip-id.json
+│   └── webhook-core-scheduled
+│       ├── src
+│       └── package.json
+├── docs
+│   ├── AGENT_CHANGELOG_TH.md
+│   ├── AGENT_HANDBOOK_TH.md
+│   ├── ARCHITECTURE_TH.md
+│   ├── CHINCHA_FLOW_NAMING_TH.md
+│   ├── CLOUD_STATUS.md
+│   ├── CODE_METRICS.md
+│   ├── CURSOR_AGENT_SETUP_TH.md
+│   ├── ENABLE_CLOUD_SCHEDULER.md
+│   ├── LINE_LIFF_SETUP_TH.md
+│   ├── LINE_OA_ORDER_SCOPE_TH.md
+│   ├── LINE_OA_PARTITION_TH.md
+│   ├── LINE_RICH_MENU_TH.md
+│   ├── PEACH_WORKING_STYLE_TH.md
+│   └── PROJECT_STRUCTURE.md
+├── packages
+│   └── app-credits
+│       ├── src
+│       └── package.json
+├── reports
+│   ├── code-metrics.json
+│   └── code-metrics.md
+├── scripts
+│   ├── code-metrics.mjs
+│   ├── materialize-cloud-env.sh
+│   ├── shrimp-fix-customer-line.mjs
+│   ├── shrimp-line-orders-prune.mjs
+│   ├── shrimp-stock-reset.mjs
+│   ├── sync-project-tree.mjs
+│   └── tea-db-reset.mjs
+├── .env.example
+├── .firebaserc
+├── .gitignore
+├── 01-bug.yml
+├── 02-feature.yml
+├── 03-task.yml
+├── AGENTS.md
+├── CLAUDE.md
+├── JIIJI.md
+├── README.md
+├── config.yml
+├── firebase.json
+├── firestore-chincha.indexes.json
+├── firestore-chincha.rules
+├── firestore.indexes.json
+├── firestore.rules
+├── package.json
+└── storage.rules
+```
+<!-- TREE_END -->
+
+---
+
+## แอป AI Chat `apps/ai-chat/`
+
+**สแต็ก:** React 18 + Vite + Tailwind · PWA ปักหน้าจอได้ · Voice Input (Web Speech API) · คุยผ่าน Cloud Function
+
+```
+apps/ai-chat/
+├── CHANGELOG.md
+├── public/
+│   ├── jiji-avatar.png            # avatar จีจี้ (แสดงใน chat bubble)
+│   ├── jiji-icon.png              # icon สำหรับ PWA / tab
+│   ├── peach-avatar.jpg           # avatar พีช (bubble ผู้ใช้)
+│   └── manifest.json              # PWA
+├── src/
+│   ├── main.jsx                   # entry
+│   ├── App.jsx                    # Chat UI — bubbles + voice input + scope picker + image attach
+│   ├── api.js                     # คุยกับ Cloud Function aiChatAgentHttp (+ imageBase64)
+│   ├── sessionStore.js            # เก็บ session history (localStorage)
+│   ├── version.js                 # APP_VERSION (ai-DDMMYY.N) — inject อัตโนมัติตอน deploy
+│   └── index.css                  # Tailwind base + scrollbar
+├── index.html
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+└── package.json
 ```
 
-> รายละเอียดเชิงลึกของโฟลเดอร์, แท็บ UI, Firestore collections และ flow สำคัญอยู่ที่ [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
+**5 Agent Scopes (ปุ่มเลือกในแอป):** root (ทั่วไป) · tea (ชินชา) · seafood (โกอ้วน) · webhook (LINE Bot) · scheduled (Automation)
+
+**Deploy:** `push main` → `deploy-hosting.yml` (job `deploy_ai_chat`) · URL: https://chincha-ai-chat.web.app
 
 ---
 
-## แอปกุ้ง: `apps/seafood-pos`
+## แอปชา `apps/chincha-tea/`
 
-**หน้าที่หลัก:** POS กุ้งแม่น้ำ / รับสต๊อก / ย้ายกุ้งตาย / จัดการล็อต / ลูกค้า / ลูกหนี้ / รับออเดอร์จาก LINE / LIFF สำหรับลูกค้าและสลิป
+**สแต็ก:** React 19 + Vite · Firestore REST + Firebase Auth/Storage · 3 ภาษา (TH / MY / EN)
 
-**สแต็กหลัก**
+```
+apps/chincha-tea/
+├── CHANGELOG.md
+├── public/
+│   ├── chincha-logo.jpg
+│   └── manifest.json              # PWA
+├── src/
+│   ├── main.jsx
+│   ├── App.jsx                    # login, แท็บ, ตะกร้า, routing หน้าหลัก
+│   ├── firebase.js
+│   │
+│   ├── screens/
+│   │   ├── LoginScreen.jsx
+│   │   ├── OrderTab.jsx           # บันทึกขาย + เสียง + เมนู
+│   │   ├── HistoryScreen.jsx
+│   │   ├── SummaryTab.jsx         # สรุปยอดขาย / ค่าใช้จ่าย / ซื้อของ / LINE
+│   │   ├── RestockTab.jsx
+│   │   └── AdminPanel.jsx         # สมาชิก, เมนู, ท็อปปิ้ง, LINE config
+│   │
+│   ├── components/
+│   │   ├── AppHeader.jsx
+│   │   ├── TabNav.jsx
+│   │   ├── CartSheet.jsx
+│   │   ├── MenuCard.jsx
+│   │   └── CustomizeModal.jsx
+│   │
+│   └── lib/
+│       ├── firestoreRest.js
+│       ├── authSession.js
+│       ├── orderService.js
+│       ├── orderSlipService.js
+│       ├── restockService.js
+│       ├── useCatalog.js
+│       ├── voiceOrder.js
+│       ├── lineNotify.js
+│       ├── i18n.js
+│       └── constants.js
+│
+├── .cursor/skills/                # app-scoped Cursor skills
+│   ├── auto-tea/SKILL.md
+│   ├── deploy-tea/SKILL.md
+│   └── ship-tea/SKILL.md
+├── index.html
+├── vite.config.js
+└── package.json
+```
 
-- React 18 + Vite
-- Firebase Auth + Firestore + Storage
-- Firestore SDK + REST helper
-- LINE LIFF (`@line/liff`)
-- html2canvas สำหรับรูปบิล
-- lucide-react สำหรับ icon
+### Firestore collections (ชา — DB default)
 
-**โครง logic สำคัญ**
-
-- `screens/` = หน้าใช้งานจริงของพนักงาน/แอดมิน
-- `components/` = panel, sheet, ปุ่ม, banner, UI เฉพาะงาน
-- `services/` = logic งานขาย/สต๊อก/ลูกหนี้/ลูกค้า/LINE order
-- `lib/` = helper ชั้นล่าง เช่น date, REST, voice parsing, map LINE order เป็น sale
-- `liff/` = flow จาก LINE เช่น ลูกค้าส่งออเดอร์/แนบสลิป/เลือกข้อมูล
-
-**Firestore collections หลักฝั่งกุ้ง**
-
-| Collection / Doc | ใช้ทำอะไร |
-|---|---|
-| `shrimp_users` | ผู้ใช้/พนักงานฝั่งกุ้ง |
-| `config/stock` | สต๊อกกุ้งเป็น/ตายแบบ realtime |
-| `stockBatches` | ล็อตรับเข้า, ราคา, FIFO, ค่ารถ |
-| `sales` | บิลขายกุ้ง |
-| `customerDebts` | ลูกหนี้ |
-| `customers` | รายชื่อลูกค้า |
-| `lineOrders` | ออเดอร์จาก LINE |
-| `productSettings/shrimp` | ราคากุ้งและ config สินค้า |
-
----
-
-## แอปร้านน้ำชินชา ไม้ขาว: `apps/chincha-tea`
-
-**หน้าที่หลัก:** Smart POS ราคาแก้ว + ท็อปปิ้ง · สต๊อกแก้ว · สั่งของ · ประวัติ · แดชบอร์ดกำไร/สต๊อก (แอดมิน) · 3 ภาษา TH/MY/EN
-
-**แท็บหลัก (พนักงานทุกคน):** ขาย · แก้ว · สั่งของ · ประวัติ
-
-**เมนูแอดมิน ☰ (เมเนเจอร์/แอดมิน):** กำไร (แดชบอร์ด) · สโตสินค้า · จัดการ (สมาชิก/LINE)
-
-**ตอกบัตร:** ยอดขายแรกของวันติ๊กพนักงานที่ขายอัตโนมัติ
-
-**สแต็กหลัก**
-
-- React 18 + Vite
-- Firebase Auth + Firestore + Storage
-- Firestore REST helper
-- PWA manifest
-- lucide-react สำหรับ icon
-- ระบบ i18n 3 ภาษา: ไทย / เมียนมา / อังกฤษ
-
-**โครง logic สำคัญ**
-
-- `screens/` = แท็บหลักของร้านชา เช่น ขาย, หลังร้าน, สรุป, กำไร, ค่าแรง, แอดมิน
-- `components/` = header, navigation, cart, menu card, modal ปรับแต่งแก้ว, voice command, staff panels
-- `lib/` = service/helper เช่น auth session, order service, restock, slip upload, catalog, voice, LINE notify, i18n, constants
-
-**Firestore collections หลักฝั่งชา**
-
-| Collection / Doc | ใช้ทำอะไร |
-|---|---|
-| `users` | สมาชิกแอป, role, approved |
+| Collection | ใช้ทำอะไร |
+|------------|-----------|
+| `users` | สมาชิกแอป (approved, role) |
 | `teaOrders` | บิลขายรายวัน |
-| `dailyExpenses` | ค่าใช้จ่าย + สรุปยอดปิดวัน |
-| `dailyCupStocks` | สต๊อกแก้วรายวัน |
-| `restocks` | รายการสั่งของ/ซื้อของเข้าร้าน |
+| `dailyExpenses` | ค่าใช้จ่าย + สรุปปิดวัน |
+| `dailyCupStocks` | สต๊อกแก้วเปล่ารายวัน |
+| `restocks` | รายการสั่งของเข้าร้าน |
+| `restockCatalog` | catalog ของเข้าร้าน + inventory |
 | `historyLogs` | ประวัติ action สำคัญ |
 | `orderSlips` | รูปใบสั่งของ/สลิป |
-| `products` / `toppings` | เมนูและ topping |
+| `products` / `toppings` | เมนู |
 | `config/teaLine` | ตั้งค่า LINE สรุปปิดวัน |
 
 ---
 
-## LINE backend + AI Agent: `apps/webhook-core`
+## แอปกุ้ง `apps/seafood-pos/`
 
-Cloud Functions สำหรับงานหลังบ้าน แยกเป็น 4 โฟลเดอร์ตาม scope
+**สแต็ก:** React + Vite · Firestore SDK + REST · LINE ออเดอร์ → ขาย
 
-| Function / Module | หน้าที่ |
-|---|---|
-| `lineWebhook` | รับข้อความ LINE ฝั่งกุ้ง (OA 1:1 + กลุ่มครอบครัว) |
-| `lineWebhookTea` | บอท LINE ชา — คำสั่งสรุป/ซื้อเข้าร้าน/แอด uid/help |
-| `teaPushSummary` | ส่งสรุปปิดวันร้านชา (จากแอป) |
-| `aiChatAgentHttp` | AI "เลขา" — chat + vision + code-action routing (HTTP) |
-| `seafood-oa/parseLineOrder.js` | แปลงข้อความลูกค้าเป็น order กุ้ง |
-| `shared/webhookDedup.js` | กัน LINE event ซ้ำ |
-| `seafood-oa/shrimpDailySummary.js` | สรุปยอดกุ้ง |
-| `tea/teaDailySummary.js` | สรุปยอดชา + คำสั่ง LINE |
+```
+apps/seafood-pos/
+├── CHANGELOG.md
+├── public/
+│   └── logo.jpg
+├── scripts/
+│   ├── smoke-test.mjs             # ตรวจ logic กุ้ง (ไม่ต้อง Firebase) — รันก่อน merge
+│   ├── prepare-bill-template.mjs
+│   └── rebuild-bill-templates-from-samples.mjs
+├── src/
+│   ├── main.jsx
+│   ├── App.jsx                    # auth, แท็บล่าง, stock realtime
+│   ├── firebase.js
+│   │
+│   ├── screens/
+│   │   ├── LoginScreen.jsx
+│   │   ├── POSMobile.jsx          # ขายของ + รูปบิล + เสียง
+│   │   ├── Dashboard.jsx          # ภาพรวมวัน / ลูกหนี้
+│   │   ├── SalesHubScreen.jsx     # hub ขายรวม (บิล + สลิป)
+│   │   ├── InventoryScreen.jsx    # รับสต๊อก + ย้ายกุ้งตาย
+│   │   ├── LotCloseScreen.jsx     # ปิดล็อตกุ้ง
+│   │   ├── ExpensesScreen.jsx     # ค่าใช้จ่ายร้าน
+│   │   ├── MembersScreen.jsx      # ลูกค้า + defaultRiverSize
+│   │   ├── CustomerAccountsScreen.jsx  # บัญชีลูกค้า / ลูกหนี้
+│   │   ├── LineOrdersScreen.jsx   # ออเดอร์ LINE → ส่งเรียบร้อย
+│   │   ├── LineDeliveryConfirmSheet.jsx
+│   │   ├── PaymentSlipsScreen.jsx # สลิปจ่ายเงิน
+│   │   ├── MyProfileScreen.jsx
+│   │   ├── ProductSettingsScreen.jsx
+│   │   └── AdminUsersScreen.jsx
+│   │
+│   ├── components/
+│   │   └── NavButton.jsx
+│   │
+│   ├── services/                  # business logic แยกจาก UI
+│   │   ├── salesService.js        # saveBillWithCart, ตรวจสต๊อก
+│   │   ├── stockService.js        # persist stock, stockBatches
+│   │   ├── debtService.js
+│   │   ├── customerService.js
+│   │   └── lineOrderService.js
+│   │
+│   ├── hooks/
+│   │   ├── useVoice.js            # Web Speech API — voice input
+│   │   ├── useLineOrdersFeed.js
+│   │   └── useSaleDeleteHandlers.js
+│   │
+│   ├── lib/                       # helpers (ไฟล์มาก — ดูได้จาก src/lib/)
+│   │   ├── firestoreRest.js
+│   │   ├── voiceParse.js
+│   │   ├── lineOrderToSale.js
+│   │   ├── date.js
+│   │   └── ...                    # อีก ~50 ไฟล์ (bill, stock, line, etc.)
+│   │
+│   └── constants/
+│
+├── .cursor/skills/                # app-scoped Cursor skills
+│   ├── auto-shrip/SKILL.md
+│   ├── deploy-shrimp/SKILL.md
+│   └── ship-shrimp/SKILL.md
+└── package.json
+```
 
-### คำสั่ง LINE (อัปเดต 2026-06)
+### Firestore collections (กุ้ง)
 
-Webhook URL ใน LINE Developers:
-
-| แอป | Function | URL |
-|-----|----------|-----|
-| กุ้ง | `lineWebhook` | `https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhook` |
-| ชา | `lineWebhookTea` | `https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhookTea` |
-
-**ชินชา (กลุ่มร้านน้ำ — ต้องตรง `config/teaLine.notifyGroupId` ในแอป)**
-
-| พิมพ์ | ผลลัพธ์ |
-|-------|---------|
-| `สรุป` / `ปิดวัน` / `ยอดขายวันนี้` / `1` | สรุปยอดขายวันนี้ |
-| `ซื้อเข้าร้าน` / `ซื้อของ` / `2` | รายการสั่งของ + ยอดซื้อแล้ว |
-| `help` / `ช่วยเหลือ` / `3` | แสดงคำสั่ง |
-| `แอด uid` / `adduid` / `เพิ่ม uid` | เพิ่ม User ID ตัวเองเข้ารับสรุปส่วนตัว |
-
-**โกอ้วน — แชต OA 1:1 (ลูกค้า):** สั่งกุ้ง · `help` · `ฟอร์ม` · `ยกเลิก` · ส่งสลิป
-
-**โกอ้วน — กลุ่มครอบครัว/พนักงาน** (ไม่ตอบ `help` — เงียบในแชททั่วไป):
-
-| พิมพ์ / เหตุการณ์ | ผลลัพธ์ |
-|-------------------|---------|
-| `1` / `สรุปออเดอร์` / `สรุปรายการวันนี้` | รายการออเดอร์ LINE วันนี้ |
-| `3` / `สรุป` / `ยอดขายวันนี้` | สรุปยอดขาย POS รายวัน |
-| `กุ้งใหญ่ 2 กก` (มีจำนวน) | รับออเดอร์ในแชท |
-| ลูกค้าส่งสลิปทาง LINE OA → เข้าแอป | แจ้งเตือนในกลุ่ม (ไม่ push ไปหาลูกค้า) |
-
-> `help` / คีย์ `2` — **ไม่ตอบในกลุ่ม** (ใช้ในแชต OA 1:1 ลูกค้าเท่านั้น)
-
-หลังแก้ `apps/webhook-core` ต้อง deploy functions (`main` push หรือ Actions → **Deploy Cloud Functions**)
-
-## AI Admin Chat: `apps/ai-chat`
-
-PWA แชทกับ "เลขา" — AI ผู้ช่วยส่วนตัวพีช เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน
-
-| ฟีเจอร์ | รายละเอียด |
-|---------|-----------|
-| 💬 Text chat | ถามข้อมูลร้าน วิเคราะห์ปัญหา แนะนำแนวทาง |
-| 🎤 Voice input | พูดภาษาไทยได้ (Web Speech API) |
-| 📸 Image upload | ส่งรูป screenshot/error ให้ AI วิเคราะห์ (vision) |
-| 🔧 Code-action | สั่ง "แก้บั๊ก / สร้าง feature" → AI deepseek + GitHub → PR อัตโนมัติ |
-| 🗂 Multi-scope | สลับ scope: ชา / กุ้ง / LINE Bot / Cron |
-
-ก่อนรับหน้าที่ AI จะสรุป: **หัวข้อ → รายละเอียด → ✅/⚠️/❌ → แนะนำ** แล้วรอยืนยัน
-
-**Backend:** `aiChatAgentHttp` (Cloud Function) → OpenRouter API  
-**Vision model:** `openai/gpt-4o-mini` (ใช้เมื่อมีรูปแนบ)  
-**Text model:** `deepseek/deepseek-chat` (ค่าเริ่มต้น, ปรับได้ผ่าน env `DEFAULT_MODEL`)
+| Collection | ใช้ทำอะไร |
+|------------|-----------|
+| `shrimp_users` | พนักงานกุ้ง |
+| `config/stock` | สต๊อกกุ้งเป็น/ตาย (realtime) |
+| `stockBatches` | ล็อตรับเข้า (ราคา/กก., ค่ารถ) |
+| `sales` | บิลขาย |
+| `customerDebts` | ลูกหนี้ |
+| `customers` | รายชื่อลูกค้า + `defaultRiverSize` |
+| `lineOrders` | ออเดอร์จาก LINE |
+| `productSettings/shrimp` | ราคากุ้ง |
 
 ---
 
-## พัฒนา local
+## LINE `apps/webhook-core/`
 
-ติดตั้ง dependencies จาก root:
+**สแต็ก:** Node 20 · Cloud Functions v2 · LINE Messaging API · OpenRouter AI
+
+```
+apps/webhook-core/
+├── CHANGELOG.md
+├── src/
+│   ├── index.js                   # exports functions ทั้งหมด
+│   ├── aiChatAgent.js             # AI chat agent (3-tier model: Flash/Pro/Vision)
+│   ├── aiWorkflowAgent.js         # agentic loop (commit/PR tools)
+│   │
+│   ├── seafood-oa/                # LINE order handling — กุ้ง
+│   │   ├── SCOPE.md
+│   │   ├── parseLineOrder.js      # แปลงข้อความ → ออเดอร์
+│   │   ├── shrimpLineOrderHandler.js  # tryCompleteOrder, group/DM flow
+│   │   ├── shrimpGroupLineWebhook.js
+│   │   ├── shrimpDirectLineWebhook.js
+│   │   ├── customerRiverDefault.js    # defaultRiverSize → product name
+│   │   ├── shrimpLineCustomerProfile.js
+│   │   ├── prepareOrderInput.js
+│   │   ├── translateOrderText.js
+│   │   ├── parseDeliveryDate.js
+│   │   ├── shrimpLineIntent.js
+│   │   ├── shrimpDailySummary.js
+│   │   ├── saveShrimpLineOrders.js
+│   │   └── ...                    # อีก ~22 ไฟล์ (LIFF, slip, config, lexicon, etc.) — รวม ~36 ไฟล์
+│   │
+│   ├── seafood-notify/            # push notification + bill render — กุ้ง
+│   │   ├── SCOPE.md
+│   │   ├── shrimpLinePush.js      # findCustomerNameByLineUserId, linkLine
+│   │   ├── shrimpBillRender.js    # render บิล PNG (satori)
+│   │   ├── shrimpBillPreRender.js
+│   │   ├── shrimpBillTemplateRows.js
+│   │   └── instantLineNotify.js
+│   │
+│   ├── tea/                       # LINE handling + summary — ชา
+│   │   ├── SCOPE.md
+│   │   ├── teaDailySummary.js
+│   │   └── teaWebhook.js
+│   │
+│   └── shared/                    # utils ร่วม
+│       ├── SCOPE.md
+│       ├── agentTools.js          # tools สำหรับ AI agent (commit, read_file, etc.)
+│       ├── lineUtils.js
+│       ├── progressTracker.js
+│       └── webhookDedup.js        # กัน event LINE ซ้ำ
+│
+└── package.json
+```
+
+| Function | หน้าที่ |
+|----------|---------|
+| `lineWebhook` | รับข้อความ LINE กุ้ง (DM + กลุ่ม) |
+| `lineWebhookTea` | รับข้อความ LINE ชา |
+| `teaPushSummary` | ส่งสรุปปิดวันชา |
+| `aiChatAgentHttp` | AI chat + agentic loop (commit/PR) — entry point เดียว |
+
+---
+
+## Shared Package `packages/app-credits/`
+
+**AppCredits** — component แสดง version badge / credit strip ใน UI ทุกแอป
+
+```
+packages/app-credits/
+├── src/
+│   ├── index.js                   # exports หลัก
+│   ├── AppCredits.jsx             # component หลัก
+│   ├── CreditsStrip.jsx           # แถบ credit
+│   ├── PlatformMark.jsx           # logo/platform mark
+│   ├── creditsContent.js          # ข้อมูล credits
+│   └── platformBrand.js           # brand config
+└── package.json
+```
+
+---
+
+## Deploy (GitHub Actions)
+
+push `main` แล้วรันเฉพาะ workflow ที่ไฟล์เกี่ยวข้องเปลี่ยน:
+
+| Workflow | เมื่อไฟล์เปลี่ยน | ผลลัพธ์ |
+|----------|------------------|---------|
+| `deploy-hosting.yml` | `apps/seafood-pos/**`, `apps/chincha-tea/**`, `apps/ai-chat/**` | Hosting ทุกแอป |
+| `deploy-functions.yml` | `apps/webhook-core/**` | Cloud Functions |
+| `deploy-rules.yml` | `firestore*.rules`, `storage.rules` | Security rules |
+| `pr-verify.yml` | ทุก PR | smoke test + syntax check |
+| `sync-project-tree.yml` | push `main` | auto-sync ต้นไม้ใน PROJECT_STRUCTURE.md |
+| `code-metrics.yml` | push `main` | วัด metrics → `reports/` |
+| `shrimp-fix-line-customer.yml` | manual | แก้ LINE userId ลูกค้ากุ้ง |
+| `shrimp-full-reset-on-demand.yml` | manual | reset ข้อมูลกุ้งทั้งหมด |
+| `shrimp-stock-reset.yml` | manual | รีเซ็ตสต๊อกกุ้ง |
+| `tea-db-reset.yml` | manual | เคลียร์ DB ร้านชา |
+
+รันมือ: GitHub → **Actions** → เลือก workflow → **Run workflow**
+
+---
+
+## คำสั่งที่ใช้บ่อย (จาก root)
 
 ```bash
 npm install
-```
-
-รันแอปชา:
-
-```bash
-npm run dev:tea
-```
-
-รันแอปกุ้ง:
-
-```bash
-npm run dev:seafood
-```
-
-รัน AI Chat:
-
-```bash
-npm run dev --workspace=ai-chat
-```
-
-Build:
-
-```bash
+npm run dev:tea              # พัฒนาแอปชา local
+npm run dev:seafood          # พัฒนาแอปกุ้ง local
 npm run build --workspace=chincha-tea
 npm run build --workspace=seafood-pos
-npm run build --workspaces --if-present
+node apps/seafood-pos/scripts/smoke-test.mjs   # ตรวจ logic กุ้ง (ไม่ต้อง Firebase)
 ```
 
 ---
 
-## Deploy
+## กฎอัปเดตเอกสารนี้ (บังคับสำหรับ AI agent)
 
-Push ขึ้น `main` แล้ว GitHub Actions deploy ตาม path ที่เปลี่ยน:
+ทุก PR ที่ **เพิ่ม / ลบ / ย้าย** ไฟล์หรือโฟลเดอร์ → อัปเดต section ที่เกี่ยวในไฟล์นี้ใน PR เดียวกัน  
+ถ้าไม่อัปเดต PROJECT_STRUCTURE จะ drift จากโค้ดจริง และ agent รอบต่อไปจะหลงทาง
 
-- **Deploy Firebase Hosting** — กุ้ง / ชา
-- **Deploy Cloud Functions** — LINE webhook
-- **Deploy Firebase Rules** — Firestore + Storage rules
-
-รันเองได้ที่ GitHub → **Actions** → เลือก workflow → **Run workflow**
-
----
-
-## คำสั่งดูแลข้อมูล
-
-### เคลียร์ข้อมูลร้านชา (Firestore)
-
-ลบเฉพาะข้อมูลร้านชา ไม่แตะกุ้ง:
-
-```bash
-firebase login
-gcloud auth application-default login --project chincha-eeed6
-npm install
-npm run tea:db-reset:dry
-npm run tea:db-reset:all
-```
-
-บน Cloud: GitHub → Actions → **Tea DB Reset** → Run workflow  
-รอบแรกเปิด dry run ก่อน แล้วรอบจริงปิด dry run + พิมพ์ `RESET` ใน `confirm_phrase`
-
-### รีเซ็ตสต๊อกกุ้ง
-
-```bash
-gcloud auth application-default login --project chincha-eeed6
-npm install
-npm run shrimp:stock-reset:dry
-npm run shrimp:stock-reset
-npm run shrimp:stock-reset:full
-```
-
-Cloud: push ไฟล์ `.ops/TRIGGER_SHRIMP_FULL_RESET` หรือ Actions → **Shrimp Stock Reset**
-
-LINE กุ้ง — Webhook URL ใน LINE Developers ต้องชี้ไปที่:
-
-```text
-https://asia-southeast1-chincha-eeed6.cloudfunctions.net/lineWebhook
-```
-
-ไม่ใช่ `lineWebhookTea`
-
----
-
-## เอกสารเพิ่ม
-
-- [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) — โครงสร้างเต็ม + collections
-- [docs/ARCHITECTURE_TH.md](docs/ARCHITECTURE_TH.md) — สถาปัตยกรรมระบบภาษาไทย
-- [docs/CHINCHA_FLOW_NAMING_TH.md](docs/CHINCHA_FLOW_NAMING_TH.md) — ชื่อระบบ + คำเรียกสากล
-- [docs/CLOUD_STATUS.md](docs/CLOUD_STATUS.md) — สถานะ hosting / functions
-- [docs/LINE_OA_ORDER_SCOPE_TH.md](docs/LINE_OA_ORDER_SCOPE_TH.md) — ขอบเขต LINE OA order
-- [docs/ENABLE_CLOUD_SCHEDULER.md](docs/ENABLE_CLOUD_SCHEDULER.md) — เปิด Scheduler สรุปอัตโนมัติ
+ดูรายละเอียดเคลียร์ DB / รีเซ็ตสต๊อกใน [README.md](../README.md)
