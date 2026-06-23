@@ -76,8 +76,13 @@ function detectQuickTrigger(message) {
 
 // ── ตรวจว่าถามเรื่อง code metrics ──────────────────────────────────────────
 function isCodeMetricsQuery(text) {
-  const t = (text || '').toLowerCase();
-  return /(นับบรรทัด|กี่บรรทัด|code metric|metrics|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน)/.test(t);
+  const t = (text || '').toLowerCase().trim();
+  
+  // ✨ เพิ่มจุดนี้: ถ้าข้อความยาวมากๆ (เช่น พีชก๊อปปี้โค้ดมาวาง) 
+  // ไม่ควรเป็นคำสั่งถาม Code Metrics สั้นๆ ให้ข้ามไปส่งให้ AI ประมวลผลปกติ
+  if (t.length > 200) return false; 
+  
+  return /(นับบรรทัด|กี่บรรทัด|code metric|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน)/.test(t);
 }
 
 // ── อ่าน CODE_METRICS.md จาก GitHub ───────────────────────────────────────
