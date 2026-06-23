@@ -654,7 +654,8 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 // เปล่าๆ แทนการยิง structured tool_calls) ถ้าเชื่อ finish_reason เฉยๆ จะได้ผลลัพธ์
 // "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
 async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt }) {
-  const MAX_ITERATIONS = 15;
+  const MAX_ITERATIONS = 30;        // รองรับงานซับซ้อนที่ต้องหลายขั้นตอน
+  const SUMMARY_CHECKPOINT = 15;    // รอบ 15: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
   const stagedFiles = {};
 
   const messages = [
@@ -670,14 +671,28 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
+    // Checkpoint ก่อนรอบ 15 — ให้จีจี้สรุปความคืบหน้าก่อนดำเนินการต่อ
+    if (iterations === SUMMARY_CHECKPOINT && !taskCompleted) {
+      messages.push({
+        role: 'user',
+        content: `[สรุปความคืบหน้า] คุณทำงานมา ${SUMMARY_CHECKPOINT - 1} รอบแล้ว ` +
+          `สรุปสั้นๆ ก่อนดำเนินการต่อ:\n` +
+          `1. งานที่ทำเสร็จไปแล้ว\n` +
+          `2. งานที่ยังเหลืออยู่\n\n` +
+          `หลังสรุปแล้วดำเนินการต่อได้เลย`,
+      });
+    }
+
     const stepLabel = iterations === 1
       ? 'จีจี้กำลังวิเคราะห์คำสั่ง...'
-      : `จีจี้กำลังดำเนินการ (รอบ ${iterations})...`;
+      : iterations === SUMMARY_CHECKPOINT
+        ? `จีจี้กำลังสรุปความคืบหน้า (รอบ ${iterations})...`
+        : `จีจี้กำลังดำเนินการ (รอบ ${iterations})...`;
     await writeProgress(requestId, stepLabel);
 
     // บังคับ tool_choice='required' ทุกรอบ จนกว่าระบบจะยืนยันว่างานจบจริง (taskCompleted)
-    // ไม่ใช่แค่รอบแรก — มิฉะนั้นโมเดลมีสิทธิ์ "ตอบ text เฉยๆ" ตั้งแต่รอบ 2 เป็นต้นไป
-    const forceTools = !taskCompleted;
+    // ยกเว้นรอบ SUMMARY_CHECKPOINT ที่อนุญาตให้ตอบ text สรุปได้
+    const forceTools = !taskCompleted && iterations !== SUMMARY_CHECKPOINT;
     const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, forceTools);
     const assistantMessage = choice.message;
 
@@ -765,6 +780,12 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
         });
       }
     } else if (!taskCompleted) {
+      // รอบ checkpoint — text สรุปคือสิ่งที่เราขอ ไม่นับเป็น text-only ผิดรูปแบบ
+      if (iterations === SUMMARY_CHECKPOINT) {
+        consecutiveTextOnlyReplies = 0;
+        continue;
+      }
+
       consecutiveTextOnlyReplies++;
 
       // หยุด early ถ้าพิมพ์ text ผิดรูปแบบซ้ำเกิน 3 รอบติดกัน — ไม่มีประโยชน์
@@ -803,6 +824,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
 
   throw new Error(
     `Agent loop เกิน ${MAX_ITERATIONS} รอบ — งานซับซ้อนเกินไปหรือ AI วนซ้ำ\n` +
+    `(มี checkpoint สรุปที่รอบ ${SUMMARY_CHECKPOINT} แล้ว)\n` +
     `ลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อย`
   );
 }

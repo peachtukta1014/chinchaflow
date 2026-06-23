@@ -1,3 +1,10 @@
+## 2026-06-23 — feat: แชทตอบ=flash, loop เขียนโค้ด=pro; checkpoint สรุปรอบ 15; MAX_ITERATIONS 15→30
+
+- **ที่มา:** พีชต้องการแยกบทบาทชัดเจน — แชทตอบทั่วไปใช้ flash (เร็ว/ถูก) ส่วน agentic loop เขียนโค้ดจริงใช้ pro เหมือนเดิม; และต้องการให้จีจี้สรุปความคืบหน้าก่อนรอบ 15 แล้วทำต่อได้
+- `aiChatAgent.js` — `pickModel()`: non-vision เปลี่ยนจาก `PRO_MODEL` → `FLASH_MODEL`; env var เปลี่ยนจาก `CODE_MODEL` → `CHAT_MODEL`; อัปเดต comment constants ให้ตรงบทบาท
+- `shared/agentTools.js` — `runAgentLoop()`: เพิ่ม `SUMMARY_CHECKPOINT=15` (inject user message ขอสรุปก่อนรอบ 15, ไม่ force tool, รีเซ็ต consecutiveTextOnlyReplies); เพิ่ม progress label "กำลังสรุปความคืบหน้า"; เพิ่ม `MAX_ITERATIONS` 15→30
+- ถ้าพังให้เช็ก: `aiChatAgent.js` (pickModel, CHAT_MODEL), `agentTools.js` (SUMMARY_CHECKPOINT, MAX_ITERATIONS)
+
 ## 2026-06-23 — refactor: รวมโมเดลแชท+เขียนโค้ดเป็น deepseek-v4-pro ตัวเดียว + harden reasoning_content
 
 - **ที่มา:** พีชต้องการให้ลดความซับซ้อนของการสลับโมเดล — ตัวเขียนโค้ด (agentic loop) ใช้ deepseek-v4-pro อยู่แล้ว (hardcode `AGENT_MODEL` ใน agentTools.js) แต่ฝั่งแชทยังสลับ flash/pro ตามคีย์เวิร์ด → รวมให้แชทที่ตอบพีชใช้ v4-pro ตัวเดียว; รูป/ไฟล์ภาพคง gpt-4o-mini; classifier (ตัวจัดเส้นทางเบื้องหลัง) คง flash เพราะยิงทุกข้อความต้องเร็ว (พีชยืนยันตัวเลือกนี้)
