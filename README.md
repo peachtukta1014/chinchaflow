@@ -106,5 +106,4 @@ LINE กุ้ง — Webhook URL ต้องชี้ที่ `…/lineWebhoo
 - [docs/ARCHITECTURE_TH.md](docs/ARCHITECTURE_TH.md) — สถาปัตยกรรมระบบ
 - [docs/AGENT_HANDBOOK_TH.md](docs/AGENT_HANDBOOK_TH.md) — คู่มือ AI agent + แผนที่ repo
 - [docs/PEACH_WORKING_STYLE_TH.md](docs/PEACH_WORKING_STYLE_TH.md) — สไตล์การสั่งงานของพีช
-- [docs/CLOUD_STATUS.md](docs/CLOUD_STATUS.md) — สถานะ hosting / functions
 - [JIIJI.md](JIIJI.md) · [AGENTS.md](AGENTS.md) · [CLAUDE.md](CLAUDE.md) — ตัวตน + กฎ AI agent

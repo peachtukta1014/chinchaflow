@@ -108,9 +108,7 @@ chinchaflow/
 │   ├── AGENT_HANDBOOK_TH.md
 │   ├── ARCHITECTURE_TH.md
 │   ├── CHINCHA_FLOW_NAMING_TH.md
-│   ├── CLOUD_STATUS.md
 │   ├── CODE_METRICS.md
-│   ├── CURSOR_AGENT_SETUP_TH.md
 │   ├── ENABLE_CLOUD_SCHEDULER.md
 │   ├── LINE_LIFF_SETUP_TH.md
 │   ├── LINE_OA_ORDER_SCOPE_TH.md
