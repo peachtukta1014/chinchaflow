@@ -1,3 +1,13 @@
+## 2026-06-23 — refactor: แยก agentTools.js เป็น 3 ไฟล์ (839 → 250/235/320 บรรทัด)
+
+- **ที่มา:** agentTools.js ใหญ่ 839 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะ tool definitions หรือ executor ได้
+- `apps/webhook-core/src/shared/agentTools.js` — เหลือ orchestrator: stripDsml, callOpenRouterWithTools, runAgentLoop; re-export TOOL_DEFINITIONS/executeTool/fetchRepoFile ครบเหมือนเดิม
+- เพิ่ม `apps/webhook-core/src/shared/toolDefinitions.js` — TOOL_DEFINITIONS (10 tools) + constants (OPENROUTER_BASE/GH_API/GH_REPO/ADMIN_EMAIL/AGENT_MODEL)
+- เพิ่ม `apps/webhook-core/src/shared/toolExecutors.js` — fetchRepoFile + executeTool switch-case; แก้ implicit bug: isHighRisk ส่งผ่าน context object แทนการอาศัย closure ที่ไม่มีอยู่จริง
+- **ตรวจสอบความปลอดภัย:** smoke-test ผ่าน; `aiWorkflowAgent.js` import `runAgentLoop` จาก `./shared/agentTools` เหมือนเดิม
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต shared/ listing
+- ถ้าพังให้เช็ก: `agentTools.js` (re-export ครบ), `toolExecutors.js` (isHighRisk ใน context)
+
 ## 2026-06-23 — refactor: แยก InventoryScreen.jsx เป็น 3 ไฟล์ (1,048 → 170/680/110 บรรทัด)
 
 - **ที่มา:** InventoryScreen.jsx ใหญ่ 1,048 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะส่วนฟอร์มหรือ display ได้

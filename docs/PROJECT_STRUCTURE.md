@@ -394,7 +394,9 @@ apps/webhook-core/
 │   │
 │   └── shared/                    # utils ร่วม
 │       ├── SCOPE.md
-│       ├── agentTools.js          # tools สำหรับ AI agent (commit, read_file, etc.)
+│       ├── agentTools.js          # orchestrator: agentic loop + OpenRouter caller
+│       ├── toolDefinitions.js     # TOOL_DEFINITIONS array + constants
+│       ├── toolExecutors.js       # fetchRepoFile + executeTool switch-case
 │       ├── lineUtils.js
 │       ├── progressTracker.js
 │       └── webhookDedup.js        # กัน event LINE ซ้ำ
