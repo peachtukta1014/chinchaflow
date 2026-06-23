@@ -9,7 +9,9 @@
 | **CHINCHA FLOW** | ชื่อผลิตภัณฑ์ / ภาพรวมธุรกิจ | พูดกับทีม, เครดิตในแอป, Slack `#chincha-flow`, เอกสารภาพรวม |
 | **chincha-business-os** | ชื่อ monorepo (เทคนิค) | `package.json`, GitHub repo folder, สถาปัตยกรรม, CI/CD |
 | **chincha-eeed6** | Firebase project ID | Auth, Firestore, Hosting, Functions, Storage |
-| **พี่เซอ · Cursor Cloud Agent** | สายพัฒนา | งาน dev ผ่าน Cursor — ไม่ใช่ user login ในแอป |
+| **พี่ซี · Claude Code CLI** | สายพัฒนา (นักพัฒนาระบบ) | งาน dev ผ่าน Claude Code remote session — implement, ตรวจสอบ, maintain |
+| **จีจี้ · Flash Agent (Chat)** | AI แชท (Cloud Function) | คุยกับพีชใน PWA — classify intent, ตอบคำถาม, ส่งงานต่อ Pro · `OPENROUTER_API_KEY` |
+| **จีจี้โปร · Pro Agent (Workflow)** | AI เขียนโค้ด (GitHub Actions) | agentic loop — แก้โค้ด, commit, เปิด PR อัตโนมัติ · `OPENROUTER_API_KEY_PRO` |
 
 **กฎสั้น:** เรียกระบบรวมว่า **CHINCHA FLOW** · เรียก repo ว่า **chincha-business-os** · อย่าสลับสองคำนี้ในที่เดียวกันโดยไม่จำเป็น
 

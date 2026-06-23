@@ -21,7 +21,8 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 ├── firestore.rules        # กฎ Firestore ร่วม
 ├── .github/workflows/     # deploy hosting / functions / rules
 ├── docs/                  # เอกสารทีม + สถาปัตยกรรม
-└── .cursor/skills/        # land-it, peter-ser, ship-*, deploy-*
+├── .claude/commands/      # land-it, peter-ser, ship-*, auto-* (Claude Code skills)
+└── .jiiji/                # IDENTITY.md, PRO_AGENT.md (AI agent config)
 ```
 
 รายละเอียดเชิงลึก:
@@ -49,7 +50,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 | collection / field Firestore ใหม่ | `ARCHITECTURE_TH.md` + `firestore.rules` comment ถ้าจำเป็น |
 | โฟลเดอร์/โมดูลใหม่สำคัญ | `PROJECT_STRUCTURE.md` ส่วนที่เกี่ยว |
 | พฤติกรรม LINE / ลูกค้า / UID | `LINE_OA_ORDER_SCOPE_TH.md` หรือ `LINE_OA_PARTITION_TH.md` หรือ `PEACH_WORKING_STYLE_TH.md` |
-| กฎทีม / workflow เอเจนต์ | `AGENTS.md` หรือ skill ใน `.cursor/skills/` |
+| กฎทีม / workflow เอเจนต์ | `AGENTS.md` หรือ `.claude/commands/` หรือ `.jiiji/` |
 | ตั้งค่าแอดมินใหม่ (`config/*`) | บรรทัดใน `ARCHITECTURE_TH.md` หรือ `PEACH_WORKING_STYLE_TH.md` |
 
 **ไม่ต้อง** copy ทั้ง repo ลงไฟล์ใหม่ทุกครั้ง — แก้ section ที่เกี่ยวพอ

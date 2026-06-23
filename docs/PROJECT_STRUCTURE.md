@@ -242,10 +242,7 @@ apps/chincha-tea/
 │       │   └── en.js             # ภาษาอังกฤษ
 │       └── constants.js
 │
-├── .cursor/skills/                # app-scoped Cursor skills
-│   ├── auto-tea/SKILL.md
-│   ├── deploy-tea/SKILL.md
-│   └── ship-tea/SKILL.md
+├── .cursor/skills/                # Cursor skills (ไม่ใช้แล้ว — ดู /.claude/commands/ แทน)
 ├── index.html
 ├── vite.config.js
 └── package.json
@@ -329,10 +326,7 @@ apps/seafood-pos/
 │   │
 │   └── constants/
 │
-├── .cursor/skills/                # app-scoped Cursor skills
-│   ├── auto-shrip/SKILL.md
-│   ├── deploy-shrimp/SKILL.md
-│   └── ship-shrimp/SKILL.md
+├── .cursor/skills/                # Cursor skills (ไม่ใช้แล้ว — ดู /.claude/commands/ แทน)
 └── package.json
 ```
 
