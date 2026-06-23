@@ -317,12 +317,28 @@ SCOPE_FILE_TREE.root = {
 
 // ── Fetch agent guidelines from repo ─────────────────────────────────────
 // เจ้าของเขียนกฎการทำงานไว้ใน repo — AI ต้องอ่านก่อนทุก session
-async function fetchAgentDocs(ghPat) {
+// scope-specific AGENTS.md โหลดเพิ่มตาม scope เพื่อให้ Pro สวมหมวกถูกแอป
+async function fetchAgentDocs(ghPat, scope) {
+  const scopeAgentsMap = {
+    seafood:  'apps/seafood-pos/AGENTS.md',
+    tea:      'apps/chincha-tea/AGENTS.md',
+    webhook:  'apps/webhook-core/AGENTS.md',
+    root:     'apps/webhook-core/AGENTS.md',
+    scheduled:'apps/webhook-core/AGENTS.md',
+  };
+
   const docs = [
     { path: 'AGENTS.md', label: 'กฎ monorepo (AGENTS.md)', maxLen: 6000 },
     { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'วิธีสื่อสารกับพี่ (PEACH_WORKING_STYLE_TH.md)', maxLen: 5000 },
     { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือเอเจนต์ (AGENT_HANDBOOK_TH.md)', maxLen: 5000 },
   ];
+
+  // เพิ่ม scope-specific AGENTS.md ถ้ามี
+  const scopePath = scopeAgentsMap[scope];
+  if (scopePath) {
+    docs.push({ path: scopePath, label: `กฎ scope "${scope}" (${scopePath})`, maxLen: 3000 });
+  }
+
   let result = '';
   for (const d of docs) {
     try {
@@ -416,7 +432,7 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
   try {
     // โหลด context: กฎ repo
     await writeProgress(requestId, 'กำลังโหลดบริบทระบบ...');
-    const agentDocs = await fetchAgentDocs(ghPat);
+    const agentDocs = await fetchAgentDocs(ghPat, currentScope);
 
     const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs);
 
