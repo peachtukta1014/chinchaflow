@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-23 | PR (pending)
+**refactor: แยก InventoryScreen.jsx เป็น 3 ไฟล์ (1,048 → 3 ไฟล์)**
+- `src/screens/InventoryScreen.jsx` — orchestrator: navigation/history state + effects + callbacks
+- เพิ่ม `src/screens/StockFilter.jsx` — ฟอร์มรับเข้า live/dead, ในบ่อ, spoilage
+- เพิ่ม `src/screens/StockBatchList.jsx` — ล็อตไทม์ไลน์ + ประวัติรับตาย
+
 ### 2026-06-21 | PR #312
 **fix: voice record บันทึกครั้งเดียว → ออเดอร์ขึ้นสองรายการ**
 - `src/hooks/useVoice.js` — เพิ่ม `flushedRef` guard ป้องกัน `flushTranscript` ถูกเรียกซ้ำจาก `stop()` + `rec.onend`

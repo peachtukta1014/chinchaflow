@@ -1,3 +1,13 @@
+## 2026-06-23 — refactor: แยก InventoryScreen.jsx เป็น 3 ไฟล์ (1,048 → 170/680/110 บรรทัด)
+
+- **ที่มา:** InventoryScreen.jsx ใหญ่ 1,048 บรรทัด → AI agent อ่านเปลือง context; แยกให้อ่านเฉพาะส่วนฟอร์มหรือ display ได้
+- `apps/seafood-pos/src/screens/InventoryScreen.jsx` — เหลือ ~170 บรรทัด orchestrator: navigation state (stockLine/tab/lotViewDate), history state (pondHistory/deadInboundHistory), all useEffects, loadPondHistory/loadDeadInboundHistory callbacks; render `<StockFilter>` + `<StockBatchList>`; export default ไม่เปลี่ยน
+- เพิ่ม `apps/seafood-pos/src/screens/StockFilter.jsx` — ฟอร์มทุกอย่าง: live receive (by_size/mixed), pond transfer + ประวัติในบ่อ, dead spoilage + ประวัติ, dead receive (~680 บรรทัด)
+- เพิ่ม `apps/seafood-pos/src/screens/StockBatchList.jsx` — display: ล็อตไทม์ไลน์ (StockLotTimeline) + ประวัติรับตาย (dead/history tab) (~110 บรรทัด)
+- **ตรวจสอบความปลอดภัย:** `npm run build --workspace=seafood-pos` ผ่าน; smoke-test เดิมผ่าน 1 fail pre-existing (shrimpBillServerRender QR image)
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต screens/ listing
+- ถ้าพังให้เช็ก: `InventoryScreen.jsx` (props ที่ส่งลง), `StockFilter.jsx` (pondHistory/deadInboundHistory รับจาก parent), `StockBatchList.jsx` (deadInboundHistory object check .directReceives/.fromPond/.spoilageDead)
+
 ## 2026-06-23 — refactor: แยก RestockTab.jsx เป็น 3 ไฟล์ (1,081 → 132/581/446 บรรทัด)
 
 - **ที่มา:** RestockTab.jsx ใหญ่ 1,081 บรรทัด → AI agent อ่านเปลือง context ทั้งที่แก้เฉพาะ form หรือ list; แยกให้อ่านเฉพาะส่วนที่เกี่ยวได้

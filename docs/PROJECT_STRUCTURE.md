@@ -288,7 +288,9 @@ apps/seafood-pos/
 │   │   ├── POSMobile.jsx          # ขายของ + รูปบิล + เสียง
 │   │   ├── Dashboard.jsx          # ภาพรวมวัน / ลูกหนี้
 │   │   ├── SalesHubScreen.jsx     # hub ขายรวม (บิล + สลิป)
-│   │   ├── InventoryScreen.jsx    # รับสต๊อก + ย้ายกุ้งตาย
+│   │   ├── InventoryScreen.jsx    # orchestrator: navigation/history state + effects
+│   │   ├── StockFilter.jsx        # ฟอร์มรับเข้า live/dead, ในบ่อ, spoilage
+│   │   ├── StockBatchList.jsx     # display: ล็อตไทม์ไลน์ + ประวัติรับตาย
 │   │   ├── LotCloseScreen.jsx     # ปิดล็อตกุ้ง
 │   │   ├── ExpensesScreen.jsx     # ค่าใช้จ่ายร้าน
 │   │   ├── MembersScreen.jsx      # ลูกค้า + defaultRiverSize
