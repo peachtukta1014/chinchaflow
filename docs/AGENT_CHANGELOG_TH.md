@@ -1,3 +1,9 @@
+## 2026-06-23 — ci: pr-verify รองรับ ready_for_review (draft → ready แล้ว auto-merge ได้)
+
+- **ที่มา:** PR ที่เปิดเป็น draft แล้วกด "Ready for review" ไม่ทริกเกอร์ pr-verify ใหม่ → job auto_merge ไม่รัน → ต้อง merge มือ
+- `.github/workflows/pr-verify.yml` — เพิ่ม `ready_for_review` ใน `pull_request.types` → กด ready แล้ว CI รันใหม่ + auto_merge ทำงานถ้าติด `[auto-merge]` และ CI ผ่าน
+- ถ้าพังให้เช็ก: `pr-verify.yml` (on.pull_request.types)
+
 ## 2026-06-23 — docs: sync README + PROJECT_STRUCTURE ให้ตรงโค้ดปัจจุบัน (เลิกซ้ำต้นไม้)
 
 - **ที่มา:** พีชก๊อปเนื้อหา PROJECT_STRUCTURE (ที่ข้อมูลเก่า) ไปวางใน README เอง → 2 ไฟล์เนื้อหาซ้ำและเก่าทั้งคู่; `sync-project-tree.yml` อัปเดตต้นไม้เฉพาะ `docs/PROJECT_STRUCTURE.md` → README ที่ก๊อปจะ drift ตลอด
