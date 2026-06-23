@@ -22,6 +22,8 @@
 
 const functions = require('firebase-functions/v1');
 const https = require('firebase-functions/v2/https');
+const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult } = require('./shared/progressTracker');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -36,6 +38,29 @@ const GH_REPO = 'peachtukta1014/chinchaflow';
 let _docsCache = null;
 let _docsCacheTime = 0;
 const DOCS_TTL_MS = 10 * 60 * 1000;
+
+// ── Cache สำหรับ project tree จาก Firestore (TTL 5 นาที) ─────────────────
+let _projectTreeCache = null;
+let _projectTreeCachedAt = 0;
+const PROJECT_TREE_TTL = 5 * 60_000;
+
+function _fsDb() {
+  if (!admin.apps.length) admin.initializeApp();
+  return getFirestore();
+}
+
+async function loadProjectTree() {
+  const now = Date.now();
+  if (_projectTreeCache && now - _projectTreeCachedAt < PROJECT_TREE_TTL) {
+    return _projectTreeCache;
+  }
+  try {
+    const snap = await _fsDb().collection('systemConfig').doc('projectTree').get();
+    _projectTreeCache = snap.data()?.tree || '';
+    _projectTreeCachedAt = now;
+  } catch { /* ใช้ cache เก่าถ้า Firestore ไม่ตอบ */ }
+  return _projectTreeCache || '';
+}
 
 // ── Quick trigger keywords (bypass classifier — health check เท่านั้น ห้าม commit) ──
 function detectQuickTrigger(message) {
@@ -564,20 +589,18 @@ exports.aiChatAgentHttp = functions
       }
     }
 
-    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) — cache 10 นาที
+    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) + project tree จาก Firestore
     const ghPat = process.env.GH_PAT;
-    const [agentDocs, jiijiDocs] = ghPat
-      ? await Promise.all([
-          fetchChatAgentDocs(ghPat).catch(() => ''),
-          fetchJiijiDef(ghPat).catch(() => ''),
-        ])
-      : ['', ''];
+    const [agentDocs, jiijiDocs, projectTree] = await Promise.all([
+      ghPat ? fetchChatAgentDocs(ghPat).catch(() => '') : Promise.resolve(''),
+      ghPat ? fetchJiijiDef(ghPat).catch(() => '') : Promise.resolve(''),
+      loadProjectTree().catch(() => ''),
+    ]);
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
-    const systemContent = (agentDocs || jiijiDocs)
-      ? basePrompt +
-        (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
-        (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '')
-      : basePrompt;
+    const systemContent = basePrompt +
+      (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
+      (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '') +
+      (projectTree ? '\n\n---\n## 🗂️ โครงสร้างโปรเจกต์ปัจจุบัน (sync จาก repo อัตโนมัติ)\n' + projectTree : '');
 
     const messages = [
       { role: 'system', content: systemContent },
