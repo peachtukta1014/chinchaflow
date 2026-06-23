@@ -62,6 +62,28 @@ async function loadProjectTree() {
   return _projectTreeCache || '';
 }
 
+// ── ส่ง repository_dispatch ไปให้ Pro GitHub Actions รัน agentic loop ──────
+// Flash CF ไม่รัน Pro เอง — isolation จริง: OPENROUTER_API_KEY_PRO ไม่แตะ Flash เลย
+async function dispatchToProAgent(ghPat, payload) {
+  const r = await fetch(`${GH_API}/repos/${GH_REPO}/dispatches`, {
+    method: 'POST',
+    headers: {
+      Authorization: `token ${ghPat}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'CF-AI',
+    },
+    body: JSON.stringify({
+      event_type: 'ai-code-action',
+      client_payload: payload,
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`GitHub dispatch failed: ${r.status} ${txt.slice(0, 200)}`);
+  }
+}
+
 // ── Quick trigger keywords (bypass classifier — health check เท่านั้น ห้าม commit) ──
 function detectQuickTrigger(message) {
   const m = (message || '').trim().toLowerCase();
@@ -511,28 +533,33 @@ exports.aiChatAgentHttp = functions
     const quickTrigger = detectQuickTrigger(message);
     if (quickTrigger) {
       const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
-      await writeProgress(requestId, `กำลังตรวจสุขภาพ ${label}...`);
-      try {
-        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
-        const result = await handleCodeActionV2({
-          message: quickTrigger.task,
-          history: history || [],
-          scope: quickTrigger.scope,
-          force: true,
-          requestId: requestId || null,
-          isHighRisk: false,
-        });
-        await clearProgress(requestId);
-        const body = { ...result.body, scope: quickTrigger.scope };
-        await writeResult(requestId, { reply: body.reply, scope: quickTrigger.scope });
-        res.status(result.statusCode || 200).json(body);
-        return;
-      } catch (err) {
-        console.error('quick trigger error:', err);
-        await clearProgress(requestId);
-        res.status(500).json({ reply: `❌ ตรวจสอบไม่ได้ครับพี่: ${err.message}`, scope: quickTrigger.scope });
+      const taskId = requestId || `qt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const ghPat = process.env.GH_PAT;
+      if (!ghPat) {
+        res.status(500).json({ reply: 'GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
         return;
       }
+      try {
+        await dispatchToProAgent(ghPat, {
+          requestId: taskId,
+          message: quickTrigger.task,
+          history: [],
+          scope: quickTrigger.scope,
+          isHighRisk: false,
+          confirmation: '',
+        });
+        await clearProgress(taskId);
+        res.json({
+          reply: `จีจี้ส่งงานตรวจสุขภาพ ${label} ไปแล้วนะคะ กำลังดำเนินการอยู่ครับพี่ 🌸`,
+          status: 'processing',
+          requestId: taskId,
+          scope: quickTrigger.scope,
+        });
+      } catch (err) {
+        console.error('quick trigger dispatch error:', err);
+        res.status(500).json({ reply: `❌ ส่งคำสั่งไม่ได้ครับพี่: ${err.message}`, scope: quickTrigger.scope });
+      }
+      return;
     }
 
     // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
@@ -551,36 +578,47 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
+      if (!requestId) {
+        await clearProgress(requestId);
+        res.status(400).json({ reply: 'ต้องมี requestId สำหรับ code-action ครับพี่', scope: finalScope });
+        return;
+      }
+
+      const ghPatForDispatch = process.env.GH_PAT;
+      if (!ghPatForDispatch) {
+        await clearProgress(requestId);
+        res.status(500).json({ reply: 'GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
+        return;
+      }
+
       try {
-        // agentic loop (tool calling) — เส้นทางเดียวสำหรับแก้โค้ด ไม่มี fallback ไประบบอื่นแล้ว (ลบ V1 ทิ้งใน PR #327)
-        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
-        const result = await handleCodeActionV2({
+        // ส่ง repository_dispatch → GitHub Actions รัน Pro agentic loop แยก process
+        // Flash CF ไม่บล็อกรอ — ไม่ต้องการ OPENROUTER_API_KEY_PRO เลย
+        await dispatchToProAgent(ghPatForDispatch, {
+          requestId,
           message: classified.translatedMessage,
-          history: history || [],
+          history: (history || []).slice(-10),
           scope: finalScope,
-          force: true,
-          requestId: requestId || null,
           isHighRisk: classified.isHighRisk !== false,
+          confirmation: classified.confirmation || '',
         });
         await clearProgress(requestId);
         const prefix = classified.confirmation
           ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';
-        const body = { ...result.body, reply: prefix + (result.body?.reply || ''), scope: finalScope };
-        if (result.statusCode === 200 || !result.statusCode) {
-          await writeResult(requestId, { reply: body.reply, scope: finalScope });
-        }
-        res.status(result.statusCode || 200).json(body);
+        res.json({
+          reply: prefix + 'จีจี้รับงานแล้วนะคะ กำลังดำเนินการอยู่ครับพี่ — ติดตามความคืบหน้าได้เลย 🌸',
+          status: 'processing',
+          requestId,
+          scope: finalScope,
+          intent: 'code-action',
+        });
         return;
       } catch (err) {
-        console.error('aiChatAgentHttp: code-action routing error:', err);
+        console.error('aiChatAgentHttp: dispatch error:', err);
+        await clearProgress(requestId);
         res.status(500).json({
-          reply: `จีจี้พยายามแก้โค้ดแล้วแต่เกิด error ครับพี่ 🌸\n\n` +
-            `**สาเหตุ:** ${err.message || 'unknown'}\n\n` +
-            `**ตรวจสอบ:**\n` +
-            `• GH_PAT ตั้งค่าใน GitHub Secrets แล้วหรือยัง?\n` +
-            `• OPENROUTER_API_KEY ยังใช้งานได้อยู่ไหม?\n` +
-            `• ดู Firebase Functions logs ที่ Google Cloud Console`,
+          reply: `จีจี้ส่งคำสั่งไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}`,
           scope: finalScope,
           intent: 'code-action',
           status: 'error',
