@@ -1,14 +1,14 @@
 # Code Metrics Report
 
-Generated: 2026-06-23T04:45:33.856Z
+Generated: 2026-06-23T05:42:36.483Z
 
 ## Summary
 
 - Files: 431
-- Lines: 54,131
-- Non-blank lines: 48,911
-- Blank lines: 5,220
-- Bytes: 2,379,495
+- Lines: 54,173
+- Non-blank lines: 48,988
+- Blank lines: 5,185
+- Bytes: 2,374,509
 
 ## By language
 
@@ -16,7 +16,7 @@ Generated: 2026-06-23T04:45:33.856Z
 |---|---:|---:|---:|---:|---:|
 | JavaScript | 242 | 27,809 | 25,189 | 2,620 | 1,128,734 |
 | React JSX | 88 | 19,075 | 17,906 | 1,169 | 799,486 |
-| Markdown | 51 | 4,900 | 3,668 | 1,232 | 368,197 |
+| Markdown | 51 | 4,942 | 3,745 | 1,197 | 363,211 |
 | YAML | 14 | 1,227 | 1,095 | 132 | 43,054 |
 | Firebase Rules | 3 | 462 | 409 | 53 | 18,790 |
 | JSON | 16 | 410 | 410 | 0 | 11,346 |
