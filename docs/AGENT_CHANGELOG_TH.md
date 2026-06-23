@@ -1,3 +1,11 @@
+## 2026-06-23 — feat: auto-merge low-risk PR หลัง CI ผ่าน (isHighRisk flag)
+
+- **ที่มา:** พีชต้องการให้ PR ที่ปลอดภัย (แก้ข้อความ/UI/doc) merge เองโดยไม่ต้องรอกด เพื่อให้ทำงานได้ขณะอยู่บนถนน/ฟาร์ม
+- `aiChatAgent.js` — `classifyAndTranslate()`: เพิ่ม `isHighRisk` field; Flash วิเคราะห์ว่างานกระทบ logic หลัก (ราคา/สต๊อก/ออเดอร์/UID/โครงสร้าง DB) หรือเป็นแค่ UI/text/doc
+- `aiWorkflowAgent.js` + `agentTools.js` — รับ `isHighRisk` ส่งต่อถึง `commit_and_pr`; ถ้า low-risk → ใส่ `[auto-merge]` tag ใน PR body + แจ้งพีช "CI ผ่านจะ auto-merge เอง"
+- `.github/workflows/pr-verify.yml` — เพิ่ม job `auto_merge`: ถ้า PR มี `[auto-merge]` + CI ผ่านทุก job → squash merge อัตโนมัติ; CI พัง → ไม่ merge เด็ดขาด
+- ถ้าพังให้เช็ก: `aiChatAgent.js` (isHighRisk ใน classifyAndTranslate), `agentTools.js` (commit_and_pr ส่วน riskNote/autoMergeTag), `pr-verify.yml` (job auto_merge)
+
 ## 2026-06-23 — feat: จีจี้ยืนยันความเข้าใจก่อน Pro loop ทุกครั้ง (Flash → confirm → Pro)
 
 - **ที่มา:** พีชต้องการให้ Flash วิเคราะห์คำพูดชาวบ้าน แปลง เป็น bullet ทำ/ไม่ทำ แล้วยืนยันก่อนส่งให้ Pro loop เขียนโค้ด
