@@ -147,8 +147,9 @@ async function pushPaidBillToLine(sale, customer, moneyReceiverName = '') {
 /**
  * ส่งบิลจ่ายแล้วให้ลูกค้าใน LINE ในพื้นหลัง — ไม่บล็อก UI
  * อัปเดต paidBillPushedAt ใน slip เมื่อสำเร็จ
+ * @param {Function} [onResult] callback({ pushed, reason?, error? })
  */
-function pushPaidBillToLineBackground(sale, customer, staffMember, slipId, receiverName) {
+function pushPaidBillToLineBackground(sale, customer, staffMember, slipId, receiverName, onResult) {
   pushPaidBillToLine(sale, customer, receiverName)
     .then((result) => {
       if (result.pushed && slipId) {
@@ -156,9 +157,11 @@ function pushPaidBillToLineBackground(sale, customer, staffMember, slipId, recei
           paidBillPushedAt: new Date().toISOString(),
         }).catch(() => {});
       }
+      if (onResult) onResult(result);
     })
     .catch((e) => {
       console.warn('pushPaidBillToLine background', e);
+      if (onResult) onResult({ pushed: false, error: e.message || 'push_failed' });
     });
 }
 
@@ -166,12 +169,14 @@ function pushPaidBillToLineBackground(sale, customer, staffMember, slipId, recei
  * ยืนยันสลิป — ปิดบิลเป็นโอน · ส่งบิลจ่ายแล้วให้ลูกค้า (ถ้ามี LINE)
  *
  * LINE push ทำงานพื้นหลัง (ไม่บล็อก UI) — ฟังก์ชันนี้คืนหลัง slip = confirmed
+ * @param {Function} [onLinePushResult] callback({ pushed, reason?, error? }) — แจ้งผลใน background
  */
 export async function confirmPaymentSlip({
   slip,
   sale,
   staffMember,
   pushPaidBill = true,
+  onLinePushResult = null,
 }) {
   if (!slip?.id || !sale?.id) throw new Error('ข้อมูลไม่ครบ');
   const remain = saleRemainingAmount(sale);
@@ -217,7 +222,7 @@ export async function confirmPaymentSlip({
     // ส่งบิล LINE ในพื้นหลัง — ไม่ block ผู้ใช้รอ
     if (pushPaidBill) {
       const receiverName = staffMember?.displayName || staffMember?.email || '';
-      pushPaidBillToLineBackground(refreshed || sale, customer, staffMember, slip.id, receiverName);
+      pushPaidBillToLineBackground(refreshed || sale, customer, staffMember, slip.id, receiverName, onLinePushResult);
     }
 
     return { sale: refreshed || sale, pushResult: { pushed: false, reason: 'async' } };

@@ -63,8 +63,9 @@ async function linePushImage(to, imageUrl, token, caption) {
     body: JSON.stringify({ to, messages }),
   });
   if (!r.ok) {
-    const body = await r.text().catch(() => '');
-    console.error('linePushImage', r.status, body);
+    const lineErrBody = await r.text().catch(() => '');
+    console.error('linePushImage', r.status, lineErrBody);
+    return { ok: false, status: r.status, lineErrBody };
   }
   return { ok: r.ok, status: r.status };
 }
@@ -308,6 +309,7 @@ async function pushShrimpBillToCustomer(db, admin, {
     const err = new Error('line_push_failed');
     err.code = 'line_push_failed';
     err.status = push.status;
+    err.lineErrBody = push.lineErrBody || '';
     throw err;
   }
 
