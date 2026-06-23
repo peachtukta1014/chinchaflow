@@ -385,7 +385,7 @@ ${agentDocs ? '\n## กฎจากเจ้าของ repo\n' + agentDocs : '
 
 // ── V2 handler: agentic loop (tool calling) ───────────────────────────────
 // แทน 2-round fixed pipeline ด้วย loop จริง — จีจี้เลือก tool เองจนงานเสร็จ
-async function handleCodeActionV2({ message, history, scope, force = false, requestId = null }) {
+async function handleCodeActionV2({ message, history, scope, force = false, requestId = null, isHighRisk = true }) {
   if (!force && !isCodeAction(message)) {
     return {
       statusCode: 200,
@@ -424,6 +424,7 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
       requestId,
       scopeFileTree: SCOPE_FILE_TREE,
       systemPrompt,
+      isHighRisk,
     });
 
     await clearProgress(requestId);

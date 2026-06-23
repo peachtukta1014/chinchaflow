@@ -453,9 +453,13 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       } catch { /* changelog failure is non-fatal */ }
 
       // Open PR
+      const riskNote = isHighRisk
+        ? `_⚠️ high-risk: กระทบ logic/ราคา/สต๊อก/โครงสร้างหลัก — **ตรวจสอบก่อน merge** นะครับพี่_`
+        : `_⚡ low-risk: CI ผ่านแล้วจะ **auto-merge เองอัตโนมัติ** 🌸_`;
+      const autoMergeTag = isHighRisk ? '' : '\n\n[auto-merge]';
       const prBodyFull = (args.pr_body || '') +
         `\n\n---\n**ไฟล์ที่แก้:** ${committed.join(', ')}\n` +
-        `_⏳ pr-verify.yml กำลังรัน smoke test + build อัตโนมัติ — รอผล comment ก่อน merge_`;
+        riskNote + autoMergeTag;
 
       const prRes = await fetch(`${GH_API}/repos/${GH_REPO}/pulls`, {
         method: 'POST',
@@ -493,7 +497,10 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles }) {
       // Clear staged files after successful commit
       Object.keys(stagedFiles).forEach(k => delete stagedFiles[k]);
 
-      return `✅ เปิด PR แล้วครับพี่! ${prUrl}\n\nBranch: ${branchName}\nไฟล์ที่แก้: ${committed.join(', ')}\n\nรอ smoke test + build ผ่านก่อน merge นะครับ 🌸`;
+      const mergeMsg = isHighRisk
+        ? `⚠️ งานนี้กระทบส่วนสำคัญ — ตรวจดูก่อน merge นะครับพี่ 🙏`
+        : `⚡ CI ผ่านแล้วจะ auto-merge + deploy เองเลยครับพี่ 🌸`;
+      return `✅ เปิด PR แล้วครับพี่! ${prUrl}\n\n${mergeMsg}\nBranch: ${branchName}\nไฟล์ที่แก้: ${committed.join(', ')}`;
     }
 
     case 'trigger_deploy': {
@@ -653,7 +660,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 // finish_reason === 'stop' ทั้งที่ยังไม่ได้ลงมือจริง (เช่น พิมพ์ tool call เป็น text
 // เปล่าๆ แทนการยิง structured tool_calls) ถ้าเชื่อ finish_reason เฉยๆ จะได้ผลลัพธ์
 // "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
-async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt }) {
+async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt, isHighRisk = true }) {
   const MAX_ITERATIONS = 30;        // รองรับงานซับซ้อนที่ต้องหลายขั้นตอน
   const SUMMARY_CHECKPOINT = 15;    // รอบ 15: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
   const stagedFiles = {};

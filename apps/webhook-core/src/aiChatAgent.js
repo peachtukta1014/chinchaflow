@@ -310,11 +310,15 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
 วิเคราะห์ว่าพี่พีช (เจ้าของ) ต้องการแก้ไขระบบ หรือต้องการให้ดู/อ่าน/ตรวจสอบโค้ดจริงในระบบ หรือแค่คุยทั่วไป/ถามความเห็น ตอบ JSON เท่านั้น:
 
 ถ้าต้องการแก้/เพิ่ม/เปลี่ยนพฤติกรรมของแอปหรือบอท หรือต้องการให้ "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง":
-{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[เทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค]","needsConfirmation":true/false,"confirmationMessage":"[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]"}
+{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[เทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค]","needsConfirmation":true/false,"confirmationMessage":"[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]","isHighRisk":true/false}
 
 กฎ needsConfirmation:
 - false ถ้า message มีคำว่า "ทำเลย" "ได้เลย" "ยืนยัน" "เปิด PR" "จัดการเลย" "โอเคทำ" "ตกลงทำ" หรือ history แสดงว่าพีชเพิ่งยืนยันต่อ confirmation message ก่อนหน้าของจีจี้แล้ว
 - true ถ้าคำสั่งไม่ชัด ซับซ้อน กระทบหลายส่วน หรือไม่มีคำยืนยันชัดเจน
+
+กฎ isHighRisk (ควบคุม auto-merge — เลือกอย่างระมัดระวัง):
+- true (ต้องพีชยืนยันก่อน merge) ถ้างานกระทบ: ราคา/คำนวณเงิน/VAT/ส่วนลด · สต๊อก FIFO (stockBatches) · ออเดอร์ LINE (lineOrders) · lineUserId/lineContacts/billing roles · โครงสร้าง Firestore collection · auth/uid/permission · flow หลักของ POS · แก้ >3 ไฟล์พร้อมกัน
+- false (auto-merge ได้ถ้า CI ผ่าน) ถ้างานแก้: ข้อความ/label/typo · UI สี/icon/layout · เพิ่ม UI เล็กๆ ไม่กระทบ business logic · log/comment · doc · แก้เฉพาะ ai-chat
 
 รูปแบบ confirmationMessage (ภาษาไทยกันเอง เหมือนคุยกับเพื่อน):
 "จีจี้เข้าใจแล้วนะครับ:\n✅ ทำ: [สิ่งที่จะทำ]\n❌ ไม่ทำ: [สิ่งที่จะไม่แตะ]\n\nถูกต้องไหมครับพี่? พิมพ์ \"ทำเลย\" ยืนยันได้เลย 🙂"
@@ -357,6 +361,7 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
       confirmation: parsed.confirmation || '',
       needsConfirmation: parsed.needsConfirmation !== false, // default true — ถามยืนยันก่อนเสมอ ยกเว้นมีคำ "ทำเลย"
       confirmationMessage: parsed.confirmationMessage || '',
+      isHighRisk: parsed.isHighRisk !== false, // default true (safe) — false เฉพาะเมื่อ AI ยืนยันชัดว่า low-risk
     };
   } catch {
     return { intent: 'chat' };
@@ -455,6 +460,7 @@ exports.aiChatAgentHttp = functions
           scope: finalScope,
           force: true,
           requestId: requestId || null,
+          isHighRisk: classified.isHighRisk !== false,
         });
         await clearProgress(requestId);
         const prefix = classified.confirmation
