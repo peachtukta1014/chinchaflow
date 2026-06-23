@@ -34,6 +34,18 @@ export async function pollProgress(requestId) {
 }
 
 /**
+ * ดึงสถานะ deploy ล่าสุดของทุก app จาก Firestore ผ่าน Cloud Function
+ * @returns {Promise<Record<string,{status:string,updatedAt:string|null}>|null>}
+ */
+export async function fetchDeployStatus() {
+  try {
+    const res = await fetch(`${CHAT_FUNCTION_URL}?action=deploy_status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+/**
  * ส่งข้อความ (+ รูปภาพถ้ามี) ไปให้ AI แล้วรับคำตอบกลับ
  * @param {object} opts
  * @param {string} opts.message     - ข้อความผู้ใช้

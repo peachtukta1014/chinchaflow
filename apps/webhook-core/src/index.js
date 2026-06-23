@@ -433,5 +433,39 @@ exports.onShrimpAdminAlertCreated = functions
     }
   });
 
+// ── Deploy Notify — รับสถานะ deploy จาก GitHub Actions ─────────────────────
+const { writeDeployStatus } = require('./deployNotify');
+
+exports.deployNotifyHttp = functions
+  .region('asia-southeast1')
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const ghPat = process.env.GH_PAT;
+    const auth = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
+    if (!ghPat || auth !== ghPat) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+
+    const { app, status, workflow, runId, sha } = req.body || {};
+    if (!app || !status) {
+      res.status(400).json({ error: 'app and status required' });
+      return;
+    }
+
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      await writeDeployStatus(app, status, { workflow, runId, sha });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('deployNotifyHttp', err);
+      res.status(500).json({ error: err.message || 'failed' });
+    }
+  });
+
 // ── AI Chat + Workflow Agent ──────────────────────────────────────────────────
 Object.assign(exports, require('./aiChatAgent'));

@@ -117,6 +117,20 @@ jobs:
           echo "Full deploy still failing — retry shrimpLiffSlip only..."
           deploy_slip_only
 
+      - name: Notify deploy status (functions)
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          STATUS="success"
+          [ "$JOB_STATUS" != "success" ] && STATUS="failure"
+          curl -sf -X POST \
+            "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp" \
+            -H "Authorization: Bearer $GH_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"app\":\"functions\",\"status\":\"$STATUS\",\"workflow\":\"deploy-functions\",\"runId\":\"$GITHUB_RUN_ID\",\"sha\":\"$GITHUB_SHA\"}" || true
+
       - name: Wait and verify webhooks (must return 200 ok)
         continue-on-error: true
         run: |
