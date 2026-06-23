@@ -1,3 +1,9 @@
+## 2026-06-23 — docs: อัปเดต doc ให้ตรงโมเดลปัจจุบัน (flash=แชท, pro=loop, vision=gpt-4o-mini)
+
+- `docs/PEACH_WORKING_STYLE_TH.md` — Stack: แก้ "Flash งานง่าย / Pro งานซับซ้อน" → Pro=loop เท่านั้น, Flash=แชท; เพิ่มแถว Vision (gpt-4o-mini)
+- `JIIJI.md` — engine frontmatter + คำอธิบาย: ระบุ flash (แชท) / pro (โค้ด) ให้ชัด
+- `docs/AGENT_HANDBOOK_TH.md` — บรรทัดแรก: ลบ "Cloud Agent, พี่เซอ, Cursor" → "จีจี้, Claude Code"
+
 ## 2026-06-23 — feat: แชทตอบ=flash, loop เขียนโค้ด=pro; checkpoint สรุปรอบ 15; MAX_ITERATIONS 15→30
 
 - **ที่มา:** พีชต้องการแยกบทบาทชัดเจน — แชทตอบทั่วไปใช้ flash (เร็ว/ถูก) ส่วน agentic loop เขียนโค้ดจริงใช้ pro เหมือนเดิม; และต้องการให้จีจี้สรุปความคืบหน้าก่อนรอบ 15 แล้วทำต่อได้
