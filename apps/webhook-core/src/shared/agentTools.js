@@ -689,11 +689,27 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     });
 
     // Always push assistant turn to conversation (strip DSML leak from text)
-    // reasoning_content must be echoed back every turn for DeepSeek thinking-mode models
+    // DeepSeek thinking-mode (มี tools) บังคับให้ส่ง reasoning ของแต่ละ turn กลับทุกครั้ง
+    // ไม่งั้น OpenRouter ตอบ 400 "reasoning_content ... must be passed back to the API"
+    // OpenRouter อาจคืน field ชื่อ reasoning_content (native DeepSeek) หรือ reasoning (normalized)
+    // → เก็บจากชื่อไหนก็ได้ แล้วส่งกลับทุกชื่อ กันกรณี provider routing ของ OpenRouter เปลี่ยน
+    const echoedReasoning = assistantMessage.reasoning_content ?? assistantMessage.reasoning;
+    if (iterations === 1) {
+      // diagnostic ชั่วคราว: ยืนยันว่า OpenRouter คืน reasoning ผ่าน field ชื่ออะไรจริงๆ
+      // (ลบ log บรรทัดนี้ออกได้เมื่อยืนยันชื่อ field แน่นอนแล้ว — ไม่มี content หลุด log แค่ key)
+      console.log('[reasoning-debug]', JSON.stringify({
+        keys: Object.keys(assistantMessage || {}),
+        hasReasoning: assistantMessage.reasoning != null,
+        hasReasoningContent: assistantMessage.reasoning_content != null,
+        hasReasoningDetails: assistantMessage.reasoning_details != null,
+      }));
+    }
     messages.push({
       role: 'assistant',
       content: stripDsml(assistantMessage.content) || null,
-      reasoning_content: assistantMessage.reasoning_content ?? assistantMessage.reasoning ?? undefined,
+      reasoning_content: echoedReasoning ?? undefined,
+      reasoning: echoedReasoning ?? undefined,
+      reasoning_details: assistantMessage.reasoning_details ?? undefined,
       tool_calls: assistantMessage.tool_calls || undefined,
     });
 

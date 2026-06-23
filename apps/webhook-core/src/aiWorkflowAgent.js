@@ -27,8 +27,7 @@ const { runAgentLoop } = require('./shared/agentTools');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
-const FLASH_MODEL = 'deepseek/deepseek-v4-flash'; // เร็ว ถูก — เลือกไฟล์ / งานง่าย
-const PRO_MODEL   = 'deepseek/deepseek-v4-pro';   // แม่นยำ — เขียนโค้ด / งานซับซ้อน
+// model เลือกใน agentTools.js (AGENT_MODEL = deepseek-v4-pro) — loop ใช้ pro ตัวเดียว
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 
