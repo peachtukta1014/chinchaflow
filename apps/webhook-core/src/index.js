@@ -141,10 +141,13 @@ exports.shrimpPushBill = functions
         return;
       }
       if (code === 'line_push_failed') {
+        let lineMsg = '';
+        try { lineMsg = JSON.parse(err.lineErrBody || '{}').message || ''; } catch {}
         res.status(502).json({
           error: code,
-          hint: 'ลูกค้าต้องเคยแอด LINE OA เป็นเพื่อนก่อนถึงส่งได้',
-          status: err.status,
+          hint: 'LINE ปฏิเสธการส่ง — ลูกค้าอาจบล็อก OA หรือยังไม่ได้เพิ่มเป็นเพื่อน',
+          lineStatus: err.status,
+          lineMessage: lineMsg,
         });
         return;
       }

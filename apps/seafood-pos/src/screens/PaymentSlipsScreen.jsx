@@ -73,8 +73,19 @@ function SlipCard({ slip, member, onDone }) {
         sale: selectedSale,
         staffMember: member,
         pushPaidBill: true,
+        onLinePushResult: (result) => {
+          if (result.pushed) {
+            setTimeout(() => alert('✅ ส่งใบจ่ายแล้วให้ลูกค้าใน LINE สำเร็จ'), 300);
+          } else {
+            const reason = result.reason || result.error || '';
+            const msg = reason === 'no_line_uid'
+              ? '⚠️ ไม่พบ LINE UID ของลูกค้า — บิลไม่ได้ถูกส่งใน LINE\n\nไปแท็บลูกค้า → เพิ่ม LINE UID แล้วส่งบิลเองจากหน้าบิล'
+              : `⚠️ ส่งบิล LINE ไม่สำเร็จ — ${reason || 'ไม่ทราบสาเหตุ'}`;
+            setTimeout(() => alert(msg), 300);
+          }
+        },
       });
-      alert(`✅ ปิดบิล ${billLabel} แล้ว · กำลังส่งใบจ่ายแล้วให้ลูกค้าใน LINE`);
+      alert(`✅ ปิดบิล ${billLabel} แล้ว — กำลังส่งบิลให้ลูกค้าใน LINE...`);
       onDone();
     } catch (e) {
       console.error(e);

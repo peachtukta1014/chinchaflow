@@ -16,7 +16,7 @@ function blobToBase64(blob) {
 
 const ERROR_HINTS = {
   invalid_line_user_id: 'ยังไม่มี LINE User ID — ไปแท็บลูกค้า กดดึงจากออเดอร์ หรือวาง U...',
-  line_push_failed: 'ส่งไม่สำเร็จ — ลูกค้าต้องแอด LINE OA เป็นเพื่อนก่อน',
+  line_push_failed: 'ส่งไม่สำเร็จ — LINE ปฏิเสธ (ลูกค้าอาจบล็อก OA หรือยังไม่ได้เพิ่มเป็นเพื่อน)',
   forbidden: 'บัญชีนี้ยังไม่ได้รับอนุมัติส่งบิล',
   line_token_missing: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า LINE Bot',
 };
@@ -73,8 +73,9 @@ export async function pushBillToLineCustomer({
 
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const hint = ERROR_HINTS[json.error] || json.hint || json.error || `HTTP ${r.status}`;
-    throw new Error(hint);
+    const baseHint = ERROR_HINTS[json.error] || json.hint || json.error || `HTTP ${r.status}`;
+    const lineDetail = json.lineMessage ? ` (LINE: ${json.lineMessage})` : '';
+    throw new Error(`${baseHint}${lineDetail}`);
   }
   return json;
 }
