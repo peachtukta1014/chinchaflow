@@ -1,3 +1,13 @@
+## 2026-06-23 — refactor: แยก RestockTab.jsx เป็น 3 ไฟล์ (1,081 → 132/581/446 บรรทัด)
+
+- **ที่มา:** RestockTab.jsx ใหญ่ 1,081 บรรทัด → AI agent อ่านเปลือง context ทั้งที่แก้เฉพาะ form หรือ list; แยกให้อ่านเฉพาะส่วนที่เกี่ยวได้
+- `apps/chincha-tea/src/screens/RestockTab.jsx` — เหลือแค่ orchestrator 132 บรรทัด: shared state (catalog/recentRequests/flash), computed memos (latestPriceByKey/catalogGroups), callbacks (refreshRecent/refreshCatalog/notifyRestockChange) render `<RestockForm>` + `<RestockList>`; export `RestockTab` คงเดิม
+- เพิ่ม `apps/chincha-tea/src/screens/RestockForm.jsx` — catalog picker (เลือก/จัดการรายการ) + text input + items list + submit (581 บรรทัด); import `RestockItemName`/`moneyLabel` จาก RestockList
+- เพิ่ม `apps/chincha-tea/src/screens/RestockList.jsx` — pending restock list + handlers (confirmPurchase/markPurchased/togglePicked ฯลฯ) (446 บรรทัด); export `RestockItemName` + `moneyLabel` (shared helpers)
+- **ตรวจสอบความปลอดภัย:** `npm run build --workspace=chincha-tea` ผ่าน + `OpsTab.jsx`/`App.jsx` import `{ RestockTab }` เหมือนเดิม ไม่เปลี่ยน
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต screens/ listing
+- ถ้าพังให้เช็ก: `RestockTab.jsx` (props ที่ส่งลง), `RestockForm.jsx` (import จาก RestockList), `RestockList.jsx` (export RestockItemName/moneyLabel)
+
 ## 2026-06-23 — refactor: แยก chincha-tea i18n.js ตามภาษา (1,558 → 18 บรรทัด)
 
 - **ที่มา:** ไฟล์ใหญ่สุดในโปรเจกต์ (1,558 บรรทัด) → AI agent อ่านเปลือง token/context; แยกให้อ่านเฉพาะภาษาที่ต้องการได้

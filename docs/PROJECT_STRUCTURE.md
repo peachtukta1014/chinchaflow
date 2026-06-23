@@ -211,7 +211,9 @@ apps/chincha-tea/
 │   │   ├── OrderTab.jsx           # บันทึกขาย + เสียง + เมนู
 │   │   ├── HistoryScreen.jsx
 │   │   ├── SummaryTab.jsx         # สรุปยอดขาย / ค่าใช้จ่าย / ซื้อของ / LINE
-│   │   ├── RestockTab.jsx
+│   │   ├── RestockTab.jsx          # orchestrator — shared state/memos เท่านั้น
+│   │   ├── RestockForm.jsx         # catalog picker + text input + submit
+│   │   ├── RestockList.jsx         # pending list + exports RestockItemName/moneyLabel
 │   │   └── AdminPanel.jsx         # สมาชิก, เมนู, ท็อปปิ้ง, LINE config
 │   │
 │   ├── components/
