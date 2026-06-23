@@ -1,0 +1,40 @@
+name: AI Workflow Trigger (Pro Agent)
+# รับ repository_dispatch จาก Flash CF → รัน Pro agentic loop → ส่งผลกลับ Cloud Function
+# Pro secrets (OPENROUTER_API_KEY_PRO, GH_PAT) อยู่ที่นี่เท่านั้น — ไม่แตะ Firebase CF เลย
+
+on:
+  repository_dispatch:
+    types: [ai-code-action]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  run-agent:
+    name: Pro agentic loop
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/webhook-core/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: apps/webhook-core
+
+      - name: Write Firebase service account
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/firebase-sa.json
+
+      - name: Run Pro agent task
+        run: node scripts/run-github-agent.mjs
+        working-directory: apps/webhook-core
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY_PRO }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+          AGENT_TASK_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
