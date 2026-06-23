@@ -234,3 +234,49 @@ jobs:
               issue_number: context.issue.number,
               body,
             });
+
+  auto_merge:
+    name: Auto-merge low-risk PR
+    needs: [changes, verify_shrimp, verify_tea, verify_webhook, verify_ai_chat, comment]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge if auto-merge tagged and all CI passed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) { console.log('ไม่ใช่ pull_request event'); return; }
+
+            const body = pr.body || '';
+            if (!body.includes('[auto-merge]')) {
+              console.log('PR ไม่มี [auto-merge] tag — ข้ามขั้นตอนนี้');
+              return;
+            }
+
+            const ok = (r) => ['success', 'skipped'].includes(r);
+            const allPassed =
+              ok('${{ needs.verify_shrimp.result }}') &&
+              ok('${{ needs.verify_tea.result }}') &&
+              ok('${{ needs.verify_webhook.result }}') &&
+              ok('${{ needs.verify_ai_chat.result }}');
+
+            if (!allPassed) {
+              console.log('CI ไม่ผ่าน — ไม่ auto-merge');
+              return;
+            }
+
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: 'squash',
+              });
+              console.log(`✅ Auto-merged PR #${pr.number}`);
+            } catch (err) {
+              console.log(`❌ Auto-merge ล้มเหลว: ${err.message}`);
+            }
