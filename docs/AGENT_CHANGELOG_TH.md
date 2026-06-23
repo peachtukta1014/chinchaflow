@@ -1,3 +1,12 @@
+## 2026-06-23 — refactor: รวมโมเดลแชท+เขียนโค้ดเป็น deepseek-v4-pro ตัวเดียว + harden reasoning_content
+
+- **ที่มา:** พีชต้องการให้ลดความซับซ้อนของการสลับโมเดล — ตัวเขียนโค้ด (agentic loop) ใช้ deepseek-v4-pro อยู่แล้ว (hardcode `AGENT_MODEL` ใน agentTools.js) แต่ฝั่งแชทยังสลับ flash/pro ตามคีย์เวิร์ด → รวมให้แชทที่ตอบพีชใช้ v4-pro ตัวเดียว; รูป/ไฟล์ภาพคง gpt-4o-mini; classifier (ตัวจัดเส้นทางเบื้องหลัง) คง flash เพราะยิงทุกข้อความต้องเร็ว (พีชยืนยันตัวเลือกนี้)
+- `aiChatAgent.js` — `pickModel`: non-vision → v4-pro; ลบ `isCodeRelated` (dead หลังเลิกแยกโมเดล); อัปเดต comment FLASH_MODEL ว่าใช้กับ classifier เท่านั้น
+- `shared/agentTools.js` — `runAgentLoop`: ส่ง reasoning กลับทั้ง `reasoning_content` + `reasoning` + `reasoning_details` (เดิม PR #331 ส่งแค่ `reasoning_content`) — กันกรณี OpenRouter ต้องการ field ชื่ออื่น; + diagnostic log ชั่วคราว เช็คชื่อ field reasoning จริงจาก response
+- `aiWorkflowAgent.js` — ลบ const `FLASH_MODEL`/`PRO_MODEL` ที่เป็น dead code (เหลือจาก V1 pipeline ลบไป PR #327)
+- **หมายเหตุ:** ความถูกต้อง 100% ของ reasoning_content fix ยังต้อง confirm ด้วยการสั่งงานจริงผ่าน ai-chat หลัง deploy แล้วดู log `[reasoning-debug]` ว่า OpenRouter คืน field ชื่ออะไร
+- ถ้าพังให้เช็ก: `aiChatAgent.js` (pickModel), `agentTools.js` (runAgentLoop, echoedReasoning)
+
 ## 2026-06-22 — docs: sync PROJECT_STRUCTURE.md + แก้ JIIJI.md อ้างอิง Claude Code App ที่ไม่มีแล้ว
 
 - **สาเหตุ:** PR #327 ลบ `aiWorkflowAgentHttp` ไปแล้วแต่ `PROJECT_STRUCTURE.md` ยังมีแถวนั้นในตาราง Cloud Functions; seafood-oa มี ~36 ไฟล์จริงแต่เอกสารบอก ~15; `JIIJI.md` ยังอ้างถึง "Claude Code App" และ "Cursor IDE" ในหลายจุดซึ่งขัดแย้งกับ `SYSTEM_PROMPTS.root` ที่ระบุว่าแอปเหล่านั้นไม่มีอีกแล้ว

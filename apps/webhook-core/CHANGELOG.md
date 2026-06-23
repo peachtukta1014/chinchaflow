@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-23 | dev/ai-model-consolidation
+**refactor: รวมโมเดลแชท+เขียนโค้ดเป็น deepseek-v4-pro ตัวเดียว + harden reasoning_content**
+- `src/aiChatAgent.js` — `pickModel`: เลิกแยก flash/pro ตามคีย์เวิร์ด → แชทที่ตอบพีชใช้ v4-pro หมด (รูปยังเป็น gpt-4o-mini); ลบฟังก์ชัน `isCodeRelated` ที่ไม่ถูกใช้แล้ว; `classifyAndTranslate` ยังคงใช้ flash (ตัวจัดเส้นทางเบื้องหลัง ยิงทุกข้อความ ต้องเร็ว)
+- `src/shared/agentTools.js` — `runAgentLoop`: harden การส่ง reasoning กลับ — เก็บจาก `reasoning_content`/`reasoning` แล้วส่งกลับทั้ง `reasoning_content` + `reasoning` + `reasoning_details` (กัน OpenRouter routing เปลี่ยนชื่อ field); เพิ่ม diagnostic log ชั่วคราว 1 รอบ/คำสั่ง เช็คว่า field reasoning ชื่ออะไรจริง
+- `src/aiWorkflowAgent.js` — ลบ const `FLASH_MODEL`/`PRO_MODEL` ที่เป็น dead code (เหลือจาก V1 pipeline ที่ลบไป PR #327 — loop ใช้ `AGENT_MODEL` จาก agentTools.js อยู่แล้ว)
+
 ### 2026-06-22 | dev/docs-sync-structure-jiiji
 **docs: sync PROJECT_STRUCTURE.md + แก้ JIIJI.md อ้างอิง Claude Code App ที่ไม่มีแล้ว**
 - `docs/PROJECT_STRUCTURE.md` — ลบแถว `aiWorkflowAgentHttp` (ลบใน PR #327); อัปเดต seafood-oa count จาก `~15` → `~36 ไฟล์`; อัปเดต `aiChatAgentHttp` description ให้ตรงสถานะจริง
