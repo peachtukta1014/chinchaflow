@@ -309,8 +309,15 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
 
 วิเคราะห์ว่าพี่พีช (เจ้าของ) ต้องการแก้ไขระบบ หรือต้องการให้ดู/อ่าน/ตรวจสอบโค้ดจริงในระบบ หรือแค่คุยทั่วไป/ถามความเห็น ตอบ JSON เท่านั้น:
 
-ถ้าต้องการแก้/เพิ่ม/เปลี่ยนพฤติกรรมของแอปหรือบอท หรือต้องการให้ "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง" (เช่น "ตรวจสอบไฟล์ X", "ดูโค้ด Y ให้หน่อย", "อธิบายว่าไฟล์ Z ทำงานยังไง") — ทั้งสองแบบนี้ต้องใช้ tool อ่านโค้ดจริง ไม่ใช่แค่คุย:
-{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[อธิบายเป็นภาษาเทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค ว่าเข้าใจว่าพี่ต้องการอะไร]"}
+ถ้าต้องการแก้/เพิ่ม/เปลี่ยนพฤติกรรมของแอปหรือบอท หรือต้องการให้ "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง":
+{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[เทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค]","needsConfirmation":true/false,"confirmationMessage":"[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]"}
+
+กฎ needsConfirmation:
+- false ถ้า message มีคำว่า "ทำเลย" "ได้เลย" "ยืนยัน" "เปิด PR" "จัดการเลย" "โอเคทำ" "ตกลงทำ" หรือ history แสดงว่าพีชเพิ่งยืนยันต่อ confirmation message ก่อนหน้าของจีจี้แล้ว
+- true ถ้าคำสั่งไม่ชัด ซับซ้อน กระทบหลายส่วน หรือไม่มีคำยืนยันชัดเจน
+
+รูปแบบ confirmationMessage (ภาษาไทยกันเอง เหมือนคุยกับเพื่อน):
+"จีจี้เข้าใจแล้วนะครับ:\n✅ ทำ: [สิ่งที่จะทำ]\n❌ ไม่ทำ: [สิ่งที่จะไม่แตะ]\n\nถูกต้องไหมครับพี่? พิมพ์ \"ทำเลย\" ยืนยันได้เลย 🙂"
 
 ถ้าแค่ถาม, คุยทั่วไป, ขอข้อมูล, หรือคำสั่งไม่ชัดพอ:
 {"intent":"chat"}
@@ -334,7 +341,7 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
           { role: 'user', content: message },
         ],
         temperature: 0.1,
-        max_tokens: 400,
+        max_tokens: 600,
       }),
     });
     if (!res.ok) return { intent: 'chat' };
@@ -348,6 +355,8 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
       scope: parsed.scope || currentScope || 'root',
       translatedMessage: parsed.translatedMessage || message,
       confirmation: parsed.confirmation || '',
+      needsConfirmation: parsed.needsConfirmation !== false, // default true — ถามยืนยันก่อนเสมอ ยกเว้นมีคำ "ทำเลย"
+      confirmationMessage: parsed.confirmationMessage || '',
     };
   } catch {
     return { intent: 'chat' };
@@ -427,6 +436,16 @@ exports.aiChatAgentHttp = functions
     const finalScope = classified.scope || resolvedScope;
 
     if (classified.intent === 'code-action') {
+      // ถ้าต้องยืนยันก่อน → ส่ง confirmationMessage กลับ ยังไม่รัน Pro loop
+      // พีชตอบ "ทำเลย" → รอบถัดไป needsConfirmation=false → ผ่านมาทำโค้ดได้
+      if (classified.needsConfirmation) {
+        const confirmMsg = classified.confirmationMessage ||
+          `จีจี้เข้าใจแล้วนะครับ: ${classified.confirmation}\n\nถูกต้องไหมครับพี่? พิมพ์ "ทำเลย" ยืนยันได้เลย 🙂`;
+        await clearProgress(requestId);
+        res.json({ reply: confirmMsg, scope: finalScope, intent: 'pending-code-action' });
+        return;
+      }
+
       try {
         // agentic loop (tool calling) — เส้นทางเดียวสำหรับแก้โค้ด ไม่มี fallback ไประบบอื่นแล้ว (ลบ V1 ทิ้งใน PR #327)
         const { handleCodeActionV2 } = require('./aiWorkflowAgent');

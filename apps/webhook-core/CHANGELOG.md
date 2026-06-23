@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-23 | dev/ai-confirm-before-code
+**feat: Flash ยืนยันความเข้าใจก่อน Pro loop — bullet ทำ/ไม่ทำ + รอ "ทำเลย"**
+- `src/aiChatAgent.js` — `classifyAndTranslate`: เพิ่ม `needsConfirmation` + `confirmationMessage` (Thai bullet ✅/❌); max_tokens 400→600
+- `src/aiChatAgent.js` — handler: ถ้า `needsConfirmation=true` → reply ด้วย confirmationMessage ทันที ไม่รัน Pro loop; "ทำเลย" → `needsConfirmation=false` → Pro loop ทำงาน
+
 ### 2026-06-23 | dev/ai-chat-flash-code-pro
 **feat: แชทตอบ → flash, loop เขียนโค้ด → pro (คงเดิม); checkpoint สรุปรอบ 15; MAX_ITERATIONS 15→30**
 - `src/aiChatAgent.js` — `pickModel`: non-vision → FLASH_MODEL (v4-flash) แทน PRO_MODEL; อัปเดต comment ให้ชัดว่า flash=แชทตอบพีช, pro=loop เขียนโค้ดใน agentTools.js เท่านั้น
