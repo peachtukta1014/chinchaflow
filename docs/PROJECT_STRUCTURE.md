@@ -107,6 +107,8 @@ chinchaflow/
 ├── docs
 │   ├── AGENT_CHANGELOG_TH.md
 │   ├── AGENT_HANDBOOK_TH.md
+│   ├── AI_AGENT_DIAGRAM.md
+│   ├── AI_AGENT_KEY_FILES.md
 │   ├── ARCHITECTURE_TH.md
 │   ├── CHINCHA_FLOW_NAMING_TH.md
 │   ├── CODE_METRICS.md
