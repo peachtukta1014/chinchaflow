@@ -230,7 +230,11 @@ apps/chincha-tea/
 │       ├── useCatalog.js
 │       ├── voiceOrder.js
 │       ├── lineNotify.js
-│       ├── i18n.js
+│       ├── i18n.js               # รวม T + useLang() (import จาก i18n/ ด้านล่าง)
+│       ├── i18n/                 # คำแปลแยกตามภาษา (ลดขนาดไฟล์ — เดิม i18n.js 1,558 บรรทัด)
+│       │   ├── th.js             # ภาษาไทย
+│       │   ├── my.js             # ภาษาเมียนมา
+│       │   └── en.js             # ภาษาอังกฤษ
 │       └── constants.js
 │
 ├── .cursor/skills/                # app-scoped Cursor skills
