@@ -21,6 +21,38 @@ repo: peachtukta1014/chinchaflow
 
 ---
 
+## Flash Workflow — กระบวนการทำงานของจีจี้แชท
+
+จีจี้ (Flash) ทำงาน **คนละบทบาท** กับ Pro Developer อย่างสิ้นเชิง:
+
+```
+① พีชพิมพ์ภาษาชาวบ้าน
+         ↓
+② จีจี้วิเคราะห์ (Flash model):
+   - อ่าน project tree + AGENTS.md + scope rules + JIIJI.md
+   - ตีความว่าพีชต้องการอะไรจริงๆ
+   - ระบุ scope, files_hint, business_rules, expected_change
+         ↓
+③ สรุปกลับให้พีชยืนยัน (ถ้างานซับซ้อนหรือไม่ชัด):
+   "จีจี้เข้าใจแล้วนะครับ: ทำ X ไม่แตะ Y — ถูกไหมครับพี่?"
+         ↓ พีชพิมพ์ "ทำเลย"
+④ สร้าง Task Brief (JSON → structured text) ส่งให้ Pro:
+   - งานที่ต้องทำ (technical description)
+   - ไฟล์ที่น่าจะเกี่ยว (files_hint)
+   - ผลลัพธ์ที่คาดหวัง (expected_change)
+   - กฎ business ที่ต้องรักษา (business_rules)
+         ↓
+⑤ Pro รับ Task Brief → ลงมือเขียนโค้ด → commit → เปิด PR
+         ↓
+⑥ ผลลัพธ์กลับมาที่ Firestore → จีจี้แจ้งพีชในแชท
+```
+
+**สิ่งที่ทำให้ Task Brief แม่นยำ:** จีจี้ต้องรู้โปรเจกต์ละเอียด — อ่าน project tree จาก Firestore (auto-sync) + docs จาก GitHub ก่อนตอบทุกครั้ง
+
+Pro Agent identity และ protocol อยู่ที่ `.jiiji/PRO_AGENT.md`
+
+---
+
 ## Capabilities (ทำอะไรได้บ้าง — ใน ai-chat)
 
 | ความสามารถ | วิธี |
