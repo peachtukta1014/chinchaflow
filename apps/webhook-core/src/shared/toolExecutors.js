@@ -288,27 +288,26 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
       const file = await fetchRepoFile(ghPat, skillPath);
       if (!file) return `❌ ไม่พบไฟล์ skill: ${skillPath}`;
       return `=== Skill: ${args.name} (${skillPath}) ===\n${file.content}\n\n` +
-        `⚠️ หมายเหตุสำคัญ: skill นี้เขียนไว้สมัยที่ agent รันบนเครื่องที่มีไฟล์ repo เต็ม ` +
-        `แต่ container ปัจจุบัน (Cloud Functions) ไม่มีไฟล์โปรเจกต์เลย คำสั่ง npm run build / git / ` +
-        `node scripts/... ในเนื้อหาด้านบนรันไม่ได้จริงผ่าน exec_command — ใช้เนื้อหานี้เป็นแค่ ` +
-        `"แนวคิด/ขั้นตอนอ้างอิง" สำหรับเข้าใจว่าควรทำอะไรเป็นลำดับ แล้วใช้ tool จริงที่มี ` +
-        `(patch_file, write_file, commit_and_pr) ทำงานแทน ไม่ใช่พยายาม exec_command ตามตัวอักษร`;
+        `ℹ️ Pro รันใน GitHub Actions runner — repo checkout พร้อม, git/npm/node ใช้ได้ผ่าน exec_command ` +
+        `(timeout สูงสุด 300 วิ) อ่าน skill นี้เพื่อเข้าใจขั้นตอน แล้วใช้ tool จริง ` +
+        `(read_file, patch_file, write_file, commit_and_pr, exec_command) ดำเนินงานต่อ`;
     }
 
     case 'exec_command': {
-      const timeoutSec = Math.min(Number(args.timeout_seconds) || 20, 45);
+      // รันใน GitHub Actions runner — มี repo checkout เต็ม, git/npm/node พร้อมใช้
+      const timeoutSec = Math.min(Number(args.timeout_seconds) || 30, 300);
       try {
         const output = execSync(args.command, {
           timeout: timeoutSec * 1000,
           encoding: 'utf8',
-          maxBuffer: 512 * 1024,
+          maxBuffer: 2 * 1024 * 1024,
         });
         return `✅ output:\n${output.trim() || '(ไม่มี output)'}`;
       } catch (err) {
         if (err.killed || err.signal === 'SIGTERM') {
-          return `❌ timeout (>${timeoutSec}วิ): command ใช้เวลานานเกินไป — ไม่เหมาะกับ Cloud Functions`;
+          return `❌ timeout (>${timeoutSec}วิ): command ใช้เวลานานเกินไป — ลอง timeout_seconds ที่มากขึ้น หรือแบ่งคำสั่งสั้นลง`;
         }
-        const msg = ((err.stdout || '') + (err.stderr || '') || err.message).slice(0, 1000);
+        const msg = ((err.stdout || '') + (err.stderr || '') || err.message).slice(0, 2000);
         return `❌ error (exit ${err.status}):\n${msg}`;
       }
     }
