@@ -387,35 +387,62 @@ async function fetchChatAgentDocs(ghPat) {
   return result;
 }
 
-// ── AI Intent Classifier + Thai→Technical Translator ─────────────────────
-// รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ว่าต้องการแก้ระบบหรือแค่ถาม → แปลเป็น technical spec
+// ── AI Intent Classifier + Task Brief Builder ────────────────────────────
+// รับภาษาชาวบ้านจากพี่พีช → วิเคราะห์ → สร้าง structured Task Brief ส่งให้ Pro
+// Pro รับ Task Brief ที่มี files_hint + business_rules + expected_change ทำงานได้ตรงจุดทันที
 async function classifyAndTranslate(apiKey, message, history, currentScope) {
-  const systemPrompt = `คุณคือตัวแปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ สำหรับ CHINCHA FLOW:
-- ร้านชินชา / ร้านน้ำ / ชา (scope: tea) — แอปขายชา apps/chincha-tea/, หน้า POS, สต๊อกแก้ว, พนักงาน, LINE บอทชา
-- โกอ้วนซีฟู้ด / ร้านกุ้ง / กุ้ง (scope: seafood) — แอปขายกุ้ง apps/seafood-pos/, สต๊อก FIFO, ลูกค้า, LINE บอทกุ้ง
-- LINE Bot (scope: webhook) — บอทกลุ่ม LINE, webhook, notify, การส่งข้อความ
-- ทั่วไป (scope: root) — หลายส่วนหรือไม่ชัดเจน
+  const systemPrompt = `คุณคือจีจี้ — เลขาส่วนตัวพีช วิเคราะห์คำสั่งภาษาชาวบ้านแล้วแปลเป็น Task Brief ให้ Pro Developer ทำงานได้ตรงจุด
 
-วิเคราะห์ว่าพี่พีช (เจ้าของ) ต้องการแก้ไขระบบ หรือต้องการให้ดู/อ่าน/ตรวจสอบโค้ดจริงในระบบ หรือแค่คุยทั่วไป/ถามความเห็น ตอบ JSON เท่านั้น:
+CHINCHA FLOW scopes:
+- ร้านชินชา/ชา/chincha-tea (scope: tea) — apps/chincha-tea/, POS ขายชา, สต๊อกแก้ว, พนักงาน, LINE บอทชา
+- โกอ้วนซีฟู้ด/ร้านกุ้ง/seafood (scope: seafood) — apps/seafood-pos/, POS ขายกุ้ง, สต๊อก FIFO, ลูกค้า, LINE LIFF
+- LINE Bot/webhook (scope: webhook) — apps/webhook-core/, บอทกลุ่ม, webhook events, Cloud Functions
+- ทั่วไป/หลายส่วน (scope: root)
 
-ถ้าต้องการแก้/เพิ่ม/เปลี่ยนพฤติกรรมของแอปหรือบอท หรือต้องการให้ "ดู/อ่าน/ตรวจสอบ/วิเคราะห์ไฟล์หรือโค้ดที่มีอยู่จริง":
-{"intent":"code-action","scope":"tea|seafood|webhook|root","translatedMessage":"[เทคนิค: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]","confirmation":"[สรุปสั้น 1 ประโยค]","needsConfirmation":true/false,"confirmationMessage":"[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]","isHighRisk":true/false}
+วิเคราะห์ว่าพี่พีชต้องการ "แก้/เพิ่ม/อ่านโค้ดจริง" หรือ "คุยทั่วไป/ถามความเห็น" แล้วตอบ JSON เท่านั้น:
+
+กรณี code-action (แก้/เพิ่ม/ดูโค้ดจริง):
+{
+  "intent": "code-action",
+  "scope": "tea|seafood|webhook|root",
+  "taskSpec": {
+    "description": "[อธิบายงาน technical: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]",
+    "files_hint": ["apps/.../ไฟล์ที่น่าจะต้องแก้", "..."],
+    "expected_change": "[อธิบายให้ชัดว่าโค้ดควรเปลี่ยนยังไง ฟังก์ชันไหน ค่าอะไร]",
+    "business_rules": ["กฎที่ Pro ต้องรักษา เช่น ห้ามแตะ FIFO", "ราคาต้องไม่ติดลบ"]
+  },
+  "confirmation": "[สรุปสั้น 1 ประโยค]",
+  "needsConfirmation": true,
+  "confirmationMessage": "[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]",
+  "isHighRisk": true
+}
+
+กฎ files_hint — ต้องระบุให้ถูกต้อง:
+- seafood: apps/seafood-pos/src/utils/, src/services/, src/lib/, src/screens/, src/liff/
+- tea: apps/chincha-tea/src/lib/, src/services/, src/screens/, src/components/
+- webhook: apps/webhook-core/src/ (aiChatAgent.js, aiWorkflowAgent.js, seafood-oa/, tea/)
+- ถ้าไม่แน่ใจ ใส่ไฟล์ที่น่าจะเกี่ยวที่สุด 1-3 ไฟล์
+
+กฎ business_rules — ใส่เฉพาะที่เกี่ยวกับงานนี้จริงๆ:
+- seafood: ราคา/คำนวณเงิน → "ราคาต้องไม่ติดลบ, ห้ามแตะ FIFO logic ใน saleFifo.js"
+- tea: สต๊อก → "ห้ามแตะ dailyCupStocks โดยตรงนอกจาก inventoryService.js"
+- ถ้าไม่มีกฎพิเศษ → []
 
 กฎ needsConfirmation:
-- false ถ้า message มีคำว่า "ทำเลย" "ได้เลย" "ยืนยัน" "เปิด PR" "จัดการเลย" "โอเคทำ" "ตกลงทำ" หรือ history แสดงว่าพีชเพิ่งยืนยันต่อ confirmation message ก่อนหน้าของจีจี้แล้ว
-- true ถ้าคำสั่งไม่ชัด ซับซ้อน กระทบหลายส่วน หรือไม่มีคำยืนยันชัดเจน
+- false ถ้า message มีคำ: "ทำเลย" "ได้เลย" "ยืนยัน" "เปิด PR" "จัดการเลย" "โอเคทำ" "ตกลงทำ" หรือ history แสดงว่าพีชยืนยันแล้ว
+- true ถ้าคำสั่งไม่ชัด ซับซ้อน หรือกระทบหลายส่วน
 
-กฎ isHighRisk (ควบคุม auto-merge — เลือกอย่างระมัดระวัง):
-- true (ต้องพีชยืนยันก่อน merge) ถ้างานกระทบ: ราคา/คำนวณเงิน/VAT/ส่วนลด · สต๊อก FIFO (stockBatches) · ออเดอร์ LINE (lineOrders) · lineUserId/lineContacts/billing roles · โครงสร้าง Firestore collection · auth/uid/permission · flow หลักของ POS · แก้ >3 ไฟล์พร้อมกัน
-- false (auto-merge ได้ถ้า CI ผ่าน) ถ้างานแก้: ข้อความ/label/typo · UI สี/icon/layout · เพิ่ม UI เล็กๆ ไม่กระทบ business logic · log/comment · doc · แก้เฉพาะ ai-chat
+กฎ isHighRisk:
+- true: ราคา/VAT/ส่วนลด, FIFO (stockBatches), lineOrders, lineUserId/roles, Firestore schema, auth/uid, flow POS หลัก, แก้ >3 ไฟล์
+- false: ข้อความ/typo, UI สี/icon/layout, log/comment/doc, เพิ่ม UI เล็กๆ
 
-รูปแบบ confirmationMessage (ภาษาไทยกันเอง เหมือนคุยกับเพื่อน):
-"จีจี้เข้าใจแล้วนะครับ:\n✅ ทำ: [สิ่งที่จะทำ]\n❌ ไม่ทำ: [สิ่งที่จะไม่แตะ]\n\nถูกต้องไหมครับพี่? พิมพ์ \"ทำเลย\" ยืนยันได้เลย 🙂"
+รูปแบบ confirmationMessage (กันเอง เหมือนคุยกับเพื่อน):
+"จีจี้เข้าใจแล้วนะครับ:\n✅ ทำ: [สิ่งที่จะทำ]\n❌ ไม่ทำ: [สิ่งที่จะไม่แตะ]\n\nถูกต้องไหมครับพี่? พิมพ์ \\"ทำเลย\\" ยืนยันได้เลย 🙂"
 
-ถ้าแค่ถาม, คุยทั่วไป, ขอข้อมูล, หรือคำสั่งไม่ชัดพอ:
+กรณี chat (ถาม/คุยทั่วไป/ขอความเห็น):
 {"intent":"chat"}
 
-ถ้าไม่แน่ใจ ให้เลือก chat เสมอ (ปลอดภัยกว่า)`;
+ถ้าไม่แน่ใจ → เลือก chat เสมอ (ปลอดภัยกว่า)`;
 
   try {
     const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
@@ -434,7 +461,7 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
           { role: 'user', content: message },
         ],
         temperature: 0.1,
-        max_tokens: 600,
+        max_tokens: 900,
       }),
     });
     if (!res.ok) return { intent: 'chat' };
@@ -443,18 +470,50 @@ async function classifyAndTranslate(apiKey, message, history, currentScope) {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { intent: 'chat' };
     const parsed = JSON.parse(jsonMatch[0]);
+    const taskSpec = parsed.taskSpec || {};
     return {
       intent: parsed.intent || 'chat',
       scope: parsed.scope || currentScope || 'root',
-      translatedMessage: parsed.translatedMessage || message,
+      taskSpec,
+      // backward-compat: translatedMessage สร้างจาก taskSpec
+      translatedMessage: taskSpec.description || parsed.translatedMessage || message,
       confirmation: parsed.confirmation || '',
-      needsConfirmation: parsed.needsConfirmation !== false, // default true — ถามยืนยันก่อนเสมอ ยกเว้นมีคำ "ทำเลย"
+      needsConfirmation: parsed.needsConfirmation !== false,
       confirmationMessage: parsed.confirmationMessage || '',
-      isHighRisk: parsed.isHighRisk !== false, // default true (safe) — false เฉพาะเมื่อ AI ยืนยันชัดว่า low-risk
+      isHighRisk: parsed.isHighRisk !== false,
     };
   } catch {
     return { intent: 'chat' };
   }
+}
+
+// ── Build structured Task Brief จาก taskSpec สำหรับ Pro ──────────────────
+// Pro รับ brief นี้เป็น "message" — มีรายละเอียดครบ ไม่ต้องเดา
+function buildTaskBrief(classified, originalMessage) {
+  const { taskSpec = {}, confirmation } = classified;
+  const filesHint = Array.isArray(taskSpec.files_hint) && taskSpec.files_hint.length
+    ? taskSpec.files_hint.map(f => `- ${f}`).join('\n')
+    : '- (ดูจาก scope file tree — อ่าน files_hint ใน AGENTS.md ของ scope นี้)';
+  const rules = Array.isArray(taskSpec.business_rules) && taskSpec.business_rules.length
+    ? taskSpec.business_rules.map(r => `- ${r}`).join('\n')
+    : '- (ไม่มีกฎพิเศษ — ปฏิบัติตาม AGENTS.md และ scope AGENTS.md)';
+
+  return `## 📋 Task Brief (สร้างโดย Flash จากคำสั่งพีช)
+
+**งานที่ต้องทำ:**
+${taskSpec.description || confirmation || originalMessage}
+
+**ไฟล์ที่น่าจะเกี่ยว (hint — read_file ก่อนเสมอ):**
+${filesHint}
+
+**ผลลัพธ์ที่คาดหวัง:**
+${taskSpec.expected_change || '(วิเคราะห์จากโค้ดจริงที่อ่าน)'}
+
+**กฎ Business ที่ต้องรักษา:**
+${rules}
+
+**คำสั่งต้นฉบับจากพีช:**
+"${originalMessage}"`;
 }
 
 // ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
@@ -599,7 +658,7 @@ exports.aiChatAgentHttp = functions
         // Flash CF ไม่บล็อกรอ — ไม่ต้องการ OPENROUTER_API_KEY_PRO เลย
         await dispatchToProAgent(ghPatForDispatch, {
           requestId,
-          message: classified.translatedMessage,
+          message: buildTaskBrief(classified, message),
           history: (history || []).slice(-10),
           scope: finalScope,
           isHighRisk: classified.isHighRisk !== false,
