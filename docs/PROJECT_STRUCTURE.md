@@ -363,7 +363,7 @@ apps/webhook-core/
 │   │   ├── shrimpLineIntent.js
 │   │   ├── shrimpDailySummary.js
 │   │   ├── saveShrimpLineOrders.js
-│   │   └── ...                    # อีก ~15 ไฟล์ (LIFF, slip, config, etc.)
+│   │   └── ...                    # อีก ~22 ไฟล์ (LIFF, slip, config, lexicon, etc.) — รวม ~36 ไฟล์
 │   │
 │   ├── seafood-notify/            # push notification + bill render — กุ้ง
 │   │   ├── SCOPE.md
@@ -393,8 +393,7 @@ apps/webhook-core/
 | `lineWebhook` | รับข้อความ LINE กุ้ง (DM + กลุ่ม) |
 | `lineWebhookTea` | รับข้อความ LINE ชา |
 | `teaPushSummary` | ส่งสรุปปิดวันชา |
-| `aiChatAgentHttp` | AI chat (เจ้าของร้าน) |
-| `aiWorkflowAgentHttp` | AI agentic workflow (commit/PR) |
+| `aiChatAgentHttp` | AI chat + agentic loop (commit/PR) — entry point เดียว |
 
 ---
 

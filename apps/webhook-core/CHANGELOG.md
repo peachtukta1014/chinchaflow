@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-22 | dev/docs-sync-structure-jiiji
+**docs: sync PROJECT_STRUCTURE.md + แก้ JIIJI.md อ้างอิง Claude Code App ที่ไม่มีแล้ว**
+- `docs/PROJECT_STRUCTURE.md` — ลบแถว `aiWorkflowAgentHttp` (ลบใน PR #327); อัปเดต seafood-oa count จาก `~15` → `~36 ไฟล์`; อัปเดต `aiChatAgentHttp` description ให้ตรงสถานะจริง
+- `JIIJI.md` — ❌ table: ลบ "เปิด Claude Code App" → "Claude Code CLI remote session"; Skills section: เปลี่ยนหัว "Claude Code App / Cursor IDE" → "Claude Code CLI"; ลบคอลัมน์ "ใช้ใน" ที่ redundant
+
 ### 2026-06-22 | dev/ai-fix-reasoning-content-loop
 **fix: reasoning_content ไม่ถูกส่งกลับใน multi-turn → OpenRouter 400 + isTransient false-positive**
 - `src/shared/agentTools.js` — `runAgentLoop`: เพิ่ม `reasoning_content` (fallback `reasoning`) ใน assistant message push — DeepSeek V4 Pro thinking mode ต้องการ field นี้ทุก turn ไม่งั้น OpenRouter ตอบ `400: reasoning_content in the thinking mode must be passed back`

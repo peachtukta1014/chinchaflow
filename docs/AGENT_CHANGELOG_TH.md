@@ -1,3 +1,10 @@
+## 2026-06-22 — docs: sync PROJECT_STRUCTURE.md + แก้ JIIJI.md อ้างอิง Claude Code App ที่ไม่มีแล้ว
+
+- **สาเหตุ:** PR #327 ลบ `aiWorkflowAgentHttp` ไปแล้วแต่ `PROJECT_STRUCTURE.md` ยังมีแถวนั้นในตาราง Cloud Functions; seafood-oa มี ~36 ไฟล์จริงแต่เอกสารบอก ~15; `JIIJI.md` ยังอ้างถึง "Claude Code App" และ "Cursor IDE" ในหลายจุดซึ่งขัดแย้งกับ `SYSTEM_PROMPTS.root` ที่ระบุว่าแอปเหล่านั้นไม่มีอีกแล้ว
+- `docs/PROJECT_STRUCTURE.md` — ลบแถว `aiWorkflowAgentHttp`; อัปเดต seafood-oa `~15` → `~36 ไฟล์`; อัปเดต aiChatAgentHttp description
+- `JIIJI.md` — ❌ table: เปลี่ยน "เปิด Claude Code App" → "Claude Code CLI remote session"; Skills section: เปลี่ยนหัว "Claude Code / Cursor เท่านั้น" → "Claude Code CLI"; ลบคอลัมน์ "ใช้ใน"; เพิ่มบรรทัดชี้แจง "ไม่มีแอปอื่นนอกจาก ai-chat"
+- ถ้าพังให้เช็ก: `PROJECT_STRUCTURE.md` (ตาราง Functions), `JIIJI.md` (Skills section, ❌ table)
+
 ## 2026-06-22 — fix: reasoning_content ไม่ถูกส่งกลับใน multi-turn → OpenRouter 400 + isTransient false-positive
 
 - **สาเหตุ:** DeepSeek V4 Pro thinking mode กำหนดว่าทุก turn ของ assistant ต้องมี `reasoning_content` ส่งกลับมาด้วย — `runAgentLoop` ใน `agentTools.js` push assistant message โดยไม่ใส่ field นี้ → OpenRouter ตอบ `400: The reasoning_content in the thinking mode must be passed back to the API` ตั้งแต่ iteration ที่ 2 เป็นต้นไป ทำให้ทุก multi-turn tool-call พัง
