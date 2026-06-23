@@ -401,7 +401,7 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     };
   }
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const openRouterKey = process.env.OPENROUTER_API_KEY_PRO || process.env.OPENROUTER_API_KEY;
   const ghPat = process.env.GH_PAT || process.env.GITHUB_TOKEN;
 
   if (!openRouterKey) {

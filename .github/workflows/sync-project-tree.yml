@@ -24,10 +24,28 @@ jobs:
         run: node scripts/sync-project-tree.mjs
 
       - name: Commit if changed
+        id: commit
         run: |
-          git diff --quiet docs/PROJECT_STRUCTURE.md && echo "no changes" && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/PROJECT_STRUCTURE.md
-          git commit -m "docs: auto-sync project tree [skip ci]"
-          git push
+          if git diff --quiet docs/PROJECT_STRUCTURE.md; then
+            echo "no changes"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add docs/PROJECT_STRUCTURE.md
+            git commit -m "docs: auto-sync project tree [skip ci]"
+            git push
+            echo "committed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync tree to Firestore
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          DEPLOY_NOTIFY_URL: ${{ secrets.DEPLOY_NOTIFY_URL }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          TREE=$(cat docs/PROJECT_STRUCTURE.md)
+          curl -sf -X POST "$DEPLOY_NOTIFY_URL" \
+            -H "Authorization: Bearer $GH_PAT" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"project_tree\",\"tree\":$(echo "$TREE" | jq -Rs .),\"sha\":\"$GITHUB_SHA\"}" || echo "Firestore sync skipped (non-fatal)"

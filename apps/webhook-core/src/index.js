@@ -454,14 +454,35 @@ exports.deployNotifyHttp = functions
       return;
     }
 
-    const { app, status, workflow, runId, sha } = req.body || {};
+    const { action, app, status, workflow, runId, sha, tree } = req.body || {};
+
+    // action: 'project_tree' — เก็บ tree ล่าสุดใน Firestore (ส่งมาจาก sync-project-tree.yml)
+    if (action === 'project_tree') {
+      if (!tree || typeof tree !== 'string') {
+        res.status(400).json({ error: 'tree required' });
+        return;
+      }
+      try {
+        await db().collection('systemConfig').doc('projectTree').set({
+          tree: tree.slice(0, 50000),
+          sha: sha || '',
+          updatedAt: new Date().toISOString(),
+          syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        res.json({ ok: true, action: 'project_tree' });
+      } catch (err) {
+        console.error('deployNotifyHttp project_tree', err);
+        res.status(500).json({ error: err.message || 'failed' });
+      }
+      return;
+    }
+
     if (!app || !status) {
       res.status(400).json({ error: 'app and status required' });
       return;
     }
 
     try {
-      if (!admin.apps.length) admin.initializeApp();
       await writeDeployStatus(app, status, { workflow, runId, sha });
       res.json({ ok: true });
     } catch (err) {
