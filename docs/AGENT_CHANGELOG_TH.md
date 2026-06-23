@@ -1,3 +1,12 @@
+## 2026-06-23 — refactor: แยก chincha-tea i18n.js ตามภาษา (1,558 → 18 บรรทัด)
+
+- **ที่มา:** ไฟล์ใหญ่สุดในโปรเจกต์ (1,558 บรรทัด) → AI agent อ่านเปลือง token/context; แยกให้อ่านเฉพาะภาษาที่ต้องการได้
+- `apps/chincha-tea/src/lib/i18n.js` — เหลือแค่ import + `export const T = { th, my, en }` + `useLang()` (18 บรรทัด); export `T`/`useLang` คงเดิม import path ที่แอปเรียกไม่เปลี่ยน
+- เพิ่ม `apps/chincha-tea/src/lib/i18n/{th,my,en}.js` — คำแปลแยกตามภาษา
+- **ตรวจสอบความปลอดภัย:** key parity เป๊ะทุกภาษา (th=513, my=522, en=502, ไม่มีหาย/เกิน) + `npm run build --workspace=chincha-tea` ผ่าน + ค่าคำแปลไม่แตะ (ย้ายบรรทัดอย่างเดียว)
+- `docs/PROJECT_STRUCTURE.md` — อัปเดต lib/ listing
+- ถ้าพังให้เช็ก: `i18n.js` (import path `./i18n/th` ฯลฯ + export T/useLang)
+
 ## 2026-06-23 — ci: pr-verify รองรับ ready_for_review (draft → ready แล้ว auto-merge ได้)
 
 - **ที่มา:** PR ที่เปิดเป็น draft แล้วกด "Ready for review" ไม่ทริกเกอร์ pr-verify ใหม่ → job auto_merge ไม่รัน → ต้อง merge มือ
