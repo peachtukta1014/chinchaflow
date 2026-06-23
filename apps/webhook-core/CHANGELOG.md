@@ -7,6 +7,28 @@
 
 ## 2026-06
 
+### 2026-06-23 | dev/ai-docs-cleanup
+**docs+cleanup: อัปเดตเอกสารตาม architecture ใหม่ + ลบไฟล์ตาย**
+- ลบ `src/seafood-notify/notify.js` — LINE Notify API (เลิกบริการ 2025-03-31), ไม่มีใคร import, ไฟล์เดียวที่ใช้ axios
+- `src/aiWorkflowAgent.js` — เอา `notify.js` ออกจาก SCOPE_FILE_TREE
+- `src/aiChatAgent.js` — อัปเดต header doc + system prompt: จาก "สวมหมวกนักพัฒนา process เดียว 60วิ" → "ส่งงานต่อทีม Pro เบื้องหลังบน GitHub Actions"
+- `docs/ARCHITECTURE_TH.md`, `docs/AGENT_HANDBOOK_TH.md` — ตาราง function + AI agent แยก 2 ฝ่าย
+
+### 2026-06-23 | dev/ai-arch-gh-actions-trigger (PR #351)
+**feat: แยก Flash CF ↔ Pro GitHub Actions ผ่าน repository_dispatch (isolation 100%)**
+- `src/aiChatAgent.js` — code-action + quick trigger → `dispatchToProAgent()` ส่ง `repository_dispatch (ai-code-action)` แล้ว return ทันที; เลิก `require('./aiWorkflowAgent')` ใน Flash CF
+- เพิ่ม `.github/workflows/ai-workflow-trigger.yml` — รับ dispatch → รัน Pro loop (`OPENROUTER_API_KEY_PRO` + `GH_PAT`), timeout 30 นาที (ไม่ติด 540s CF)
+- เพิ่ม `scripts/run-github-agent.mjs` — รัน `handleCodeActionV2` ใน GH Actions, เขียนผลกลับ Firestore ผ่าน firebase-admin
+
+### 2026-06-23 | dev/ai-arch-split-keys-project-tree (PR #349)
+**feat: ลด loop limit 30→15, แยก API key Pro/Flash, sync project tree → Firestore**
+- `src/shared/agentTools.js` — `MAX_ITERATIONS` 30→15, `SUMMARY_CHECKPOINT` 15→8 + error message
+- `src/aiWorkflowAgent.js` — ใช้ `OPENROUTER_API_KEY_PRO` (fallback `OPENROUTER_API_KEY`)
+- `src/aiChatAgent.js` — `loadProjectTree()` อ่าน `systemConfig/projectTree` (cache 5 นาที) inject เข้า system prompt
+- `src/index.js` — `deployNotifyHttp` รองรับ `action:'project_tree'` เขียน Firestore
+- `.github/workflows/sync-project-tree.yml` — ส่ง tree ไป Cloud Function หลัง commit
+- `.github/workflows/deploy-functions.yml` — เพิ่ม `OPENROUTER_API_KEY_PRO` ใน .env
+
 ### 2026-06-23 | PR (pending)
 **refactor: แยก agentTools.js → 3 ไฟล์ (webhook-core)**
 - `src/shared/agentTools.js` — orchestrator: stripDsml + callOpenRouterWithTools + runAgentLoop

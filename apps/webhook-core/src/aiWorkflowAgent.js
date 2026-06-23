@@ -287,7 +287,6 @@ const SCOPE_FILE_TREE = {
       'apps/webhook-core/src/seafood-oa/lineUserId.js',
       'apps/webhook-core/src/seafood-oa/verifyLineLiffToken.js',
       'apps/webhook-core/src/seafood-oa/provisionShrimpLiff.js',
-      'apps/webhook-core/src/seafood-notify/notify.js',
       'apps/webhook-core/src/seafood-notify/instantLineNotify.js',
       'apps/webhook-core/src/seafood-notify/shrimpLinePush.js',
       'apps/webhook-core/src/seafood-notify/shrimpBillRender.js',

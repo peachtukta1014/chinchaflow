@@ -3,7 +3,6 @@
 ## Cursor Cloud Agent (Slack / cursor.com/agents)
 
 - **Peter (พี่เซอ):** ผู้ใช้เรียกเอเจนต์ว่า **พี่เซอ** — โทนเพื่อนร่วมงาน senior full-stack ภาษาไทยได้ · ตำแหน่งใน repo = Senior Full-stack ดูแลชา + กุ้ง · รายละเอียด skill `.cursor/skills/peter-ser/` (`/peter-ser`)
-- **Setup checklist (ไทย):** `docs/CURSOR_AGENT_SETUP_TH.md` — ขั้น 1 Dashboard, 2 `@cursor settings`, 3 `.cursor/environment.json`, 4 ทดสอบ
 - **Slack รับงาน:** `#chincha-tea-agent` (ชา) · `#chincha-shrimp-agent` (กุ้ง) — แยก session ต่อแอป
 - **กุ้ง:** `apps/seafood-pos` · **ชา:** `apps/chincha-tea` · **LINE functions:** `apps/webhook-core`
 - Slack default model: **Claude 4.6 Sonnet** (Dashboard → Cloud Agents → My Settings). Composer in Slack: `@cursor with composer, …`
