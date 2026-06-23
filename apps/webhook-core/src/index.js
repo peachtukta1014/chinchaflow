@@ -491,5 +491,57 @@ exports.deployNotifyHttp = functions
     }
   });
 
-// ── AI Chat + Workflow Agent ──────────────────────────────────────────────────
+// ── AI Chat Agent (Flash) ─────────────────────────────────────────────────────
 Object.assign(exports, require('./aiChatAgent'));
+
+// ── AI Workflow Trigger (Pro) — Firestore-triggered, แยก process จาก Flash ───
+// รับ agentTask จาก Flash CF → รัน Pro agentic loop → เขียนผลกลับ Firestore
+// Pro CF เท่านั้นที่รู้จัก OPENROUTER_API_KEY_PRO และ GH_PAT
+const { writeProgress: _wpTrigger, writeResult: _wrTrigger, clearProgress: _cpTrigger } = require('./shared/progressTracker');
+
+exports.aiWorkflowTrigger = functions
+  .region('asia-southeast1')
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .firestore.document('agentTasks/{requestId}')
+  .onCreate(async (snap, context) => {
+    const requestId = context.params.requestId;
+    const task = snap.data() || {};
+
+    if (task.status !== 'pending') return;
+
+    await snap.ref.update({
+      status: 'running',
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    try {
+      const { handleCodeActionV2 } = require('./aiWorkflowAgent');
+      const result = await handleCodeActionV2({
+        message: task.message,
+        history: task.history || [],
+        scope: task.scope || 'root',
+        force: true,
+        requestId,
+        isHighRisk: task.isHighRisk !== false,
+      });
+
+      const prefix = task.confirmation
+        ? `จีจี้เข้าใจแล้วนะคะ: "${task.confirmation}"\n\n`
+        : '';
+      const reply = prefix + (result.body?.reply || '');
+      await _wrTrigger(requestId, { reply, scope: task.scope || 'root' });
+      await snap.ref.update({ status: 'done', completedAt: admin.firestore.FieldValue.serverTimestamp() });
+    } catch (err) {
+      console.error('aiWorkflowTrigger', requestId, err);
+      const errReply =
+        `จีจี้พยายามแก้โค้ดแล้วแต่เกิด error ครับพี่ 🌸\n\n` +
+        `**สาเหตุ:** ${err.message || 'unknown'}\n\n` +
+        `ดู Firebase Functions logs สำหรับรายละเอียด`;
+      await _cpTrigger(requestId);
+      await _wrTrigger(requestId, { reply: errReply, scope: task.scope || 'root' });
+      await snap.ref.update({
+        status: 'error',
+        error: String(err?.message || err).slice(0, 500),
+      });
+    }
+  });

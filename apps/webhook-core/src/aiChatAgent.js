@@ -511,28 +511,31 @@ exports.aiChatAgentHttp = functions
     const quickTrigger = detectQuickTrigger(message);
     if (quickTrigger) {
       const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
-      await writeProgress(requestId, `กำลังตรวจสุขภาพ ${label}...`);
+      const taskId = requestId || `qt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      await writeProgress(taskId, `กำลังส่งงานตรวจสุขภาพ ${label}...`);
       try {
-        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
-        const result = await handleCodeActionV2({
+        await _fsDb().collection('agentTasks').doc(taskId).set({
           message: quickTrigger.task,
-          history: history || [],
+          history: [],
           scope: quickTrigger.scope,
-          force: true,
-          requestId: requestId || null,
           isHighRisk: false,
+          confirmation: '',
+          status: 'pending',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        await clearProgress(requestId);
-        const body = { ...result.body, scope: quickTrigger.scope };
-        await writeResult(requestId, { reply: body.reply, scope: quickTrigger.scope });
-        res.status(result.statusCode || 200).json(body);
-        return;
+        await clearProgress(taskId);
+        res.json({
+          reply: `จีจี้รับงานตรวจสุขภาพ ${label} แล้วนะคะ กำลังดำเนินการอยู่ครับพี่ 🌸`,
+          status: 'processing',
+          requestId: taskId,
+          scope: quickTrigger.scope,
+        });
       } catch (err) {
-        console.error('quick trigger error:', err);
-        await clearProgress(requestId);
-        res.status(500).json({ reply: `❌ ตรวจสอบไม่ได้ครับพี่: ${err.message}`, scope: quickTrigger.scope });
-        return;
+        console.error('quick trigger queue error:', err);
+        await clearProgress(taskId);
+        res.status(500).json({ reply: `❌ ส่งงานไม่ได้ครับพี่: ${err.message}`, scope: quickTrigger.scope });
       }
+      return;
     }
 
     // ── AI Intent Classifier: แปลภาษาชาวบ้านเป็นคำสั่งโปรแกรมเมอร์ ─────────
@@ -551,36 +554,40 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
+      if (!requestId) {
+        await clearProgress(requestId);
+        res.status(400).json({ reply: 'ต้องมี requestId สำหรับ code-action ครับพี่', scope: finalScope });
+        return;
+      }
+
       try {
-        // agentic loop (tool calling) — เส้นทางเดียวสำหรับแก้โค้ด ไม่มี fallback ไประบบอื่นแล้ว (ลบ V1 ทิ้งใน PR #327)
-        const { handleCodeActionV2 } = require('./aiWorkflowAgent');
-        const result = await handleCodeActionV2({
+        // ส่งงานไปให้ Pro CF ผ่าน Firestore — Flash ไม่บล็อกรอ, Pro ทำงานแยก process
+        await _fsDb().collection('agentTasks').doc(requestId).set({
           message: classified.translatedMessage,
-          history: history || [],
+          history: (history || []).slice(-10),
           scope: finalScope,
-          force: true,
-          requestId: requestId || null,
           isHighRisk: classified.isHighRisk !== false,
+          confirmation: classified.confirmation || '',
+          status: 'pending',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         await clearProgress(requestId);
         const prefix = classified.confirmation
           ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';
-        const body = { ...result.body, reply: prefix + (result.body?.reply || ''), scope: finalScope };
-        if (result.statusCode === 200 || !result.statusCode) {
-          await writeResult(requestId, { reply: body.reply, scope: finalScope });
-        }
-        res.status(result.statusCode || 200).json(body);
+        res.json({
+          reply: prefix + 'จีจี้รับงานแล้วนะคะ กำลังดำเนินการอยู่ครับพี่ — ติดตามความคืบหน้าได้เลย 🌸',
+          status: 'processing',
+          requestId,
+          scope: finalScope,
+          intent: 'code-action',
+        });
         return;
       } catch (err) {
-        console.error('aiChatAgentHttp: code-action routing error:', err);
+        console.error('aiChatAgentHttp: failed to queue code-action:', err);
+        await clearProgress(requestId);
         res.status(500).json({
-          reply: `จีจี้พยายามแก้โค้ดแล้วแต่เกิด error ครับพี่ 🌸\n\n` +
-            `**สาเหตุ:** ${err.message || 'unknown'}\n\n` +
-            `**ตรวจสอบ:**\n` +
-            `• GH_PAT ตั้งค่าใน GitHub Secrets แล้วหรือยัง?\n` +
-            `• OPENROUTER_API_KEY ยังใช้งานได้อยู่ไหม?\n` +
-            `• ดู Firebase Functions logs ที่ Google Cloud Console`,
+          reply: `จีจี้ส่งงานไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}`,
           scope: finalScope,
           intent: 'code-action',
           status: 'error',
