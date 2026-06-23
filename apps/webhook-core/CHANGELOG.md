@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-23 | dev/ai-chat-flash-code-pro
+**feat: แชทตอบ → flash, loop เขียนโค้ด → pro (คงเดิม); checkpoint สรุปรอบ 15; MAX_ITERATIONS 15→30**
+- `src/aiChatAgent.js` — `pickModel`: non-vision → FLASH_MODEL (v4-flash) แทน PRO_MODEL; อัปเดต comment ให้ชัดว่า flash=แชทตอบพีช, pro=loop เขียนโค้ดใน agentTools.js เท่านั้น
+- `src/shared/agentTools.js` — `runAgentLoop`: เพิ่ม SUMMARY_CHECKPOINT=15 (inject user message ขอสรุปก่อนรอบ 15, ไม่ force tool รอบนั้น, รีเซ็ต consecutiveTextOnlyReplies); เพิ่ม MAX_ITERATIONS 15→30 รองรับงานซับซ้อน
+
 ### 2026-06-23 | dev/ai-model-consolidation
 **refactor: รวมโมเดลแชท+เขียนโค้ดเป็น deepseek-v4-pro ตัวเดียว + harden reasoning_content**
 - `src/aiChatAgent.js` — `pickModel`: เลิกแยก flash/pro ตามคีย์เวิร์ด → แชทที่ตอบพีชใช้ v4-pro หมด (รูปยังเป็น gpt-4o-mini); ลบฟังก์ชัน `isCodeRelated` ที่ไม่ถูกใช้แล้ว; `classifyAndTranslate` ยังคงใช้ flash (ตัวจัดเส้นทางเบื้องหลัง ยิงทุกข้อความ ต้องเร็ว)
