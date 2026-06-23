@@ -37,6 +37,7 @@ chinchaflow/
 │   └── environment.json
 ├── .github
 │   └── workflows
+│       ├── ai-workflow-trigger.yml
 │       ├── code-metrics.yml
 │       ├── deploy-functions.yml
 │       ├── deploy-hosting.yml
