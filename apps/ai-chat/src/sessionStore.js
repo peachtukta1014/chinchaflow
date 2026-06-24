@@ -19,11 +19,15 @@ export function listSessions() {
   return loadAll();
 }
 
-export function createSession({ firstMessage, scope }) {
+// 🔥 เอาตัวแปร scope ออกจากฟังก์ชันสร้างแชทใหม่
+export function createSession({ firstMessage }) {
   const id = 'ses_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const title = (firstMessage || 'แชทใหม่').slice(0, 40) + ((firstMessage || '').length > 40 ? '...' : '');
   const now = Date.now();
-  const session = { id, title, scope, createdAt: now, updatedAt: now, messages: [] };
+  
+  // ลบฟิลด์ scope ออกจากตัวโครงสร้างวัตถุ (Session Object)
+  const session = { id, title, createdAt: now, updatedAt: now, messages: [] };
+  
   let all = loadAll();
   all.unshift(session);
   if (all.length > MAX_SESSIONS) all = all.slice(0, MAX_SESSIONS);
@@ -31,13 +35,17 @@ export function createSession({ firstMessage, scope }) {
   return id;
 }
 
-export function updateSession(id, messages, scope) {
+// 🔥 เอาตัวแปร scope ออกจากฟังก์ชันอัปเดตแชท
+export function updateSession(id, messages) {
   const all = loadAll();
   const idx = all.findIndex(s => s.id === id);
   if (idx === -1) return;
+  
   // ไม่เก็บ imageUrls (ประหยัด storage)
   const stored = messages.map(m => ({ role: m.role, content: m.content }));
-  const updated = { ...all[idx], messages: stored, scope, updatedAt: Date.now() };
+  
+  // อัปเดตแค่ข้อความและเวลาล่าสุด ไม่ต้องเซฟเรื่องกลุ่มแล้ว
+  const updated = { ...all[idx], messages: stored, updatedAt: Date.now() };
   all.splice(idx, 1);
   all.unshift(updated);
   saveAll(all);
