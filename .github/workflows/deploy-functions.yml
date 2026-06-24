@@ -92,11 +92,12 @@ jobs:
             echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
             echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
             echo "LINE_LOGIN_CHANNEL_ID=${{ secrets.LINE_LOGIN_CHANNEL_ID }}"
+            echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
           } > apps/webhook-core/.env
           # หมายเหตุ isolation:
           #   GH_PAT          → Secret Manager (mount เฉพาะ deployNotifyHttp)
           #   GH_PAT_DISPATCH → Secret Manager (mount เฉพาะ aiChatAgentHttp/Flash — dispatch only)
-          #   OPENROUTER_API_KEY → Secret Manager (Flash); OPENROUTER_API_KEY_PRO → GitHub Actions (Pro) เท่านั้น
+          #   OPENROUTER_API_KEY → .env (Flash); OPENROUTER_API_KEY_PRO → GitHub Actions (Pro) เท่านั้น
 
       - name: Deploy all LINE functions
         run: |
