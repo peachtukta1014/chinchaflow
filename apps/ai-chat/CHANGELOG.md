@@ -7,6 +7,25 @@
 
 ## 2026-06
 
+
+## 2026-06-24 | Peach
+
+refactor: ถอดระบบแยกกลุ่ม (Scope Picker) ออกจากหน้าบ้าน สู่ Decoupled Architecture + ปรับปรุงอวตาร์ผู้ใช้
+
+- src/App.jsx
+  - [ลบออก] ปุ่ม UI เลือกกลุ่ม Agent (Scope Dropdown Picker) บน Header ขวา
+  - [ลบออก] สเตทควบคุมกลุ่ม `agentScope`, `showAgentPicker` และอาเรย์ตัวเลือกกลุ่ม `AGENT_OPTIONS`
+  - [ลบออก] ฟังก์ชันการทำงานฝั่งตรวจจับคำดักกลุ่มอัตโนมัติ `detectScope(text)`
+  - [ปรับปรุง] ระบบจัดเก็บสเตตัส Session แชท โดยถอดการผูกตัวแปรสโคป และลบป้าย Tag กลุ่มในแถบประวัติแชทออกทั้งหมด
+  - [แก้ไข] ปรับเปลี่ยน CSS รูปอวตาร์ผู้ใช้ (`peach-avatar.jpg`) จาก `object-top` → `object-[center_28%]` เพื่อขยับมุมกล้องมาโฟกัสเจาะจงใบหน้าพี่พีชให้กึ่งกลางวงกลมแชทพอดี ไม่หลุดเฟรมไปหลังคาปราสาทหรือพุงเสื้อดำ
+- src/api.js
+  - [ปรับปรุง] ถอดพารามิเตอร์ `scope` ออกจากออบเจกต์คำขอในฟังก์ชัน `chatWithAI` และออบเจกต์ซิงค์ข้อมูล `fetchResult`
+  - [Decoupled] ผลักภาระหน้าที่การวิเคราะห์เจตนา (Intent Classification) และการจัดสรรขอบเขตแอปพลิเคชัน (ร้านชา/ร้านกุ้ง/งานระบบ) ไปให้ตัว Cloud Function ฝั่ง Backend จัดการแต่เพียงผู้เดียว 100% ช่วยให้โค้ดหน้าบ้านคลีนและเบาขึ้น
+- PWA & Build Config Verification
+  - ตรวจสอบและยืนยันความพร้อมของไฟล์ `manifest.json`, `index.html`, `tailwind.config.js` และ `vite.config.js` ให้ทำงานสอดประสานรองรับสถาปัตยกรรมแอปพลิเคชันรูปแบบใหม่แบบไร้รอยต่อ
+
+
+
 ### 2026-06-21 | PR #317
 **feat: ปุ่ม Refresh + เลขเวอร์ชัน ai-DDMMYY.N (auto-bump ทุก deploy)**
 - `src/App.jsx` — เพิ่ม `IconRefresh` SVG + ปุ่ม 🔄 ขวาสุด header (`window.location.reload()`)
