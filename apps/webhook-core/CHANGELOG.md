@@ -8,6 +8,14 @@
 ## 2026-06
 
 ### 2026-06-24 | claude/new-session-358ebr
+**security: แยก GH_PAT_DISPATCH (dispatch-only) + lock GH_PAT ออกจาก Flash (PR-B)**
+- `aiChatAgent.js` — runWith secrets เพิ่ม `GH_PAT_DISPATCH`; dispatch ใช้ `process.env.GH_PAT_DISPATCH` แทน `GH_PAT`
+- `index.js` — `deployNotifyHttp` เพิ่ม `runWith({ secrets: ['GH_PAT'] })` (auth จาก Secret Manager)
+- `deploy-functions.yml` — ลบ `GH_PAT` + `OPENROUTER_API_KEY_PRO` ออกจาก `.env` ร่วม
+- ผล: Flash มีแค่ OPENROUTER_API_KEY + GH_PAT_DISPATCH (dispatch only) — ไม่มี repo write
+- **ต้องเพิ่มใน Secret Manager:** `GH_PAT` (ค่าเดียวกับ GitHub Secret) ไม่งั้น deploy ล้ม
+
+### 2026-06-24 | claude/new-session-358ebr
 **security: Flash เลิกอ่าน GitHub ตรงๆ — อ่าน docs จาก Firestore (PR-A)**
 - `aiChatAgent.js` — `loadAgentDocs()` อ่าน `systemConfig/agentDocs`; `fetchCodeMetrics/fetchJiijiDef/fetchChatAgentDocs` เลิกยิง GitHub API (ไม่รับ ghPat)
 - `index.js` — `deployNotifyHttp` รับ action `agent_docs` เก็บ docs map ใน Firestore

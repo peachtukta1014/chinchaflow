@@ -441,6 +441,7 @@ const { writeDeployStatus } = require('./deployNotify');
 
 exports.deployNotifyHttp = functions
   .region('asia-southeast1')
+  .runWith({ secrets: ['GH_PAT'] })   // auth: ตรวจ Bearer GH_PAT จาก Secret Manager (ไม่อยู่ใน .env แล้ว)
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');

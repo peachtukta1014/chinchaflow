@@ -1,3 +1,14 @@
+## 2026-06-24 — security: แยก GH_PAT_DISPATCH (dispatch-only) + lock GH_PAT ออกจาก Flash (PR-B)
+
+- **ที่มา:** Flash CF เคยมี `GH_PAT` เต็ม (read/write repo) + `OPENROUTER_API_KEY_PRO` ใน `.env` ร่วม — ถ้า Flash หลุด attacker เขียน repo ได้. ต้องการให้ Flash มีแค่ token ที่ dispatch ได้อย่างเดียว
+- **แก้ (per-function Secret Manager):**
+  - `aiChatAgent.js` — `aiChatAgentHttp` runWith secrets เพิ่ม `GH_PAT_DISPATCH`; dispatch (quick-trigger + code-action) ใช้ `process.env.GH_PAT_DISPATCH` แทน `GH_PAT`
+  - `index.js` — `deployNotifyHttp` เพิ่ม `runWith({ secrets: ['GH_PAT'] })` (mount เฉพาะฟังก์ชันนี้สำหรับ auth)
+  - `deploy-functions.yml` — ลบ `GH_PAT` + `OPENROUTER_API_KEY_PRO` ออกจาก `.env` ร่วม (ไม่ global แล้ว)
+- **ผลลัพธ์ isolation จริง:** Flash มีแค่ `OPENROUTER_API_KEY` + `GH_PAT_DISPATCH` (dispatch only); ไม่มี `GH_PAT` เต็ม, ไม่มี `OPENROUTER_API_KEY_PRO`. deployNotifyHttp มี `GH_PAT` ของตัวเอง. Pro (`GH_PAT` + `OPENROUTER_API_KEY_PRO`) อยู่ GitHub Actions เท่านั้น
+- **ต้องมีใน Google Cloud Secret Manager (chincha-eeed6):** `OPENROUTER_API_KEY`, `GH_PAT_DISPATCH` (ใหม่), **`GH_PAT` (ใหม่ — ต้องเพิ่ม ค่าเดียวกับ GitHub Secret)** — ไม่งั้น deploy functions ล้มเหลว (mount secret ไม่เจอ)
+- ถ้าพังให้เช็ก: secret ครบ 3 ตัวใน Secret Manager · service account มีสิทธิ์ secretAccessor · GH_PAT_DISPATCH เป็น fine-grained PAT (Contents: R/W, repo เดียว)
+
 ## 2026-06-24 — security: Flash เลิกอ่าน GitHub ตรงๆ — ย้าย docs ไป Firestore (PR-A)
 
 - **ที่มา:** Flash CF (`aiChatAgent.js`) ใช้ `GH_PAT` อ่านไฟล์จาก GitHub ตรงๆ 5 ไฟล์ (JIIJI.md, AGENTS.md, CODE_METRICS.md, PEACH_WORKING_STYLE, AGENT_HANDBOOK) — ขัดหลัก isolation (Flash ไม่ควรแตะ repo). พีชต้องการให้ Flash รับรู้โครงสร้าง/กฎจาก Firestore เท่านั้น
