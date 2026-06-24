@@ -1,26 +1,29 @@
 // ── AI Chat API — เรียกผ่าน Cloud Function (ไม่เรียก OpenRouter โดยตรง) ─────
-// หน้าที่: ป้องกัน API Key รั่วไหล, จัดการ system prompt + scope ที่ backend
+// หน้าที่: ป้องกัน API Key รั่วไหล, จัดการ system prompt ที่ backend โดยตัดระบบ scope ออก
 
 export const CHAT_FUNCTION_URL = import.meta.env.VITE_AI_CHAT_FUNCTION_URL
   || 'https://asia-southeast1-chincha-eeed6.cloudfunctions.net/aiChatAgentHttp';
 
 /**
  * ดึงผลลัพธ์สุดท้ายจาก Firestore (ใช้เมื่อ client กลับมา foreground)
- * @param {string} requestId
- * @returns {Promise<{reply: string, scope: string}|null>}
+ * @param {string} requestId - ไอดีอ้างอิงชุดคำสั่งเพื่อดึงข้อมูลข้าม session ค้างเดิม
+ * @returns {Promise<{reply: string}|null>} คืนค่าเฉพาะข้อความตอบกลับที่แมตช์สำเร็จ
  */
 export async function fetchResult(requestId) {
   try {
     const res = await fetch(`${CHAT_FUNCTION_URL}?action=result&requestId=${encodeURIComponent(requestId)}`);
     if (!res.ok) return null;
     const data = await res.json();
-    return data.found ? { reply: data.reply, scope: data.scope } : null;
-  } catch { return null; }
+    return data.found ? { reply: data.reply } : null;
+  } catch (err) {
+    console.error('fetchResult recovery error:', err);
+    return null;
+  }
 }
 
 /**
  * ดึงสถานะ progress ของ request ที่กำลังรัน
- * @param {string} requestId
+ * @param {string} requestId - ไอดีอ้างอิงสเตตัสการทำงานปัจจุบันของ Agent Backend
  * @returns {Promise<{step: string|null, ts: number|null}>}
  */
 export async function pollProgress(requestId) {
@@ -28,7 +31,8 @@ export async function pollProgress(requestId) {
     const res = await fetch(`${CHAT_FUNCTION_URL}?action=progress&requestId=${encodeURIComponent(requestId)}`);
     if (!res.ok) return { step: null, ts: null };
     return await res.json();
-  } catch {
+  } catch (err) {
+    console.error('pollProgress network error:', err);
     return { step: null, ts: null };
   }
 }
@@ -42,28 +46,35 @@ export async function fetchDeployStatus() {
     const res = await fetch(`${CHAT_FUNCTION_URL}?action=deploy_status`);
     if (!res.ok) return null;
     return await res.json();
-  } catch { return null; }
+  } catch (err) {
+    console.error('fetchDeployStatus communication error:', err);
+    return null;
+  }
 }
 
 /**
- * ส่งข้อความ (+ รูปภาพถ้ามี) ไปให้ AI แล้วรับคำตอบกลับ
+ * ส่งข้อความ (+ รูปภาพถ้ามี) ไปให้ AI แล้วรับคำตอบกลับโดยตรงแบบ Decoupled Scope
  * @param {object} opts
- * @param {string} opts.message     - ข้อความผู้ใช้
- * @param {Array}  opts.history     - [{role, content}] ประวัติแชท
- * @param {string} opts.scope       - 'root'|'tea'|'seafood'|'webhook'|'scheduled'
- * @param {string} [opts.requestId] - ID สำหรับ poll progress
- * @param {string} [opts.imageBase64] - base64 string (ไม่รวม data: prefix)
- * @returns {Promise<{reply: string, scope: string, intent?: string, status?: string, prUrl?: string, branchName?: string}>}
+ * @param {string} opts.message       - ข้อความคำสั่งหรือข้อความแนบเนื้อหาไฟล์ดิบจากผู้ใช้
+ * @param {Array}  opts.history       - [{role, content}] ประวัติแชทย้อนหลังสูงสุด 10 ลำดับล่าสุด
+ * @param {string} [opts.requestId]   - Unique UUID สำหรับผูกสเตตัส Polling และระบบ Recovery Backstage
+ * @param {Array}  [opts.images]      - อาร์เรย์ของสตริง Base64 ของรูปภาพเพื่อประมวลผล Multi-modal
+ * @param {string} [opts.imageBase64] - Fallback บัฟเฟอร์สตริงรูปภาพเดี่ยว
+ * @returns {Promise<{reply: string, intent?: string, status?: string, prUrl?: string, branchName?: string}>}
  */
-export async function chatWithAI({ message, history = [], scope = 'root', images = null, imageBase64 = null, requestId = null }) {
+export async function chatWithAI({ message, history = [], images = null, imageBase64 = null, requestId = null }) {
   try {
-    const body = { message, history, scope };
+    // ปรับโครงสร้างข้อมูล Payload หลักโดยนำฟิลด์ scope ออกทั้งหมดเพื่อผลักภาระการคำนวณบริบทไปไว้ที่ Backend 
+    const body = { message, history };
+    
     if (requestId) body.requestId = requestId;
+    
     if (images && images.length > 0) {
       body.images = images;
     } else if (imageBase64) {
       body.imageBase64 = imageBase64;
     }
+
     const res = await fetch(CHAT_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -74,24 +85,23 @@ export async function chatWithAI({ message, history = [], scope = 'root', images
       const err = await res.json().catch(() => ({}));
       return {
         reply: `Error (${res.status}): ${err?.error || 'ไม่สามารถติดต่อ AI Server ได้'}`,
-        scope,
       };
     }
 
     const data = await res.json();
+    
+    // ส่งคืนเฉพาะออบเจกต์ผลลัพธ์และโครงสร้างทางวิศวกรรมการทำงาน (Git/CI/CD Execution) 
     return {
       reply: data.reply || 'ไม่ได้รับคำตอบจาก AI',
-      scope: data.scope || scope,
       intent: data.intent || 'chat',
       status: data.status,
       prUrl: data.prUrl,
       branchName: data.branchName,
     };
   } catch (err) {
-    console.error('chatWithAI fetch error:', err);
+    console.error('chatWithAI fetch network breakdown:', err);
     return {
       reply: 'ไม่สามารถเชื่อมต่อกับ AI Server — เช็คอินเทอร์เน็ตหรือลองใหม่ภายหลัง',
-      scope,
     };
   }
 }
