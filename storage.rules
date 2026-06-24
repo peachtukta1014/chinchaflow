@@ -44,6 +44,14 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // รูปรายการประจำร้าน (chincha-tea restock catalog) — แอดมินอัปโหลดผ่าน RestockForm
+    match /catalogImages/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
