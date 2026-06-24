@@ -1,9 +1,10 @@
-# อัปเดต tree overview ใน docs/PROJECT_STRUCTURE.md อัตโนมัติทุก push main
+# อัปเดต tree overview ใน docs/PROJECT_STRUCTURE.md + sync docs ให้ Flash อ่าน (Firestore)
 name: Sync Project Tree
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -49,3 +50,29 @@ jobs:
             -H "Authorization: Bearer $GH_PAT" \
             -H "Content-Type: application/json" \
             -d "{\"action\":\"project_tree\",\"tree\":$(echo "$TREE" | jq -Rs .),\"sha\":\"$GITHUB_SHA\"}" || echo "Firestore sync skipped (non-fatal)"
+
+      # sync docs (กฎ/persona/metrics) ให้ Flash อ่านจาก Firestore แทน GitHub — รันทุกครั้ง
+      - name: Sync agent docs to Firestore
+        if: always()
+        env:
+          DEPLOY_NOTIFY_URL: ${{ secrets.DEPLOY_NOTIFY_URL }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg sha "$GITHUB_SHA" \
+            --arg jiiji    "$(cat JIIJI.md 2>/dev/null || true)" \
+            --arg agents   "$(cat AGENTS.md 2>/dev/null || true)" \
+            --arg metrics  "$(cat docs/CODE_METRICS.md 2>/dev/null || true)" \
+            --arg style    "$(cat docs/PEACH_WORKING_STYLE_TH.md 2>/dev/null || true)" \
+            --arg handbook "$(cat docs/AGENT_HANDBOOK_TH.md 2>/dev/null || true)" \
+            '{action:"agent_docs", sha:$sha, files:{
+              "JIIJI.md":$jiiji,
+              "AGENTS.md":$agents,
+              "docs/CODE_METRICS.md":$metrics,
+              "docs/PEACH_WORKING_STYLE_TH.md":$style,
+              "docs/AGENT_HANDBOOK_TH.md":$handbook
+            }}')
+          curl -sf -X POST "$DEPLOY_NOTIFY_URL" \
+            -H "Authorization: Bearer $GH_PAT" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "agent_docs sync skipped (non-fatal)"

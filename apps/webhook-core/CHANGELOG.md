@@ -7,6 +7,13 @@
 
 ## 2026-06
 
+### 2026-06-24 | claude/new-session-358ebr
+**security: Flash เลิกอ่าน GitHub ตรงๆ — อ่าน docs จาก Firestore (PR-A)**
+- `aiChatAgent.js` — `loadAgentDocs()` อ่าน `systemConfig/agentDocs`; `fetchCodeMetrics/fetchJiijiDef/fetchChatAgentDocs` เลิกยิง GitHub API (ไม่รับ ghPat)
+- `index.js` — `deployNotifyHttp` รับ action `agent_docs` เก็บ docs map ใน Firestore
+- `.github/workflows/sync-project-tree.yml` — เพิ่ม workflow_dispatch + step sync 5 ไฟล์เข้า Firestore
+- ผล: Flash ไม่ใช้ GH_PAT อ่าน repo อีก (เหลือแค่ dispatch); หลัง deploy ต้อง trigger sync workflow 1 ครั้ง populate agentDocs
+
 ### 2026-06-23 | claude/new-session-358ebr
 **feat: Flash CF อ่าน `OPENROUTER_API_KEY` จาก Google Cloud Secret Manager**
 - `src/aiChatAgent.js` — `aiChatAgentHttp` เพิ่ม `secrets: ['OPENROUTER_API_KEY']` ใน `runWith` → Firebase mount key จาก Secret Manager ตอน runtime

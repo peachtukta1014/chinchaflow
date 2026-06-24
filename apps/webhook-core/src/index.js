@@ -477,6 +477,33 @@ exports.deployNotifyHttp = functions
       return;
     }
 
+    // action: 'agent_docs' — เก็บ docs (กฎ/persona/metrics) ใน Firestore ให้ Flash อ่าน
+    // ส่งมาจาก sync-project-tree.yml → Flash ไม่ต้องอ่าน GitHub เอง (ไม่ต้องมีสิทธิ์ repo)
+    if (action === 'agent_docs') {
+      const docFiles = (req.body || {}).files;
+      if (!docFiles || typeof docFiles !== 'object') {
+        res.status(400).json({ error: 'files required' });
+        return;
+      }
+      try {
+        const trimmed = {};
+        for (const [k, v] of Object.entries(docFiles)) {
+          if (typeof v === 'string' && v) trimmed[k] = v.slice(0, 20000);
+        }
+        await db().collection('systemConfig').doc('agentDocs').set({
+          files: trimmed,
+          sha: sha || '',
+          updatedAt: new Date().toISOString(),
+          syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        res.json({ ok: true, action: 'agent_docs', count: Object.keys(trimmed).length });
+      } catch (err) {
+        console.error('deployNotifyHttp agent_docs', err);
+        res.status(500).json({ error: err.message || 'failed' });
+      }
+      return;
+    }
+
     if (!app || !status) {
       res.status(400).json({ error: 'app and status required' });
       return;
