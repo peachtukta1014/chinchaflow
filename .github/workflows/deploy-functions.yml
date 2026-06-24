@@ -96,7 +96,6 @@ jobs:
             echo "GH_PAT_DISPATCH=${{ secrets.GH_PAT_DISPATCH }}"
             echo "GH_PAT=${{ secrets.GH_PAT }}"
           } > apps/webhook-core/.env
-          # OPENROUTER_API_KEY_PRO → GitHub Actions (Pro) เท่านั้น — ไม่อยู่ใน .env นี้
 
       - name: Deploy all LINE functions
         run: |
@@ -132,6 +131,56 @@ jobs:
             -H "Authorization: Bearer $GH_PAT" \
             -H "Content-Type: application/json" \
             -d "{\"app\":\"functions\",\"status\":\"$STATUS\",\"workflow\":\"deploy-functions\",\"runId\":\"$GITHUB_RUN_ID\",\"sha\":\"$GITHUB_SHA\"}" || true
+
+      # =========================================================================
+      # 🔥 สเตปใหม่: ซิงค์คู่มือและสมอง AI (เวอร์ชันอัปเกรดคำสั่งภาษาไทย ดัก Error จริง)
+      # =========================================================================
+      - name: Sync Agent Docs to Brain (ภาษาไทย)
+        if: job.status == 'success'
+        env:
+          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          echo "📢 [1/3] กำลังเตรียมอ่านไฟล์คู่มือภาษาไทยและข้อมูลระบบ..."
+          
+          PAYLOAD=$(jq -n \
+            --arg sha "$GITHUB_SHA" \
+            --arg jiiji    "$(cat JIIJI.md 2>/dev/null || true)" \
+            --arg agents   "$(cat AGENTS.md 2>/dev/null || true)" \
+            --arg metrics  "$(cat docs/CODE_METRICS.md 2>/dev/null || true)" \
+            --arg style    "$(cat docs/PEACH_WORKING_STYLE_TH.md 2>/dev/null || true)" \
+            --arg handbook "$(cat docs/AGENT_HANDBOOK_TH.md 2>/dev/null || true)" \
+            '{action:"agent_docs", sha:$sha, files:{
+              "JIIJI.md":$jiiji,
+              "AGENTS.md":$agents,
+              "docs/CODE_METRICS.md":$metrics,
+              "docs/PEACH_WORKING_STYLE_TH.md":$style,
+              "docs/AGENT_HANDBOOK_TH.md":$handbook
+            }}')
+
+          echo "🚀 [2/3] กำลังยิงส่งข้อมูลขึ้น Cloud Functions เพื่ออัปเดตความทรงจำ AI..."
+          
+          # ใช้ -i เพื่อดู Response Header และเอา -sf ออกเพื่อไม่ให้ซ่อน Error
+          # ผลลัพธ์การตอบกลับจะถูกเซฟลงไฟล์ /tmp/docs_response
+          HTTP_STATUS=$(curl -i -X POST "$DEPLOY_NOTIFY_URL" \
+            -H "Authorization: Bearer $GH_PAT" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -s -w "%{http_code}" -o /tmp/docs_response)
+
+          echo "--------------------------------------------------"
+          echo "📥 [3/3] รายละเอียดการตอบกลับจากเซิร์ฟเวอร์ (HTTP Status: $HTTP_STATUS):"
+          echo "--------------------------------------------------"
+          cat /tmp/docs_response
+          echo -e "\n--------------------------------------------------"
+
+          # ตรวจสอบสเตตัส ถ้าไม่ใช่ 200 ให้สั่งท่อพังทันที (Exit 1)
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ [FAIL] ซิงค์ไฟล์คู่มือภาษาไทยเข้าสมอง AI ไม่สำเร็จ! กรุณาเช็กสิทธิ์คีย์หรือโค้ดหลังบ้าน"
+            exit 1
+          fi
+          
+          echo "✅ [SUCCESS] ซิงค์คู่มือและสไตล์การทำงานของพี่พีชขึ้นสมอง AI เรียบร้อยแล้ว!"
 
       - name: Wait and verify webhooks (must return 200 ok)
         continue-on-error: true
