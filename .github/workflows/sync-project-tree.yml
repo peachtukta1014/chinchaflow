@@ -40,7 +40,7 @@ jobs:
           fi
 
       - name: Sync tree to Firestore
-        if: steps.commit.outputs.committed == 'true'
+        if: always()
         env:
           DEPLOY_NOTIFY_URL: ${{ secrets.DEPLOY_NOTIFY_URL }}
           GH_PAT: ${{ secrets.GH_PAT }}
