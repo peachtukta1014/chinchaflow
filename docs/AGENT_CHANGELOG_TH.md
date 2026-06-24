@@ -1,3 +1,14 @@
+## 2026-06-24 — security: Flash เลิกอ่าน GitHub ตรงๆ — ย้าย docs ไป Firestore (PR-A)
+
+- **ที่มา:** Flash CF (`aiChatAgent.js`) ใช้ `GH_PAT` อ่านไฟล์จาก GitHub ตรงๆ 5 ไฟล์ (JIIJI.md, AGENTS.md, CODE_METRICS.md, PEACH_WORKING_STYLE, AGENT_HANDBOOK) — ขัดหลัก isolation (Flash ไม่ควรแตะ repo). พีชต้องการให้ Flash รับรู้โครงสร้าง/กฎจาก Firestore เท่านั้น
+- **แก้:**
+  - `aiChatAgent.js` — เพิ่ม `loadAgentDocs()` อ่าน `systemConfig/agentDocs` จาก Firestore; `fetchCodeMetrics/fetchJiijiDef/fetchChatAgentDocs` เลิกยิง GitHub API (เลิกรับ `ghPat`) — อ่านจาก Firestore แทน
+  - `index.js` — `deployNotifyHttp` รับ action ใหม่ `agent_docs` → เก็บ `systemConfig/agentDocs` (map ของ path→content, จำกัด 20k/ไฟล์)
+  - `sync-project-tree.yml` — เพิ่ม `workflow_dispatch` + step "Sync agent docs to Firestore" (POST 5 ไฟล์ทุก push main)
+- **ผล:** Flash อ่านทั้ง project tree + docs จาก Firestore แล้ว — ไม่ใช้ GH_PAT อ่าน repo อีก (เหลือใช้แค่ dispatch → PR-B จะแยกเป็น dispatch-only PAT)
+- **หลัง deploy ต้องทำ:** trigger "Sync Project Tree" (workflow_dispatch) 1 ครั้งเพื่อ populate `systemConfig/agentDocs` (ไม่งั้น Flash ได้ context ว่างชั่วคราว — graceful fallback ไม่ error)
+- ถ้าพังให้เช็ก: `systemConfig/agentDocs` มี data ไหม · DEPLOY_NOTIFY_URL/GH_PAT auth · loadAgentDocs catch
+
 ## 2026-06-24 — fix: อัปโหลดรูปรายการประจำร้าน (chincha-tea) ไม่สำเร็จ — เพิ่ม storage rule
 
 - **อาการ:** ใส่รูปให้รายการประจำร้านใน RestockForm แล้วขึ้น "อัปโหลดไม่สำเร็จ" ทุกครั้ง แม้รูปเล็ก

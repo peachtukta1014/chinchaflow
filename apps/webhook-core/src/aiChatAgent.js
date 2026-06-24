@@ -38,9 +38,7 @@ const VISION_MODEL = 'openai/gpt-4o-mini';           // มีรูปแนบ
 const GH_API  = 'https://api.github.com';
 const GH_REPO = 'peachtukta1014/chinchaflow';
 
-// ── Cache สำหรับ project docs (TTL 10 นาที) ──────────────────────────────
-let _docsCache = null;
-let _docsCacheTime = 0;
+// ── TTL สำหรับ docs cache (10 นาที) ──────────────────────────────────────
 const DOCS_TTL_MS = 10 * 60 * 1000;
 
 // ── Cache สำหรับ project tree จาก Firestore (TTL 5 นาที) ─────────────────
@@ -64,6 +62,23 @@ async function loadProjectTree() {
     _projectTreeCachedAt = now;
   } catch { /* ใช้ cache เก่าถ้า Firestore ไม่ตอบ */ }
   return _projectTreeCache || '';
+}
+
+// ── Cache สำหรับ agent docs จาก Firestore (TTL 10 นาที) ───────────────────
+// Flash อ่านกฎ/persona/metrics จาก Firestore (systemConfig/agentDocs) แทน GitHub
+// → Flash ไม่ต้องมีสิทธิ์อ่าน repo เลย (sync มาจาก sync-project-tree.yml)
+let _agentDocsCache = null;
+let _agentDocsCachedAt = 0;
+
+async function loadAgentDocs() {
+  const now = Date.now();
+  if (_agentDocsCache && now - _agentDocsCachedAt < DOCS_TTL_MS) return _agentDocsCache;
+  try {
+    const snap = await _fsDb().collection('systemConfig').doc('agentDocs').get();
+    _agentDocsCache = snap.data()?.files || {};
+    _agentDocsCachedAt = now;
+  } catch { /* ใช้ cache เก่าถ้า Firestore ไม่ตอบ */ }
+  return _agentDocsCache || {};
 }
 
 // ── ส่ง repository_dispatch ไปให้ Pro GitHub Actions รัน agentic loop ──────
@@ -133,20 +148,10 @@ function isCodeMetricsQuery(text) {
   return /(นับบรรทัด|กี่บรรทัด|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน|code\s*metric)/.test(t);
 }
 
-// ── อ่าน CODE_METRICS.md จาก GitHub ───────────────────────────────────────
-async function fetchCodeMetrics(ghPat) {
-  try {
-    const res = await fetch(`${GH_API}/repos/${GH_REPO}/contents/docs/CODE_METRICS.md?ref=main`, {
-      headers: {
-        'Authorization': `token ${ghPat}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'CF-AI',
-      },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Buffer.from(data.content, 'base64').toString('utf-8');
-  } catch { return null; }
+// ── อ่าน CODE_METRICS.md จาก Firestore (sync มาจาก repo) ───────────────────
+async function fetchCodeMetrics() {
+  const files = await loadAgentDocs();
+  return files['docs/CODE_METRICS.md'] || null;
 }
 
 // ── Scope detection from user message ────────────────────────────────────
@@ -333,57 +338,27 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
   return data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
 }
 
-// ── โหลด JIIJI.md — ตัวตนและ skills ของจีจี้ (cache เดียวกัน) ───────────
-let _jiijiCache = null;
-let _jiijiCacheTime = 0;
-
-async function fetchJiijiDef(ghPat) {
-  const now = Date.now();
-  if (_jiijiCache && (now - _jiijiCacheTime) < DOCS_TTL_MS) return _jiijiCache;
-  try {
-    const res = await fetch(`${GH_API}/repos/${GH_REPO}/contents/JIIJI.md?ref=main`, {
-      headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'CF-AI' },
-    });
-    if (!res.ok) return '';
-    const data = await res.json();
-    const content = Buffer.from(data.content, 'base64').toString('utf-8');
-    _jiijiCache = content.slice(0, 3500);
-    _jiijiCacheTime = now;
-    return _jiijiCache;
-  } catch { return ''; }
+// ── โหลด JIIJI.md — ตัวตนและ skills ของจีจี้ (จาก Firestore) ───────────
+async function fetchJiijiDef() {
+  const files = await loadAgentDocs();
+  return (files['JIIJI.md'] || '').slice(0, 3500);
 }
 
-// ── โหลด project rules + Peach's style จาก GitHub (cache 10 นาที) ─────────
-// อ่านทุก session แรก จากนั้น cache ไว้ไม่ต้องยิง GitHub ทุกข้อความ
-async function fetchChatAgentDocs(ghPat) {
-  const now = Date.now();
-  if (_docsCache && (now - _docsCacheTime) < DOCS_TTL_MS) return _docsCache;
-
-  const files = [
+// ── โหลด project rules + Peach's style จาก Firestore (sync มาจาก repo) ────
+// Flash ไม่อ่าน GitHub เอง — อ่านจาก systemConfig/agentDocs ที่ workflow sync ไว้
+async function fetchChatAgentDocs() {
+  const files = await loadAgentDocs();
+  const list = [
     { path: 'AGENTS.md', label: 'กฎ monorepo + กฎแต่ละแอป', maxLen: 6000 },
     { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'สไตล์การทำงานของพี่พีช', maxLen: 5000 },
     { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือ agent + แผนที่ repo', maxLen: 5000 },
   ];
 
   let result = '';
-  for (const f of files) {
-    try {
-      const res = await fetch(`${GH_API}/repos/${GH_REPO}/contents/${f.path}?ref=main`, {
-        headers: {
-          'Authorization': `token ${ghPat}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CF-AI',
-        },
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const content = Buffer.from(data.content, 'base64').toString('utf-8');
-      result += `\n\n=== ${f.label} (${f.path}) ===\n${content.slice(0, f.maxLen)}\n`;
-    } catch { /* skip ถ้า GitHub ไม่ตอบ */ }
+  for (const f of list) {
+    const content = files[f.path];
+    if (content) result += `\n\n=== ${f.label} (${f.path}) ===\n${content.slice(0, f.maxLen)}\n`;
   }
-
-  _docsCache = result;
-  _docsCacheTime = now;
   return result;
 }
 
@@ -581,8 +556,7 @@ exports.aiChatAgentHttp = functions
 
     // ── Code Metrics shortcut: ถ้าถามเรื่องบรรทัด ตอบจาก docs/CODE_METRICS.md ──
     if (isCodeMetricsQuery(message)) {
-      const ghPat = process.env.GH_PAT;
-      const metrics = ghPat ? await fetchCodeMetrics(ghPat).catch(() => null) : null;
+      const metrics = await fetchCodeMetrics().catch(() => null);
       if (metrics) {
         res.json({ reply: `📊 **Code Metrics ล่าสุด**\n\n${metrics}`, scope: currentScope });
         return;
@@ -690,11 +664,10 @@ exports.aiChatAgentHttp = functions
       }
     }
 
-    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) + project tree จาก Firestore
-    const ghPat = process.env.GH_PAT;
+    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) + project tree — จาก Firestore ทั้งหมด
     const [agentDocs, jiijiDocs, projectTree] = await Promise.all([
-      ghPat ? fetchChatAgentDocs(ghPat).catch(() => '') : Promise.resolve(''),
-      ghPat ? fetchJiijiDef(ghPat).catch(() => '') : Promise.resolve(''),
+      fetchChatAgentDocs().catch(() => ''),
+      fetchJiijiDef().catch(() => ''),
       loadProjectTree().catch(() => ''),
     ]);
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
