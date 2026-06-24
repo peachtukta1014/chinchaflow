@@ -1,3 +1,10 @@
+## 2026-06-23 — feat: Flash CF อ่าน OPENROUTER_API_KEY จาก Google Cloud Secret Manager
+
+- **ที่มา:** เดิม Flash key มาจาก GitHub Secrets → เขียนลง `.env` ตอน deploy. พีชต้องการแยกที่เก็บจริง: Flash key อยู่ Google Cloud Secret Manager, Pro key อยู่ GitHub Secrets เท่านั้น
+- **PR #361** — `aiChatAgent.js` `aiChatAgentHttp` เพิ่ม `secrets: ['OPENROUTER_API_KEY']` ใน `runWith` → Firebase mount จาก Secret Manager ตอน runtime; `deploy-functions.yml` ลบ `OPENROUTER_API_KEY` ออกจาก `.env` (เหลือ `OPENROUTER_API_KEY_PRO` สำหรับ Pro)
+- **ต้องมี:** secret `OPENROUTER_API_KEY` ใน Google Cloud Secret Manager (project `chincha-eeed6`) มี version ที่ใช้งานได้ — Firebase CLI mount อัตโนมัติตอน deploy
+- ถ้าพังให้เช็ก: Secret Manager version active, service account มีสิทธิ์ `secretmanager.versions.access`
+
 ## 2026-06-23 — arch: แยก AI agent 2 ฝ่าย (Flash chat ↔ Pro GitHub Actions) + docs cleanup
 
 - **ที่มา:** เดิม Flash CF เรียก Pro agentic loop ใน process เดียวกัน → timeout 540s, key รวมกัน, รอค้างหน้าจอ. พีชต้องการแยก 2 ฝ่ายให้เสถียร/ประหยัด token + ปลอดภัยขึ้น

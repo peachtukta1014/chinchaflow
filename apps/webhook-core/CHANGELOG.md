@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-23 | claude/new-session-358ebr
+**feat: Flash CF อ่าน `OPENROUTER_API_KEY` จาก Google Cloud Secret Manager**
+- `src/aiChatAgent.js` — `aiChatAgentHttp` เพิ่ม `secrets: ['OPENROUTER_API_KEY']` ใน `runWith` → Firebase mount key จาก Secret Manager ตอน runtime
+- `.github/workflows/deploy-functions.yml` — ลบ `OPENROUTER_API_KEY` ออกจาก `.env` (ไม่ผ่าน GitHub Secrets แล้ว); `OPENROUTER_API_KEY_PRO` ยังอยู่ที่ GitHub Secrets สำหรับ Pro agent
+- ผล: Flash key อยู่ที่ Google Cloud Secret Manager, Pro key อยู่ที่ GitHub — isolation แยกที่เก็บจริง
+
 ### 2026-06-23 | dev/ai-docs-cleanup
 **docs+cleanup: อัปเดตเอกสารตาม architecture ใหม่ + ลบไฟล์ตาย**
 - ลบ `src/seafood-notify/notify.js` — LINE Notify API (เลิกบริการ 2025-03-31), ไม่มีใคร import, ไฟล์เดียวที่ใช้ axios
