@@ -494,7 +494,7 @@ ${rules}
 
 // ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
 exports.aiChatAgentHttp = functions
-  .runWith({ memory: '512MB', timeoutSeconds: 540, secrets: ['OPENROUTER_API_KEY'] })
+  .runWith({ memory: '512MB', timeoutSeconds: 540, secrets: ['OPENROUTER_API_KEY', 'GH_PAT_DISPATCH'] })
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -571,9 +571,10 @@ exports.aiChatAgentHttp = functions
     if (quickTrigger) {
       const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
       const taskId = requestId || `qt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const ghPat = process.env.GH_PAT;
+      // dispatch-only token (trigger Pro เท่านั้น อ่าน/เขียน repo ไม่ได้) — ไม่ใช่ GH_PAT เต็ม
+      const ghPat = process.env.GH_PAT_DISPATCH;
       if (!ghPat) {
-        res.status(500).json({ reply: 'GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
         return;
       }
       try {
@@ -621,10 +622,11 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
-      const ghPatForDispatch = process.env.GH_PAT;
+      // dispatch-only token (trigger Pro เท่านั้น อ่าน/เขียน repo ไม่ได้) — ไม่ใช่ GH_PAT เต็ม
+      const ghPatForDispatch = process.env.GH_PAT_DISPATCH;
       if (!ghPatForDispatch) {
         await clearProgress(requestId);
-        res.status(500).json({ reply: 'GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
         return;
       }
 
