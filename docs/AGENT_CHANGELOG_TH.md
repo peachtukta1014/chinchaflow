@@ -1,3 +1,11 @@
+## 2026-06-24 — fix: อัปโหลดรูปรายการประจำร้าน (chincha-tea) ไม่สำเร็จ — เพิ่ม storage rule
+
+- **อาการ:** ใส่รูปให้รายการประจำร้านใน RestockForm แล้วขึ้น "อัปโหลดไม่สำเร็จ" ทุกครั้ง แม้รูปเล็ก
+- **สาเหตุ:** `RestockForm.jsx` อัปโหลดไป `catalogImages/{id}.jpg` แต่ `storage.rules` ไม่มี match path นี้ → โดน catch-all `match /{allPaths=**} { allow read, write: if false }` บล็อก (ไม่เกี่ยวขนาดรูป — มี `compressImageFile` 400×400 อยู่แล้ว)
+- **แก้:** เพิ่ม rule `match /catalogImages/{fileName}` — signed-in อ่าน/เขียนได้, จำกัด < 3MB + เฉพาะ image (ตามแพทเทิร์น avatars เดิม)
+- **ต้อง deploy:** `deploy-rules.yml` (push main แตะ `storage.rules`) — ถ้า auto-merge โดย bot ต้อง trigger เอง (GITHUB_TOKEN ไม่ trigger workflow ต่อ)
+- ถ้าพังอีกให้เช็ก: deploy storage rules แล้วหรือยัง · path ตรง `catalogImages/` ไหม
+
 ## 2026-06-23 — feat: Flash CF อ่าน OPENROUTER_API_KEY จาก Google Cloud Secret Manager
 
 - **ที่มา:** เดิม Flash key มาจาก GitHub Secrets → เขียนลง `.env` ตอน deploy. พีชต้องการแยกที่เก็บจริง: Flash key อยู่ Google Cloud Secret Manager, Pro key อยู่ GitHub Secrets เท่านั้น
