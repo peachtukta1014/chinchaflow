@@ -66,21 +66,14 @@ const WELCOME_MSG = {
   content: 'สวัสดีพี่พีช! จีจี้เลขาส่วนตัวพีชเองนะคะ 🌸\n\nพร้อมช่วยพี่เสมอเลย ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู (แนบได้ถึง 5 รูปต่อครั้งเลย)\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะคะ',
 };
 
-const AGENT_OPTIONS = [
-  { id: 'root', label: '🌸 จีจี้', desc: 'ทั่วไป' },
-  { id: 'tea', label: '🧋 ชินชา', desc: 'ร้านชา' },
-  { id: 'seafood', label: '🦐 โกอ้วน', desc: 'ร้านกุ้ง' },
-  { id: 'webhook', label: '🤖 LINE', desc: 'Bot' },
-  { id: 'scheduled', label: '⏰ Cron', desc: 'Automation' },
-];
+// 🔥 [ลบออก] AGENT_OPTIONS Array
 
 export default function App() {
   const [messages, setMessages] = useState([WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [agentScope, setAgentScope] = useState('root');
-  const [showAgentPicker, setShowAgentPicker] = useState(false);
+  // 🔥 [ลบออก] สเตตอยกกลุ่ม agentScope และ showAgentPicker
   const [showHistory, setShowHistory] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [fileAttachment, setFileAttachment] = useState(null);
@@ -100,7 +93,6 @@ export default function App() {
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
   // ── Background result recovery ─────────────────────────────────────────
-  // เมื่อพี่กลับมา foreground หลัง connection ขาด → ดึงผลจาก Firestore
   const PENDING_KEY = 'jiiji_pending_result';
   useEffect(() => {
     const onVisible = async () => {
@@ -110,13 +102,11 @@ export default function App() {
       if (!raw) return;
       let pending;
       try { pending = JSON.parse(raw); } catch { localStorage.removeItem(PENDING_KEY); return; }
-      // หมดอายุ 30 นาที
       if (Date.now() - (pending.ts || 0) > 30 * 60 * 1000) { localStorage.removeItem(PENDING_KEY); return; }
 
       setLoading(true);
       setProgressStep('กำลังดึงผลลัพธ์จากฉากหลัง...');
 
-      // ลอง 10 ครั้ง ห่าง 3 วิ (รวม 30 วิ)
       let found = null;
       for (let i = 0; i < 10; i++) {
         found = await fetchResult(pending.requestId);
@@ -133,12 +123,13 @@ export default function App() {
         setMessages(prev => {
           const updated = [...prev, replyMsg];
           if (currentSessionId.current) {
-            updateSession(currentSessionId.current, updated, found.scope || pending.scope);
+            // 🧹 [ปรับปรุง] เอาพารามิเตอร์ scope ตัวท้ายออก
+            updateSession(currentSessionId.current, updated);
             setSessions(listSessions());
           }
           return updated;
         });
-        if (found.scope) setAgentScope(found.scope);
+        // 🔥 [ลบออก] setAgentScope(found.scope)
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -181,15 +172,7 @@ export default function App() {
   // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // ── Scope detection ────────────────────────────────────────────────────
-  function detectScope(text) {
-    const t = (text || '').toLowerCase();
-    if (t.includes('กุ้ง') || t.includes('shrimp') || t.includes('seafood') || t.includes('โกอ้วน') || t.includes('ร้านกุ้ง')) return 'seafood';
-    if (t.includes('ชา') || t.includes('tea') || t.includes('ชินชา') || t.includes('ร้านน้ำ') || t.includes('chincha') || t.includes('bubble')) return 'tea';
-    if (t.includes('webhook') || t.includes('line') || t.includes('ไลน์')) return 'webhook';
-    if (t.includes('cron') || t.includes('scheduled') || t.includes('schedule') || t.includes('automation') || t.includes('auto')) return 'scheduled';
-    return agentScope;
-  }
+  // 🔥 [ลบออก] ฟังก์ชัน detectScope(text)
 
   // ── New chat ───────────────────────────────────────────────────────────
   const newChat = useCallback(() => {
@@ -208,7 +191,7 @@ export default function App() {
     if (!session) return;
     currentSessionId.current = id;
     setMessages(session.messages.length > 0 ? session.messages : [WELCOME_MSG]);
-    setAgentScope(session.scope || 'root');
+    // 🔥 [ลบออก] setAgentScope(session.scope)
     setShowHistory(false);
   }, []);
 
@@ -230,7 +213,6 @@ export default function App() {
     const images = imagePreviews.map(p => p.split(',')[1]);
     const displayText = text || (imagePreviews.length > 0 ? '📸' : `📎 ${fileAttachment?.name}`);
 
-    // ข้อความที่ส่งให้ AI — ต่อท้ายด้วยเนื้อไฟล์ถ้ามี
     const aiText = fileAttachment
       ? `${text || '(ดูไฟล์แนบด้านล่าง)'}\n\n---\n📎 ไฟล์แนบ: ${fileAttachment.name}\n\`\`\`\n${fileAttachment.text.slice(0, MAX_FILE_CHARS)}\n\`\`\`${fileAttachment.text.length > MAX_FILE_CHARS ? `\n\n⚠️ ไฟล์ยาวเกิน แสดงแค่ ${MAX_FILE_CHARS} ตัวอักษรแรก` : ''}`
       : text;
@@ -239,7 +221,7 @@ export default function App() {
       ? crypto.randomUUID()
       : Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-    const scope = detectScope(text);
+    // 🔥 [ลบออก] ตัวแปรสโคปและการเซ็ตติ้งต่างๆ
     const messagesWithUser = [...messages, { role: 'user', content: displayText, imageUrls: [...imagePreviews] }];
 
     setInput('');
@@ -248,30 +230,27 @@ export default function App() {
     setProgressStep(null);
     setMessages(messagesWithUser);
     setLoading(true);
-    if (scope !== agentScope) setAgentScope(scope);
 
-    // สร้าง session ใหม่เมื่อส่งข้อความแรก
+    // 🧹 [ปรับปรุง] สร้าง session ใหม่โดยไม่ต้องส่ง scope เข้าไป
     if (!currentSessionId.current) {
-      currentSessionId.current = createSession({ firstMessage: text || 'รูปภาพ', scope });
+      currentSessionId.current = createSession({ firstMessage: text || 'รูปภาพ' });
       setSessions(listSessions());
     }
 
-    // บันทึก pending เผื่อ connection ขาดระหว่างรอ
-    localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, scope, ts: Date.now() }));
+    // 🧹 [ปรับปรุง] เอาพารามิเตอร์ scope ออกจากตัวจำ pending
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, ts: Date.now() }));
 
-    // Start progress polling
     pollIntervalRef.current = setInterval(async () => {
       const data = await pollProgress(requestId);
       if (data.step) setProgressStep(data.step);
     }, 2000);
 
-    // ส่ง history แค่ 10 ข้อความล่าสุดให้ AI (ลด token + ลดช้า)
     const historyForAI = messagesWithUser.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
+    // 🧹 [ปรับปรุง] ส่งค่าเข้า API ของ Cloud เปล่า ๆ โดยถอดระบบ 'scope' ออกไปดื้อ ๆ เลยค่ะ
     const reply = await chatWithAI({
       message: aiText,
       history: historyForAI,
-      scope,
       images: images.length > 0 ? images : undefined,
       requestId,
     });
@@ -279,21 +258,21 @@ export default function App() {
     clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = null;
     setProgressStep(null);
-    localStorage.removeItem(PENDING_KEY); // ได้รับ reply แล้ว ไม่ต้อง recover
+    localStorage.removeItem(PENDING_KEY);
 
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
-    if (reply.scope) setAgentScope(reply.scope);
+    // 🔥 [ลบออก] if (reply.scope) setAgentScope(reply.scope)
 
-    // Auto-save session
+    // 🧹 [ปรับปรุง] ตัวอัปเดตเซสชัน ลบพารามิเตอร์สุดท้ายออก
     if (currentSessionId.current) {
-      updateSession(currentSessionId.current, finalMessages, reply.scope || scope);
+      updateSession(currentSessionId.current, finalMessages);
       setSessions(listSessions());
     }
 
     setLoading(false);
     inputRef.current?.focus();
-  }, [input, loading, messages, agentScope, imagePreviews]);
+  }, [input, loading, messages, imagePreviews]);
 
   // ── Voice input ────────────────────────────────────────────────────────
   const toggleVoice = useCallback(() => {
@@ -372,7 +351,7 @@ export default function App() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const currentAgent = AGENT_OPTIONS.find(a => a.id === agentScope) || AGENT_OPTIONS[0];
+  // 🔥 [ลบออก] บรรทัดคำนวณ currentAgent 
   const canSend = (input.trim() || imagePreviews.length > 0 || fileAttachment !== null) && !loading;
 
   return (
@@ -419,11 +398,7 @@ export default function App() {
                     <span className="text-[10px] text-ai-muted">
                       {new Date(s.updatedAt).toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {s.scope && s.scope !== 'root' && (
-                      <span className="text-[9px] text-ai-accent border border-ai-accent/40 rounded-full px-1.5 py-0.5 leading-none">
-                        {AGENT_OPTIONS.find(a => a.id === s.scope)?.label || s.scope}
-                      </span>
-                    )}
+                    {/* 🔥 [ลบออก] ป้าย Tag แสดงชื่อกลุ่มแชทขนาดเล็กในอดีต */}
                   </div>
                 </div>
                 <button
@@ -459,32 +434,7 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Scope picker */}
-          <div className="relative">
-            <button
-              onClick={() => setShowAgentPicker(!showAgentPicker)}
-              className="text-xs px-2 py-1 rounded-full border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent transition-colors"
-            >
-              {currentAgent.label}
-            </button>
-            {showAgentPicker && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowAgentPicker(false)} />
-                <div className="absolute right-0 top-8 z-20 bg-ai-card border border-ai-border rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-                  {AGENT_OPTIONS.map(a => (
-                    <button
-                      key={a.id}
-                      onClick={() => { setAgentScope(a.id); setShowAgentPicker(false); }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-ai-bg transition-colors flex items-center gap-2 ${agentScope === a.id ? 'text-ai-accent' : 'text-ai-text'}`}
-                    >
-                      <span>{a.label}</span>
-                      <span className="text-[10px] text-ai-muted ml-auto">{a.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          {/* 🔥 [ลบออก] ชุด Dropdown ระบบ Scope Picker ทั้งดุ้นเรียบร้อยค่ะ */}
           <button onClick={newChat} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="แชทใหม่">
             <IconPlus />
           </button>
@@ -618,7 +568,6 @@ export default function App() {
             />
           </div>
 
-          {/* Image button with count badge */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={imagePreviews.length >= MAX_IMAGES}
@@ -633,7 +582,6 @@ export default function App() {
             )}
           </button>
 
-          {/* File attach button */}
           <button
             onClick={() => fileInputRef2.current?.click()}
             disabled={fileAttachment !== null}
@@ -643,7 +591,6 @@ export default function App() {
             <IconFile />
           </button>
 
-          {/* Voice button */}
           <button
             onClick={toggleVoice}
             className={`p-2.5 rounded-full transition-colors shrink-0 ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-ai-bg border border-ai-border text-ai-muted hover:text-ai-accent hover:border-ai-accent'}`}
@@ -652,7 +599,6 @@ export default function App() {
             {listening ? <IconStop /> : <IconMic active={false} />}
           </button>
 
-          {/* Send button */}
           <button
             onClick={handleSend}
             disabled={!canSend}
@@ -662,7 +608,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Hidden file input — images */}
         <input
           ref={fileInputRef}
           type="file"
@@ -671,7 +616,6 @@ export default function App() {
           className="hidden"
           onChange={handleImageSelect}
         />
-        {/* Hidden file input — text files */}
         <input
           ref={fileInputRef2}
           type="file"
