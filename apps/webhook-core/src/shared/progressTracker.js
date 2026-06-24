@@ -28,7 +28,9 @@ async function writeProgress(requestId, step) {
   if (!requestId) return;
   try {
     await getDb().doc(`aiProgress/${requestId}`).set({ step, ts: Date.now() });
-  } catch { /* non-critical — ไม่ให้ progress พัง flow หลัก */ }
+  } catch (err) {
+    console.warn(`[Progress Error] writeProgress failed for ${requestId}:`, err.message);
+  }
 }
 
 /**
@@ -58,16 +60,24 @@ async function readProgress(requestId) {
 
 /**
  * เขียนผลลัพธ์สุดท้ายลง Firestore (เผื่อ client disconnect ระหว่างรัน)
- * TTL 30 นาที — client จะลบเองเมื่ออ่านแล้ว
+ * ใช้เอกสาร Timestamp เพื่อให้รองรับระบบลบอัตโนมัติ (TTL Policy) ของ Firestore หน้าคอนโซล
  * @param {string|null} requestId
  * @param {object} data  — { reply, scope, ... }
  */
 async function writeResult(requestId, data) {
   if (!requestId) return;
   try {
-    const expiresAt = Date.now() + 30 * 60 * 1000;
-    await getDb().doc(`aiResults/${requestId}`).set({ ...data, ts: Date.now(), expiresAt });
-  } catch { /* non-critical */ }
+    const { Timestamp } = require('firebase-admin/firestore');
+    const expiresAtMillis = Date.now() + 30 * 60 * 1000; // +30 นาที
+    
+    await getDb().doc(`aiResults/${requestId}`).set({
+      ...data,
+      ts: Date.now(),
+      expiresAt: Timestamp.fromMillis(expiresAtMillis) // แปลงเป็นวัตถุ Timestamp เพื่อให้ลบอัตโนมัติได้จริง
+    });
+  } catch (err) {
+    console.warn(`[Progress Error] writeResult failed for ${requestId}:`, err.message);
+  }
 }
 
 /**
@@ -80,9 +90,17 @@ async function readResult(requestId) {
     const doc = await getDb().doc(`aiResults/${requestId}`).get();
     if (!doc.exists) return null;
     const data = doc.data();
-    if (data.expiresAt && Date.now() > data.expiresAt) {
-      await getDb().doc(`aiResults/${requestId}`).delete();
-      return null;
+    
+    if (data.expiresAt) {
+      // รองรับทั้งแบบวัตถุ Timestamp (.toMillis()) และแบบตัวเลขมิลลิวินาทีในอดีต
+      const expiresMillis = typeof data.expiresAt.toMillis === 'function' 
+        ? data.expiresAt.toMillis() 
+        : Number(data.expiresAt);
+
+      if (Date.now() > expiresMillis) {
+        await getDb().doc(`aiResults/${requestId}`).delete();
+        return null;
+      }
     }
     return data;
   } catch { return null; }
@@ -108,7 +126,9 @@ async function appendRunLog(requestId, entry) {
   if (!requestId) return;
   try {
     await getDb().collection(`agentRunLogs/${requestId}/steps`).add({ ...entry, ts: Date.now() });
-  } catch { /* non-critical — ไม่ให้ log พัง flow หลัก */ }
+  } catch (err) {
+    console.warn(`[Progress Error] appendRunLog failed for ${requestId}:`, err.message);
+  }
 }
 
 module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog };
