@@ -519,7 +519,7 @@ ${rules}
 
 // ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
 exports.aiChatAgentHttp = functions
-  .runWith({ memory: '512MB', timeoutSeconds: 540 })
+  .runWith({ memory: '512MB', timeoutSeconds: 540, secrets: ['OPENROUTER_API_KEY'] })
   .region('asia-southeast1')
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
