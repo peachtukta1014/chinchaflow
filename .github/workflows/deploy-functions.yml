@@ -83,7 +83,13 @@ jobs:
           echo "id=$ID" >> "$GITHUB_OUTPUT"
 
       - name: Write env vars for functions
+        env:
+          _OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          _GH_PAT_DISPATCH: ${{ secrets.GH_PAT_DISPATCH }}
+          _GH_PAT: ${{ secrets.GH_PAT }}
         run: |
+          # ใช้ env: + printf เพื่อ strip newline ที่อาจติดมาตอน paste secret
+          strip() { printf '%s' "$1" | tr -d '\r\n'; }
           {
             echo "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}"
             echo "LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }}"
@@ -92,9 +98,9 @@ jobs:
             echo "LINE_LIFF_ID=${{ steps.liff.outputs.id }}"
             echo "LINE_LIFF_SLIP_ID=${{ steps.liff_slip.outputs.id }}"
             echo "LINE_LOGIN_CHANNEL_ID=${{ secrets.LINE_LOGIN_CHANNEL_ID }}"
-            echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
-            echo "GH_PAT_DISPATCH=${{ secrets.GH_PAT_DISPATCH }}"
-            echo "GH_PAT=${{ secrets.GH_PAT }}"
+            printf 'OPENROUTER_API_KEY=%s\n' "$(strip "${_OPENROUTER_API_KEY}")"
+            printf 'GH_PAT_DISPATCH=%s\n'    "$(strip "${_GH_PAT_DISPATCH}")"
+            printf 'GH_PAT=%s\n'             "$(strip "${_GH_PAT}")"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions
