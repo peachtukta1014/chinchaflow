@@ -571,10 +571,10 @@ exports.aiChatAgentHttp = functions
     if (quickTrigger) {
       const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
       const taskId = requestId || `qt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      // dispatch-only token (trigger Pro เท่านั้น อ่าน/เขียน repo ไม่ได้) — ไม่ใช่ GH_PAT เต็ม
-      const ghPat = process.env.GH_PAT_DISPATCH;
+      // dispatch-only token ถ้ามี; fallback ไป GH_PAT (อยู่ใน .env อยู่แล้ว)
+      const ghPat = process.env.GH_PAT_DISPATCH || process.env.GH_PAT;
       if (!ghPat) {
-        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH และ GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
         return;
       }
       try {
@@ -622,11 +622,11 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
-      // dispatch-only token (trigger Pro เท่านั้น อ่าน/เขียน repo ไม่ได้) — ไม่ใช่ GH_PAT เต็ม
-      const ghPatForDispatch = process.env.GH_PAT_DISPATCH;
+      // dispatch-only token ถ้ามี; fallback ไป GH_PAT (อยู่ใน .env อยู่แล้ว)
+      const ghPatForDispatch = process.env.GH_PAT_DISPATCH || process.env.GH_PAT;
       if (!ghPatForDispatch) {
         await clearProgress(requestId);
-        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH และ GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
         return;
       }
 
