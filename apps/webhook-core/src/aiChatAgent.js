@@ -104,8 +104,13 @@ async function dispatchToProAgent(ghPat, payload) {
 }
 
 // ── Quick trigger keywords (bypass classifier — health check เท่านั้น ห้าม commit) ──
+function normalizeThai(str) {
+  // มือถือบางรุ่น input สระล่าง (ุ ู) หลัง tone mark → swap ให้ตรงมาตรฐาน
+  return str.replace(/([่-๋])([ุู])/g, '$2$1');
+}
+
 function detectQuickTrigger(message) {
-  const m = (message || '').trim().toLowerCase();
+  const m = normalizeThai((message || '').trim().toLowerCase());
   if (/^(โอเคกุ้ง|ตรวจกุ้ง|auto-shrimp|เช็คกุ้ง|ok กุ้ง|okกุ้ง)$/.test(m)) {
     return {
       scope: 'seafood',
@@ -335,7 +340,9 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
   } catch (parseErr) {
     throw new Error(`OpenRouter ตอบกลับมาไม่สมบูรณ์: ${parseErr.message}`);
   }
-  return data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
+  const raw = data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
+  // DeepSeek บางครั้ง generate tool call XML ออกมาเป็น text — strip ก่อน return
+  return raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim() || '⚠️ ไม่ได้รับคำตอบจาก AI';
 }
 
 // ── โหลด JIIJI.md — ตัวตนและ skills ของจีจี้ (จาก Firestore) ───────────

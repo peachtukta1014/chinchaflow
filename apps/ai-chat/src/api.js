@@ -84,7 +84,7 @@ export async function chatWithAI({ message, history = [], images = null, imageBa
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return {
-        reply: `Error (${res.status}): ${err?.error || 'ไม่สามารถติดต่อ AI Server ได้'}`,
+        reply: err?.reply || `Error (${res.status}): ${err?.error || 'ไม่สามารถติดต่อ AI Server ได้'}`,
       };
     }
 
