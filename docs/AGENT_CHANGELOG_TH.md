@@ -1,3 +1,18 @@
+## 2026-06-26 — fix: โอเคกุ้ง ไม่ match + DSML strip + hardcode DEPLOY_NOTIFY_URL
+
+- **อาการ:** พิม "โอเคกุ้ง" จากมือถือ → ตอบ "ไม่สามารถติดต่อ AI Server" แทนที่จะส่ง dispatch
+- **สาเหตุหลัก 3 อย่าง:**
+  1. iPhone บางรุ่นส่ง tone mark (้) ก่อนสระล่าง (ุ) ขัดมาตรฐาน → regex ไม่ match `โอเคกุ้ง`
+  2. DeepSeek V4 Flash generate `< | DSML | invoke >` XML ออกมาเป็น text ทั้งที่ไม่มี tools
+  3. `api.js` แสดง generic error แทน reply จริงจาก CF
+  4. `GH_PAT_DISPATCH` ไม่ได้ตั้งใน Secret Manager → dispatch ล้มเหลว แต่ fallback `GH_PAT` ช่วยไว้ได้
+  5. `sync-project-tree.yml` ใช้ `${{ secrets.DEPLOY_NOTIFY_URL }}` ถ้าไม่ set → tree ไม่ sync → Flash hallucinate TypeScript
+- **แก้:**
+  - `aiChatAgent.js` — `normalizeThai()` swap tone mark ก่อนสระล่าง; DSML strip ใน `callOpenRouter()`; fallback `GH_PAT_DISPATCH || GH_PAT`
+  - `api.js` — ตรวจ `err?.reply` ก่อน fallback ให้เห็น error จริง
+  - `sync-project-tree.yml` — hardcode `DEPLOY_NOTIFY_URL` แทน secret (URL สาธารณะไม่ใช่ secret จริง)
+- ถ้าพังอีกให้เช็ก: `GH_PAT` ใน `.env` · dispatch log ใน Firebase · GitHub Actions `ai-workflow-trigger.yml` runs
+
 ## 2026-06-24 — security: แยก GH_PAT_DISPATCH (dispatch-only) + lock GH_PAT ออกจาก Flash (PR-B)
 
 - **ที่มา:** Flash CF เคยมี `GH_PAT` เต็ม (read/write repo) + `OPENROUTER_API_KEY_PRO` ใน `.env` ร่วม — ถ้า Flash หลุด attacker เขียน repo ได้. ต้องการให้ Flash มีแค่ token ที่ dispatch ได้อย่างเดียว

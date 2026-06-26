@@ -42,7 +42,7 @@ jobs:
       - name: Sync tree to Firestore
         if: always()
         env:
-          DEPLOY_NOTIFY_URL: ${{ secrets.DEPLOY_NOTIFY_URL }}
+          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           TREE=$(cat docs/PROJECT_STRUCTURE.md)
@@ -55,7 +55,7 @@ jobs:
       - name: Sync agent docs to Firestore
         if: always()
         env:
-          DEPLOY_NOTIFY_URL: ${{ secrets.DEPLOY_NOTIFY_URL }}
+          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           PAYLOAD=$(jq -n \
