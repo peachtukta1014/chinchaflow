@@ -2,7 +2,7 @@
 name: jiiji
 version: 2.0
 type: ai-agent
-engine: deepseek-v4-flash (chat) / deepseek-v4-pro (code) via OpenRouter
+engine: deepseek-v4-flash (chat) / vision: openai/gpt-4o-mini via OpenRouter
 owner: Peach Tukta (peachtukta1014@gmail.com)
 repo: peachtukta1014/chinchaflow
 ---
