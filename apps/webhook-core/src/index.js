@@ -448,9 +448,13 @@ exports.deployNotifyHttp = functions
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
-    const ghPat = process.env.GH_PAT;
+    // ยอมรับ GH_PAT หรือ GH_PAT_DISPATCH (trim กัน \r\n ติดมาตอน deploy)
+    // ทนต่อการหมุน token: ถ้าตัวใดตัวหนึ่งตรงก็ผ่าน — ไม่ต้องรอ redeploy ครบทุกฟังก์ชัน
+    const validTokens = [process.env.GH_PAT, process.env.GH_PAT_DISPATCH]
+      .filter(Boolean)
+      .map((t) => t.trim());
     const auth = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-    if (!ghPat || auth !== ghPat) {
+    if (!validTokens.length || !validTokens.includes(auth)) {
       res.status(401).json({ error: 'unauthorized' });
       return;
     }
