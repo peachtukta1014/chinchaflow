@@ -505,6 +505,27 @@ exports.deployNotifyHttp = functions
       return;
     }
 
+    // action: 'task_ack' — Pro Agent ยิงกลับทันทีที่ได้รับงาน (ก่อนเริ่ม loop)
+    // Flash อ่านจาก agentProgress/{requestId}.status === 'received_by_pro'
+    if (action === 'task_ack') {
+      const { requestId, scope, runId: ackRunId } = req.body || {};
+      if (!requestId) { res.status(400).json({ error: 'requestId required' }); return; }
+      try {
+        await db().collection('agentProgress').doc(requestId).set({
+          step: 'Pro ได้รับงานแล้ว กำลังเริ่มทำ...',
+          status: 'received_by_pro',
+          scope: scope || 'root',
+          runId: ackRunId || null,
+          ackedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        res.json({ ok: true, action: 'task_ack', requestId });
+      } catch (err) {
+        console.error('deployNotifyHttp task_ack', err);
+        res.status(500).json({ error: err.message || 'failed' });
+      }
+      return;
+    }
+
     if (!app || !status) {
       res.status(400).json({ error: 'app and status required' });
       return;
