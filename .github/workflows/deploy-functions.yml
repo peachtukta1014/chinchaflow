@@ -165,14 +165,20 @@ jobs:
             }}')
 
           echo "🚀 [2/3] กำลังยิงส่งข้อมูลขึ้น Cloud Functions เพื่ออัปเดตความทรงจำ AI..."
-          
-          # ใช้ -i เพื่อดู Response Header และเอา -sf ออกเพื่อไม่ให้ซ่อน Error
-          # ผลลัพธ์การตอบกลับจะถูกเซฟลงไฟล์ /tmp/docs_response
-          HTTP_STATUS=$(curl -i -X POST "$DEPLOY_NOTIFY_URL" \
-            -H "Authorization: Bearer $GH_PAT" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            -s -w "%{http_code}" -o /tmp/docs_response)
+
+          # retry เพราะ revision ใหม่หลัง deploy ใช้เวลา propagate (~30-60s)
+          # revision เก่ายังถือ token เก่า → 401 ชั่วคราว → รอจน 200
+          HTTP_STATUS="000"
+          for i in 1 2 3 4 5 6 7 8; do
+            HTTP_STATUS=$(curl -X POST "$DEPLOY_NOTIFY_URL" \
+              -H "Authorization: Bearer $GH_PAT" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              -s -w "%{http_code}" -o /tmp/docs_response)
+            echo "  ครั้งที่ $i → HTTP $HTTP_STATUS"
+            [ "$HTTP_STATUS" = "200" ] && break
+            sleep 15
+          done
 
           echo "--------------------------------------------------"
           echo "📥 [3/3] รายละเอียดการตอบกลับจากเซิร์ฟเวอร์ (HTTP Status: $HTTP_STATUS):"
@@ -181,11 +187,11 @@ jobs:
           echo -e "\n--------------------------------------------------"
 
           # ตรวจสอบสเตตัส ถ้าไม่ใช่ 200 ให้สั่งท่อพังทันที (Exit 1)
-          if [ "$HTTP_STATUS" -ne 200 ]; then
+          if [ "$HTTP_STATUS" != "200" ]; then
             echo "❌ [FAIL] ซิงค์ไฟล์คู่มือภาษาไทยเข้าสมอง AI ไม่สำเร็จ! กรุณาเช็กสิทธิ์คีย์หรือโค้ดหลังบ้าน"
             exit 1
           fi
-          
+
           echo "✅ [SUCCESS] ซิงค์คู่มือและสไตล์การทำงานของพี่พีชขึ้นสมอง AI เรียบร้อยแล้ว!"
 
       - name: Wait and verify webhooks (must return 200 ok)
