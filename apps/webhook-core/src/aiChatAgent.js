@@ -111,7 +111,7 @@ function normalizeThai(str) {
 
 function detectQuickTrigger(message) {
   const m = normalizeThai((message || '').trim().toLowerCase());
-  if (/^(โอเคกุ้ง|ตรวจกุ้ง|auto-shrimp|เช็คกุ้ง|ok กุ้ง|okกุ้ง)$/.test(m)) {
+  if (/^(checking|โอเคกุ้ง|ตรวจกุ้ง|auto-shrimp|เช็คกุ้ง|ok กุ้ง|okกุ้ง)$/.test(m)) {
     return {
       scope: 'seafood',
       task: `ตรวจสุขภาพ seafood-pos (โกอ้วนซีฟู้ด/ร้านกุ้ง):
