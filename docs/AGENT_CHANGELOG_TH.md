@@ -1,3 +1,8 @@
+## 2026-06-29 — feat: progress indicator แสดง PRO badge + step จาก tool call จริง
+
+- **เหตุผล:** ผู้ใช้ไม่รู้ว่าโปรกำลังทำงานอยู่ หรือทำ tool call อะไรอยู่ — ต้องการ feedback ที่ชัดขึ้น
+- **แก้:** `apps/ai-chat/src/App.jsx` — loading bubble เพิ่ม badge `PRO` (text-ai-accent) ข้างๆ dots เมื่อ `progressStep` set; step text แสดงจากการเรียก tool จริง (เช่น `"กำลังอ่านไฟล์: xxx"`, `"กำลัง commit และเปิด PR..."`); fallback เปลี่ยนเป็น `"Flash กำลังรับคำสั่ง..."`
+
 ## 2026-06-29 — fix: Pro Agent รันเสร็จแต่ UI เงียบ — progress indicator หาย + isMaxIter ผิด + TTL สั้น
 
 - **อาการ:** ส่งงานให้โปร Flash ตอบ "processing" แล้ว UI เงียบสนิท — ไม่มีสถานะ ไม่มีผลลัพธ์ แม้โปรทำงานครบ 15 รอบ

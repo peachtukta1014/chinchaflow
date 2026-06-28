@@ -585,13 +585,18 @@ function AppShell({ user }) {
               <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />
             </div>
             <div className="bg-ai-card border border-ai-border rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex gap-1 mb-1">
-                <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                {progressStep && (
+                  <span className="text-[9px] font-bold text-ai-accent tracking-widest">PRO</span>
+                )}
               </div>
               <p className="text-[10px] text-ai-muted">
-                {progressStep || 'กำลังดำเนินการ... งานแก้โค้ดอาจใช้ถึง 3 นาที'}
+                {progressStep || 'Flash กำลังรับคำสั่ง...'}
               </p>
             </div>
           </div>
