@@ -40,6 +40,15 @@
 
 - **GitHub Actions CI** รัน smoke + build กุ้งบนทุก PR — **ไม่จำเป็น**: มี smoke script + `auto-shrip` + deploy บน `main` อยู่แล้ว; PR #127 ปิดโดยไม่ merge.
 
+## กฎ changelog — บังคับสำหรับ AI ทุกตัวที่แก้โค้ด (Pro Agent + Claude Code)
+
+> Flash (จีจี้) ไม่แก้โค้ด — ไม่ต้องทำ
+
+1. **อ่าน `docs/AGENT_CHANGELOG_TH.md` ก่อนลงมือทุกครั้ง** ดูว่ารอบก่อนแก้อะไรไปแล้ว ป้องกันแก้ซ้ำหรือ conflict กัน
+2. **อัปเดต changelog ใน commit/PR เดียวกันเสมอ** (ไม่ต้องรอ merge) ได้แก่:
+   - `docs/AGENT_CHANGELOG_TH.md` — สรุปอาการ, สาเหตุ, วิธีแก้, วิธีตรวจถ้าพัง
+   - `apps/<app>/CHANGELOG.md` — ของแอปที่เปลี่ยน
+
 ## เอกสารให้เอเจนต์ (อ่านทุกรอบ)
 
 | เอกสาร | หน้าที่ |

@@ -7,6 +7,17 @@
 
 ## 2026-06
 
+### 2026-06-28 | PR #392
+**fix: progress polling ระหว่างรอ Pro Agent + timeout 10 นาที**
+- `src/App.jsx` — ต่อ `pollProgress` (3s) หลัง "processing" เพื่อแสดง ACK + steps จาก Pro
+- เปลี่ยน timeout เป็น time-based 10 นาที แทน count-based 5 นาที (แก้ mobile background throttle)
+- `unsubscribeRef` cleanup ล้าง `pollIntervalRef` ด้วยเสมอ
+
+### 2026-06-28 | PR #391
+**fix: เปลี่ยน result delivery จาก Firestore onSnapshot เป็น HTTP polling**
+- `src/App.jsx` — ลบ `listenForResult` (Firestore onSnapshot ถูก Security Rules block)
+- ใช้ `setInterval` + `fetchResult` HTTP ทุก 5s แทน (ผ่าน Firebase Admin SDK, bypass Security Rules)
+- `unsubscribeRef` เปลี่ยนเป็นเก็บ `() => clearInterval(timerId)` แทน onSnapshot fn
 
 ## 2026-06-24 | Peach
 

@@ -25,9 +25,11 @@ const readFile = (relPath) => {
 const files = {
   'JIIJI.md': readFile('JIIJI.md'),
   'AGENTS.md': readFile('AGENTS.md'),
-  'docs/CODE_METRICS.md': readFile('docs/CODE_METRICS.md'),
+  'docs/PROJECT_STRUCTURE.md': readFile('docs/PROJECT_STRUCTURE.md'),
+  'docs/AGENT_CHANGELOG_TH.md': readFile('docs/AGENT_CHANGELOG_TH.md'),
   'docs/PEACH_WORKING_STYLE_TH.md': readFile('docs/PEACH_WORKING_STYLE_TH.md'),
   'docs/AGENT_HANDBOOK_TH.md': readFile('docs/AGENT_HANDBOOK_TH.md'),
+  'docs/CODE_METRICS.md': readFile('docs/CODE_METRICS.md'),
 };
 
 const trimmed = Object.fromEntries(Object.entries(files).filter(([, v]) => v));
