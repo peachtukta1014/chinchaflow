@@ -86,6 +86,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const fileInputRef2 = useRef(null);
   const pollIntervalRef = useRef(null);
+  const resultPollRef = useRef(null);
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
 
@@ -207,6 +208,12 @@ export default function App() {
 
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
+    // ยกเลิก result poll เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
+    if (resultPollRef.current) {
+      clearInterval(resultPollRef.current);
+      resultPollRef.current = null;
+      localStorage.removeItem(PENDING_KEY);
+    }
     const text = input.trim();
     if ((!text && imagePreviews.length === 0 && !fileAttachment) || loading) return;
 
@@ -258,8 +265,39 @@ export default function App() {
     clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = null;
     setProgressStep(null);
-    localStorage.removeItem(PENDING_KEY);
 
+    if (reply.status === 'processing') {
+      // Flash ส่งงานให้ Pro Agent แล้ว — แสดงข้อความรอ แล้ว poll ผลในพื้นหลังทุก 10 วินาที
+      const processingMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
+      setMessages(processingMessages);
+      if (currentSessionId.current) {
+        updateSession(currentSessionId.current, processingMessages);
+        setSessions(listSessions());
+      }
+      setLoading(false);
+      inputRef.current?.focus();
+
+      if (resultPollRef.current) clearInterval(resultPollRef.current);
+      resultPollRef.current = setInterval(async () => {
+        const found = await fetchResult(requestId);
+        if (found) {
+          clearInterval(resultPollRef.current);
+          resultPollRef.current = null;
+          localStorage.removeItem(PENDING_KEY);
+          setMessages(prev => {
+            const updated = [...prev, { role: 'assistant', content: found.reply }];
+            if (currentSessionId.current) {
+              updateSession(currentSessionId.current, updated);
+              setSessions(listSessions());
+            }
+            return updated;
+          });
+        }
+      }, 10000);
+      return;
+    }
+
+    localStorage.removeItem(PENDING_KEY);
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
     // 🔥 [ลบออก] if (reply.scope) setAgentScope(reply.scope)
@@ -344,7 +382,10 @@ export default function App() {
   };
 
   // ── Cleanup polling on unmount ─────────────────────────────────────────
-  useEffect(() => () => { clearInterval(pollIntervalRef.current); }, []);
+  useEffect(() => () => {
+    clearInterval(pollIntervalRef.current);
+    clearInterval(resultPollRef.current);
+  }, []);
 
   // ── Handle Enter ───────────────────────────────────────────────────────
   const handleKeyDown = (e) => {
