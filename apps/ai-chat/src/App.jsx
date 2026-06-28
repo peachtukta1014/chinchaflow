@@ -282,15 +282,23 @@ export default function App() {
       setLoading(false);
       inputRef.current?.focus();
 
-      // Poll HTTP endpoint ทุก 5s (bypass Firestore Security Rules)
+      // ต่อ progress polling เพื่อแสดง ACK + steps จาก Pro Agent ระหว่างรอผล
       if (unsubscribeRef.current) unsubscribeRef.current();
-      let pollCount = 0;
+      pollIntervalRef.current = setInterval(async () => {
+        const data = await pollProgress(requestId);
+        if (data.step) setProgressStep(data.step);
+      }, 3000);
+
+      // Poll result ทุก 5s ด้วย time-based timeout 10 นาที (ไม่ขึ้นกับจำนวนครั้ง)
+      const resultStartTime = Date.now();
       const timerId = setInterval(async () => {
-        pollCount++;
         const found = await fetchResult(requestId);
-        if (!found && pollCount < 60) return;
+        if (!found && Date.now() - resultStartTime < 10 * 60 * 1000) return;
         clearInterval(timerId);
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
         unsubscribeRef.current = null;
+        setProgressStep(null);
         localStorage.removeItem(PENDING_KEY);
         if (found) {
           setMessages(prev => {
@@ -308,7 +316,11 @@ export default function App() {
           }]);
         }
       }, 5000);
-      unsubscribeRef.current = () => clearInterval(timerId);
+      unsubscribeRef.current = () => {
+        clearInterval(timerId);
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      };
       return;
     }
 
