@@ -235,9 +235,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BE_YY=$(( ( $(date -u +%Y) + 543 ) % 100 ))
-          DDMMYY="$(date -u +%d%m)$(printf '%02d' $BE_YY)"
-          TODAY=$(date -u +%Y-%m-%d)
+          BE_YY=$(( ( $(TZ=Asia/Bangkok date +%Y) + 543 ) % 100 ))
+          DDMMYY="$(TZ=Asia/Bangkok date +%d%m)$(printf '%02d' $BE_YY)"
+          TODAY=$(TZ=Asia/Bangkok date +%Y-%m-%d)
           PATCH=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-hosting.yml/runs?per_page=100" \
             --jq "[.workflow_runs[] | select(.created_at | startswith(\"$TODAY\"))] | length" 2>/dev/null || echo "1")
           [ -z "$PATCH" ] || [ "$PATCH" = "0" ] && PATCH=1
