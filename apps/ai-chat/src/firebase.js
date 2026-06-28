@@ -76,7 +76,7 @@ export async function saveCustomNotes(notes) {
 }
 
 // ── Token logs ───────────────────────────────────────────────────────────────
-export async function getRecentTokenLogs(maxCount = 20) {
+export async function getRecentTokenLogs(maxCount = 200) {
   const db = getDb();
   if (!db) return [];
   try {
