@@ -445,6 +445,7 @@ exports.deployNotifyHttp = functions
   .https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.set('X-Notify-Rev', '3'); // bump เพื่อบังคับ firebase redeploy ฟังก์ชันนี้ (รับ .env/token ใหม่)
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
