@@ -32,6 +32,9 @@
 | ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`/ship-tea` หรือพูด **โอเค/ชินชา**) | หลัง PR พร้อม; build = smoke ชา |
 | deploy rules / functions | `deploy-rules.yml`, `deploy-functions.yml` | |
 | ปิดงาน PR | skill `land-it` | |
+| sync docs AI เข้า Firestore | `apps/webhook-core/scripts/sync-agent-docs.cjs` | รัน CI หลัง deploy functions อัตโนมัติ (ไม่ต้องรันมือ) |
+| ACK Pro Agent กลับ UI | `apps/webhook-core/scripts/ack-pro-agent.cjs` | รัน `ai-workflow-trigger.yml` อัตโนมัติเมื่อ Pro ตื่น |
+| ส่ง Pro Agent ทำงาน | พิมพ์ **"โอเคกุ้ง"** หรือ **"โอเคชา"** ใน ai-chat (จีจี้) | Flash → dispatch → `ai-workflow-trigger.yml` → Pro loop |
 
 ### ตัวอย่างที่ทีมตัดสินแล้ว (ไม่ทำซ้ำ)
 
