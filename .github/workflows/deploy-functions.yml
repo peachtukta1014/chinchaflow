@@ -148,7 +148,11 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           echo "📢 [1/3] กำลังเตรียมอ่านไฟล์คู่มือภาษาไทยและข้อมูลระบบ..."
-          
+
+          # strip \r\n ที่อาจติดมาตอน paste secret — กัน curl exit 43 (header พัง)
+          # ให้ตรงกับ .env ที่ฝั่ง deploy strip ไว้แล้ว (token จะ match กัน)
+          GH_PAT=$(printf '%s' "$GH_PAT" | tr -d '\r\n')
+
           PAYLOAD=$(jq -n \
             --arg sha "$GITHUB_SHA" \
             --arg jiiji    "$(cat JIIJI.md 2>/dev/null || true)" \
