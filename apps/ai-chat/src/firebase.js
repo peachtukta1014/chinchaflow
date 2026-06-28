@@ -99,20 +99,16 @@ export function listenForResult(requestId, onResult) {
 // ── systemConfig helpers ─────────────────────────────────────────────────────
 export async function getProjectTree() {
   const db = getDb();
-  if (!db) return '';
-  try {
-    const snap = await getDoc(doc(db, 'systemConfig', 'projectTree'));
-    return snap.exists() ? (snap.data()?.tree || '') : '';
-  } catch { return ''; }
+  if (!db) throw new Error('Firebase not configured — ตรวจสอบ VITE_FIREBASE_API_KEY และ VITE_FIREBASE_PROJECT_ID');
+  const snap = await getDoc(doc(db, 'systemConfig', 'projectTree'));
+  return snap.exists() ? (snap.data()?.tree || '') : '';
 }
 
 export async function getAgentDocs() {
   const db = getDb();
-  if (!db) return {};
-  try {
-    const snap = await getDoc(doc(db, 'systemConfig', 'agentDocs'));
-    return snap.exists() ? (snap.data()?.files || {}) : {};
-  } catch { return {}; }
+  if (!db) throw new Error('Firebase not configured');
+  const snap = await getDoc(doc(db, 'systemConfig', 'agentDocs'));
+  return snap.exists() ? (snap.data()?.files || {}) : {};
 }
 
 export async function getCustomNotes() {

@@ -1,3 +1,13 @@
+## 2026-06-28 — fix: Knowledge tab แสดง error จริงแทนที่ "ยังไม่มีข้อมูล" เงียบๆ
+
+- **อาการ:** Knowledge tab → Project Tree / Agent Docs แสดง "ยังไม่มีข้อมูล" ตลอด แม้ข้อมูลอยู่ใน Firestore แล้ว — ไม่รู้ว่าพังจากอะไร
+- **สาเหตุ:** `firebase.js` มี `catch { return ''; }` เงียบๆ และ `App.jsx` มี `.catch(() => '')` ซ้อนอีกชั้น — error ใดๆ ถูกกลืนหมดโดยไม่มีใครรู้
+- **แก้:**
+  - `apps/ai-chat/src/firebase.js` — เอา try-catch ออกจาก `getProjectTree()` + `getAgentDocs()` ให้ error propagate ขึ้นไปถึง caller; throw Error ถ้า `getDb()` return null
+  - `apps/ai-chat/src/App.jsx` — `loadKnowledge` capture error ใส่ `treeError` / `docsError` state แทน catch เงียบ
+  - `apps/ai-chat/src/components/KnowledgePanel.jsx` — แสดง error code จริง (เช่น `permission-denied`) ใน UI ถ้าโหลดไม่ได้
+- ถ้าพัง: error จะโชว์ใต้ tab Project Tree / Agent Docs เลย ดู error code แล้วตรวจตาม: `permission-denied` → rules; `not-found` → doc ยังไม่มี; `unavailable` → network; ไม่มีข้อความ error → data ว่างจริง (ยังไม่เคย sync)
+
 ## 2026-06-28 — refactor: แยก App.jsx → icons, LoginScreen, KnowledgePanel, TokenDashboard
 
 - `apps/ai-chat/src/icons.jsx` — SVG icons 11 ตัว (named exports)

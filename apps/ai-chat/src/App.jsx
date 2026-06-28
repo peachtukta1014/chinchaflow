@@ -57,7 +57,7 @@ function AppShell({ user }) {
   const [deployBanner, setDeployBanner] = useState(null);
   const [sessions, setSessions] = useState(() => listSessions());
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'knowledge' | 'tokens'
-  const [knowledgeData, setKnowledgeData] = useState({ tree: '', docs: {}, notes: '', notesLoading: false, notesSaving: false });
+  const [knowledgeData, setKnowledgeData] = useState({ tree: '', docs: {}, notes: '', notesLoading: false, notesSaving: false, treeError: null, docsError: null });
   const [tokenLogs, setTokenLogs] = useState([]);
   const [tokenLogsLoading, setTokenLogsLoading] = useState(false);
   const chatEnd = useRef(null);
@@ -373,13 +373,12 @@ function AppShell({ user }) {
 
   // ── Load Knowledge tab data ────────────────────────────────────────────
   const loadKnowledge = useCallback(async () => {
-    setKnowledgeData(prev => ({ ...prev, notesLoading: true }));
-    const [tree, docs, notes] = await Promise.all([
-      getProjectTree().catch(() => ''),
-      getAgentDocs().catch(() => ({})),
-      getCustomNotes().catch(() => ''),
-    ]);
-    setKnowledgeData({ tree, docs, notes, notesLoading: false, notesSaving: false });
+    setKnowledgeData(prev => ({ ...prev, notesLoading: true, treeError: null, docsError: null }));
+    let treeError = null, docsError = null;
+    const tree = await getProjectTree().catch(err => { treeError = err.code || err.message; return ''; });
+    const docs = await getAgentDocs().catch(err => { docsError = err.code || err.message; return {}; });
+    const notes = await getCustomNotes().catch(() => '');
+    setKnowledgeData({ tree, docs, notes, notesLoading: false, notesSaving: false, treeError, docsError });
   }, []);
 
   useEffect(() => {
