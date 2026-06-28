@@ -139,64 +139,17 @@ jobs:
             -d "{\"app\":\"functions\",\"status\":\"$STATUS\",\"workflow\":\"deploy-functions\",\"runId\":\"$GITHUB_RUN_ID\",\"sha\":\"$GITHUB_SHA\"}" || true
 
       # =========================================================================
-      # 🔥 สเตปใหม่: ซิงค์คู่มือและสมอง AI (เวอร์ชันอัปเกรดคำสั่งภาษาไทย ดัก Error จริง)
+      # ซิงค์คู่มือ AI เข้า Firestore โดยตรง (ไม่ผ่าน HTTP เพื่อเลี่ยง 401/propagation)
+      # ใช้ Service Account (/tmp/sa.json) ที่เขียนไว้แล้วในขั้น deploy
       # =========================================================================
-      - name: Sync Agent Docs to Brain (ภาษาไทย)
+      - name: Sync Agent Docs to Brain
         if: job.status == 'success'
         env:
-          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
         run: |
-          echo "📢 [1/3] กำลังเตรียมอ่านไฟล์คู่มือภาษาไทยและข้อมูลระบบ..."
-
-          # strip \r\n ที่อาจติดมาตอน paste secret — กัน curl exit 43 (header พัง)
-          # ให้ตรงกับ .env ที่ฝั่ง deploy strip ไว้แล้ว (token จะ match กัน)
-          GH_PAT=$(printf '%s' "$GH_PAT" | tr -d '\r\n')
-
-          PAYLOAD=$(jq -n \
-            --arg sha "$GITHUB_SHA" \
-            --arg jiiji    "$(cat JIIJI.md 2>/dev/null || true)" \
-            --arg agents   "$(cat AGENTS.md 2>/dev/null || true)" \
-            --arg metrics  "$(cat docs/CODE_METRICS.md 2>/dev/null || true)" \
-            --arg style    "$(cat docs/PEACH_WORKING_STYLE_TH.md 2>/dev/null || true)" \
-            --arg handbook "$(cat docs/AGENT_HANDBOOK_TH.md 2>/dev/null || true)" \
-            '{action:"agent_docs", sha:$sha, files:{
-              "JIIJI.md":$jiiji,
-              "AGENTS.md":$agents,
-              "docs/CODE_METRICS.md":$metrics,
-              "docs/PEACH_WORKING_STYLE_TH.md":$style,
-              "docs/AGENT_HANDBOOK_TH.md":$handbook
-            }}')
-
-          echo "🚀 [2/3] กำลังยิงส่งข้อมูลขึ้น Cloud Functions เพื่ออัปเดตความทรงจำ AI..."
-
-          # retry เพราะ revision ใหม่หลัง deploy ใช้เวลา propagate (~30-60s)
-          # revision เก่ายังถือ token เก่า → 401 ชั่วคราว → รอจน 200
-          HTTP_STATUS="000"
-          for i in 1 2 3 4 5 6 7 8; do
-            HTTP_STATUS=$(curl -X POST "$DEPLOY_NOTIFY_URL" \
-              -H "Authorization: Bearer $GH_PAT" \
-              -H "Content-Type: application/json" \
-              -d "$PAYLOAD" \
-              -s -w "%{http_code}" -o /tmp/docs_response)
-            echo "  ครั้งที่ $i → HTTP $HTTP_STATUS"
-            [ "$HTTP_STATUS" = "200" ] && break
-            sleep 15
-          done
-
-          echo "--------------------------------------------------"
-          echo "📥 [3/3] รายละเอียดการตอบกลับจากเซิร์ฟเวอร์ (HTTP Status: $HTTP_STATUS):"
-          echo "--------------------------------------------------"
-          cat /tmp/docs_response
-          echo -e "\n--------------------------------------------------"
-
-          # ตรวจสอบสเตตัส ถ้าไม่ใช่ 200 ให้สั่งท่อพังทันที (Exit 1)
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "❌ [FAIL] ซิงค์ไฟล์คู่มือภาษาไทยเข้าสมอง AI ไม่สำเร็จ! กรุณาเช็กสิทธิ์คีย์หรือโค้ดหลังบ้าน"
-            exit 1
-          fi
-
-          echo "✅ [SUCCESS] ซิงค์คู่มือและสไตล์การทำงานของพี่พีชขึ้นสมอง AI เรียบร้อยแล้ว!"
+          echo "📢 ซิงค์ไฟล์คู่มือ AI โดยตรง → Firestore (ไม่ผ่าน HTTP)..."
+          node apps/webhook-core/scripts/sync-agent-docs.cjs
+          echo "✅ ซิงค์คู่มือและสไตล์การทำงานของพี่พีชขึ้นสมอง AI เรียบร้อยแล้ว!"
 
       - name: Wait and verify webhooks (must return 200 ok)
         continue-on-error: true
