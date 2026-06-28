@@ -20,11 +20,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: apps/webhook-core/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
         working-directory: apps/webhook-core
 
       - name: Write Firebase service account
@@ -32,16 +30,10 @@ jobs:
 
       - name: ACK — แจ้ง Firestore ว่า Pro ได้รับงานแล้ว
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
           REQUEST_ID: ${{ github.event.client_payload.requestId }}
           SCOPE: ${{ github.event.client_payload.scope }}
-        run: |
-          curl -sf -X POST \
-            "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp" \
-            -H "Authorization: Bearer $GH_PAT" \
-            -H "Content-Type: application/json" \
-            -d "{\"action\":\"task_ack\",\"requestId\":\"$REQUEST_ID\",\"scope\":\"$SCOPE\",\"runId\":\"$GITHUB_RUN_ID\"}" \
-            || echo "ACK skipped (non-fatal)"
+        run: node apps/webhook-core/scripts/ack-pro-agent.cjs || echo "ACK skipped (non-fatal)"
 
       - name: Run Pro agent task
         run: node scripts/run-github-agent.mjs
