@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
+import { listenForResult } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -86,7 +87,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const fileInputRef2 = useRef(null);
   const pollIntervalRef = useRef(null);
-  const resultPollRef = useRef(null);
+  const unsubscribeRef = useRef(null);  // Firestore onSnapshot unsubscribe fn
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
 
@@ -208,10 +209,10 @@ export default function App() {
 
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    // ยกเลิก result poll เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
-    if (resultPollRef.current) {
-      clearInterval(resultPollRef.current);
-      resultPollRef.current = null;
+    // ยกเลิก onSnapshot เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
       localStorage.removeItem(PENDING_KEY);
     }
     const text = input.trim();
@@ -267,7 +268,7 @@ export default function App() {
     setProgressStep(null);
 
     if (reply.status === 'processing') {
-      // Flash ส่งงานให้ Pro Agent แล้ว — แสดงข้อความรอ แล้ว poll ผลในพื้นหลังทุก 10 วินาที
+      // Flash ส่งงานให้ Pro Agent แล้ว — แสดงข้อความรอ แล้วฟัง onSnapshot (event-driven ไม่ polling)
       const processingMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
       setMessages(processingMessages);
       if (currentSessionId.current) {
@@ -277,23 +278,21 @@ export default function App() {
       setLoading(false);
       inputRef.current?.focus();
 
-      if (resultPollRef.current) clearInterval(resultPollRef.current);
-      resultPollRef.current = setInterval(async () => {
-        const found = await fetchResult(requestId);
-        if (found) {
-          clearInterval(resultPollRef.current);
-          resultPollRef.current = null;
-          localStorage.removeItem(PENDING_KEY);
-          setMessages(prev => {
-            const updated = [...prev, { role: 'assistant', content: found.reply }];
-            if (currentSessionId.current) {
-              updateSession(currentSessionId.current, updated);
-              setSessions(listSessions());
-            }
-            return updated;
-          });
-        }
-      }, 10000);
+      // ยกเลิก listener เดิม (ถ้ามี) แล้วเริ่มฟัง aiResults/{requestId}
+      if (unsubscribeRef.current) unsubscribeRef.current();
+      unsubscribeRef.current = listenForResult(requestId, (found) => {
+        if (unsubscribeRef.current) unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        localStorage.removeItem(PENDING_KEY);
+        setMessages(prev => {
+          const updated = [...prev, { role: 'assistant', content: found.reply }];
+          if (currentSessionId.current) {
+            updateSession(currentSessionId.current, updated);
+            setSessions(listSessions());
+          }
+          return updated;
+        });
+      });
       return;
     }
 
@@ -384,7 +383,7 @@ export default function App() {
   // ── Cleanup polling on unmount ─────────────────────────────────────────
   useEffect(() => () => {
     clearInterval(pollIntervalRef.current);
-    clearInterval(resultPollRef.current);
+    unsubscribeRef.current?.();
   }, []);
 
   // ── Handle Enter ───────────────────────────────────────────────────────
