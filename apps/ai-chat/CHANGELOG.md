@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-29 | feat: progress indicator แสดง PRO badge + step จาก tool call จริง
+- `src/App.jsx` — เพิ่ม `PRO` badge (text-ai-accent) ข้างๆ dots เมื่อโปรทำงาน (progressStep set)
+- `src/App.jsx` — แสดง step text จากการเรียก tool จริง (เช่น "กำลังอ่านไฟล์: xxx", "กำลัง patch: xxx") แทน fallback ทั่วไป
+- `src/App.jsx` — fallback text เปลี่ยนเป็น "Flash กำลังรับคำสั่ง..." เมื่อยังไม่มี step
+
 ### 2026-06-29 | fix: Pro Agent รันเสร็จแต่ UI เงียบ — progress indicator + isMaxIter + TTL
 - `src/App.jsx` — เปลี่ยน `{loading && ...}` → `{(loading || progressStep) && ...}` ให้ dots + step text โชว์ตลอดที่โปรยังทำงาน
 - `src/App.jsx` — background recovery window 30 นาที → 2 ชั่วโมง
