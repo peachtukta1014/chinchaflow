@@ -1,6 +1,6 @@
 # CHINCHA FLOW — AI Agent Architecture Diagram
 
-อัปเดต: 2026-06-23 · ตรงกับ codebase จริง (PR #349 + #351 + #352)
+อัปเดต: 2026-06-28 · ตรงกับ codebase จริง (PR #349 + #351 + #352 + #394)
 
 ---
 
@@ -43,8 +43,13 @@ flowchart TD
 
     D -->|chat| CH[โหลด context\n① JIIJI.md จาก GitHub\n② AGENTS.md + docs จาก GitHub\n③ project tree จาก Firestore\nTTL: 10 นาที / 5 นาที]
     CH --> CR[callOpenRouter\nFlash Model\ntemp=0.3 · max_tokens=2048]
-    CR --> WR1[(Firestore\naiResults/requestId)]
+    CR -->|ผลลัพธ์ปกติ| WR1[(Firestore\naiResults/requestId)]
     CR --> Z
+
+    CR -->|ตรวจพบ [WEB_SEARCH: query]| WS[🌐 Web Search\ncallOpenRouterForWebSearch\ndeepseek/deepseek-chat\n+ web plugin · max_results=3]
+    WS --> WSR[ได้ผลจากเว็บ\nส่งกลับให้ Flash\nเป็น context เพิ่มเติม]
+    WSR --> CR2[callOpenRouter\nFlash Model อีกครั้ง\nตอบสรุปพร้อมแหล่งข้อมูล]
+    CR2 --> WR1
 
     D -->|code-action\nneedsConfirmation=true| CF[ส่ง confirmationMessage\nกลับให้พีชยืนยัน\nstatus=pending-code-action]
     CF --> Z
@@ -181,3 +186,23 @@ MAX_ITERATIONS  = 15   (เดิม 30)
 SUMMARY_CHECKPOINT = 8 (เดิม 15 — รอบ 8 จีจี้บังคับสรุปก่อนวิ่งต่อ)
 timeout GitHub Actions = 30 นาที
 ```
+
+---
+
+## Web Search Flow (Flash เท่านั้น)
+
+เพิ่มใน PR #394 — Flash ตรวจ output ตัวเองก่อนส่งกลับ:
+
+```
+① Flash ตอบมา → ตรวจพบ [WEB_SEARCH: query] ในผลลัพธ์
+                       │
+② callOpenRouterForWebSearch(query)
+   model: deepseek/deepseek-chat
+   plugins: [{ id: 'web', max_results: 3 }]
+                       │
+③ ได้ผลจากเว็บ (snippet + URL) → ส่งเป็น context เพิ่มให้ Flash
+                       │
+④ Flash เรียก callOpenRouter อีกครั้ง → ตอบสรุปพร้อมแหล่งอ้างอิง
+```
+
+**กฎ:** Pro Agent ไม่มี web search — ค้นเว็บได้แค่ Flash (Cloud Function) เท่านั้น

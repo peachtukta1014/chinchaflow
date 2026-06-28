@@ -16,7 +16,7 @@ description: "ปิดงาน — ตรวจ, commit, push, เปิด PR
 
 4. **Push** — `git push -u origin <branch>`
 
-5. **PR** — เปิด PR draft ไปที่ `main` พร้อม:
+5. **PR** — เปิด PR ปกติ (ไม่ใช่ draft) ไปที่ `main` พร้อม:
    - สรุปงานที่แก้ (bullet)
    - แอปที่กระทบ + production URL
    - คำสั่ง verify ที่รันแล้ว
