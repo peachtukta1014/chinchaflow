@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-28 | (branch: claude/test-coverage-analysis-67owag)
+**feat: เพิ่ม PROJECT_STRUCTURE + AGENT_CHANGELOG เข้า agentDocs sync และ Flash context**
+- `scripts/sync-agent-docs.cjs` — เพิ่ม `docs/PROJECT_STRUCTURE.md` + `docs/AGENT_CHANGELOG_TH.md` ใน sync list
+- `src/flash/flashContext.js` — เพิ่มสองไฟล์นี้ใน `fetchChatAgentDocs()` เพื่อให้จีจี้รู้โครงสร้าง repo + changelog ล่าสุดทุก request
+
 ### 2026-06-28 | PR #391
 **fix: แก้ description exec_command — relative path + GitHub Actions runner**
 - `src/shared/toolDefinitions.js` — แก้ description `exec_command` จาก "Cloud Functions container" เป็น "GitHub Actions runner มี repo checkout เต็ม"

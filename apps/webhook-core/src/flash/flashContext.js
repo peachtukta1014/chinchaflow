@@ -56,6 +56,8 @@ async function fetchChatAgentDocs() {
   const files = await loadAgentDocs();
   const list = [
     { path: 'AGENTS.md', label: 'กฎ monorepo + กฎแต่ละแอป', maxLen: 6000 },
+    { path: 'docs/PROJECT_STRUCTURE.md', label: 'โครงสร้างไฟล์ repo', maxLen: 5000 },
+    { path: 'docs/AGENT_CHANGELOG_TH.md', label: 'changelog ล่าสุด (แก้อะไรไปแล้ว)', maxLen: 5000 },
     { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'สไตล์การทำงานของพี่พีช', maxLen: 5000 },
     { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือ agent + แผนที่ repo', maxLen: 5000 },
   ];
