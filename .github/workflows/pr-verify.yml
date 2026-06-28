@@ -280,3 +280,15 @@ jobs:
             } catch (err) {
               console.log(`❌ Auto-merge ล้มเหลว: ${err.message}`);
             }
+
+      - name: Trigger deploy after auto-merge (ai-chat)
+        if: contains(github.event.pull_request.body, '[auto-merge]') && needs.changes.outputs.ai_chat == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: token $GH_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy-hosting.yml/dispatches \
+            -d '{"ref":"main","inputs":{"deploy_shrimp":"false","deploy_tea":"false","deploy_ai_chat":"true"}}' \
+            && echo "✅ triggered deploy-hosting (ai-chat)" || echo "⚠️ trigger failed (non-fatal)"
