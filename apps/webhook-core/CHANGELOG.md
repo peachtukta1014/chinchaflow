@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-28 | fix: sync-agent-docs.cjs เขียน projectTree ด้วย + sync-project-tree.yml ใช้ Service Account
+- **อาการ:** Knowledge tab → Project Tree ว่างตลอด — `systemConfig/projectTree` ไม่มีข้อมูลใน Firestore
+- **แก้:** `scripts/sync-agent-docs.cjs` — เพิ่ม write `systemConfig/projectTree` (tree field) ควบคู่ agentDocs ใน `Promise.all`
+- **แก้:** `.github/workflows/sync-project-tree.yml` — แทน curl+GH_PAT ด้วย Service Account + `node scripts/sync-agent-docs.cjs`
+
 ### 2026-06-28 | fix: SyntaxError ใน aiWorkflowAgent.js — escape backtick ใน template literal
 - **อาการ:** Pro Agent รัน `run-github-agent.mjs` พัง `SyntaxError: Unexpected identifier 'docs'` ที่ line 393 — ทุก workflow trigger ล้มเหลวทันที
 - **สาเหตุ:** `buildAgentSystemPrompt` return template literal (backtick) ที่มี backtick `` ` `` ปนอยู่ใน body (lines 393, 395, 396) โดยไม่ escape → Node.js ปิด template ก่อนกำหนด → syntax error

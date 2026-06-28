@@ -39,40 +39,14 @@ jobs:
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Sync tree to Firestore
+      # sync projectTree + agentDocs → Firestore ผ่าน Service Account (เชื่อถือได้กว่า curl+GH_PAT)
+      - name: Sync docs to Firestore
         if: always()
         env:
-          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
-          GH_PAT: ${{ secrets.GH_PAT }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          TREE=$(cat docs/PROJECT_STRUCTURE.md)
-          curl -sf -X POST "$DEPLOY_NOTIFY_URL" \
-            -H "Authorization: Bearer $GH_PAT" \
-            -H "Content-Type: application/json" \
-            -d "{\"action\":\"project_tree\",\"tree\":$(echo "$TREE" | jq -Rs .),\"sha\":\"$GITHUB_SHA\"}" || echo "Firestore sync skipped (non-fatal)"
-
-      # sync docs (กฎ/persona/metrics) ให้ Flash อ่านจาก Firestore แทน GitHub — รันทุกครั้ง
-      - name: Sync agent docs to Firestore
-        if: always()
-        env:
-          DEPLOY_NOTIFY_URL: "https://asia-southeast1-chincha-eeed6.cloudfunctions.net/deployNotifyHttp"
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          PAYLOAD=$(jq -n \
-            --arg sha "$GITHUB_SHA" \
-            --arg jiiji    "$(cat JIIJI.md 2>/dev/null || true)" \
-            --arg agents   "$(cat AGENTS.md 2>/dev/null || true)" \
-            --arg metrics  "$(cat docs/CODE_METRICS.md 2>/dev/null || true)" \
-            --arg style    "$(cat docs/PEACH_WORKING_STYLE_TH.md 2>/dev/null || true)" \
-            --arg handbook "$(cat docs/AGENT_HANDBOOK_TH.md 2>/dev/null || true)" \
-            '{action:"agent_docs", sha:$sha, files:{
-              "JIIJI.md":$jiiji,
-              "AGENTS.md":$agents,
-              "docs/CODE_METRICS.md":$metrics,
-              "docs/PEACH_WORKING_STYLE_TH.md":$style,
-              "docs/AGENT_HANDBOOK_TH.md":$handbook
-            }}')
-          curl -sf -X POST "$DEPLOY_NOTIFY_URL" \
-            -H "Authorization: Bearer $GH_PAT" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" || echo "agent_docs sync skipped (non-fatal)"
+          echo "$FIREBASE_SERVICE_ACCOUNT" > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          cd apps/webhook-core && npm install --prefer-offline --silent
+          node scripts/sync-agent-docs.cjs

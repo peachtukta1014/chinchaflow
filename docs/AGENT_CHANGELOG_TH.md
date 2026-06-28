@@ -1,3 +1,12 @@
+## 2026-06-28 — fix: Knowledge tab "Project Tree" ว่าง — sync-project-tree.yml ใช้ Service Account แทน curl
+
+- **อาการ:** Knowledge tab → Project Tree แสดง "ยังไม่มีข้อมูล" ตลอด — `systemConfig/projectTree` ว่างเปล่าใน Firestore
+- **สาเหตุ:** `sync-project-tree.yml` ใช้ curl + GH_PAT Bearer auth ส่ง POST ไปหา `deployNotifyHttp` เพื่อ write Firestore — แต่ล้มเหลวเงียบๆ (`|| echo "skipped (non-fatal)"`) เพราะ GH_PAT มีปัญหา
+- **แก้:**
+  - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เพิ่ม write `systemConfig/projectTree` ควบคู่กับ `systemConfig/agentDocs` ในครั้งเดียว (ใช้ `Promise.all`)
+  - `.github/workflows/sync-project-tree.yml` — แทนที่ 2 ขั้น curl (Sync tree + Sync agent docs) ด้วยขั้นเดียว: เขียน Service Account `/tmp/sa.json` → `npm install` → `node scripts/sync-agent-docs.cjs` (Service Account ไม่มีปัญหา auth)
+- ถ้าพัง: เช็ก `FIREBASE_SERVICE_ACCOUNT` ใน GitHub Secrets ว่ามีอยู่ไหม, รัน `sync-project-tree.yml` ด้วย workflow_dispatch แล้วดู log
+
 ## 2026-06-28 — fix: SyntaxError ใน aiWorkflowAgent.js — Pro Agent ไม่ตื่นเลย
 
 - **อาการ:** ส่งงานผ่าน ai-chat → Flash dispatch → GitHub Actions trigger → Pro Agent รัน `node scripts/run-github-agent.mjs` แล้วพัง `SyntaxError: Unexpected identifier 'docs'` ที่ `aiWorkflowAgent.js:393` — ทุกงานล้มเหลวทันที Pro ไม่ทำงานได้เลย

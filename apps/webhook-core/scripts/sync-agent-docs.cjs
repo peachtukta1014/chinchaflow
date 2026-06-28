@@ -35,15 +35,25 @@ const files = {
 const trimmed = Object.fromEntries(Object.entries(files).filter(([, v]) => v));
 console.log(`📢 ไฟล์ที่พบ ${Object.keys(trimmed).length} ไฟล์: ${Object.keys(trimmed).join(', ')}`);
 
-db.collection('systemConfig').doc('agentDocs')
-  .set({
+const sha = process.env.GITHUB_SHA || '';
+const updatedAt = new Date().toISOString();
+
+Promise.all([
+  db.collection('systemConfig').doc('agentDocs').set({
     files: trimmed,
-    sha: process.env.GITHUB_SHA || '',
-    updatedAt: new Date().toISOString(),
+    sha,
+    updatedAt,
     syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-  })
+  }),
+  db.collection('systemConfig').doc('projectTree').set({
+    tree: files['docs/PROJECT_STRUCTURE.md'] || '',
+    sha,
+    updatedAt,
+    syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }),
+])
   .then(() => {
-    console.log('✅ ซิงค์คู่มือ AI เข้า Firestore agentDocs สำเร็จ!');
+    console.log('✅ ซิงค์ agentDocs + projectTree เข้า Firestore สำเร็จ!');
     process.exit(0);
   })
   .catch((err) => {
