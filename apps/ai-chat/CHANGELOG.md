@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-29 | fix: Pro Agent รันเสร็จแต่ UI เงียบ — progress indicator + isMaxIter + TTL
+- `src/App.jsx` — เปลี่ยน `{loading && ...}` → `{(loading || progressStep) && ...}` ให้ dots + step text โชว์ตลอดที่โปรยังทำงาน
+- `src/App.jsx` — background recovery window 30 นาที → 2 ชั่วโมง
+- `apps/webhook-core/src/aiWorkflowAgent.js` — isMaxIter เพิ่ม regex ตรวจ Thai error `'เกิน N รอบ'`
+- `apps/webhook-core/src/shared/progressTracker.js` — writeResult TTL 30 นาที → 2 ชั่วโมง
+
 ### 2026-06-29 | fix: เลขเวอร์ชันแสดงวันที่ผิด — UTC vs ไทย UTC+7
 - `.github/workflows/deploy-hosting.yml` Bump version step — เปลี่ยน `date -u` → `TZ=Asia/Bangkok date` (BE_YY, DDMMYY, TODAY)
 

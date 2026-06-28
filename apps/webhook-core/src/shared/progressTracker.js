@@ -68,7 +68,7 @@ async function writeResult(requestId, data) {
   if (!requestId) return;
   try {
     const { Timestamp } = require('firebase-admin/firestore');
-    const expiresAtMillis = Date.now() + 30 * 60 * 1000; // +30 นาที
+    const expiresAtMillis = Date.now() + 2 * 60 * 60 * 1000; // +2 ชั่วโมง
     
     await getDb().doc(`aiResults/${requestId}`).set({
       ...data,
