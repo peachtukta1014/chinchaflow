@@ -26,15 +26,6 @@ chinchaflow/
 │       ├── peter-ser.md
 │       ├── ship-shrimp.md
 │       └── ship-tea.md
-├── .cursor
-│   ├── skills
-│   │   ├── auto-shrimp
-│   │   ├── auto-tea
-│   │   ├── land-it
-│   │   ├── peter-ser
-│   │   ├── ship-shrimp
-│   │   └── ship-tea
-│   └── environment.json
 ├── .github
 │   └── workflows
 │       ├── ai-workflow-trigger.yml
