@@ -43,3 +43,9 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
           AGENT_TASK_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+
+      - name: Sync project tree → Firestore
+        if: always()
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+        run: node apps/webhook-core/scripts/sync-project-tree.cjs || echo "sync-project-tree skipped (non-fatal)"

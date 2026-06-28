@@ -395,6 +395,13 @@ service cloud.firestore {
       allow delete: if isAdminShrimp();
     }
 
+    // ผลลัพธ์ Pro Agent — อ่านได้เฉพาะคนที่รู้ requestId (UUID ไม่เดาได้)
+    // เขียนได้เฉพาะ Service Account (backend) ผ่าน firebase-admin
+    match /aiResults/{requestId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
