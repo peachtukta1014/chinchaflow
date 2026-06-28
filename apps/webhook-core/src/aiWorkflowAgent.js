@@ -488,7 +488,7 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
 
     const isReasoningContentError = /reasoning_content.*thinking mode/i.test(err.message || '');
     const isTransient = !isReasoningContentError && /GitHub \d{3}|OpenRouter \d{3}|fetch failed|ECONNRESET|ETIMEDOUT/.test(err.message || '');
-    const isMaxIter = err.message?.includes('MAX_ITERATIONS');
+    const isMaxIter = err.message?.includes('MAX_ITERATIONS') || /Agent loop เกิน|เกิน \d+ รอบ/.test(err.message || '');
 
     let userMsg;
     if (isMaxIter) {

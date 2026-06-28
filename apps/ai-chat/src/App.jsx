@@ -82,7 +82,7 @@ function AppShell({ user }) {
       if (!raw) return;
       let pending;
       try { pending = JSON.parse(raw); } catch { localStorage.removeItem(PENDING_KEY); return; }
-      if (Date.now() - (pending.ts || 0) > 30 * 60 * 1000) { localStorage.removeItem(PENDING_KEY); return; }
+      if (Date.now() - (pending.ts || 0) > 2 * 60 * 60 * 1000) { localStorage.removeItem(PENDING_KEY); return; }
 
       setLoading(true);
       setProgressStep('กำลังดึงผลลัพธ์จากฉากหลัง...');
@@ -579,7 +579,7 @@ function AppShell({ user }) {
           </div>
         ))}
 
-        {loading && (
+        {(loading || progressStep) && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-full overflow-hidden border border-ai-border shrink-0">
               <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />

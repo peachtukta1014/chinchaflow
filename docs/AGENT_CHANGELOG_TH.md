@@ -1,3 +1,16 @@
+## 2026-06-29 — fix: Pro Agent รันเสร็จแต่ UI เงียบ — progress indicator หาย + isMaxIter ผิด + TTL สั้น
+
+- **อาการ:** ส่งงานให้โปร Flash ตอบ "processing" แล้ว UI เงียบสนิท — ไม่มีสถานะ ไม่มีผลลัพธ์ แม้โปรทำงานครบ 15 รอบ
+- **สาเหตุ 1 (หลัก):** `App.jsx` — หลัง Flash ตอบ "processing" เรียก `setLoading(false)` → progress indicator `{loading && ...}` หายทันที ทั้งที่ `pollProgress` ยังอัปเดต `progressStep` อยู่ข้างใน
+- **สาเหตุ 2:** `aiWorkflowAgent.js` — `isMaxIter` เช็ค `'MAX_ITERATIONS'` (ภาษาอังกฤษ) แต่ error ที่โยนมาจาก `agentTools.js` เป็นภาษาไทย `'Agent loop เกิน 15 รอบ...'` → isMaxIter = false เสมอ → ผู้ใช้ได้รับข้อความ error ทั่วไปแทนคำแนะนำแบ่งงาน
+- **สาเหตุ 3:** `progressTracker.js` writeResult TTL 30 นาที — มือถือ (พีชขับรถส่งกุ้ง) ปิดหน้าจอนานกว่า 30 นาที แล้วกลับมาผลลัพธ์หาย
+- **แก้:**
+  - `apps/ai-chat/src/App.jsx` line 582 — เปลี่ยน `{loading && ...}` → `{(loading || progressStep) && ...}` ให้ progress indicator โชว์ตลอดที่มี step อยู่
+  - `apps/ai-chat/src/App.jsx` line 85 — เปลี่ยน recovery window จาก 30 นาที → 2 ชั่วโมง
+  - `apps/webhook-core/src/aiWorkflowAgent.js` line 491 — เพิ่ม regex `/Agent loop เกิน|เกิน \d+ รอบ/` ใน isMaxIter เช็ค
+  - `apps/webhook-core/src/shared/progressTracker.js` line 71 — เปลี่ยน TTL จาก 30 นาที → 2 ชั่วโมง
+- ถ้าพัง: ตรวจ `pollProgress` ว่า return step จริงไหม, เช็ค Firestore `aiProgress/{requestId}` มีข้อมูลไหม
+
 ## 2026-06-29 — fix: เลขเวอร์ชัน ai-chat ยังเป็นวันที่เมื่อวาน — ผิด timezone UTC vs ไทย
 
 - **อาการ:** เลขเวอร์ชันใน header (เช่น `ai-280669.7`) ยังโชว์วันที่เมื่อวาน แม้จะ deploy วันใหม่แล้ว — เพราะพีชอยู่ UTC+7 แต่ script รัน `date -u` (UTC)
