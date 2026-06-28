@@ -73,7 +73,7 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
     if (!apiKey) {
       res.status(500).json({ error: 'OPENROUTER_API_KEY ไม่ได้ตั้งค่า' });
       return;
