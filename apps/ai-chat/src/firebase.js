@@ -28,10 +28,19 @@ let _db = null;
 
 function getApp() {
   if (_app) return _app;
+  
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  
+  // 💡 ป้องกันกรณีเอเจ้นเขียนโค้ดเพี้ยน หรือติดเครื่องหมาย < > / ขึ้นบรรทัดใหม่มาจากตัวบิลด์
+  let authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  if (authDomain) {
+    authDomain = authDomain.replace(/[<>\s]/g, '').trim();
+  }
+
   if (!apiKey || !projectId) return null;
+  
+  // ใช้ค่า authDomain ที่ถูกกรองจนสะอาดแล้ว
   _app = getApps()[0] ?? initializeApp({ apiKey, projectId, authDomain });
   return _app;
 }
@@ -50,8 +59,13 @@ export async function signInWithGoogle() {
   if (!app) throw new Error('Firebase not configured');
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
+  
+  // ช่วย Hint อีเมลของพีชไว้ล่วงหน้าตอนหน้าต่าง Google Pop-up เด้งขึ้นมา
   provider.setCustomParameters({ login_hint: ALLOWED_EMAIL });
+  
   const result = await signInWithPopup(auth, provider);
+  
+  // ระบบล็อกความปลอดภัยสูงสุด — ถ้าไม่ใช่เมลพีช ระบบจะเตะออกทันที
   if (result.user.email !== ALLOWED_EMAIL) {
     await signOut(auth);
     throw new Error('ไม่ได้รับอนุญาต — ใช้บัญชี peachtukta1014@gmail.com เท่านั้น');
