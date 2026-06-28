@@ -13,7 +13,6 @@
   - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เพิ่ม `docs/PROJECT_STRUCTURE.md` + `docs/AGENT_CHANGELOG_TH.md` ใน sync list
   - `apps/webhook-core/src/flash/flashContext.js` — เพิ่มสองไฟล์นี้ใน `fetchChatAgentDocs()` (จีจี้ได้ context ครบ)
 - ถ้าพัง: รัน `node apps/webhook-core/scripts/sync-agent-docs.cjs` ใน CI หลัง deploy functions แล้วดู `systemConfig/agentDocs` ใน Firestore Console
-
 ## 2026-06-28 — fix: progress polling ระหว่างรอ Pro + timeout 10 นาที (PR #392)
 
 - **อาการ:** หลัง Flash ตอบ "กำลังดำเนินการ" → ผู้ใช้ไม่เห็น feedback จาก Pro Agent ระหว่างรอ; timeout 5 นาทีเกินก่อน Pro เขียนผล (mobile browser throttle setInterval ตอน background)
