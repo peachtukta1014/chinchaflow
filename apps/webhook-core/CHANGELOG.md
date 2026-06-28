@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-28 | PR #391
+**fix: แก้ description exec_command — relative path + GitHub Actions runner**
+- `src/shared/toolDefinitions.js` — แก้ description `exec_command` จาก "Cloud Functions container" เป็น "GitHub Actions runner มี repo checkout เต็ม"
+- เพิ่มกฎชัดเจน: ใช้ relative path เสมอ (ห้ามขึ้นต้น `/`)
+- แก้ปัญหา AI รัน `node /apps/seafood-pos/scripts/smoke-test.mjs` แทน `node apps/...`
+
 ### 2026-06-28 | PR #379
 **fix: bump X-Notify-Rev '4' แก้ 401 Sync Agent Docs step**
 - `index.js` — `X-Notify-Rev` '3' → '4' บังคับ Firebase redeploy `deployNotifyHttp` ดึง `.env` ใหม่

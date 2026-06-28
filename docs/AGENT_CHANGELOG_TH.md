@@ -1,3 +1,23 @@
+## 2026-06-28 — fix: progress polling ระหว่างรอ Pro + timeout 10 นาที (PR #392)
+
+- **อาการ:** หลัง Flash ตอบ "กำลังดำเนินการ" → ผู้ใช้ไม่เห็น feedback จาก Pro Agent ระหว่างรอ; timeout 5 นาทีเกินก่อน Pro เขียนผล (mobile browser throttle setInterval ตอน background)
+- **สาเหตุ:** `pollIntervalRef` ถูก clear ทันทีที่ Flash ตอบ "processing" → Pro Agent steps ไม่โชว์; count-based timeout 60×5s ขึ้นกับจำนวน poll จริงซึ่งลดลงตอน background
+- **แก้:** `apps/ai-chat/src/App.jsx`
+  - ต่อ `pollProgress` (3s) ระหว่างรอ result → แสดง ACK + steps จาก Pro Agent ใน progress indicator
+  - เปลี่ยน timeout เป็น time-based `Date.now() - startTime < 10*60*1000` แทน count-based
+  - `unsubscribeRef` cleanup ล้าง `pollIntervalRef` ด้วยเสมอ
+- ถ้าพัง: เช็ก `aiProgress/{requestId}` ใน Firestore ว่า Pro เขียน step มาไหม
+
+## 2026-06-28 — fix: result delivery เป็น HTTP polling + แก้ path exec_command (PR #391)
+
+- **อาการ:** ผลลัพธ์จาก Pro Agent ไม่กลับมาใน UI เลย (เงียบ) หลังส่งคำสั่ง; Pro Agent รัน `node /apps/seafood-pos/scripts/smoke-test.mjs` path ผิด (ขึ้นต้น `/`)
+- **สาเหตุ 1 (UI):** `listenForResult` ใช้ Firestore `onSnapshot` จาก browser — Firestore Security Rules block → fail แบบเงียบ (`console.warn` เท่านั้น)
+- **สาเหตุ 2 (path):** `exec_command` description ใน `toolDefinitions.js` บอก AI ว่ารันใน "Cloud Functions container" และ "ไม่มีไฟล์โปรเจกต์" (ข้อมูลเก่า) → AI ใช้ absolute path `/apps/...`
+- **แก้:**
+  - `apps/ai-chat/src/App.jsx` — แทน `listenForResult` ด้วย `setInterval` + `fetchResult` HTTP ทุก 5s (ผ่าน Firebase Admin SDK, bypass Rules)
+  - `apps/webhook-core/src/shared/toolDefinitions.js` — แก้ description `exec_command` ให้บอกว่ารันใน GitHub Actions runner มี repo เต็ม + ย้ำ "ใช้ relative path เสมอ (ห้ามขึ้นต้น /)"
+- ถ้าพัง: เช็ก `aiResults/{requestId}` ใน Firestore ว่า Pro เขียนผลแล้วไหม · เช็ก endpoint `GET ?action=result&requestId=xxx` ตอบอะไร
+
 ## 2026-06-28 — fix: Pro Agent ตื่นได้ + ACK กลับ UI (PR #381)
 
 - **อาการ:** พิมพ์ "โอเคกุ้ง" → dispatch ส่งไปถึง GitHub แต่ Pro Agent ไม่ตื่น ไม่มี ACK กลับ UI เลย
