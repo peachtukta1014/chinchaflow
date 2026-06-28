@@ -22,7 +22,7 @@
  */
 
 const functions = require('firebase-functions/v1');
-const { writeProgress, clearProgress } = require('./shared/progressTracker');
+const { writeProgress, clearProgress, writeResult } = require('./shared/progressTracker');
 const { runAgentLoop } = require('./shared/agentTools');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
@@ -448,6 +448,15 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     });
 
     await clearProgress(requestId);
+
+    // Pro Agent รัน GitHub Actions — ไม่มี HTTP response ให้ client โดยตรง
+    // เขียนผลลัพธ์ลง Firestore ให้ frontend poll ได้
+    await writeResult(requestId, {
+      reply: result.reply,
+      scope: currentScope,
+      intent: 'code-action',
+      status: 'completed',
+    });
 
     return {
       statusCode: 200,
