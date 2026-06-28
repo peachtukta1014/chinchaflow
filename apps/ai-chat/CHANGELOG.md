@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-28 | PR (this)
+**feat: เพิ่ม Google Sign-in login (whitelist peachtukta1014@gmail.com)**
+- `src/firebase.js` — เพิ่ม `signInWithGoogle`, `signOutUser`, `onAuthChanged`; เพิ่ม `authDomain` ใน config
+- `src/App.jsx` — auth gate (App → LoginScreen / AppShell); ปุ่ม logout ใน header
+- `.github/workflows/deploy-hosting.yml` — เพิ่ม `VITE_FIREBASE_AUTH_DOMAIN` env var
+
 ### 2026-06-28 | PR #392
 **fix: progress polling ระหว่างรอ Pro Agent + timeout 10 นาที**
 - `src/App.jsx` — ต่อ `pollProgress` (3s) หลัง "processing" เพื่อแสดง ACK + steps จาก Pro
