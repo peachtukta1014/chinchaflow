@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
-import { listenForResult } from './firebase';
+import { listenForResult, getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -81,6 +81,10 @@ export default function App() {
   const [progressStep, setProgressStep] = useState(null);
   const [deployBanner, setDeployBanner] = useState(null);
   const [sessions, setSessions] = useState(() => listSessions());
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'knowledge' | 'tokens'
+  const [knowledgeData, setKnowledgeData] = useState({ tree: '', docs: {}, notes: '', notesLoading: false, notesSaving: false });
+  const [tokenLogs, setTokenLogs] = useState([]);
+  const [tokenLogsLoading, setTokenLogsLoading] = useState(false);
   const chatEnd = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -386,6 +390,36 @@ export default function App() {
     unsubscribeRef.current?.();
   }, []);
 
+  // ── Load Knowledge tab data ────────────────────────────────────────────
+  const loadKnowledge = useCallback(async () => {
+    setKnowledgeData(prev => ({ ...prev, notesLoading: true }));
+    const [tree, docs, notes] = await Promise.all([
+      getProjectTree().catch(() => ''),
+      getAgentDocs().catch(() => ({})),
+      getCustomNotes().catch(() => ''),
+    ]);
+    setKnowledgeData({ tree, docs, notes, notesLoading: false, notesSaving: false });
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'knowledge') loadKnowledge();
+    if (activeTab === 'tokens') {
+      setTokenLogsLoading(true);
+      getRecentTokenLogs(20).then(logs => { setTokenLogs(logs); setTokenLogsLoading(false); });
+    }
+  }, [activeTab, loadKnowledge]);
+
+  const handleSaveNotes = useCallback(async (notes) => {
+    setKnowledgeData(prev => ({ ...prev, notesSaving: true }));
+    try {
+      await saveCustomNotes(notes);
+      setKnowledgeData(prev => ({ ...prev, notes, notesSaving: false }));
+    } catch (err) {
+      alert('บันทึกไม่ได้: ' + err.message);
+      setKnowledgeData(prev => ({ ...prev, notesSaving: false }));
+    }
+  }, []);
+
   // ── Handle Enter ───────────────────────────────────────────────────────
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -456,31 +490,54 @@ export default function App() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header
-        className="flex items-center justify-between px-4 border-b border-ai-border bg-ai-card shrink-0"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))', paddingBottom: '0.75rem' }}
+        className="border-b border-ai-border bg-ai-card shrink-0"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setSessions(listSessions()); setShowHistory(true); }}
-            className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors"
-            title="ประวัติแชท"
-          >
-            <IconHistory />
-          </button>
-          <span className="text-lg">🌸</span>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight">จีจี้</h1>
-            <p className="text-[10px] text-ai-muted">CHINCHA FLOW · <span className="text-ai-accent/70">{APP_VERSION}</span></p>
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setSessions(listSessions()); setShowHistory(true); }}
+              className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors"
+              title="ประวัติแชท"
+            >
+              <IconHistory />
+            </button>
+            <span className="text-lg">🌸</span>
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">จีจี้</h1>
+              <p className="text-[10px] text-ai-muted">CHINCHA FLOW · <span className="text-ai-accent/70">{APP_VERSION}</span></p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab === 'chat' && (
+              <button onClick={newChat} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="แชทใหม่">
+                <IconPlus />
+              </button>
+            )}
+            <button onClick={() => window.location.reload()} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="โหลดหน้าใหม่">
+              <IconRefresh />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* 🔥 [ลบออก] ชุด Dropdown ระบบ Scope Picker ทั้งดุ้นเรียบร้อยค่ะ */}
-          <button onClick={newChat} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="แชทใหม่">
-            <IconPlus />
-          </button>
-          <button onClick={() => window.location.reload()} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="โหลดหน้าใหม่">
-            <IconRefresh />
-          </button>
+        {/* Tab bar */}
+        <div className="flex border-t border-ai-border">
+          {[
+            { id: 'chat', label: '💬 แชท' },
+            { id: 'knowledge', label: '📂 Knowledge' },
+            { id: 'tokens', label: '📊 Tokens' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'text-ai-accent border-b-2 border-ai-accent'
+                  : 'text-ai-muted hover:text-ai-text'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -495,8 +552,25 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Knowledge Panel ───────────────────────────────────────────── */}
+      {activeTab === 'knowledge' && (
+        <KnowledgePanel data={knowledgeData} onSave={handleSaveNotes} onRefresh={loadKnowledge} />
+      )}
+
+      {/* ── Token Dashboard ───────────────────────────────────────────── */}
+      {activeTab === 'tokens' && (
+        <TokenDashboard
+          logs={tokenLogs}
+          loading={tokenLogsLoading}
+          onRefresh={() => {
+            setTokenLogsLoading(true);
+            getRecentTokenLogs(20).then(logs => { setTokenLogs(logs); setTokenLogsLoading(false); });
+          }}
+        />
+      )}
+
       {/* ── Messages ──────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-thin">
+      {activeTab === 'chat' && <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-thin">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
@@ -545,10 +619,10 @@ export default function App() {
         )}
 
         <div ref={chatEnd} />
-      </div>
+      </div>}
 
-      {/* ── Input bar ─────────────────────────────────────────────────── */}
-      <div
+      {/* ── Input bar (chat only) ─────────────────────────────────────── */}
+      {activeTab === 'chat' && <div
         className="px-3 py-3 border-t border-ai-border bg-ai-card shrink-0"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
@@ -663,8 +737,173 @@ export default function App() {
           className="hidden"
           onChange={handleFileSelect}
         />
+      </div>}
+
+    </div>
+  );
+}
+
+// ── Knowledge Panel component ────────────────────────────────────────────────
+function KnowledgePanel({ data, onSave, onRefresh }) {
+  const [section, setSection] = useState('notes'); // 'notes' | 'tree' | 'docs'
+  const [localNotes, setLocalNotes] = useState(data.notes || '');
+
+  useEffect(() => { setLocalNotes(data.notes || ''); }, [data.notes]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Sub-tabs */}
+      <div className="flex border-b border-ai-border bg-ai-card shrink-0">
+        {[
+          { id: 'notes', label: '✏️ Custom Skills' },
+          { id: 'tree', label: '📂 Project Tree' },
+          { id: 'docs', label: '📚 Agent Docs' },
+        ].map(s => (
+          <button
+            key={s.id}
+            onClick={() => setSection(s.id)}
+            className={`flex-1 py-2 text-[11px] font-medium transition-colors ${
+              section === s.id ? 'text-ai-accent border-b-2 border-ai-accent' : 'text-ai-muted'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+        <button onClick={onRefresh} className="px-3 text-ai-muted hover:text-ai-accent transition-colors" title="รีเฟรช">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+          </svg>
+        </button>
       </div>
 
+      {data.notesLoading ? (
+        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">กำลังโหลด...</div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {/* Custom Skills / Notes — editable */}
+          {section === 'notes' && (
+            <div className="p-4 flex flex-col h-full gap-3">
+              <p className="text-[11px] text-ai-muted leading-relaxed">
+                จีจี้จะอ่าน Custom Skills ทุกครั้งที่คุย — ใส่ข้อมูลร้าน, style การตอบ, หรือสกิลเพิ่มเติมได้เลยครับพี่
+              </p>
+              <textarea
+                value={localNotes}
+                onChange={e => setLocalNotes(e.target.value)}
+                placeholder={'ตัวอย่าง:\n- ร้านกุ้งส่งทุกวันจันทร์-ศุกร์\n- ลูกค้าประจำ: คุณA ชอบกุ้งขนาดใหญ่\n- Flash ตอบสั้นๆ ไม่เกิน 3 บรรทัด\n- ราคากุ้งปัจจุบัน: ตัวเล็ก 80/kg, ใหญ่ 120/kg'}
+                className="flex-1 w-full min-h-[200px] resize-none bg-ai-bg border border-ai-border rounded-xl p-3 text-sm text-ai-text placeholder-ai-muted outline-none focus:border-ai-accent transition-colors font-mono"
+                style={{ height: '300px' }}
+              />
+              <button
+                onClick={() => onSave(localNotes)}
+                disabled={data.notesSaving}
+                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  data.notesSaving
+                    ? 'bg-ai-border text-ai-muted cursor-not-allowed'
+                    : 'bg-ai-accent text-white hover:brightness-110'
+                }`}
+              >
+                {data.notesSaving ? 'กำลังบันทึก...' : 'บันทึก Custom Skills'}
+              </button>
+            </div>
+          )}
+
+          {/* Project Tree — read-only */}
+          {section === 'tree' && (
+            <div className="p-4">
+              {data.tree ? (
+                <pre className="text-[11px] text-ai-text font-mono leading-relaxed whitespace-pre-wrap break-all">
+                  {data.tree}
+                </pre>
+              ) : (
+                <p className="text-ai-muted text-sm text-center mt-8">ยังไม่มีข้อมูล — รัน Pro Agent ครั้งแรกแล้วจะ sync อัตโนมัติ</p>
+              )}
+            </div>
+          )}
+
+          {/* Agent Docs — read-only */}
+          {section === 'docs' && (
+            <div className="p-4 space-y-4">
+              {Object.keys(data.docs).length === 0 ? (
+                <p className="text-ai-muted text-sm text-center mt-8">ยังไม่มีข้อมูล</p>
+              ) : Object.entries(data.docs).map(([filename, content]) => (
+                <div key={filename}>
+                  <p className="text-[11px] font-semibold text-ai-accent mb-1">{filename}</p>
+                  <pre className="text-[11px] text-ai-muted font-mono leading-relaxed whitespace-pre-wrap break-words bg-ai-bg rounded-lg p-2 max-h-40 overflow-y-auto">
+                    {content}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Token Dashboard component ────────────────────────────────────────────────
+function TokenDashboard({ logs, loading, onRefresh }) {
+  const fmt = n => (n || 0).toLocaleString();
+  const totalByModel = (log) => {
+    const f = log.flash || {};
+    const v = log.vision || {};
+    const p = log.pro || {};
+    return {
+      input: (f.input || 0) + (v.input || 0) + (p.input || 0),
+      output: (f.output || 0) + (v.output || 0) + (p.output || 0),
+    };
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-ai-border shrink-0">
+        <span className="text-xs text-ai-muted">20 requests ล่าสุด</span>
+        <button onClick={onRefresh} className="text-xs text-ai-accent hover:brightness-110 transition-colors">รีเฟรช</button>
+      </div>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">กำลังโหลด...</div>
+      ) : logs.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">ยังไม่มีข้อมูล Token</div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          {logs.map(log => {
+            const tot = totalByModel(log);
+            return (
+              <div key={log.id} className="bg-ai-card border border-ai-border rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-ai-muted font-mono">{log.requestId?.slice(0, 8)}…</span>
+                  <span className="text-[10px] text-ai-muted">
+                    {log.createdAt ? new Date(log.createdAt).toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  {[
+                    { label: '⚡ Flash', data: log.flash },
+                    { label: '👁 Vision', data: log.vision },
+                    { label: '🤖 Pro', data: log.pro },
+                  ].map(({ label, data: d }) => (
+                    <div key={label} className={`rounded-lg px-2 py-1.5 ${d ? 'bg-ai-bg' : 'bg-ai-bg opacity-30'}`}>
+                      <p className="text-[10px] text-ai-muted mb-0.5">{label}</p>
+                      {d ? (
+                        <>
+                          <p className="text-[11px] font-medium text-ai-text">{fmt(d.input)}↑</p>
+                          <p className="text-[11px] font-medium text-ai-accent">{fmt(d.output)}↓</p>
+                          {d.iterations && <p className="text-[9px] text-ai-muted">{d.iterations} iters</p>}
+                        </>
+                      ) : <p className="text-[11px] text-ai-muted">—</p>}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-[10px] text-ai-muted pt-1 border-t border-ai-border">
+                  <span>รวม input: <strong className="text-ai-text">{fmt(tot.input)}</strong></span>
+                  <span>รวม output: <strong className="text-ai-accent">{fmt(tot.output)}</strong></span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
