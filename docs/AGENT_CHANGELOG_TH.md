@@ -1,3 +1,14 @@
+## 2026-06-28 — fix: ลบ auto-merge ออกจาก pr-verify.yml + แก้ sync-project-tree ไม่รัน
+
+- **อาการ:** Knowledge tab (Project Tree) ว่างเปล่าทุกครั้งที่ PR merge — `sync-project-tree.yml` ไม่ trigger หลัง merge
+- **สาเหตุ:** `pr-verify.yml` `auto_merge` job ใช้ `GITHUB_TOKEN` merge PR → GitHub ไม่ trigger workflow จากการ push ของ GITHUB_TOKEN → `sync-project-tree.yml` ไม่รัน
+- **แก้:**
+  - `.github/workflows/pr-verify.yml` — ลบ `auto_merge` job ออกทั้งหมด (75 บรรทัด)
+  - `CLAUDE.md` — เปลี่ยน "ใส่ `[auto-merge]` ในบอดี้" เป็น "รอพีชกด merge หรือบอกพี่ซี merge ให้"
+  - Trigger `sync-project-tree.yml` via workflow_dispatch เพื่อ populate projectTree ใน Firestore ทันที
+- **วิธี merge PR ต่อไป:** พีชกด merge เอง หรือสั่ง "พี่ซีช่วย merge PR #xxx ให้หน่อย" → พี่ซีรัน `gh pr merge --squash`
+- ถ้าพัง: เช็ก `sync-project-tree.yml` ว่ารันหลัง merge ไหม — ถ้าไม่รัน trigger ด้วย workflow_dispatch
+
 ## 2026-06-28 — feat: จีจี้ค้นเว็บได้ (on-demand web search, two-model) + แก้ flashPrompts + JIIJI.md
 
 - **ฟีเจอร์ใหม่:** จีจี้ค้นข้อมูลเว็บได้เมื่อคำถามต้องการข้อมูลล่าสุด (ราคาตลาด, ข่าว ฯลฯ) — ไม่เปิดตลอด เปิดเฉพาะตอนจำเป็น
