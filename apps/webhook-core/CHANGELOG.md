@@ -8,6 +8,12 @@
 ## 2026-06
 
 ### 2026-06-28 | (branch: claude/test-coverage-analysis-67owag)
+**feat: จีจี้ค้นเว็บได้ (on-demand web search) + แก้ prompt + JIIJI.md**
+- `src/flash/flashModels.js` — เพิ่ม `SEARCH_MODEL = 'deepseek/deepseek-chat'` + `callOpenRouterForWebSearch()` (OpenRouter web plugin)
+- `src/aiChatAgent.js` — two-model web search flow: Flash signal `[WEB_SEARCH: query]` → deepseek-chat ค้นเว็บ → Flash ตอบอีกรอบ
+- `src/flash/flashPrompts.js` — แก้คำอธิบาย AI tools: พี่ซี (Claude Code) ยังมีอยู่ (session แยก), เอาแค่ Cursor Cloud Agent ออก
+- `JIIJI.md` — ลบ GH_PAT fallback ออก (security: Flash ใช้ GH_PAT_DISPATCH เท่านั้น)
+
 **feat: เพิ่ม PROJECT_STRUCTURE + AGENT_CHANGELOG เข้า agentDocs sync และ Flash context**
 - `scripts/sync-agent-docs.cjs` — เพิ่ม `docs/PROJECT_STRUCTURE.md` + `docs/AGENT_CHANGELOG_TH.md` ใน sync list
 - `src/flash/flashContext.js` — เพิ่มสองไฟล์นี้ใน `fetchChatAgentDocs()` เพื่อให้จีจี้รู้โครงสร้าง repo + changelog ล่าสุดทุก request

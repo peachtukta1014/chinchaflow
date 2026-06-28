@@ -1,3 +1,14 @@
+## 2026-06-28 — feat: จีจี้ค้นเว็บได้ (on-demand web search, two-model) + แก้ flashPrompts + JIIJI.md
+
+- **ฟีเจอร์ใหม่:** จีจี้ค้นข้อมูลเว็บได้เมื่อคำถามต้องการข้อมูลล่าสุด (ราคาตลาด, ข่าว ฯลฯ) — ไม่เปิดตลอด เปิดเฉพาะตอนจำเป็น
+- **Two-model flow:** Flash (deepseek-v4-flash) ตัดสินใจก่อน → ถ้าต้องค้นเว็บ ส่งสัญญาณ `[WEB_SEARCH: <query>]` → `deepseek-chat` ค้นเว็บ (web plugin) → Flash ตอบอีกรอบด้วยข้อมูลจริง
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashModels.js` — เพิ่ม `SEARCH_MODEL = 'deepseek/deepseek-chat'` + `callOpenRouterForWebSearch()` (plugins: web)
+  - `apps/webhook-core/src/aiChatAgent.js` — เพิ่ม web search signal detection + two-model re-call flow; import `callOpenRouterForWebSearch`
+  - `apps/webhook-core/src/flash/flashPrompts.js` — แก้ line 39: ระบุชัดว่า พี่ซี (Claude Code / claude.ai/code) ยังมีอยู่, เอาแค่ Cursor Cloud Agent ออก
+  - `JIIJI.md` — ลบ Authentication Fallback Rule (GH_PAT fallback) ออก — Flash ใช้แค่ `GH_PAT_DISPATCH` เสมอ (security isolation)
+- ถ้าพัง: เช็ก `SEARCH_MODEL` env หรือ `process.env.OPENROUTER_API_KEY` ใช้ได้กับ deepseek-chat + web plugin ไหม
+
 ## 2026-06-28 — fix: deploy Firestore Rules ใหม่ — Knowledge tab + aiResults ถูก deny จาก rules เก่า
 
 - **อาการ:** Knowledge tab → Agent Docs และ Project Tree ว่างเปล่า; aiResults อ่านไม่ได้ (อาจกระทบ result delivery); Tokens tab ว่าง
@@ -13,7 +24,6 @@
   - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เพิ่ม `docs/PROJECT_STRUCTURE.md` + `docs/AGENT_CHANGELOG_TH.md` ใน sync list
   - `apps/webhook-core/src/flash/flashContext.js` — เพิ่มสองไฟล์นี้ใน `fetchChatAgentDocs()` (จีจี้ได้ context ครบ)
 - ถ้าพัง: รัน `node apps/webhook-core/scripts/sync-agent-docs.cjs` ใน CI หลัง deploy functions แล้วดู `systemConfig/agentDocs` ใน Firestore Console
-
 ## 2026-06-28 — fix: progress polling ระหว่างรอ Pro + timeout 10 นาที (PR #392)
 
 - **อาการ:** หลัง Flash ตอบ "กำลังดำเนินการ" → ผู้ใช้ไม่เห็น feedback จาก Pro Agent ระหว่างรอ; timeout 5 นาทีเกินก่อน Pro เขียนผล (mobile browser throttle setInterval ตอน background)
