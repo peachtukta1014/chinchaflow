@@ -1,3 +1,24 @@
+## 2026-06-28 — fix: Pro Agent ตื่นได้ + ACK กลับ UI (PR #381)
+
+- **อาการ:** พิมพ์ "โอเคกุ้ง" → dispatch ส่งไปถึง GitHub แต่ Pro Agent ไม่ตื่น ไม่มี ACK กลับ UI เลย
+- **สาเหตุ:** `ai-workflow-trigger.yml` step `setup-node` ตั้ง `cache: npm` + `cache-dependency-path: apps/webhook-core/package-lock.json` แต่ `package-lock.json` ไม่ได้ commit ไว้ใน repo → `##[error] Some specified paths were not resolved` → workflow พังตั้งแต่ขั้นแรก ก่อนถึง ACK และ Pro loop ทุกรอบ
+- **แก้:**
+  - `ai-workflow-trigger.yml` — ลบ `cache: npm` / `cache-dependency-path` ออก; เปลี่ยน `npm ci` → `npm install`
+  - ACK step เปลี่ยนจาก `curl → deployNotifyHttp` (พึ่ง GH_PAT auth) เป็น `node ack-pro-agent.cjs` เขียน `agentProgress/{requestId}` ตรงใน Firestore ผ่าน Service Account
+  - เพิ่ม `apps/webhook-core/scripts/ack-pro-agent.cjs` — เขียน `status: "received_by_pro"` + `step: "Pro ได้รับงานแล้ว กำลังเริ่มทำ..."` ใน Firestore ทันทีที่ workflow ตื่น
+- **ผลลัพธ์:** Pro Agent รัน loop ได้ + UI ของพี่เห็นสถานะ "Pro ได้รับงานแล้ว" ทันที
+- ถ้าพังให้เช็ก: `FIREBASE_SERVICE_ACCOUNT` ใน GitHub Secrets ถูกต้องไหม · `agentProgress/{requestId}` มีค่าใน Firestore Console
+
+## 2026-06-28 — fix: Sync Agent Docs 401 ถาวร — เขียน Firestore ตรง (PR #380)
+
+- **อาการ:** CI step "Sync Agent Docs to Brain" fail HTTP 401 ทุกรอบ แม้ deploy `deployNotifyHttp` ใหม่สำเร็จ — 8 retry × 15s ทั้งหมดยังคง 401
+- **สาเหตุ:** GH_PAT ใน GitHub Secrets มีอักขระ Unicode (non-ASCII, value > 255) ปนอยู่ที่ตำแหน่ง ~38 ของ token (bytstring error) → token ที่อบลง `.env` ไม่ตรงกับ token ที่ CI ส่งไป → mismatch ถาวร ไม่ใช่ propagation delay
+- **แก้:** เปลี่ยน step ทั้งหมดจาก curl loop → `node sync-agent-docs.cjs` เขียน `systemConfig/agentDocs` ตรงใน Firestore ผ่าน Service Account (`/tmp/sa.json` ที่ deploy step เขียนไว้แล้ว)
+  - เพิ่ม `apps/webhook-core/scripts/sync-agent-docs.cjs`
+  - แก้ `.github/workflows/deploy-functions.yml` — ลบ curl 8 รอบ, ใช้ `GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json` แทน
+- **ผลลัพธ์:** ไม่ต้องพึ่ง GH_PAT หรือรอ propagation — sync ผ่านทุก run ตั้งแต่รอบแรก
+- ถ้าพังให้เช็ก: `/tmp/sa.json` ยังอยู่ไหม (ต้องรันหลัง deploy step) · FIREBASE_SERVICE_ACCOUNT ถูกต้องไหม
+
 ## 2026-06-28 — fix: bump X-Notify-Rev '4' แก้ 401 Sync Agent Docs (PR #379)
 
 - **อาการ:** CI step "Sync Agent Docs to Brain" fail 401 ทุกรอบ (8 retry ก็ยังไม่ผ่าน)
