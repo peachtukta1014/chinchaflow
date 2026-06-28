@@ -1,68 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
-import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signInWithGoogle, signOutUser, onAuthChanged } from './firebase';
+import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signOutUser, onAuthChanged } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
-
-// ── Icons (inline lucide) ───────────────────────────────────────────────
-const IconSend = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 2 11 13" /><path d="m22 2-7 20-4-9-9-4Z" />
-  </svg>
-);
-const IconMic = ({ active }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="2" width="6" height="11" rx="3" ry="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" />
-  </svg>
-);
-const IconStop = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="6" y="6" width="12" height="12" rx="2" />
-  </svg>
-);
-const IconTrash = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><rect x="5" y="6" width="14" height="16" rx="2" /><path d="M10 11v6" /><path d="M14 11v6" />
-  </svg>
-);
-const IconImage = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" />
-  </svg>
-);
-const IconHistory = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-  </svg>
-);
-const IconPlus = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-const IconX = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-const IconRefresh = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-    <path d="M21 3v5h-5" />
-    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-    <path d="M8 16H3v5" />
-  </svg>
-);
-const IconFile = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" />
-  </svg>
-);
-const IconLogout = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
+import { IconSend, IconMic, IconStop, IconTrash, IconImage, IconHistory, IconPlus, IconX, IconRefresh, IconFile, IconLogout } from './icons';
+import LoginScreen from './LoginScreen';
+import KnowledgePanel from './components/KnowledgePanel';
+import TokenDashboard from './components/TokenDashboard';
 
 const MAX_IMAGES = 5;
 const MAX_FILE_CHARS = 8000;
@@ -71,8 +15,6 @@ const WELCOME_MSG = {
   role: 'assistant',
   content: 'สวัสดีพี่พีช! จีจี้เลขาส่วนตัวพีชเองนะคะ 🌸\n\nพร้อมช่วยพี่เสมอเลย ไม่ว่าจะเป็น:\n- ถามเรื่องร้านชา / ร้านกุ้ง\n- ส่งรูป screenshot หรือ error มาให้ดู (แนบได้ถึง 5 รูปต่อครั้งเลย)\n- สั่งแก้โค้ด AI deepseek จัดการ + เปิด PR ให้\n\nพูดหรือพิมพ์ได้เลยนะคะ',
 };
-
-// 🔥 [ลบออก] AGENT_OPTIONS Array
 
 const ALLOWED_EMAIL = 'peachtukta1014@gmail.com';
 
@@ -103,55 +45,11 @@ export default function App() {
   return <AppShell user={user} />;
 }
 
-function LoginScreen() {
-  const [error, setError] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
-
-  const handleLogin = async () => {
-    setError('');
-    setLoggingIn(true);
-    try {
-      await signInWithGoogle();
-    } catch (e) {
-      setError(e.message);
-      setLoggingIn(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full items-center justify-center bg-ai-bg gap-6 px-8" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <img src="/jiji-avatar.png" alt="จีจี้" className="w-24 h-24 rounded-full border-2 border-ai-accent/40 shadow-lg" />
-      <div className="text-center">
-        <h1 className="text-xl font-semibold text-ai-text">จีจี้</h1>
-        <p className="text-xs text-ai-muted mt-1">CHINCHA FLOW · AI Assistant</p>
-      </div>
-      {error && (
-        <p className="text-xs text-red-400 text-center bg-red-900/20 px-4 py-3 rounded-xl max-w-xs leading-relaxed">{error}</p>
-      )}
-      <button
-        onClick={handleLogin}
-        disabled={loggingIn}
-        className="flex items-center gap-3 px-6 py-3 bg-white text-gray-800 rounded-2xl text-sm font-medium hover:bg-gray-100 transition-colors shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-        </svg>
-        {loggingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วย Google'}
-      </button>
-      <p className="text-[11px] text-ai-muted text-center">เฉพาะบัญชี peachtukta1014@gmail.com</p>
-    </div>
-  );
-}
-
 function AppShell({ user }) {
   const [messages, setMessages] = useState([WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  // 🔥 [ลบออก] สเตตอยกกลุ่ม agentScope และ showAgentPicker
   const [showHistory, setShowHistory] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [fileAttachment, setFileAttachment] = useState(null);
@@ -168,11 +66,10 @@ function AppShell({ user }) {
   const fileInputRef = useRef(null);
   const fileInputRef2 = useRef(null);
   const pollIntervalRef = useRef(null);
-  const unsubscribeRef = useRef(null);  // cleanup fn for active result-poll interval
+  const unsubscribeRef = useRef(null);
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
 
-  // ── Sync loadingRef ────────────────────────────────────────────────────
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
   // ── Background result recovery ─────────────────────────────────────────
@@ -206,13 +103,11 @@ function AppShell({ user }) {
         setMessages(prev => {
           const updated = [...prev, replyMsg];
           if (currentSessionId.current) {
-            // 🧹 [ปรับปรุง] เอาพารามิเตอร์ scope ตัวท้ายออก
             updateSession(currentSessionId.current, updated);
             setSessions(listSessions());
           }
           return updated;
         });
-        // 🔥 [ลบออก] setAgentScope(found.scope)
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -252,10 +147,7 @@ function AppShell({ user }) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
-  // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  // 🔥 [ลบออก] ฟังก์ชัน detectScope(text)
 
   // ── New chat ───────────────────────────────────────────────────────────
   const newChat = useCallback(() => {
@@ -274,7 +166,6 @@ function AppShell({ user }) {
     if (!session) return;
     currentSessionId.current = id;
     setMessages(session.messages.length > 0 ? session.messages : [WELCOME_MSG]);
-    // 🔥 [ลบออก] setAgentScope(session.scope)
     setShowHistory(false);
   }, []);
 
@@ -290,7 +181,6 @@ function AppShell({ user }) {
 
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    // ยกเลิก result-poll เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = null;
@@ -310,7 +200,6 @@ function AppShell({ user }) {
       ? crypto.randomUUID()
       : Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-    // 🔥 [ลบออก] ตัวแปรสโคปและการเซ็ตติ้งต่างๆ
     const messagesWithUser = [...messages, { role: 'user', content: displayText, imageUrls: [...imagePreviews] }];
 
     setInput('');
@@ -320,13 +209,11 @@ function AppShell({ user }) {
     setMessages(messagesWithUser);
     setLoading(true);
 
-    // 🧹 [ปรับปรุง] สร้าง session ใหม่โดยไม่ต้องส่ง scope เข้าไป
     if (!currentSessionId.current) {
       currentSessionId.current = createSession({ firstMessage: text || 'รูปภาพ' });
       setSessions(listSessions());
     }
 
-    // 🧹 [ปรับปรุง] เอาพารามิเตอร์ scope ออกจากตัวจำ pending
     localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, ts: Date.now() }));
 
     pollIntervalRef.current = setInterval(async () => {
@@ -336,7 +223,6 @@ function AppShell({ user }) {
 
     const historyForAI = messagesWithUser.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
-    // 🧹 [ปรับปรุง] ส่งค่าเข้า API ของ Cloud เปล่า ๆ โดยถอดระบบ 'scope' ออกไปดื้อ ๆ เลยค่ะ
     const reply = await chatWithAI({
       message: aiText,
       history: historyForAI,
@@ -349,7 +235,6 @@ function AppShell({ user }) {
     setProgressStep(null);
 
     if (reply.status === 'processing') {
-      // Flash ส่งงานให้ Pro Agent แล้ว — แสดงข้อความรอ แล้วฟัง onSnapshot (event-driven ไม่ polling)
       const processingMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
       setMessages(processingMessages);
       if (currentSessionId.current) {
@@ -359,14 +244,12 @@ function AppShell({ user }) {
       setLoading(false);
       inputRef.current?.focus();
 
-      // ต่อ progress polling เพื่อแสดง ACK + steps จาก Pro Agent ระหว่างรอผล
       if (unsubscribeRef.current) unsubscribeRef.current();
       pollIntervalRef.current = setInterval(async () => {
         const data = await pollProgress(requestId);
         if (data.step) setProgressStep(data.step);
       }, 3000);
 
-      // Poll result ทุก 5s ด้วย time-based timeout 10 นาที (ไม่ขึ้นกับจำนวนครั้ง)
       const resultStartTime = Date.now();
       const timerId = setInterval(async () => {
         const found = await fetchResult(requestId);
@@ -404,9 +287,7 @@ function AppShell({ user }) {
     localStorage.removeItem(PENDING_KEY);
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
-    // 🔥 [ลบออก] if (reply.scope) setAgentScope(reply.scope)
 
-    // 🧹 [ปรับปรุง] ตัวอัปเดตเซสชัน ลบพารามิเตอร์สุดท้ายออก
     if (currentSessionId.current) {
       updateSession(currentSessionId.current, finalMessages);
       setSessions(listSessions());
@@ -485,7 +366,6 @@ function AppShell({ user }) {
     e.target.value = '';
   };
 
-  // ── Cleanup polling on unmount ─────────────────────────────────────────
   useEffect(() => () => {
     clearInterval(pollIntervalRef.current);
     unsubscribeRef.current?.();
@@ -521,12 +401,10 @@ function AppShell({ user }) {
     }
   }, []);
 
-  // ── Handle Enter ───────────────────────────────────────────────────────
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  // 🔥 [ลบออก] บรรทัดคำนวณ currentAgent 
   const canSend = (input.trim() || imagePreviews.length > 0 || fileAttachment !== null) && !loading;
 
   return (
@@ -573,7 +451,6 @@ function AppShell({ user }) {
                     <span className="text-[10px] text-ai-muted">
                       {new Date(s.updatedAt).toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {/* 🔥 [ลบออก] ป้าย Tag แสดงชื่อกลุ่มแชทขนาดเล็กในอดีต */}
                   </div>
                 </div>
                 <button
@@ -679,13 +556,11 @@ function AppShell({ user }) {
       {activeTab === 'chat' && <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-thin">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            {/* Avatar */}
             <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 mt-0.5 border border-ai-border">
               {msg.role === 'user'
                 ? <img src="/peach-avatar.jpg" alt="พีช" className="w-full h-full object-cover object-top" />
                 : <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />}
             </div>
-            {/* Bubble */}
             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-ai-user text-white rounded-br-md' : 'bg-ai-card border border-ai-border text-ai-text rounded-bl-md'}`}>
               {msg.imageUrls && msg.imageUrls.length > 0 && (
                 <div className={`mb-2 ${msg.imageUrls.length > 1 ? 'grid grid-cols-2 gap-1' : ''}`}>
@@ -705,7 +580,6 @@ function AppShell({ user }) {
           </div>
         ))}
 
-        {/* Typing indicator */}
         {loading && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-full overflow-hidden border border-ai-border shrink-0">
@@ -732,7 +606,6 @@ function AppShell({ user }) {
         className="px-3 py-3 border-t border-ai-border bg-ai-card shrink-0"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        {/* Image previews grid */}
         {imagePreviews.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-2 items-end">
             {imagePreviews.map((preview, idx) => (
@@ -756,7 +629,6 @@ function AppShell({ user }) {
           </div>
         )}
 
-        {/* File attachment chip */}
         {fileAttachment && (
           <div className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-ai-bg border border-ai-accent/40 rounded-xl w-fit max-w-full">
             <span className="text-ai-accent shrink-0"><IconFile /></span>
@@ -828,249 +700,10 @@ function AppShell({ user }) {
           </button>
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleImageSelect}
-        />
-        <input
-          ref={fileInputRef2}
-          type="file"
-          accept={ACCEPTED_FILES}
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+        <input ref={fileInputRef2} type="file" accept={ACCEPTED_FILES} className="hidden" onChange={handleFileSelect} />
       </div>}
 
-    </div>
-  );
-}
-
-// ── Knowledge Panel component ────────────────────────────────────────────────
-function KnowledgePanel({ data, onSave, onRefresh }) {
-  const [section, setSection] = useState('notes'); // 'notes' | 'tree' | 'docs'
-  const [localNotes, setLocalNotes] = useState(data.notes || '');
-
-  useEffect(() => { setLocalNotes(data.notes || ''); }, [data.notes]);
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Sub-tabs */}
-      <div className="flex border-b border-ai-border bg-ai-card shrink-0">
-        {[
-          { id: 'notes', label: '✏️ Custom Skills' },
-          { id: 'tree', label: '📂 Project Tree' },
-          { id: 'docs', label: '📚 Agent Docs' },
-        ].map(s => (
-          <button
-            key={s.id}
-            onClick={() => setSection(s.id)}
-            className={`flex-1 py-2 text-[11px] font-medium transition-colors ${
-              section === s.id ? 'text-ai-accent border-b-2 border-ai-accent' : 'text-ai-muted'
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-        <button onClick={onRefresh} className="px-3 text-ai-muted hover:text-ai-accent transition-colors" title="รีเฟรช">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
-          </svg>
-        </button>
-      </div>
-
-      {data.notesLoading ? (
-        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">กำลังโหลด...</div>
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          {/* Custom Skills / Notes — editable */}
-          {section === 'notes' && (
-            <div className="p-4 flex flex-col h-full gap-3">
-              <p className="text-[11px] text-ai-muted leading-relaxed">
-                จีจี้จะอ่าน Custom Skills ทุกครั้งที่คุย — ใส่ข้อมูลร้าน, style การตอบ, หรือสกิลเพิ่มเติมได้เลยครับพี่
-              </p>
-              <textarea
-                value={localNotes}
-                onChange={e => setLocalNotes(e.target.value)}
-                placeholder={'ตัวอย่าง:\n- ร้านกุ้งส่งทุกวันจันทร์-ศุกร์\n- ลูกค้าประจำ: คุณA ชอบกุ้งขนาดใหญ่\n- Flash ตอบสั้นๆ ไม่เกิน 3 บรรทัด\n- ราคากุ้งปัจจุบัน: ตัวเล็ก 80/kg, ใหญ่ 120/kg'}
-                className="flex-1 w-full min-h-[200px] resize-none bg-ai-bg border border-ai-border rounded-xl p-3 text-sm text-ai-text placeholder-ai-muted outline-none focus:border-ai-accent transition-colors font-mono"
-                style={{ height: '300px' }}
-              />
-              <button
-                onClick={() => onSave(localNotes)}
-                disabled={data.notesSaving}
-                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  data.notesSaving
-                    ? 'bg-ai-border text-ai-muted cursor-not-allowed'
-                    : 'bg-ai-accent text-white hover:brightness-110'
-                }`}
-              >
-                {data.notesSaving ? 'กำลังบันทึก...' : 'บันทึก Custom Skills'}
-              </button>
-            </div>
-          )}
-
-          {/* Project Tree — read-only */}
-          {section === 'tree' && (
-            <div className="p-4">
-              {data.tree ? (
-                <pre className="text-[11px] text-ai-text font-mono leading-relaxed whitespace-pre-wrap break-all">
-                  {data.tree}
-                </pre>
-              ) : (
-                <p className="text-ai-muted text-sm text-center mt-8">ยังไม่มีข้อมูล — รัน Pro Agent ครั้งแรกแล้วจะ sync อัตโนมัติ</p>
-              )}
-            </div>
-          )}
-
-          {/* Agent Docs — read-only */}
-          {section === 'docs' && (
-            <div className="p-4 space-y-4">
-              {Object.keys(data.docs).length === 0 ? (
-                <p className="text-ai-muted text-sm text-center mt-8">ยังไม่มีข้อมูล</p>
-              ) : Object.entries(data.docs).map(([filename, content]) => (
-                <div key={filename}>
-                  <p className="text-[11px] font-semibold text-ai-accent mb-1">{filename}</p>
-                  <pre className="text-[11px] text-ai-muted font-mono leading-relaxed whitespace-pre-wrap break-words bg-ai-bg rounded-lg p-2 max-h-40 overflow-y-auto">
-                    {content}
-                  </pre>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Token Dashboard component ────────────────────────────────────────────────
-function TokenDashboard({ logs, loading, onRefresh }) {
-  const [expandedDay, setExpandedDay] = useState(null);
-
-  const fmt = n => (n || 0).toLocaleString();
-
-  const sumTokens = (log) => {
-    const f = log.flash || {};
-    const v = log.vision || {};
-    const p = log.pro || {};
-    return {
-      input: (f.input || 0) + (v.input || 0) + (p.input || 0),
-      output: (f.output || 0) + (v.output || 0) + (p.output || 0),
-      flashIn: f.input || 0, flashOut: f.output || 0,
-      visionIn: v.input || 0, visionOut: v.output || 0,
-      proIn: p.input || 0, proOut: p.output || 0,
-      proIters: p.iterations || 0,
-    };
-  };
-
-  // จัดกลุ่มตามวัน (key = "YYYY-MM-DD")
-  const grouped = logs.reduce((acc, log) => {
-    const d = log.createdAt ? new Date(log.createdAt) : new Date();
-    const key = d.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    if (!acc[key]) acc[key] = { label: key, ts: log.createdAt || 0, items: [] };
-    acc[key].items.push(log);
-    return acc;
-  }, {});
-
-  const days = Object.values(grouped).sort((a, b) => b.ts - a.ts);
-
-  // รวม token ต่อวัน
-  const daySum = (items) => items.reduce((acc, log) => {
-    const t = sumTokens(log);
-    return {
-      input: acc.input + t.input, output: acc.output + t.output,
-      flashIn: acc.flashIn + t.flashIn, flashOut: acc.flashOut + t.flashOut,
-      visionIn: acc.visionIn + t.visionIn, visionOut: acc.visionOut + t.visionOut,
-      proIn: acc.proIn + t.proIn, proOut: acc.proOut + t.proOut,
-    };
-  }, { input: 0, output: 0, flashIn: 0, flashOut: 0, visionIn: 0, visionOut: 0, proIn: 0, proOut: 0 });
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-ai-border shrink-0">
-        <span className="text-xs text-ai-muted">{logs.length} requests · {days.length} วัน</span>
-        <button onClick={onRefresh} className="text-xs text-ai-accent hover:brightness-110 transition-colors">รีเฟรช</button>
-      </div>
-
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">กำลังโหลด...</div>
-      ) : logs.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-ai-muted text-sm">ยังไม่มีข้อมูล Token</div>
-      ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {days.map(day => {
-            const s = daySum(day.items);
-            const isOpen = expandedDay === day.label;
-            return (
-              <div key={day.label} className="bg-ai-card border border-ai-border rounded-xl overflow-hidden">
-                {/* แถวรายวัน — กดเพื่อ expand */}
-                <button
-                  className="w-full px-3 py-2.5 flex items-center gap-2 text-left hover:bg-ai-bg/50 transition-colors"
-                  onClick={() => setExpandedDay(isOpen ? null : day.label)}
-                >
-                  <span className="text-xs">{isOpen ? '▾' : '▸'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-ai-text">📅 {day.label}</span>
-                      <span className="text-[10px] text-ai-muted">{day.items.length} requests</span>
-                    </div>
-                    <div className="flex gap-3 mt-0.5 flex-wrap">
-                      <span className="text-[10px] text-ai-muted">⚡ {fmt(s.flashIn + s.flashOut)}</span>
-                      {s.visionIn + s.visionOut > 0 && <span className="text-[10px] text-ai-muted">👁 {fmt(s.visionIn + s.visionOut)}</span>}
-                      {s.proIn + s.proOut > 0 && <span className="text-[10px] text-ai-muted">🤖 {fmt(s.proIn + s.proOut)}</span>}
-                      <span className="text-[10px] font-semibold text-ai-accent">รวม {fmt(s.input + s.output)} tokens</span>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Drill-down รายละเอียดแต่ละ request */}
-                {isOpen && (
-                  <div className="border-t border-ai-border divide-y divide-ai-border/50">
-                    {/* สรุปรวมของวัน */}
-                    <div className="px-3 py-2 bg-ai-bg/30">
-                      <div className="grid grid-cols-3 gap-1.5 text-center">
-                        {[
-                          { label: '⚡ Flash', inT: s.flashIn, outT: s.flashOut },
-                          { label: '👁 Vision', inT: s.visionIn, outT: s.visionOut },
-                          { label: '🤖 Pro', inT: s.proIn, outT: s.proOut },
-                        ].map(({ label, inT, outT }) => (
-                          <div key={label} className={`rounded-lg px-2 py-1.5 bg-ai-card ${inT + outT === 0 ? 'opacity-30' : ''}`}>
-                            <p className="text-[10px] text-ai-muted">{label}</p>
-                            <p className="text-[11px] text-ai-text">{fmt(inT)}↑ {fmt(outT)}↓</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* รายการแต่ละ request */}
-                    {day.items.map((log, idx) => {
-                      const t = sumTokens(log);
-                      const time = log.createdAt ? new Date(log.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
-                      return (
-                        <div key={log.id} className="px-3 py-2 flex items-center gap-2">
-                          <span className="text-[10px] text-ai-muted w-5 shrink-0">{idx + 1}.</span>
-                          <span className="text-[10px] text-ai-muted w-10 shrink-0">{time}</span>
-                          <div className="flex-1 flex gap-2 flex-wrap">
-                            {t.flashIn + t.flashOut > 0 && <span className="text-[10px] text-ai-muted">⚡{fmt(t.flashIn + t.flashOut)}</span>}
-                            {t.visionIn + t.visionOut > 0 && <span className="text-[10px] text-ai-muted">👁{fmt(t.visionIn + t.visionOut)}</span>}
-                            {t.proIn + t.proOut > 0 && <span className="text-[10px] text-ai-muted">🤖{fmt(t.proIn + t.proOut)}{t.proIters ? ` (${t.proIters}i)` : ''}</span>}
-                          </div>
-                          <span className="text-[10px] font-medium text-ai-accent shrink-0">{fmt(t.input + t.output)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,3 +1,11 @@
+## 2026-06-28 — refactor: แยก App.jsx → icons, LoginScreen, KnowledgePanel, TokenDashboard
+
+- `apps/ai-chat/src/icons.jsx` — SVG icons 11 ตัว (named exports)
+- `apps/ai-chat/src/LoginScreen.jsx` — LoginScreen + firebase import
+- `apps/ai-chat/src/components/KnowledgePanel.jsx` — Knowledge panel
+- `apps/ai-chat/src/components/TokenDashboard.jsx` — Token dashboard
+- `apps/ai-chat/src/App.jsx` — ลดจาก 1,076 → ~420 บรรทัด (App auth gate + AppShell เท่านั้น)
+
 ## 2026-06-28 — fix: Knowledge tab "Project Tree" ว่าง — sync-project-tree.yml ใช้ Service Account แทน curl
 
 - **อาการ:** Knowledge tab → Project Tree แสดง "ยังไม่มีข้อมูล" ตลอด — `systemConfig/projectTree` ว่างเปล่าใน Firestore

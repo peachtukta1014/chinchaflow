@@ -164,9 +164,14 @@ apps/ai-chat/
 │   └── manifest.json              # PWA
 ├── src/
 │   ├── main.jsx                   # entry
-│   ├── App.jsx                    # Chat UI — bubbles + voice + image/file attach + scope picker
-│   │                              #   + deploy banner + progress polling + background result recovery
+│   ├── App.jsx                    # auth gate (App) + AppShell — chat UI + session + polling
+│   ├── icons.jsx                  # SVG icon components (named exports)
+│   ├── LoginScreen.jsx            # Google Sign-in screen
+│   ├── components/
+│   │   ├── KnowledgePanel.jsx     # Knowledge tab (Custom Skills, Project Tree, Agent Docs)
+│   │   └── TokenDashboard.jsx     # Token usage dashboard (grouped by day)
 │   ├── api.js                     # chatWithAI · pollProgress · fetchResult · fetchDeployStatus
+│   ├── firebase.js                # Firestore reads + Auth (Google Sign-in)
 │   ├── sessionStore.js            # เก็บ session history (localStorage)
 │   ├── version.js                 # APP_VERSION (ai-DDMMYY.N) — inject อัตโนมัติตอน deploy
 │   └── index.css                  # Tailwind base + scrollbar
