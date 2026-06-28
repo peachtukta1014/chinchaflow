@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-28 | fix: SyntaxError ใน aiWorkflowAgent.js — escape backtick ใน template literal
+- **อาการ:** Pro Agent รัน `run-github-agent.mjs` พัง `SyntaxError: Unexpected identifier 'docs'` ที่ line 393 — ทุก workflow trigger ล้มเหลวทันที
+- **สาเหตุ:** `buildAgentSystemPrompt` return template literal (backtick) ที่มี backtick `` ` `` ปนอยู่ใน body (lines 393, 395, 396) โดยไม่ escape → Node.js ปิด template ก่อนกำหนด → syntax error
+- **แก้:** `src/aiWorkflowAgent.js` lines 393-396 — escape backtick เป็น `\`` ทุกตัวในส่วนที่เป็น markdown code span
+- ถ้าพัง: `node --check apps/webhook-core/src/aiWorkflowAgent.js` ตรวจ syntax
+
 ### 2026-06-28 | (branch: claude/test-coverage-analysis-67owag)
 **feat: จีจี้ค้นเว็บได้ (on-demand web search) + แก้ prompt + JIIJI.md**
 - `src/flash/flashModels.js` — เพิ่ม `SEARCH_MODEL = 'deepseek/deepseek-chat'` + `callOpenRouterForWebSearch()` (OpenRouter web plugin)
