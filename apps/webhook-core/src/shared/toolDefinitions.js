@@ -183,17 +183,17 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'exec_command',
-      description: `รัน shell command ใน Cloud Functions container (Node 20 · Linux · ephemeral)
+      description: `รัน shell command ใน GitHub Actions runner (Node 20 · Ubuntu · repo checkout เต็ม)
 
 ⚠️ ข้อจำกัดสำคัญ — ประเมินก่อนเรียกทุกครั้ง:
-• Cloud Functions timeout รวม 60 วิ — เหลือให้ command ≤ 45 วิ
-• ไม่มีไฟล์โปรเจกต์ใน container (ห้ามรัน npm run build / git / node scripts/...)
-• Ephemeral — ไม่มี state ข้ามการเรียก ผลลัพธ์ครั้งเดียว
+• timeout สูงสุด 300 วิ — command ควรเสร็จก่อนนั้น
+• **ใช้ path relative จาก repo root เสมอ** เช่น "node apps/seafood-pos/scripts/smoke-test.mjs" (ห้ามขึ้นต้น /)
+• Ephemeral — ไม่มี state ข้ามการเรียก
 
-✅ เหมาะ: node -e "...", curl, date, echo, การคำนวณ, ทดสอบ logic สั้น
-❌ ไม่เหมาะ: build, git, คำสั่งที่ต้องไฟล์ repo, คำสั่งนาน >45 วิ
+✅ เหมาะ: node scripts/..., npm run build, git status, node -e "...", curl
+❌ ไม่เหมาะ: path ขึ้นต้น / (absolute), คำสั่งที่ต้อง interactive input
 
-ถ้าไม่แน่ใจว่าเสร็จใน 45 วิหรือไม่ → แจ้งพี่แทน อย่าเดา`,
+path ต้องเป็น relative เสมอ เช่น "node apps/seafood-pos/scripts/smoke-test.mjs" ไม่ใช่ "node /apps/..."`,
       parameters: {
         type: 'object',
         properties: {

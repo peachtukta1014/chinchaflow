@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
-import { listenForResult, getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs } from './firebase';
+import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -91,7 +91,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const fileInputRef2 = useRef(null);
   const pollIntervalRef = useRef(null);
-  const unsubscribeRef = useRef(null);  // Firestore onSnapshot unsubscribe fn
+  const unsubscribeRef = useRef(null);  // cleanup fn for active result-poll interval
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
 
@@ -213,7 +213,7 @@ export default function App() {
 
   // ── Send message ───────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    // ยกเลิก onSnapshot เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
+    // ยกเลิก result-poll เดิม (ถ้ามี) เมื่อผู้ใช้ส่งข้อความใหม่
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = null;
@@ -282,21 +282,33 @@ export default function App() {
       setLoading(false);
       inputRef.current?.focus();
 
-      // ยกเลิก listener เดิม (ถ้ามี) แล้วเริ่มฟัง aiResults/{requestId}
+      // Poll HTTP endpoint ทุก 5s (bypass Firestore Security Rules)
       if (unsubscribeRef.current) unsubscribeRef.current();
-      unsubscribeRef.current = listenForResult(requestId, (found) => {
-        if (unsubscribeRef.current) unsubscribeRef.current();
+      let pollCount = 0;
+      const timerId = setInterval(async () => {
+        pollCount++;
+        const found = await fetchResult(requestId);
+        if (!found && pollCount < 60) return;
+        clearInterval(timerId);
         unsubscribeRef.current = null;
         localStorage.removeItem(PENDING_KEY);
-        setMessages(prev => {
-          const updated = [...prev, { role: 'assistant', content: found.reply }];
-          if (currentSessionId.current) {
-            updateSession(currentSessionId.current, updated);
-            setSessions(listSessions());
-          }
-          return updated;
-        });
-      });
+        if (found) {
+          setMessages(prev => {
+            const updated = [...prev, { role: 'assistant', content: found.reply }];
+            if (currentSessionId.current) {
+              updateSession(currentSessionId.current, updated);
+              setSessions(listSessions());
+            }
+            return updated;
+          });
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: 'จีจี้รอผลนานเกินไปแล้วครับพี่ 🌸 ถ้างานเสร็จแล้วลองแตะหน้าจอใหม่ หรือส่งคำสั่งใหม่ได้เลย',
+          }]);
+        }
+      }, 5000);
+      unsubscribeRef.current = () => clearInterval(timerId);
       return;
     }
 
