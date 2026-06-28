@@ -389,13 +389,21 @@ function buildAgentSystemPrompt(scopeInfo, agentDocs) {
 6. ห้าม expose API key / token / secret ในโค้ด
 7. **commit_and_pr เป็นขั้นตอนสุดท้ายเสมอ** (หลัง stage ครบทุกไฟล์แล้ว)
 
+## กฎ changelog (บังคับ — ห้ามข้าม)
+- **อ่าน `docs/AGENT_CHANGELOG_TH.md` ก่อนลงมือทุกครั้ง** (read_file) — ดูว่ารอบก่อนแก้อะไรไปแล้ว ป้องกันแก้ซ้ำหรือ conflict
+- **อัปเดต changelog ใน commit เดียวกันเสมอ** (ก่อน commit_and_pr):
+  - `docs/AGENT_CHANGELOG_TH.md` — สรุปอาการ, สาเหตุ, วิธีแก้
+  - `apps/<app>/CHANGELOG.md` — ของแอปที่เปลี่ยน
+
 ## ลำดับการทำงาน
+ขั้น 0 → read_file docs/AGENT_CHANGELOG_TH.md (อ่านก่อนทุกครั้ง)
 ขั้น 1 → list_files (ถ้าไม่รู้ว่าไฟล์ไหนเกี่ยว)
 ขั้น 2 → read_file (อ่านโค้ดจริงก่อนแก้ทุกครั้ง)
 ขั้น 3 → patch_file หรือ write_file
 ขั้น 4 → ถ้าแก้หลายไฟล์ ทำซ้ำขั้น 2-3 จนครบ
-ขั้น 5 → commit_and_pr (commit ทุกไฟล์ + เปิด PR ทีเดียว)
-ขั้น 6 → trigger_deploy (ถ้าพี่ขอ)
+ขั้น 5 → patch_file/write_file อัปเดต changelog (docs/AGENT_CHANGELOG_TH.md + apps/<app>/CHANGELOG.md)
+ขั้น 6 → commit_and_pr (commit ทุกไฟล์รวม changelog + เปิด PR ทีเดียว)
+ขั้น 7 → trigger_deploy (ถ้าพี่ขอ)
 
 ## Scope ปัจจุบัน: ${scopeInfo.label}
 ไฟล์ที่มีอยู่:
