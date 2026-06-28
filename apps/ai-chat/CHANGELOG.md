@@ -7,6 +7,13 @@
 
 ## 2026-06
 
+### 2026-06-28 | refactor: แยก App.jsx → 4 ไฟล์ (icons, LoginScreen, KnowledgePanel, TokenDashboard)
+- `src/icons.jsx` — แยก SVG icon components ทั้ง 11 ตัวออก (export named)
+- `src/LoginScreen.jsx` — แยก LoginScreen component + import `signInWithGoogle` ตรง
+- `src/components/KnowledgePanel.jsx` — แยก KnowledgePanel component
+- `src/components/TokenDashboard.jsx` — แยก TokenDashboard component
+- `src/App.jsx` — เหลือแค่ App (auth gate) + AppShell (~420 บรรทัด จาก 1,076)
+
 ### 2026-06-28 | PR (this)
 **feat: เพิ่ม Google Sign-in login (whitelist peachtukta1014@gmail.com)**
 - `src/firebase.js` — เพิ่ม `signInWithGoogle`, `signOutUser`, `onAuthChanged`; เพิ่ม `authDomain` ใน config
