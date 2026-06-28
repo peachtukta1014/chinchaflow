@@ -1,3 +1,10 @@
+## 2026-06-28 — fix: SyntaxError ใน aiWorkflowAgent.js — Pro Agent ไม่ตื่นเลย
+
+- **อาการ:** ส่งงานผ่าน ai-chat → Flash dispatch → GitHub Actions trigger → Pro Agent รัน `node scripts/run-github-agent.mjs` แล้วพัง `SyntaxError: Unexpected identifier 'docs'` ที่ `aiWorkflowAgent.js:393` — ทุกงานล้มเหลวทันที Pro ไม่ทำงานได้เลย
+- **สาเหตุ:** `buildAgentSystemPrompt()` ใน `aiWorkflowAgent.js` return template literal (backtick string) ที่บรรทัด 393–396 มี backtick `` ` `` ในเนื้อหา (markdown code span) โดยไม่ได้ escape → Node.js ปิด template literal ก่อนกำหนด → parser เห็น `docs` เป็น bare identifier → `SyntaxError`
+- **แก้:** `apps/webhook-core/src/aiWorkflowAgent.js` lines 393–396 — เปลี่ยน `` `path` `` → `` \`path\` `` (escape backtick ทั้งหมด 4 คู่)
+- ถ้าพัง: `node --check apps/webhook-core/src/aiWorkflowAgent.js` — ต้องไม่มี error
+
 ## 2026-06-28 — feat: เพิ่ม Google Sign-in login ใน ai-chat PWA (whitelist พีชอย่างเดียว)
 
 - **ฟีเจอร์ใหม่:** ai-chat เปิดต้องล็อกอินก่อน — รองรับแค่ `peachtukta1014@gmail.com` เท่านั้น

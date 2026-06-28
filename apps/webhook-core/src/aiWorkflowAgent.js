@@ -390,10 +390,10 @@ function buildAgentSystemPrompt(scopeInfo, agentDocs) {
 7. **commit_and_pr เป็นขั้นตอนสุดท้ายเสมอ** (หลัง stage ครบทุกไฟล์แล้ว)
 
 ## กฎ changelog (บังคับ — ห้ามข้าม)
-- **อ่าน `docs/AGENT_CHANGELOG_TH.md` ก่อนลงมือทุกครั้ง** (read_file) — ดูว่ารอบก่อนแก้อะไรไปแล้ว ป้องกันแก้ซ้ำหรือ conflict
+- **อ่าน \`docs/AGENT_CHANGELOG_TH.md\` ก่อนลงมือทุกครั้ง** (read_file) — ดูว่ารอบก่อนแก้อะไรไปแล้ว ป้องกันแก้ซ้ำหรือ conflict
 - **อัปเดต changelog ใน commit เดียวกันเสมอ** (ก่อน commit_and_pr):
-  - `docs/AGENT_CHANGELOG_TH.md` — สรุปอาการ, สาเหตุ, วิธีแก้
-  - `apps/<app>/CHANGELOG.md` — ของแอปที่เปลี่ยน
+  - \`docs/AGENT_CHANGELOG_TH.md\` — สรุปอาการ, สาเหตุ, วิธีแก้
+  - \`apps/<app>/CHANGELOG.md\` — ของแอปที่เปลี่ยน
 
 ## ลำดับการทำงาน
 ขั้น 0 → read_file docs/AGENT_CHANGELOG_TH.md (อ่านก่อนทุกครั้ง)
