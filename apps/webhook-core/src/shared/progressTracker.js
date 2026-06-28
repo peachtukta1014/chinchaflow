@@ -131,4 +131,22 @@ async function appendRunLog(requestId, entry) {
   }
 }
 
-module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog };
+/**
+ * เขียน/อัปเดต token log สำหรับ request นั้น
+ * schema: { flash?, vision?, pro?, createdAt, requestId }
+ * @param {string|null} requestId
+ * @param {object} data — partial update (merge: true)
+ */
+async function writeTokenLog(requestId, data) {
+  if (!requestId) return;
+  try {
+    await getDb().doc(`tokenLogs/${requestId}`).set(
+      { ...data, requestId, createdAt: Date.now() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn(`[Progress Error] writeTokenLog failed for ${requestId}:`, err.message);
+  }
+}
+
+module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog, writeTokenLog };

@@ -402,6 +402,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // systemConfig — projectTree + agentDocs อ่านได้, customNotes อ่าน+เขียนได้จาก UI
+    match /systemConfig/{doc} {
+      allow read: if true;
+      allow write: if doc == 'customNotes';
+    }
+
+    // tokenLogs — อ่านได้จาก UI, เขียนเฉพาะ backend (Service Account)
+    match /tokenLogs/{requestId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

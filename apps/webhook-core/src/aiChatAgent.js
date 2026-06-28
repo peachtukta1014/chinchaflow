@@ -28,7 +28,7 @@ const functions = require('firebase-functions/v1');
 const https = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
-const { writeProgress, clearProgress, readProgress, writeResult, clearResult } = require('./shared/progressTracker');
+const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const FLASH_MODEL = 'deepseek/deepseek-v4-flash';   // แชทตอบพีช (ทุกข้อความที่ไม่ใช่รูป) + classifier
@@ -62,6 +62,15 @@ async function loadProjectTree() {
     _projectTreeCachedAt = now;
   } catch { /* ใช้ cache เก่าถ้า Firestore ไม่ตอบ */ }
   return _projectTreeCache || '';
+}
+
+// ── Custom notes จาก UI — พีชแก้ได้เองผ่านหน้า Knowledge Panel ────────────
+// ไม่มี cache เพราะ write ได้จาก UI — อ่านทุกครั้งเพื่อให้ real-time เสมอ
+async function loadCustomNotes() {
+  try {
+    const snap = await _fsDb().collection('systemConfig').doc('customNotes').get();
+    return snap.data()?.notes || '';
+  } catch { return ''; }
 }
 
 // ── Cache สำหรับ agent docs จาก Firestore (TTL 10 นาที) ───────────────────
@@ -341,8 +350,17 @@ async function callOpenRouter(apiKey, messages, { imageBase64, images, text } = 
     throw new Error(`OpenRouter ตอบกลับมาไม่สมบูรณ์: ${parseErr.message}`);
   }
   const raw = data?.choices?.[0]?.message?.content || '⚠️ ไม่ได้รับคำตอบจาก AI';
-  // DeepSeek บางครั้ง generate tool call XML ออกมาเป็น text — strip ก่อน return
-  return raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim() || '⚠️ ไม่ได้รับคำตอบจาก AI';
+  const text = raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim() || '⚠️ ไม่ได้รับคำตอบจาก AI';
+  const usage = data?.usage || {};
+  const model = data?.model || pickModel(text, { imageBase64, images });
+  return {
+    text,
+    usage: {
+      input: usage.prompt_tokens || 0,
+      output: usage.completion_tokens || 0,
+      model,
+    },
+  };
 }
 
 // ── โหลด JIIJI.md — ตัวตนและ skills ของจีจี้ (จาก Firestore) ───────────
@@ -673,17 +691,19 @@ exports.aiChatAgentHttp = functions
       }
     }
 
-    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) + project tree — จาก Firestore ทั้งหมด
-    const [agentDocs, jiijiDocs, projectTree] = await Promise.all([
+    // โหลด project docs (กฎ + สไตล์พี่พีช + JIIJI.md) + project tree + custom notes — จาก Firestore ทั้งหมด
+    const [agentDocs, jiijiDocs, projectTree, customNotes] = await Promise.all([
       fetchChatAgentDocs().catch(() => ''),
       fetchJiijiDef().catch(() => ''),
       loadProjectTree().catch(() => ''),
+      loadCustomNotes().catch(() => ''),
     ]);
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
     const systemContent = basePrompt +
       (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
       (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '') +
-      (projectTree ? '\n\n---\n## 🗂️ โครงสร้างโปรเจกต์ปัจจุบัน (sync จาก repo อัตโนมัติ)\n' + projectTree : '');
+      (projectTree ? '\n\n---\n## 🗂️ โครงสร้างโปรเจกต์ปัจจุบัน (sync จาก repo อัตโนมัติ)\n' + projectTree : '') +
+      (customNotes ? '\n\n---\n## 📝 Custom Skills / Notes (พีชตั้งค่าเอง)\n' + customNotes : '');
 
     const messages = [
       { role: 'system', content: systemContent },
@@ -692,7 +712,14 @@ exports.aiChatAgentHttp = functions
     ];
 
     try {
-      const reply = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, images: images || null, text: message });
+      const result = await callOpenRouter(apiKey, messages, { imageBase64: imageBase64 || null, images: images || null, text: message });
+      const { text: reply, usage } = result;
+      // บันทึก token usage แยกตาม Flash/Vision
+      const hasImages = imageBase64 || (images && images.length > 0);
+      const tokenEntry = hasImages
+        ? { vision: usage }
+        : { flash: usage };
+      await writeTokenLog(requestId, tokenEntry).catch(() => {});
       await writeResult(requestId, { reply, scope: finalScope });
       res.json({ reply, scope: finalScope });
     } catch (err) {

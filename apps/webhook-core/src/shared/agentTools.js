@@ -125,7 +125,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
   }
   const choice = data?.choices?.[0];
   if (!choice) throw new Error('OpenRouter ไม่ตอบกลับ');
-  return choice;
+  return { ...choice, _usage: data?.usage || {} };
 }
 
 // ── Main agentic loop ──────────────────────────────────────────────────────
@@ -194,6 +194,9 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   let iterations = 0;
   let taskCompleted = false; // set โดยระบบเท่านั้น เมื่อเจอ tool ที่นับว่า "จบงานจริง"
   let consecutiveTextOnlyReplies = 0; // นับรอบที่โมเดลตอบ text ล้วนๆติดกัน (ไม่มี tool_calls)
+  let _totalProInput = 0;
+  let _totalProOutput = 0;
+  let _proModel = process.env.CODE_MODEL || AGENT_MODEL;
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -221,6 +224,8 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     // ยกเว้นรอบ SUMMARY_CHECKPOINT ที่อนุญาตให้ตอบ text สรุปได้
     const forceTools = !taskCompleted && iterations !== SUMMARY_CHECKPOINT;
     const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, forceTools);
+    _totalProInput += choice._usage?.prompt_tokens || 0;
+    _totalProOutput += choice._usage?.completion_tokens || 0;
     const assistantMessage = choice.message;
 
     await appendRunLog(requestId, {
@@ -377,6 +382,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
         reply: finalContent,
         iterations,
         stagedFiles: Object.keys(stagedFiles),
+        proUsage: { input: _totalProInput, output: _totalProOutput, model: _proModel, iterations },
       };
     }
   }
