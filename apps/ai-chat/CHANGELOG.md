@@ -7,6 +7,11 @@
 
 ## 2026-06
 
+### 2026-06-28 | fix: Knowledge tab แสดง error จริงแทนที่ "ยังไม่มีข้อมูล" ตลอด
+- `src/firebase.js` — เอา try-catch ออกจาก `getProjectTree()` + `getAgentDocs()` ให้ error propagate ขึ้นมา
+- `src/App.jsx` — `loadKnowledge` capture error ใส่ `treeError` + `docsError` state
+- `src/components/KnowledgePanel.jsx` — แสดง error code จริงถ้าโหลดไม่ได้ (เช่น `permission-denied`)
+
 ### 2026-06-28 | refactor: แยก App.jsx → 4 ไฟล์ (icons, LoginScreen, KnowledgePanel, TokenDashboard)
 - `src/icons.jsx` — แยก SVG icon components ทั้ง 11 ตัวออก (export named)
 - `src/LoginScreen.jsx` — แยก LoginScreen component + import `signInWithGoogle` ตรง

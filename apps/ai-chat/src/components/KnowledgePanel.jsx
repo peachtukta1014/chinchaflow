@@ -67,7 +67,9 @@ export default function KnowledgePanel({ data, onSave, onRefresh }) {
           {/* Project Tree — read-only */}
           {section === 'tree' && (
             <div className="p-4">
-              {data.tree ? (
+              {data.treeError ? (
+                <p className="text-red-400 text-xs text-center mt-8 break-all">⚠️ โหลดไม่ได้: {data.treeError}</p>
+              ) : data.tree ? (
                 <pre className="text-[11px] text-ai-text font-mono leading-relaxed whitespace-pre-wrap break-all">
                   {data.tree}
                 </pre>
@@ -80,7 +82,9 @@ export default function KnowledgePanel({ data, onSave, onRefresh }) {
           {/* Agent Docs — read-only */}
           {section === 'docs' && (
             <div className="p-4 space-y-4">
-              {Object.keys(data.docs).length === 0 ? (
+              {data.docsError ? (
+                <p className="text-red-400 text-xs text-center mt-8 break-all">⚠️ โหลดไม่ได้: {data.docsError}</p>
+              ) : Object.keys(data.docs).length === 0 ? (
                 <p className="text-ai-muted text-sm text-center mt-8">ยังไม่มีข้อมูล</p>
               ) : Object.entries(data.docs).map(([filename, content]) => (
                 <div key={filename}>
