@@ -16,7 +16,7 @@
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
 const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics } = require('./flash/flashContext');
-const { callOpenRouter } = require('./flash/flashModels');
+const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
 const { dispatchToProAgent } = require('./flash/flashDispatch');
@@ -195,11 +195,13 @@ exports.aiChatAgentHttp = functions
       loadCustomNotes().catch(() => ''),
     ]);
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
+    const webSearchInstruction = '\n\n---\n🔍 **Web Search Protocol:** ถ้าคำถามต้องการข้อมูลที่เปลี่ยนแปลงบ่อย (ราคาตลาดล่าสุด ข่าวล่าสุด เหตุการณ์ปัจจุบัน ข้อมูลที่ฐานความรู้ปัจจุบันไม่มี) ให้ตอบเฉพาะบรรทัดนี้แล้วหยุด: `[WEB_SEARCH: <query เป็นภาษาอังกฤษ>]` — ระบบจะค้นเว็บและส่งผลกลับมาให้ตอบใหม่ทันที ห้ามตอบอื่นเพิ่มในรอบนี้';
     const systemContent = basePrompt +
       (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
       (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '') +
       (projectTree ? '\n\n---\n## 🗂️ โครงสร้างโปรเจกต์ปัจจุบัน (sync จาก repo อัตโนมัติ)\n' + projectTree : '') +
-      (customNotes ? '\n\n---\n## 📝 Custom Skills / Notes (พีชตั้งค่าเอง)\n' + customNotes : '');
+      (customNotes ? '\n\n---\n## 📝 Custom Skills / Notes (พีชตั้งค่าเอง)\n' + customNotes : '') +
+      webSearchInstruction;
 
     const messages = [
       { role: 'system', content: systemContent },
@@ -213,6 +215,40 @@ exports.aiChatAgentHttp = functions
       const hasImages = imageBase64 || (images && images.length > 0);
       const tokenEntry = hasImages ? { vision: usage } : { flash: usage };
       await writeTokenLog(requestId, tokenEntry).catch(() => {});
+
+      // ── Web search two-model flow ─────────────────────────────────────
+      const WEB_SEARCH_RE = /^\[WEB_SEARCH:\s*(.+?)\]/i;
+      const wsMatch = !hasImages && reply.match(WEB_SEARCH_RE);
+      if (wsMatch) {
+        const searchQuery = wsMatch[1].trim();
+        await writeProgress(requestId, `กำลังค้นหาข้อมูลจากเว็บ: "${searchQuery}"...`);
+        let wsText = '';
+        try {
+          const wsResult = await callOpenRouterForWebSearch(apiKey, searchQuery);
+          wsText = wsResult.text;
+          await writeTokenLog(requestId, { search: wsResult.usage }).catch(() => {});
+        } catch (wsErr) {
+          console.error('web search failed — continuing without results:', wsErr.message);
+        }
+        const messagesWithWeb = [
+          ...messages,
+          { role: 'assistant', content: reply },
+          {
+            role: 'user',
+            content: wsText
+              ? `ผลการค้นหาจากเว็บ (query: "${searchQuery}"):\n\n${wsText}\n\nตอบคำถามเดิมของพี่พีชโดยใช้ข้อมูลนี้ได้เลยครับ`
+              : `ค้นเว็บไม่ได้ขณะนี้ กรุณาตอบจากความรู้ที่มีแทนครับ`,
+          },
+        ];
+        const result2 = await callOpenRouter(apiKey, messagesWithWeb, { userText: message });
+        const { text: finalReply, usage: usage2 } = result2;
+        await writeTokenLog(requestId, { flash: usage2 }).catch(() => {});
+        await writeResult(requestId, { reply: finalReply, scope: finalScope });
+        res.json({ reply: finalReply, scope: finalScope });
+        return;
+      }
+      // ────────────────────────────────────────────────────────────────
+
       await writeResult(requestId, { reply, scope: finalScope });
       res.json({ reply, scope: finalScope });
     } catch (err) {
