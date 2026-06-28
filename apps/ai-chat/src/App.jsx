@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
-import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs } from './firebase';
+import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signInWithGoogle, signOutUser, onAuthChanged } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 
@@ -58,6 +58,11 @@ const IconFile = () => (
     <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" />
   </svg>
 );
+const IconLogout = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
 
 const MAX_IMAGES = 5;
 const MAX_FILE_CHARS = 8000;
@@ -69,7 +74,79 @@ const WELCOME_MSG = {
 
 // 🔥 [ลบออก] AGENT_OPTIONS Array
 
+const ALLOWED_EMAIL = 'peachtukta1014@gmail.com';
+
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthChanged(u => { setUser(u); setAuthLoading(false); });
+    return unsub;
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-ai-bg">
+        <div className="flex flex-col items-center gap-3">
+          <img src="/jiji-avatar.png" alt="จีจี้" className="w-16 h-16 rounded-full border border-ai-border animate-pulse" />
+          <p className="text-xs text-ai-muted">กำลังตรวจสอบ...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.email !== ALLOWED_EMAIL) {
+    return <LoginScreen />;
+  }
+
+  return <AppShell user={user} />;
+}
+
+function LoginScreen() {
+  const [error, setError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    setError('');
+    setLoggingIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      setError(e.message);
+      setLoggingIn(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full items-center justify-center bg-ai-bg gap-6 px-8" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <img src="/jiji-avatar.png" alt="จีจี้" className="w-24 h-24 rounded-full border-2 border-ai-accent/40 shadow-lg" />
+      <div className="text-center">
+        <h1 className="text-xl font-semibold text-ai-text">จีจี้</h1>
+        <p className="text-xs text-ai-muted mt-1">CHINCHA FLOW · AI Assistant</p>
+      </div>
+      {error && (
+        <p className="text-xs text-red-400 text-center bg-red-900/20 px-4 py-3 rounded-xl max-w-xs leading-relaxed">{error}</p>
+      )}
+      <button
+        onClick={handleLogin}
+        disabled={loggingIn}
+        className="flex items-center gap-3 px-6 py-3 bg-white text-gray-800 rounded-2xl text-sm font-medium hover:bg-gray-100 transition-colors shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+        </svg>
+        {loggingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วย Google'}
+      </button>
+      <p className="text-[11px] text-ai-muted text-center">เฉพาะบัญชี peachtukta1014@gmail.com</p>
+    </div>
+  );
+}
+
+function AppShell({ user }) {
   const [messages, setMessages] = useState([WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -536,6 +613,11 @@ export default function App() {
             {activeTab === 'chat' && (
               <button onClick={newChat} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="แชทใหม่">
                 <IconPlus />
+              </button>
+            )}
+            {user && (
+              <button onClick={() => signOutUser()} className="p-1.5 text-ai-muted hover:text-red-400 transition-colors" title={`ออกจากระบบ (${user.email})`}>
+                <IconLogout />
               </button>
             )}
             <button onClick={() => window.location.reload()} className="p-1.5 text-ai-muted hover:text-ai-accent transition-colors" title="โหลดหน้าใหม่">

@@ -1,3 +1,14 @@
+## 2026-06-28 — feat: เพิ่ม Google Sign-in login ใน ai-chat PWA (whitelist พีชอย่างเดียว)
+
+- **ฟีเจอร์ใหม่:** ai-chat เปิดต้องล็อกอินก่อน — รองรับแค่ `peachtukta1014@gmail.com` เท่านั้น
+- **แก้:**
+  - `apps/ai-chat/src/firebase.js` — เพิ่ม `signInWithGoogle`, `signOutUser`, `onAuthChanged`; เพิ่ม `authDomain` ใน config; refactor `getApp()` singleton
+  - `apps/ai-chat/src/App.jsx` — แยก `App` (auth gate) + `LoginScreen` + `AppShell`; เพิ่ม `user` / `authLoading` state; ปุ่ม logout (IconLogout) ใน header
+  - `.github/workflows/deploy-hosting.yml` — เพิ่ม `VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}` ใน Build ai-chat step
+- **สิ่งที่พีชต้องทำเองใน Firebase Console:** เปิด Authentication → Sign-in method → Google → Enable (ถ้ายังไม่เปิด)
+- **GitHub Secret ที่ต้องเพิ่ม:** `VITE_FIREBASE_AUTH_DOMAIN` = `chincha-eeed6.firebaseapp.com`
+- ถ้าพัง: ตรวจ Firebase Console → Authentication → Google provider เปิดอยู่ไหม, ตรวจ `VITE_FIREBASE_AUTH_DOMAIN` ใน GitHub Secrets
+
 ## 2026-06-28 — fix: ลบ auto-merge ออกจาก pr-verify.yml + แก้ sync-project-tree ไม่รัน
 
 - **อาการ:** Knowledge tab (Project Tree) ว่างเปล่าทุกครั้งที่ PR merge — `sync-project-tree.yml` ไม่ trigger หลัง merge

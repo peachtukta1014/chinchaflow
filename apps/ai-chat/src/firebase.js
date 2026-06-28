@@ -1,5 +1,4 @@
-// Firebase Firestore helpers — ใช้ onSnapshot + get/set โดยตรง
-// ต้องการเฉพาะ VITE_FIREBASE_API_KEY + VITE_FIREBASE_PROJECT_ID
+// Firebase helpers — Firestore + Google Auth
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
@@ -14,17 +13,62 @@ import {
   getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
 
+const ALLOWED_EMAIL = 'peachtukta1014@gmail.com';
+
+let _app = null;
 let _db = null;
+
+function getApp() {
+  if (_app) return _app;
+  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  if (!apiKey || !projectId) return null;
+  _app = getApps()[0] ?? initializeApp({ apiKey, projectId, authDomain });
+  return _app;
+}
 
 function getDb() {
   if (_db) return _db;
-  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  if (!apiKey || !projectId) return null;
-  const app = getApps()[0] ?? initializeApp({ apiKey, projectId });
+  const app = getApp();
+  if (!app) return null;
   _db = getFirestore(app);
   return _db;
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+export async function signInWithGoogle() {
+  const app = getApp();
+  if (!app) throw new Error('Firebase not configured');
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ login_hint: ALLOWED_EMAIL });
+  const result = await signInWithPopup(auth, provider);
+  if (result.user.email !== ALLOWED_EMAIL) {
+    await signOut(auth);
+    throw new Error('ไม่ได้รับอนุญาต — ใช้บัญชี peachtukta1014@gmail.com เท่านั้น');
+  }
+  return result.user;
+}
+
+export async function signOutUser() {
+  const app = getApp();
+  if (!app) return;
+  await signOut(getAuth(app));
+}
+
+export function onAuthChanged(callback) {
+  const app = getApp();
+  if (!app) { callback(null); return () => {}; }
+  return onAuthStateChanged(getAuth(app), callback);
 }
 
 // ── Pro Agent result (onSnapshot event-driven) ───────────────────────────────
