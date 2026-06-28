@@ -1,3 +1,10 @@
+## 2026-06-28 — fix: deploy Firestore Rules ใหม่ — Knowledge tab + aiResults ถูก deny จาก rules เก่า
+
+- **อาการ:** Knowledge tab → Agent Docs และ Project Tree ว่างเปล่า; aiResults อ่านไม่ได้ (อาจกระทบ result delivery); Tokens tab ว่าง
+- **สาเหตุ:** Production Firestore Rules deploy ล่าสุดเมื่อ `2026-06-24` (commit `275b721e`) — ยังไม่มี rule สำหรับ `systemConfig`, `aiResults`, `tokenLogs` → ถูก catch-all `allow read, write: if false` บล็อกทั้งหมด; `firestore.rules` ใน repo มีครบแล้วแต่ไม่ได้ trigger deploy เพราะ PR หลังจากนั้นไม่ได้แตะ `firestore.rules`
+- **แก้:** Trigger `deploy-rules.yml` ผ่าน workflow_dispatch → deploy rules ใหม่จาก main ล่าสุด
+- ถ้าพัง: เช็ก `deploy-rules.yml` run ล่าสุดใน GitHub Actions → ดู log step "Deploy Firestore rules"
+
 ## 2026-06-28 — feat: เพิ่ม PROJECT_STRUCTURE + AGENT_CHANGELOG เข้า agentDocs sync และ Flash context
 
 - **อาการ:** Knowledge tab ใน ai-chat แสดง "ยังไม่มีข้อมูล" ส่วน docs; จีจี้ไม่รู้โครงสร้าง repo ล่าสุดและไม่รู้ว่า round ก่อนแก้อะไรไป
