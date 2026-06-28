@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+### 2026-06-29 | fix: เลขเวอร์ชันแสดงวันที่ผิด — UTC vs ไทย UTC+7
+- `.github/workflows/deploy-hosting.yml` Bump version step — เปลี่ยน `date -u` → `TZ=Asia/Bangkok date` (BE_YY, DDMMYY, TODAY)
+
 ### 2026-06-28 | fix: Knowledge tab แสดง error จริงแทนที่ "ยังไม่มีข้อมูล" ตลอด
 - `src/firebase.js` — เอา try-catch ออกจาก `getProjectTree()` + `getAgentDocs()` ให้ error propagate ขึ้นมา
 - `src/App.jsx` — `loadKnowledge` capture error ใส่ `treeError` + `docsError` state

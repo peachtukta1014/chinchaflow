@@ -1,3 +1,10 @@
+## 2026-06-29 — fix: เลขเวอร์ชัน ai-chat ยังเป็นวันที่เมื่อวาน — ผิด timezone UTC vs ไทย
+
+- **อาการ:** เลขเวอร์ชันใน header (เช่น `ai-280669.7`) ยังโชว์วันที่เมื่อวาน แม้จะ deploy วันใหม่แล้ว — เพราะพีชอยู่ UTC+7 แต่ script รัน `date -u` (UTC)
+- **สาเหตุ:** `.github/workflows/deploy-hosting.yml` Bump version step ใช้ `date -u` ทุกที่ → ที่เวลา 00:00–07:00 ไทย ยัง UTC เมื่อวาน → วันที่ผิด
+- **แก้:** lines 238–240 เปลี่ยน `date -u` → `TZ=Asia/Bangkok date` ทุก 3 บรรทัด (BE_YY, DDMMYY, TODAY)
+- ถ้าพัง: เช็ก "Bump version" step log ว่า `AI Chat version →` ได้วันอะไร
+
 ## 2026-06-28 — fix: Knowledge tab แสดง error จริงแทนที่ "ยังไม่มีข้อมูล" เงียบๆ
 
 - **อาการ:** Knowledge tab → Project Tree / Agent Docs แสดง "ยังไม่มีข้อมูล" ตลอด แม้ข้อมูลอยู่ใน Firestore แล้ว — ไม่รู้ว่าพังจากอะไร
