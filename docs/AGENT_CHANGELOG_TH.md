@@ -1,3 +1,10 @@
+## 2026-06-28 — fix: bump X-Notify-Rev '4' แก้ 401 Sync Agent Docs (PR #379)
+
+- **อาการ:** CI step "Sync Agent Docs to Brain" fail 401 ทุกรอบ (8 retry ก็ยังไม่ผ่าน)
+- **สาเหตุ:** Firebase ใช้ code hash ตัดสินว่าต้อง redeploy — re-run workflow รอบที่ 2 เห็นโค้ดเหมือนเดิม → "No changes detected" → ข้าม redeploy → `deployNotifyHttp` ยังใช้ `.env` เก่าที่มี `GH_PAT` ล้าสมัย → token mismatch → 401
+- **แก้:** `apps/webhook-core/src/index.js` — เปลี่ยน `X-Notify-Rev` จาก `'3'` → `'4'` บังคับให้ Firebase เห็น code diff → redeploy → ดึง `.env` ใหม่
+- ถ้าพังอีก (401 กลับมา): ให้ bump `X-Notify-Rev` ขึ้นอีกตัว แล้ว push — อย่า re-run workflow เดิมซ้ำ เพราะ Firebase จะ skip อีก
+
 ## 2026-06-26 — fix: โอเคกุ้ง ไม่ match + DSML strip + hardcode DEPLOY_NOTIFY_URL
 
 - **อาการ:** พิม "โอเคกุ้ง" จากมือถือ → ตอบ "ไม่สามารถติดต่อ AI Server" แทนที่จะส่ง dispatch

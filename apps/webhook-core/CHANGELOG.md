@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-28 | PR #379
+**fix: bump X-Notify-Rev '4' แก้ 401 Sync Agent Docs step**
+- `index.js` — `X-Notify-Rev` '3' → '4' บังคับ Firebase redeploy `deployNotifyHttp` ดึง `.env` ใหม่
+- สาเหตุ 401: re-run workflow → Firebase "No changes detected" → skip redeploy → token เก่า
+- ถ้าพังอีก: bump X-Notify-Rev ขึ้นอีก อย่า re-run workflow เดิม
+
 ### 2026-06-24 | claude/new-session-358ebr
 **security: แยก GH_PAT_DISPATCH (dispatch-only) + lock GH_PAT ออกจาก Flash (PR-B)**
 - `aiChatAgent.js` — runWith secrets เพิ่ม `GH_PAT_DISPATCH`; dispatch ใช้ `process.env.GH_PAT_DISPATCH` แทน `GH_PAT`
