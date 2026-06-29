@@ -228,8 +228,23 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
           }
         }
         if (!prUrl) {
-          const err = await prRes.json().catch(() => ({}));
-          throw new Error(`PR create ล้มเหลว: ${err.message || prRes.status}`);
+          // Atomicity: delete orphan branch so next run can start clean
+          let branchCleaned = false;
+          try {
+            const delRes = await fetch(`${GH_API}/repos/${GH_REPO}/git/refs/heads/${branchName}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'CF-AI' },
+            });
+            branchCleaned = delRes.status === 204;
+          } catch { /* ignore */ }
+
+          const errData = await prRes.json().catch(() => ({}));
+          const errMsg = errData.message || String(prRes.status);
+          if (branchCleaned) {
+            // staged files still in memory — Pro can retry commit_and_pr with a new branch name
+            throw new Error(`PR create ล้มเหลว (${errMsg}) — ลบ orphan branch ${branchName} แล้ว · staged files ยังอยู่ใน memory → เรียก commit_and_pr ใหม่ได้เลย`);
+          }
+          throw new Error(`PR create ล้มเหลว (${errMsg}) — orphan branch ยังอยู่: ${branchName} → สร้าง PR ด้วยตนเองหรือลองใหม่`);
         }
       } else {
         prUrl = (await prRes.json()).html_url;

@@ -1,3 +1,12 @@
+## 2026-06-29 — feat: commit_and_pr atomicity — ลบ orphan branch เมื่อ PR create ล้มเหลว (Roadmap #3)
+
+- **เหตุผล:** ถ้า commit ผ่านแต่ PR create ล้มเหลว branch จะลอยอยู่ใน repo โดยไม่มี PR (orphan branch) — Pro loop จะ error และ branch ค้างไว้
+- **แก้:**
+  - `apps/webhook-core/src/shared/toolExecutors.js` — ใน `commit_and_pr`: เมื่อ PR create fail และหา existing PR ไม่เจอ → พยายาม DELETE branch ผ่าน GitHub API ก่อน throw
+    - ถ้าลบ branch สำเร็จ (204): throw พร้อมแจ้ง Pro ว่า "staged files ยังอยู่ใน memory → retry commit_and_pr ได้เลย"
+    - ถ้าลบ branch ไม่ได้: throw พร้อม branch name ให้สร้าง PR ด้วยตนเอง
+- **ผล:** Pro loop ไม่มี orphan branch ค้างใน repo; retry cycle สะอาด; staged files ยังอยู่ใน memory ระหว่าง session เดียวกัน
+
 ## 2026-06-29 — feat: Monitoring Dashboard — stats summary บน TokenDashboard (Roadmap #6)
 
 - **เหตุผล:** TokenDashboard แสดงแค่รายการ logs ต่อวัน ไม่มีตัวเลขสรุป ทำให้ยากต่อการประเมิน cost และ usage trend
