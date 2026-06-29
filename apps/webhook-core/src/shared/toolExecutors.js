@@ -167,9 +167,11 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
         committed.push(filePath);
       }
 
-      // Auto-add changelog entry
+      // Auto-add changelog entry — ข้ามถ้า Pro อัปเดต changelog เองแล้ว (ป้องกัน entry ซ้ำ)
       try {
-        const changelog = await fetchRepoFile(ghPat, 'docs/AGENT_CHANGELOG_TH.md', branchName);
+        const changelog = !committed.includes('docs/AGENT_CHANGELOG_TH.md')
+          ? await fetchRepoFile(ghPat, 'docs/AGENT_CHANGELOG_TH.md', branchName)
+          : null;
         if (changelog) {
           const today = new Date().toISOString().slice(0, 10);
           const entry = `## ${today} — ${args.pr_title}\n- ไฟล์ที่แก้: ${committed.join(', ')}\n- Branch: ${branchName}`;
@@ -238,7 +240,7 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
 
       const mergeMsg = isHighRisk
         ? `⚠️ งานนี้กระทบส่วนสำคัญ — ตรวจดูก่อน merge นะครับพี่ 🙏`
-        : `⚡ CI ผ่านแล้วจะ auto-merge + deploy เองเลยครับพี่ 🌸`;
+        : `⚡ low-risk — ตรวจสอบ CI ผ่านแล้วค่อย merge ได้เลยครับพี่ 🌸`;
       return `✅ เปิด PR แล้วครับพี่! ${prUrl}\n\n${mergeMsg}\nBranch: ${branchName}\nไฟล์ที่แก้: ${committed.join(', ')}`;
     }
 

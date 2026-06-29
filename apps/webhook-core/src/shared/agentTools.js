@@ -225,7 +225,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
-    // Checkpoint ก่อนรอบ 15 — ให้จีจี้สรุปความคืบหน้าก่อนดำเนินการต่อ
+    // Checkpoint รอบ 25 — ให้จีจี้สรุปความคืบหน้าก่อนดำเนินการต่อ
     if (iterations === SUMMARY_CHECKPOINT && !taskCompleted) {
       messages.push({
         role: 'user',

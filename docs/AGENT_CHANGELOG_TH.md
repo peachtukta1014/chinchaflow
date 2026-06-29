@@ -1,3 +1,14 @@
+## 2026-06-29 — fix: deep review — แก้ mergeMsg + auto-changelog ซ้ำ + comment เก่า
+
+- **เหตุผล:** ทำ deep review ทั้งระบบ AI (Flash + Pro agentic loop) พบ 5 จุดที่ต้องแก้
+- **แก้:**
+  - `toolExecutors.js` L241 — `mergeMsg` low-risk ยังบอก "auto-merge + deploy เองเลย" ทั้งที่ feature ถูกลบไปแล้ว → แก้เป็น "low-risk — ตรวจสอบ CI ผ่านแล้วค่อย merge ได้เลย"
+  - `toolExecutors.js` auto-changelog — ข้ามการเพิ่ม entry อัตโนมัติถ้า Pro อัปเดต changelog เองแล้ว (ป้องกัน entry ซ้ำ)
+  - `agentTools.js` L228 — comment "รอบ 15" แก้เป็น "รอบ 25" (ตรงกับ SUMMARY_CHECKPOINT จริง)
+  - `aiWorkflowAgent.js` L7-16 — แก้ comment header จาก "Round 1/Round 2" pipeline เก่า เป็น agentic loop ปัจจุบัน
+  - `toolDefinitions.js` exec_command — description "default 20, สูงสุด 45" แก้เป็น "default 30, สูงสุด 300" (ตรงกับ code จริง)
+- **ผล:** ข้อความที่ Pro รายงานพีชถูกต้อง, changelog ไม่ซ้ำ, docs/comments ตรงกับพฤติกรรมจริง
+
 ## 2026-06-29 — fix: cleanup bugs + ลบไฟล์เก่า + ทำความสะอาดโค้ด
 
 - **แก้ bugs:**

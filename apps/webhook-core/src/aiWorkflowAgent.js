@@ -5,15 +5,14 @@
  * as the AI brain to analyze + generate code fixes, then creates a PR via
  * GitHub REST API.
  *
- * Flow (v2 — "อ่านก่อนเขียน"):
- *   PWA message → aiChatAgent detects code-action → aiWorkflowAgent
- *     Round 1: ส่ง file tree ของ scope ให้ AI เลือกไฟล์ที่ต้องอ่านจริง (need_files)
- *     Round 2: ดึงเนื้อไฟล์เต็มๆตามที่ AI ขอ แล้วให้ AI สร้างแผนแก้จากของจริง
- *     → apply: ต้องเจอ exact match ของ old/find ในไฟล์จริงเท่านั้น
- *               ห้าม fallback เขียนทับทั้งไฟล์แบบเงียบๆ — ถ้าหา match ไม่เจอ ให้ throw
- *     → GitHub API: create branch + commit + open PR
+ * Flow (agentic loop — Pro เลือก tool เองจนงานเสร็จ):
+ *   คำสั่งจากพีช → Flash (aiChatAgent) → Task Brief → repository_dispatch → GitHub Actions
+ *     → run-github-agent.mjs → handleCodeActionV2 → runAgentLoop (agentTools.js)
+ *     Loop: Pro เรียก tool (read/patch/write/commit) ต่อเนื่อง MAX_ITERATIONS=30 รอบ
+ *     → taskCompleted=true เมื่อ commit_and_pr ✅ หรือ report_no_action_needed
+ *     → ผลลัพธ์เขียนลง Firestore aiResults/{requestId} ให้ frontend poll
  *   PR ที่เปิดจะถูกตรวจสอบอัตโนมัติโดย .github/workflows/pr-verify.yml
- *   (smoke test + build) แล้ว comment ผลกลับเข้า PR ก่อนพี่กด merge
+ *   (smoke test + build) แล้ว comment ผลกลับเข้า PR ก่อนพีชกด merge
  *
  * No Cursor Cloud — uses OpenRouter + GitHub PAT only (low cost).
  * Model: deepseek/deepseek-chat (or DEFAULT_MODEL from env).
