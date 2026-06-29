@@ -62,11 +62,12 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 | # | เรื่อง | สถานะ | PR |
 |---|--------|-------|-----|
 | 1 | เลื่อน SUMMARY_CHECKPOINT จากรอบ 25 → 8-10 เพื่อลด context สะสม | ⏳ ยังไม่ทำ | — |
-| 2 | ตรวจ payload รวม (requestId + history + Brief) ต้องไม่เกิน 10KB ก่อน dispatch | ⏳ ยังไม่ทำ | — |
+| 2 | ตรวจ payload รวม (requestId + history + Brief) ต้องไม่เกิน 10KB ก่อน dispatch | 🔸 Brief สั้นลงมากแล้ว (ข้อ 7) — ยังขาด size check จริงก่อน dispatch | — |
 | 3 | commit_and_pr atomicity — ป้องกัน orphan branch เมื่อ commit ผ่านแต่ PR fail | ⏳ ยังไม่ทำ (รับว่าซับซ้อน) | — |
 | 4 | Flash retry 1 ครั้งเมื่อ dispatch ล้มเหลว (non-204) | ⏳ ยังไม่ทำ | — |
 | 5 | Flash สรุปงาน + รอ "ไฟเขียว" ก่อน dispatch Pro ทุกครั้ง | ✅ เสร็จแล้ว | #429 |
 | 6 | Monitoring dashboard — runs/วัน, ต้นทุน/task, success rate จาก tokenLogs | ⏳ ยังไม่ทำ | — |
+| 7 | compact Task Brief — Flash ย่อบริบทเป็น 4 บรรทัด ส่ง Pro (งาน/ไฟล์/อ่านก่อน/กฎ) | ✅ เสร็จแล้ว | #431 |
 
 **ไฟล์ที่เกี่ยวข้องกับ AI loop:**
 - Flash: `apps/webhook-core/src/aiChatAgent.js`, `flash/flashTriggers.js`, `flash/flashContext.js`
