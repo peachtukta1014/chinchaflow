@@ -71,6 +71,7 @@ function AppShell({ user }) {
   const loadingRef = useRef(false);
   const knowledgeLoadedRef = useRef(false);
   const tokenLogsLoadedRef = useRef(false);
+  const pendingRequestIdRef = useRef(null);
 
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
@@ -161,6 +162,7 @@ function AppShell({ user }) {
   // ── New chat ───────────────────────────────────────────────────────────
   const newChat = useCallback(() => {
     currentSessionId.current = null;
+    pendingRequestIdRef.current = null;
     setMessages([{ role: 'assistant', content: 'แชทใหม่เริ่มแล้วนะคะพี่ 🌸 สั่งได้เลย' }]);
     setImagePreviews([]);
     setFileAttachment(null);
@@ -237,7 +239,15 @@ function AppShell({ user }) {
       history: historyForAI,
       images: images.length > 0 ? images : undefined,
       requestId,
+      pendingRequestId: pendingRequestIdRef.current || undefined,
     });
+
+    // เก็บ/เคลียร์ pendingRequestId ตามผลลัพธ์
+    if (reply.pendingRequestId) {
+      pendingRequestIdRef.current = reply.pendingRequestId;
+    } else if (reply.intent === 'code-action' || reply.intent === 'chat') {
+      pendingRequestIdRef.current = null;
+    }
 
     if (reply.status === 'processing') {
       const processingMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];

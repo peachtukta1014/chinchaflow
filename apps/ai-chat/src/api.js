@@ -62,13 +62,12 @@ export async function fetchDeployStatus() {
  * @param {string} [opts.imageBase64] - Fallback บัฟเฟอร์สตริงรูปภาพเดี่ยว
  * @returns {Promise<{reply: string, intent?: string, status?: string, prUrl?: string, branchName?: string}>}
  */
-export async function chatWithAI({ message, history = [], images = null, imageBase64 = null, requestId = null }) {
+export async function chatWithAI({ message, history = [], images = null, imageBase64 = null, requestId = null, pendingRequestId = null }) {
   try {
-    // ปรับโครงสร้างข้อมูล Payload หลักโดยนำฟิลด์ scope ออกทั้งหมดเพื่อผลักภาระการคำนวณบริบทไปไว้ที่ Backend 
     const body = { message, history };
-    
     if (requestId) body.requestId = requestId;
-    
+    if (pendingRequestId) body.pendingRequestId = pendingRequestId;
+
     if (images && images.length > 0) {
       body.images = images;
     } else if (imageBase64) {
@@ -90,13 +89,13 @@ export async function chatWithAI({ message, history = [], images = null, imageBa
 
     const data = await res.json();
     
-    // ส่งคืนเฉพาะออบเจกต์ผลลัพธ์และโครงสร้างทางวิศวกรรมการทำงาน (Git/CI/CD Execution) 
     return {
       reply: data.reply || 'ไม่ได้รับคำตอบจาก AI',
       intent: data.intent || 'chat',
       status: data.status,
       prUrl: data.prUrl,
       branchName: data.branchName,
+      pendingRequestId: data.pendingRequestId || null,
     };
   } catch (err) {
     console.error('chatWithAI fetch network breakdown:', err);
