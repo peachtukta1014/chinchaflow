@@ -1,3 +1,10 @@
+## 2026-06-29 — fix: flashPrompts.js — ลด SYSTEM_PROMPTS เหลือ base เดียว + แก้ syntax error
+
+- **เหตุผล:** `flashPrompts.js` มี syntax error (YAML/Markdown หลุดเข้าไปใน JS) ทำให้ Flash CF โหลดไม่ขึ้นเลย + ไฟล์เดิมมี SYSTEM_PROMPTS แยก 5 scope ทั้งที่ Flash เป็น Planner ตัวเดียว ไม่ได้สวมหมวก scope-specific อีกแล้ว
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashPrompts.js` — เขียนใหม่ทั้งไฟล์: SYSTEM_PROMPTS เหลือ `root` prompt เดียว, `detectScope` ยังอยู่ (ใช้ routing Pro เท่านั้น), ตัวตนเต็มๆ ของจีจี้อยู่ที่ `FLASH.md` (inject ผ่าน Firestore)
+- **ผล:** Flash CF โหลดได้ปกติ + Flash มีตัวตนเดียวจาก FLASH.md อัปเดตตัวตนที่ FLASH.md ที่เดียวโดยไม่ต้องแตะโค้ด
+
 ## 2026-06-29 — feat: แยก agent identity เป็น FLASH.md + PRO.md ที่ root + อัปเดตโค้ด
 
 - **เหตุผล:** แต่ละ agent ควรมีไฟล์ identity ของตัวเองที่ root repo ชัดเจน — ไม่ซ้อนใน `.jiiji/` และ system prompt Flash ไม่ควรมี scope roles ของทุกแอปเพราะ Flash ไม่ใช่ตัวเขียนโค้ด
