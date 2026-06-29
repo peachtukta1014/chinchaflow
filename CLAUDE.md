@@ -71,7 +71,7 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 - **พี่ซี**: Anthropic session นี้ — implement, maintain, ตรวจ PR
 
 ไฟล์หลัก: `apps/webhook-core/src/aiChatAgent.js` (Flash) · `apps/webhook-core/src/aiWorkflowAgent.js` (Pro)  
-Docs: `.jiiji/IDENTITY.md` · `.jiiji/PRO_AGENT.md` · `JIIJI.md`  
+Docs: `.jiiji/IDENTITY.md` · `FLASH.md` · `PRO.md`  
 Diagram: `docs/AI_AGENT_DIAGRAM.md` · Key files: `docs/AI_AGENT_KEY_FILES.md`
 
 ---

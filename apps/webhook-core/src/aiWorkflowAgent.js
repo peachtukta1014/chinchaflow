@@ -377,7 +377,7 @@ function buildAgentSystemPrompt(scopeInfo, agentDocs) {
     ? `\n... (และอีก ${scopeInfo.files.length - 25} ไฟล์ — เรียก list_files เพื่อดูทั้งหมด)`
     : '';
 
-  return `คุณคือ "จีจี้" — AI Developer สำหรับ CHINCHA FLOW monorepo ของพี่พีช
+  return `คุณคือ Pro Agent (จีจี้โปร) — Executor สำหรับ CHINCHA FLOW monorepo ของพี่พีช
 ทำงานแบบ agentic loop: เรียก tool ต่อเนื่องทีละขั้น จนงานเสร็จจริง
 
 ## ⚡ กฎเหล็ก — ห้ามฝ่าฝืน
@@ -499,13 +499,11 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
       userMsg = `จีจี้เจอปัญหาครับพี่: ${err.message}\n\nไม่มีการแก้โค้ดเกิดขึ้น (ไม่มีการเขียนทับแบบเดา) ลองอธิบายคำสั่งให้ชัดขึ้น หรือระบุไฟล์ที่ต้องการแก้`;
     }
 
-    // ✨ สั่งเขียนผลลัพธ์ลง Firestore ทันทีเมื่อเกิด Error เพื่อปลดล็อกให้หน้าจอแชทเลิกค้างเลิกหมุน
     try {
-      const { writeResult } = require('./shared/progressTracker');
-      await writeResult(requestId, { 
-        reply: userMsg, 
+      await writeResult(requestId, {
+        reply: userMsg,
         scope: currentScope || 'root',
-        status: 'error'
+        status: 'error',
       });
     } catch (writeErr) {
       console.error('Failed to write error result to Firestore:', writeErr);
