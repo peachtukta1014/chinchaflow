@@ -85,10 +85,21 @@ export function onAuthChanged(callback) {
   return onAuthStateChanged(getAuth(app), callback);
 }
 
+// ── Pro Agent progress (onSnapshot event-driven) ─────────────────────────────
+export function listenProgress(requestId, onStep) {
+  const db = getDb();
+  if (!db) return () => {};
+  return onSnapshot(
+    doc(db, 'aiProgress', requestId),
+    (snap) => { onStep(snap.exists() ? (snap.data()?.step || null) : null); },
+    (err) => console.warn('[Firebase] listenProgress:', err.code)
+  );
+}
+
 // ── Pro Agent result (onSnapshot event-driven) ───────────────────────────────
 export function listenForResult(requestId, onResult) {
   const db = getDb();
-  if (!db) return null;
+  if (!db) return () => {};
   return onSnapshot(
     doc(db, 'aiResults', requestId),
     (snap) => { if (snap.exists()) onResult(snap.data()); },

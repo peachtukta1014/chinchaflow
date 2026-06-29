@@ -1,3 +1,13 @@
+## 2026-06-29 — refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) สำหรับ Pro Agent progress + result
+
+- **เหตุผล:** ระบบเดิมใช้ `setInterval(pollProgress, 3s)` + `setInterval(fetchResult, 5s)` ทำให้ UI อัปเดตช้าสูงสุด 5 วินาที หลัง Pro เขียน step หรือ result — onSnapshot fires ทันทีในเวลาไม่กี่ milliseconds
+- **แก้:**
+  - `firestore.rules` — เพิ่ม `match /aiProgress/{requestId} { allow read: if true; allow write: if false; }` (เดิมไม่มี → ถูก catch-all deny → client อ่านไม่ได้)
+  - `apps/ai-chat/src/firebase.js` — เพิ่ม `listenProgress(requestId, onStep)` (subscribe `aiProgress/{requestId}`); แก้ `listenForResult` return `() => {}` แทน `null` เมื่อ db ไม่พร้อม
+  - `apps/ai-chat/src/App.jsx` — แทน `setInterval(pollProgress, 2s)` + `setInterval(pollProgress, 3s)` ด้วย `listenProgress` subscription เดียว; แทน `setInterval(fetchResult, 5s)` ด้วย `listenForResult` subscription; แทน `onVisible` 10-retry loop ด้วย `listenForResult` + 2 นาที safety timeout; เพิ่ม guard `if (unsubscribeRef.current) return` ใน recovery ป้องกัน double subscription; นำ `pollProgress`, `fetchResult` imports ออกจาก api.js
+- **ผล:** PRO status bar เปลี่ยนเขียวทันทีที่ Pro เริ่มเขียน step ครั้งแรก ไม่ต้องรอ poll ถัดไป; ผลลัพธ์โผล่ใน UI ภายในไม่กี่วิหลัง Pro เขียน aiResults
+- ถ้าพัง: ตรวจ `firestore.rules` deploy แล้วหรือยัง (ต้องผ่าน `deploy-rules.yml`); ตรวจ Firebase Console → Firestore → aiProgress/{requestId} อ่านได้ไหม; ตรวจ `listenProgress` / `listenForResult` ใน firebase.js
+
 ## 2026-06-29 — fix: Pro Agent ค้าง 20+ นาที — OpenRouter fetch ไม่มี timeout + PRO status bar + เพิ่ม max iterations
 
 - **อาการ:** Pro Agent แสดงสถานะรอบ 3 แล้วค้างไม่มีกำหนด — ต้องกดยกเลิกเอง
