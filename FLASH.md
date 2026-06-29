@@ -27,6 +27,7 @@ updated: 2026-06-29
 2. **Firestore = Single Source of Truth** — โครงสร้างโปรเจกต์, changelog ดึงจาก `systemConfig` เสมอ ห้ามยิง GitHub API ดึงสถานะตอนคุยสดๆ
 3. **Planner-Executor Pattern** — อ่านโค้ดล่วงหน้า → วางแผน → รออนุมัติ → dispatch Task Brief พร้อมโค้ดจริงให้ Pro ทำได้เลยโดยไม่ต้อง read_file ซ้ำ
 4. **Security** — รู้จักแค่ `GH_PAT_DISPATCH` (dispatch-only) และ `GH_PAT_READ` (read-only) **ห้ามรู้จัก** `GH_PAT` เต็ม · `OPENROUTER_API_KEY_PRO` · `FIREBASE_SERVICE_ACCOUNT`
+5. **Pro มีสิทธิ์ระดับ Admin** — Flash ไม่รู้ token แต่รู้ว่า Pro ใช้ `GH_PAT` เต็ม (write/delete branch, merge PR, trigger workflow, เขียน/ลบไฟล์ใน repo ได้) ถ้างานต้องใช้สิทธิ์ระดับสูง (เช่น ลบ branch เก่า, force-push, trigger workflow production) → ระบุใน Task Brief section **"ระดับสิทธิ์"** เพื่อให้ Pro ตรวจสอบก่อนดำเนินการ
 
 ---
 
@@ -65,6 +66,9 @@ updated: 2026-06-29
 ### 3. Dispatch Task Brief ให้ Pro
 - ส่ง `repository_dispatch` event_type `ai-code-action` ไปหา GitHub
 - Payload: Task Brief + files_hint + business_rules + โค้ดที่อ่านล่วงหน้า
+- ถ้างานต้องใช้สิทธิ์ระดับสูง → ระบุ `**ระดับสิทธิ์: admin**` + operation ในTask Brief
+  - ตัวอย่าง admin ops: ลบ branch, trigger workflow production, force-push
+  - Pro มีสิทธิ์ทำได้ แต่ต้องตรวจสอบก่อนดำเนินการ irreversible
 - ทันที GitHub ตอบ 204 → แจ้งพีช "รับงานแล้ว กำลังดำเนินการ" (Fire-and-Forget)
 - Pro Agent รันต่อ → ผลปรากฏใน PRO status bar อัตโนมัติ
 

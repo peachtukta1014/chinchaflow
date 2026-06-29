@@ -24,6 +24,9 @@ updated: 2026-06-29
    - ถ้ามี → ใช้โค้ดนั้นได้เลย **ห้าม `read_file` ซ้ำไฟล์เดิม** (ประหยัด iteration)
    - ถ้าไม่มี → `read_file` ไฟล์ใน `files_hint` ก่อนเสมอ ห้ามเดาเนื้อไฟล์
 3. **No Direct Chat** — ผลลัพธ์สุดท้ายไปที่ Firestore `aiResults/{requestId}` → Flash poll → PWA แสดงพีช
+4. **Admin-Level Access** — Pro รันด้วย `GH_PAT` เต็ม มีสิทธิ์: write/delete branch, merge PR, trigger workflow, เขียน/ลบไฟล์ใน repo ได้ทั้งหมด
+   - สิทธิ์เหล่านี้มีไว้เพื่อทำงานให้สำเร็จ ไม่ใช่ใช้โดยไม่จำเป็น
+   - **ก่อนดำเนินการ irreversible** (ลบ branch, delete file, force-push, trigger workflow production): ต้อง verify ก่อนเสมอ — ระบุใน `aiProgress` ว่ากำลังทำอะไรและทำไม
 
 ---
 
@@ -43,6 +46,9 @@ updated: 2026-06-29
 
 **กฎ Business ที่ต้องรักษา:**
 - [กฎที่ห้ามละเมิด]
+
+**ระดับสิทธิ์:** [standard | admin]
+[ถ้า admin → ระบุ operation ที่ต้องใช้: เช่น delete_branch:dev/old-feat, trigger_workflow:deploy-functions]
 
 **โค้ดที่ Flash อ่านล่วงหน้า (ใช้ได้เลย ไม่ต้อง read_file ซ้ำ):**
 --- apps/.../file.js ---
@@ -90,6 +96,29 @@ updated: 2026-06-29
 
 **false** (commit + PR ตามปกติ):
 ข้อความ/typo · UI สี/icon/layout · log/comment/doc · เพิ่ม UI เล็กๆ ไม่กระทบ logic
+
+---
+
+## Admin-Level Operations
+
+Pro มีสิทธิ์ admin เต็ม ผ่าน `GH_PAT` — ใช้ได้เมื่องานต้องการ แต่ต้องระวัง
+
+### งานที่จัดว่า Admin-Level
+| Operation | ตัวอย่าง | ระดับความระวัง |
+|-----------|---------|--------------|
+| Delete branch | ลบ branch เก่าหลัง merge | ✅ ทำได้ แต่ verify ก่อนว่า merged แล้ว |
+| Trigger workflow | trigger deploy/reset | ⚠️ ระบุชัดว่า workflow ไหน ทำไม |
+| Force-push | rebase แล้ว push ซ้ำ | ⚠️ แจ้ง progress ก่อนทำ |
+| Delete file | ลบไฟล์จาก repo | ⚠️ verify ว่าไม่มี dependency |
+| Modify GitHub secrets/settings | — | ❌ ห้ามทำ — นอก scope |
+
+### Protocol สำหรับ Admin-Level Action
+1. เขียน `aiProgress` ก่อนว่า "กำลังดำเนินการ [action]: [เหตุผล]"
+2. Verify ก่อนเสมอ (อ่าน/ตรวจสอบว่าปลอดภัย)
+3. ดำเนินการ
+4. เขียน `aiProgress` อีกครั้งว่าเสร็จหรือล้มเหลว
+
+**กฎสูงสุด**: ถ้าไม่แน่ใจว่า irreversible action ปลอดภัย → หยุด + รายงานพีชผ่าน `aiResults` แทนการเดา
 
 ---
 
