@@ -194,8 +194,8 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
       // Open PR
       const riskNote = isHighRisk
         ? `_⚠️ high-risk: กระทบ logic/ราคา/สต๊อก/โครงสร้างหลัก — **ตรวจสอบก่อน merge** นะครับพี่_`
-        : `_⚡ low-risk: CI ผ่านแล้วจะ **auto-merge เองอัตโนมัติ** 🌸_`;
-      const autoMergeTag = isHighRisk ? '' : '\n\n[auto-merge]';
+        : `_⚡ low-risk: ตรวจสอบ CI ผ่านแล้วค่อย merge ได้เลยครับพี่_`;
+      const autoMergeTag = '';
       const prBodyFull = (args.pr_body || '') +
         `\n\n---\n**ไฟล์ที่แก้:** ${committed.join(', ')}\n` +
         riskNote + autoMergeTag;
@@ -276,10 +276,10 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
 
     case 'get_skill': {
       const skillPaths = {
-        'auto-shrimp': '.cursor/skills/auto-shrimp/SKILL.md',
-        'auto-tea': '.cursor/skills/auto-tea/SKILL.md',
-        'ship-shrimp': '.cursor/skills/ship-shrimp/SKILL.md',
-        'ship-tea': '.cursor/skills/ship-tea/SKILL.md',
+        'auto-shrimp': '.claude/commands/auto-shrimp.md',
+        'auto-tea': '.claude/commands/auto-tea.md',
+        'ship-shrimp': '.claude/commands/ship-shrimp.md',
+        'ship-tea': '.claude/commands/ship-tea.md',
         'land-it': '.claude/commands/land-it.md',
         'peter-ser': '.claude/commands/peter-ser.md',
       };

@@ -265,16 +265,6 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     // OpenRouter อาจคืน field ชื่อ reasoning_content (native DeepSeek) หรือ reasoning (normalized)
     // → เก็บจากชื่อไหนก็ได้ แล้วส่งกลับทุกชื่อ กันกรณี provider routing ของ OpenRouter เปลี่ยน
     const echoedReasoning = assistantMessage.reasoning_content ?? assistantMessage.reasoning;
-    if (iterations === 1) {
-      // diagnostic ชั่วคราว: ยืนยันว่า OpenRouter คืน reasoning ผ่าน field ชื่ออะไรจริงๆ
-      // (ลบ log บรรทัดนี้ออกได้เมื่อยืนยันชื่อ field แน่นอนแล้ว — ไม่มี content หลุด log แค่ key)
-      console.log('[reasoning-debug]', JSON.stringify({
-        keys: Object.keys(assistantMessage || {}),
-        hasReasoning: assistantMessage.reasoning != null,
-        hasReasoningContent: assistantMessage.reasoning_content != null,
-        hasReasoningDetails: assistantMessage.reasoning_details != null,
-      }));
-    }
     messages.push({
       role: 'assistant',
       content: stripDsml(assistantMessage.content) || null,

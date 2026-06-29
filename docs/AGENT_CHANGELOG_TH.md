@@ -1,3 +1,17 @@
+## 2026-06-29 — fix: cleanup bugs + ลบไฟล์เก่า + ทำความสะอาดโค้ด
+
+- **แก้ bugs:**
+  - `toolExecutors.js` — `get_skill` paths: `.cursor/skills/...` → `.claude/commands/...` (ไฟล์จริงอยู่ที่ `.claude/commands/`)
+  - `toolExecutors.js` — ลบ `[auto-merge]` tag + แก้ข้อความ auto-merge ที่ misleading (feature ถูกลบแล้วตั้งแต่ PR ก่อน)
+  - `aiWorkflowAgent.js` — Pro system prompt: `"จีจี้" → "Pro Agent (จีจี้โปร)"` (ถูกตัวตน), ลบ duplicate `require` ใน catch block
+  - `agentTools.js` — ลบ debug `console.log('[reasoning-debug]', ...)` ออกจาก production
+  - `aiChatAgent.js` — `GH_PAT_DISPATCH || GH_PAT` → `GH_PAT_DISPATCH` เท่านั้น (security isolation), อัปเดต label JIIJI.md → FLASH.md
+  - `flashContext.js` — ลบ fallback `|| files['JIIJI.md']` (JIIJI.md ถูกลบแล้ว)
+- **ลบไฟล์ deprecated:**
+  - `JIIJI.md` — replaced by `FLASH.md`
+  - `.jiiji/PRO_AGENT.md` — replaced by `PRO.md`
+- **อัปเดตเอกสาร:** `CLAUDE.md` — อัปเดต Docs pointer ให้ตรงกับไฟล์จริง
+
 ## 2026-06-29 — fix: flashPrompts.js — ลด SYSTEM_PROMPTS เหลือ base เดียว + แก้ syntax error
 
 - **เหตุผล:** `flashPrompts.js` มี syntax error (YAML/Markdown หลุดเข้าไปใน JS) ทำให้ Flash CF โหลดไม่ขึ้นเลย + ไฟล์เดิมมี SYSTEM_PROMPTS แยก 5 scope ทั้งที่ Flash เป็น Planner ตัวเดียว ไม่ได้สวมหมวก scope-specific อีกแล้ว

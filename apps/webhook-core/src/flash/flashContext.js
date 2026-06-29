@@ -49,7 +49,7 @@ async function loadAgentDocs() {
 
 async function fetchJiijiDef() {
   const files = await loadAgentDocs();
-  return (files['FLASH.md'] || files['JIIJI.md'] || '').slice(0, 3500);
+  return (files['FLASH.md'] || '').slice(0, 3500);
 }
 
 async function fetchChatAgentDocs() {

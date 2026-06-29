@@ -98,9 +98,9 @@ exports.aiChatAgentHttp = functions
     if (quickTrigger) {
       const label = quickTrigger.scope === 'seafood' ? '🦐 ร้านกุ้ง' : '🧋 ร้านชา';
       const taskId = requestId || `qt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const ghPat = process.env.GH_PAT_DISPATCH || process.env.GH_PAT;
+      const ghPat = (process.env.GH_PAT_DISPATCH || '').trim();
       if (!ghPat) {
-        res.status(500).json({ reply: 'GH_PAT_DISPATCH และ GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งตรวจสุขภาพไม่ได้', scope: quickTrigger.scope });
         return;
       }
       try {
@@ -146,10 +146,10 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
-      const ghPatForDispatch = process.env.GH_PAT_DISPATCH || process.env.GH_PAT;
+      const ghPatForDispatch = (process.env.GH_PAT_DISPATCH || '').trim();
       if (!ghPatForDispatch) {
         await clearProgress(requestId);
-        res.status(500).json({ reply: 'GH_PAT_DISPATCH และ GH_PAT ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
+        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
         return;
       }
 
@@ -204,7 +204,7 @@ exports.aiChatAgentHttp = functions
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
     const webSearchInstruction = '\n\n---\n🔍 **Web Search Protocol:** ถ้าคำถามต้องการข้อมูลที่เปลี่ยนแปลงบ่อย (ราคาตลาดล่าสุด ข่าวล่าสุด เหตุการณ์ปัจจุบัน ข้อมูลที่ฐานความรู้ปัจจุบันไม่มี) ให้ตอบเฉพาะบรรทัดนี้แล้วหยุด: `[WEB_SEARCH: <query เป็นภาษาอังกฤษ>]` — ระบบจะค้นเว็บและส่งผลกลับมาให้ตอบใหม่ทันที ห้ามตอบอื่นเพิ่มในรอบนี้';
     const systemContent = basePrompt +
-      (jiijiDocs ? '\n\n---\n## 🤖 JIIJI.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
+      (jiijiDocs ? '\n\n---\n## 🤖 FLASH.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
       (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '') +
       (projectTree ? '\n\n---\n## 🗂️ โครงสร้างโปรเจกต์ปัจจุบัน (sync จาก repo อัตโนมัติ)\n' + projectTree : '') +
       (customNotes ? '\n\n---\n## 📝 Custom Skills / Notes (พีชตั้งค่าเอง)\n' + customNotes : '') +
