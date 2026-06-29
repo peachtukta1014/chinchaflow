@@ -148,39 +148,55 @@ CHINCHA FLOW scopes:
 }
 
 // สร้าง structured Task Brief สำหรับ Pro — Pro รับ brief นี้เป็น "message"
+// hard cap 8,000 chars เพื่อไม่เกิน GitHub client_payload 10KB limit
+const BRIEF_MAX_CHARS = 8000;
+
 function buildTaskBrief(classified, originalMessage, fileContents = {}) {
   const { taskSpec = {}, confirmation } = classified;
   const filesHint = Array.isArray(taskSpec.files_hint) && taskSpec.files_hint.length
     ? taskSpec.files_hint.map(f => `- ${f}`).join('\n')
-    : '- (ดูจาก scope file tree — อ่าน files_hint ใน AGENTS.md ของ scope นี้)';
+    : '- (Pro ต้องสำรวจเองจาก scope)';
   const rules = Array.isArray(taskSpec.business_rules) && taskSpec.business_rules.length
     ? taskSpec.business_rules.map(r => `- ${r}`).join('\n')
-    : '- (ไม่มีกฎพิเศษ — ปฏิบัติตาม AGENTS.md และ scope AGENTS.md)';
+    : '- ปฏิบัติตาม AGENTS.md';
 
   const preloadedEntries = Object.entries(fileContents).filter(([, v]) => v);
-  const preloadedSection = preloadedEntries.length
-    ? '\n\n**โค้ดที่ Flash อ่านล่วงหน้า (อ่านแล้ว — ใช้ได้เลย ไม่ต้อง read_file ซ้ำ):**\n' +
-      preloadedEntries.map(([path, content]) =>
-        `\n--- ${path} ---\n\`\`\`\n${content}\n\`\`\``
-      ).join('\n')
-    : '';
+  const hasPreloaded = preloadedEntries.length > 0;
 
-  return `## 📋 Task Brief (สร้างโดย Flash จากคำสั่งพีช)
+  const coreSection = `## 📋 Task Brief (สร้างโดย Flash)
 
 **งานที่ต้องทำ:**
 ${taskSpec.description || confirmation || originalMessage}
 
-**ไฟล์ที่น่าจะเกี่ยว (hint — read_file ก่อนเสมอ):**
-${filesHint}
-
 **ผลลัพธ์ที่คาดหวัง:**
-${taskSpec.expected_change || '(วิเคราะห์จากโค้ดจริงที่อ่าน)'}
+${taskSpec.expected_change || '(วิเคราะห์จากโค้ดจริง)'}
 
 **กฎ Business ที่ต้องรักษา:**
-${rules}${preloadedSection}
+${rules}
+
+**ไฟล์ที่เกี่ยว:**
+${filesHint}
+${hasPreloaded ? '→ Flash อ่านล่วงหน้าแล้ว — ดูโค้ดด้านล่าง ไม่ต้อง read_file ซ้ำ' : '→ Flash ไม่ได้ preload — Pro ต้อง read_file ก่อนแก้'}
 
 **คำสั่งต้นฉบับจากพีช:**
 "${originalMessage}"`;
+
+  if (!hasPreloaded) return coreSection;
+
+  // แจก budget ที่เหลือให้โค้ด preload — ตัดสั้นถ้าเกิน cap
+  const budget = BRIEF_MAX_CHARS - coreSection.length - 60;
+  if (budget <= 200) return coreSection; // core ยาวเกินไป ตัด preload ออก
+
+  const perFile = Math.floor(budget / preloadedEntries.length);
+  let preloadedSection = '\n\n**โค้ดที่ Flash อ่านล่วงหน้า:**';
+  for (const [path, content] of preloadedEntries) {
+    const maxLen = Math.max(perFile - 60, 100);
+    const snippet = content.slice(0, maxLen);
+    const truncated = content.length > maxLen ? '\n...(ตัดบางส่วน)' : '';
+    preloadedSection += `\n\n--- ${path} ---\n\`\`\`\n${snippet}${truncated}\n\`\`\``;
+  }
+
+  return coreSection + preloadedSection;
 }
 
 module.exports = { normalizeThai, detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief };

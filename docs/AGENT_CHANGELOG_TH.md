@@ -1,3 +1,11 @@
+## 2026-06-29 — fix: Task Brief cap 8K chars + Pro ไม่ต้อง read_file ซ้ำเมื่อ Flash preload แล้ว
+
+- **เหตุผล:** `buildTaskBrief` ไม่มี size cap → ถ้า preload 5 ไฟล์ใหญ่อาจเกิน GitHub `client_payload` 10KB → dispatch 500. และ format เดิมบอก Pro ว่า "read_file ก่อนเสมอ" ทำให้กิน token โดยไม่จำเป็น
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashTriggers.js` — `buildTaskBrief` เพิ่ม hard cap 8,000 chars, แจก budget โค้ด preload ตามสัดส่วน, ตัด `...(ตัดบางส่วน)` ถ้าเกิน
+  - เปลี่ยน wording: "hint — read_file ก่อนเสมอ" → "Flash อ่านล่วงหน้าแล้ว ไม่ต้อง read_file ซ้ำ" (เมื่อมี preload) / "Flash ไม่ได้ preload — Pro ต้อง read_file ก่อนแก้" (เมื่อไม่มี)
+- **ผล:** Task Brief ไม่เกิน 8K chars, Pro รู้ทันทีว่าต้องอ่านเพิ่มหรือไม่ → ลด tool call ที่ไม่จำเป็น
+
 ## 2026-06-29 — debug: เปิด error log ใน getRecentTokenLogs เพื่อหาสาเหตุ Tokens tab ว่าง
 
 - **เหตุผล:** Tokens tab แสดง "ยังไม่มีข้อมูล" ทั้งที่มีการ run Flash/Pro — `catch { return []; }` กลืน error ทุกอย่าง ทำให้ไม่รู้สาเหตุ
