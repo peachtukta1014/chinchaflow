@@ -238,10 +238,10 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     }
 
     const stepLabel = iterations === 1
-      ? 'จีจี้กำลังวิเคราะห์คำสั่ง...'
+      ? 'V4-Pro กำลังวิเคราะห์คำสั่ง...'
       : iterations === SUMMARY_CHECKPOINT
-        ? `จีจี้กำลังสรุปความคืบหน้า (รอบ ${iterations})...`
-        : `จีจี้กำลังดำเนินการ (รอบ ${iterations})...`;
+        ? `V4-Pro กำลังสรุปความคืบหน้า (รอบ ${iterations})...`
+        : `V4-Pro กำลังดำเนินการ (รอบ ${iterations})...`;
     await writeProgress(requestId, stepLabel);
 
     // บังคับ tool_choice='required' ทุกรอบ จนกว่าระบบจะยืนยันว่างานจบจริง (taskCompleted)
@@ -372,7 +372,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       // รอบเพราะพิมพ์ <read_file path="docs/" /> ซ้ำๆ)
       if (consecutiveTextOnlyReplies >= 3) {
         throw new Error(
-          `จีจี้พยายามเรียก tool แต่พิมพ์รูปแบบผิดซ ${consecutiveTextOnlyReplies} รอบติดกัน ` +
+          `V4-Pro พยายามเรียก tool แต่พิมพ์รูปแบบผิดซ ${consecutiveTextOnlyReplies} รอบติดกัน ` +
           `(โมเดลพิมพ์ syntax คล้าย tool call เป็นข้อความธรรมดา ไม่ใช่เรียกจริง) ` +
           `ลองสั่งงานใหม่อีกครั้ง หรือลองใช้คำสั่งที่ตรงชื่อ tool มากขึ้น เช่น "list_files docs/" ` +
           `แทน "list_files ที่ docs/ ก่อน"`
