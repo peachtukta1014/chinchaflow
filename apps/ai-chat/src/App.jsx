@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatWithAI, fetchDeployStatus } from './api';
-import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signOutUser, onAuthChanged, listenProgress, listenForResult } from './firebase';
+import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, listenTokenLogs, signOutUser, onAuthChanged, listenProgress, listenForResult } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 import { IconSend, IconMic, IconStop, IconTrash, IconImage, IconHistory, IconPlus, IconX, IconRefresh, IconFile, IconLogout } from './icons';
@@ -71,9 +71,14 @@ function AppShell({ user }) {
   const loadingRef = useRef(false);
   const knowledgeLoadedRef = useRef(false);
   const tokenLogsLoadedRef = useRef(false);
+  const tokenLogsUnsubRef = useRef(null);
   const pendingRequestIdRef = useRef(null);
 
   useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  useEffect(() => {
+    return () => { tokenLogsUnsubRef.current?.(); };
+  }, []);
 
   // ── Background result recovery ─────────────────────────────────────────
   const PENDING_KEY = 'jiiji_pending_result';
@@ -285,8 +290,6 @@ function AppShell({ user }) {
         cleanup();
         setProgressStep(null);
         localStorage.removeItem(PENDING_KEY);
-        // อัปเดต token logs อัตโนมัติหลัง Pro ตอบกลับ
-        getRecentTokenLogs().then(logs => setTokenLogs(logs)).catch(() => {});
         setMessages(prev => {
           const updated = [...prev, { role: 'assistant', content: found.reply }];
           if (currentSessionId.current) {
@@ -305,8 +308,6 @@ function AppShell({ user }) {
     localStorage.removeItem(PENDING_KEY);
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
-    // อัปเดต token logs อัตโนมัติหลัง Flash ตอบกลับ
-    getRecentTokenLogs().then(logs => setTokenLogs(logs)).catch(() => {});
 
     if (currentSessionId.current) {
       updateSession(currentSessionId.current, finalMessages);
@@ -410,7 +411,10 @@ function AppShell({ user }) {
     if (activeTab === 'tokens' && !tokenLogsLoadedRef.current) {
       tokenLogsLoadedRef.current = true;
       setTokenLogsLoading(true);
-      getRecentTokenLogs().then(logs => { setTokenLogs(logs); setTokenLogsLoading(false); });
+      tokenLogsUnsubRef.current = listenTokenLogs(logs => {
+        setTokenLogs(logs);
+        setTokenLogsLoading(false);
+      });
     }
   }, [activeTab, loadKnowledge]);
 
@@ -579,8 +583,12 @@ function AppShell({ user }) {
           logs={tokenLogs}
           loading={tokenLogsLoading}
           onRefresh={() => {
+            tokenLogsUnsubRef.current?.();
             setTokenLogsLoading(true);
-            getRecentTokenLogs().then(logs => { setTokenLogs(logs); setTokenLogsLoading(false); });
+            tokenLogsUnsubRef.current = listenTokenLogs(logs => {
+              setTokenLogs(logs);
+              setTokenLogsLoading(false);
+            });
           }}
         />
       )}

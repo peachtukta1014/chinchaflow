@@ -1,3 +1,11 @@
+## 2026-06-29 — fix: TokenDashboard เปลี่ยนจาก getDocs → onSnapshot (real-time + offline cache)
+
+- **เหตุผล:** `getDocs` บน network ไม่ดีจะ timeout → ข้อมูล tokenLogs ไม่โหลดขึ้น; dashboard ค้างหรือว่างเปล่า
+- **แก้:**
+  - `apps/ai-chat/src/firebase.js` — แทน `getRecentTokenLogs` ด้วย `listenTokenLogs` (onSnapshot) — ใช้ Firestore offline cache ทนเน็ตช้า; auto-update เมื่อ Pro เขียน tokenLog ใหม่
+  - `apps/ai-chat/src/App.jsx` — ใช้ `listenTokenLogs`; unsub ใน `tokenLogsUnsubRef`; cleanup on unmount; ลบ manual refresh calls หลัง Flash/Pro reply
+- **ผล:** โหลดจาก cache ทันที → update real-time เมื่อ Pro เสร็จงาน → ไม่ต้องกด refresh
+
 ## 2026-06-29 — feat: compact Task Brief — Flash ย่อบริบทเป็น 4 บรรทัด ส่ง Pro
 
 - **เหตุผล:** Task Brief เดิมยาว ~8,000 chars ใส่ header ซ้ำ + dump code snippet → บวม token ที่ Pro ต้องอ่าน + เกิน GitHub payload limit ง่าย
