@@ -1,3 +1,16 @@
+## 2026-06-29 — feat: แยก agent identity เป็น FLASH.md + PRO.md ที่ root + อัปเดตโค้ด
+
+- **เหตุผล:** แต่ละ agent ควรมีไฟล์ identity ของตัวเองที่ root repo ชัดเจน — ไม่ซ้อนใน `.jiiji/` และ system prompt Flash ไม่ควรมี scope roles ของทุกแอปเพราะ Flash ไม่ใช่ตัวเขียนโค้ด
+- **แก้:**
+  - `FLASH.md` (ใหม่) — Flash identity v3.0: Planner/Director, tools (fetchRepoFiles, Web Research, dispatch), workflow 3 ขั้น, security isolation ชัดเจน
+  - `PRO.md` (ใหม่) — Pro identity v1.0: tools 10 ตัว, Task Brief format, Scope Rules, isHighRisk, Loop Limits, Core Protocol
+  - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เปลี่ยน key `JIIJI.md` → `FLASH.md` (Flash อ่าน FLASH.md จาก Firestore แทน)
+  - `apps/webhook-core/src/flash/flashContext.js` — `fetchJiijiDef()`: อ่าน `FLASH.md` key ก่อน, fallback `JIIJI.md` (backward compat)
+  - `apps/webhook-core/src/aiWorkflowAgent.js` — `fetchAgentDocs()`: อ่าน `PRO.md` แทน `.jiiji/PRO_AGENT.md`
+  - `CLAUDE.md` — เพิ่ม section Agent Identity Files (pointer ไป FLASH.md, PRO.md, CLAUDE.md)
+  - `JIIJI.md` — เพิ่ม deprecated notice (content ย้ายไป FLASH.md)
+- **ผล:** แต่ละ agent รับ identity จากไฟล์เดียวของตัวเอง ไม่มีข้อมูลซ้ำซ้อนข้ามตัว
+
 ## 2026-06-29 — docs: sync AI agent workflow docs ครบชุด — ตัดซ้ำ + อัปเดตตัวเลขผิด + JIIJI.md v2.2
 
 - **เหตุผล:** เอกสารหลายไฟล์มีข้อมูลซ้ำซ้อนกัน (CLAUDE.md ซ้ำ IDENTITY.md, IDENTITY.md ซ้ำ KEY_FILES) ทำให้ AI agents โฟกัสยุ่งเหยิง + ตัวเลข MAX_ITERATIONS=15 (จริง 30), TTL=30m (จริง 2h), GH_PAT_READ ยังติด "Planned" ทั้งที่ implement แล้ว
