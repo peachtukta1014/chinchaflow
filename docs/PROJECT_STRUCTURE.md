@@ -40,8 +40,7 @@ chinchaflow/
 │       ├── sync-project-tree.yml
 │       └── tea-db-reset.yml
 ├── .jiiji
-│   ├── IDENTITY.md
-│   └── PRO_AGENT.md
+│   └── IDENTITY.md
 ├── 00_peach
 │   └── i18n-3ภาษาเพิ่มเติม.md
 ├── apps
@@ -136,7 +135,6 @@ chinchaflow/
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── FLASH.md
-├── JIIJI.md
 ├── PRO.md
 ├── README.md
 ├── config.yml
