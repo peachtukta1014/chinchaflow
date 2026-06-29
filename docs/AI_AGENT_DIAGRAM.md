@@ -1,6 +1,6 @@
 # CHINCHA FLOW — AI Agent Architecture Diagram
 
-อัปเดต: 2026-06-29 · ตรงกับ codebase จริง (PR #394 + Flash Code Reader)
+อัปเดต: 2026-06-29 · ตรงกับ codebase จริง (PR #416–#419)
 
 ---
 
@@ -41,7 +41,7 @@ flowchart TD
 
     CL --> D{intent?}
 
-    D -->|chat| CH[โหลด context\n① JIIJI.md จาก GitHub\n② AGENTS.md + docs จาก GitHub\n③ project tree จาก Firestore\nTTL: 10 นาที / 5 นาที]
+    D -->|chat| CH[โหลด context\n① FLASH.md จาก Firestore\n② AGENTS.md + docs จาก Firestore\n③ project tree จาก Firestore\nTTL: 10 นาที / 5 นาที]
     CH --> CR[callOpenRouter\nFlash Model\ntemp=0.3 · max_tokens=2048]
     CR -->|ผลลัพธ์ปกติ| WR1[(Firestore\naiResults/requestId)]
     CR --> Z
@@ -56,7 +56,7 @@ flowchart TD
     A -->|พีชพิมพ์ ทำเลย\nneedsConfirmation=false| CL
 
     D -->|code-action\nneedsConfirmation=false| FCR[🔍 Flash Code Reader\nGH_PAT_READ → fetchRepoFiles\nfiles_hint สูงสุด 5 ไฟล์ × 3,000 chars\nแนบเข้า Task Brief]
-    FCR --> CA[dispatchToProAgent\nGH_PAT_DISPATCH||GH_PAT\nPOST github.com/repos/dispatches\nevent_type=ai-code-action\n+ Task Brief พร้อมโค้ด]
+    FCR --> CA[dispatchToProAgent\nGH_PAT_DISPATCH เท่านั้น\nPOST github.com/repos/dispatches\nevent_type=ai-code-action\n+ Task Brief พร้อมโค้ด]
     CA --> FS2[(Firestore\naiProgress/requestId\nclear)]
     CA --> RP([💬 รับงานแล้ว กำลังดำเนินการ\nstatus=processing + requestId])
 
@@ -119,9 +119,11 @@ flowchart TD
 │                                  │   │                                      │
 │  Secrets (Firebase / GitHub):    │   │  Secrets (GitHub Secrets only):      │
 │  ✅ OPENROUTER_API_KEY           │   │  ✅ OPENROUTER_API_KEY_PRO           │
-│  ✅ GH_PAT (read + dispatch)     │   │  ✅ GH_PAT (read + write + PR)       │
-│  ❌ OPENROUTER_API_KEY_PRO       │   │  ✅ FIREBASE_SERVICE_ACCOUNT         │
-│  ❌ FIREBASE_SERVICE_ACCOUNT     │   │  ❌ OPENROUTER_API_KEY (Flash)       │
+│  ✅ GH_PAT_DISPATCH (dispatch)   │   │  ✅ GH_PAT (read + write + PR)       │
+│  ✅ GH_PAT_READ (read-only)      │   │  ✅ FIREBASE_SERVICE_ACCOUNT         │
+│  ❌ GH_PAT เต็ม — ไม่รู้จักเลย │   │  ❌ OPENROUTER_API_KEY (Flash)       │
+│  ❌ OPENROUTER_API_KEY_PRO       │   │                                      │
+│  ❌ FIREBASE_SERVICE_ACCOUNT     │   │                                      │
 │                                  │   │                                      │
 │  ทำได้:                          │   │  ทำได้:                              │
 │  ✅ classify intent              │   │  ✅ อ่านไฟล์ใน repo                  │

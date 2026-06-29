@@ -1,3 +1,14 @@
+## 2026-06-29 — refactor: ลบ IDENTITY.md + เพิ่ม AI_AGENT_DIAGRAM เข้า sync pipeline
+
+- **เหตุผล:** `.jiiji/IDENTITY.md` ซ้ำกับ FLASH.md/PRO.md และมักเก่าช้า → ลบออก แล้วย้ายส่วน unique (architecture diagram + security model) ไปไว้ใน `docs/AI_AGENT_DIAGRAM.md` ซึ่ง sync เข้า Firestore อัตโนมัติทุก deploy
+- **แก้:**
+  - `.jiiji/IDENTITY.md` — ลบออก (replaced by FLASH.md + PRO.md + AI_AGENT_DIAGRAM.md)
+  - `docs/AI_AGENT_DIAGRAM.md` — อัปเดตให้ถูกต้อง: FLASH.md แทน JIIJI.md, GH_PAT_DISPATCH เท่านั้น, security model ถูก
+  - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เพิ่ม docs/AI_AGENT_DIAGRAM.md เข้า sync list
+  - `apps/webhook-core/src/flash/flashContext.js` — เพิ่ม docs/AI_AGENT_DIAGRAM.md ใน fetchChatAgentDocs()
+  - `CLAUDE.md` — เปลี่ยนจาก `.jiiji/IDENTITY.md` → `docs/AI_AGENT_DIAGRAM.md`
+- **ผล:** Flash เห็น architecture diagram ครบชุดอัตโนมัติจาก Firestore ไม่ต้อง maintain ไฟล์แยก
+
 ## 2026-06-29 — fix: deep review — แก้ mergeMsg + auto-changelog ซ้ำ + comment เก่า
 
 - **เหตุผล:** ทำ deep review ทั้งระบบ AI (Flash + Pro agentic loop) พบ 5 จุดที่ต้องแก้
