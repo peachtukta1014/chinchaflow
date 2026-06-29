@@ -7,6 +7,10 @@
 
 ## 2026-06
 
+### 2026-06-29 | feat: PRO status bar ปักหมุดใต้ header + fix OpenRouter timeout + เพิ่ม max iterations
+- `src/App.jsx` — เพิ่ม PRO status bar ใต้ "จีจี้ / CHINCHA FLOW" เหนือ tab bar: เทาเมื่อไม่ทำงาน, เขียว animate-pulse + step text เมื่อโปรรัน
+- `apps/webhook-core/src/shared/agentTools.js` — OpenRouter fetch ใส่ AbortController 5 นาที; MAX_ITERATIONS 15→30, SUMMARY_CHECKPOINT 8→25
+
 ### 2026-06-29 | feat: progress indicator แสดง PRO badge + step จาก tool call จริง
 - `src/App.jsx` — เพิ่ม `PRO` badge (text-ai-accent) ข้างๆ dots เมื่อโปรทำงาน (progressStep set)
 - `src/App.jsx` — แสดง step text จากการเรียก tool จริง (เช่น "กำลังอ่านไฟล์: xxx", "กำลัง patch: xxx") แทน fallback ทั่วไป

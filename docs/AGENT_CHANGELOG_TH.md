@@ -1,3 +1,13 @@
+## 2026-06-29 — fix: Pro Agent ค้าง 20+ นาที — OpenRouter fetch ไม่มี timeout + PRO status bar + เพิ่ม max iterations
+
+- **อาการ:** Pro Agent แสดงสถานะรอบ 3 แล้วค้างไม่มีกำหนด — ต้องกดยกเลิกเอง
+- **สาเหตุ:** `callOpenRouterWithTools` ใช้ `fetch` ไปยัง OpenRouter โดยไม่มี timeout เลย — ถ้า DeepSeek Pro ค้างกลางคัน Node.js จะรอตลอดไป
+- **แก้:**
+  - `apps/webhook-core/src/shared/agentTools.js` — เพิ่ม `AbortController` + 5 นาที timeout บน OpenRouter fetch; throw error ที่ชัดเจนถ้าค้างเกินกำหนด
+  - `apps/webhook-core/src/shared/agentTools.js` — MAX_ITERATIONS 15 → 30, SUMMARY_CHECKPOINT 8 → 25 (งานซับซ้อนได้รอบมากขึ้น)
+  - `apps/ai-chat/src/App.jsx` — เพิ่ม PRO status bar ใต้ "จีจี้ / CHINCHA FLOW" เหนือ tab bar: แสดง `○ PRO · พร้อมทำงาน` (เทา) หรือ `● PRO · {step}` (เขียว animate-pulse) ตลอดเวลา
+- ถ้าพัง: OpenRouter timeout จะ throw error → Pro เขียน error result ลง Firestore → PWA แสดงข้อความ "DeepSeek ไม่ตอบ ลองสั่งใหม่"
+
 ## 2026-06-29 — feat: progress indicator แสดง PRO badge + step จาก tool call จริง
 
 - **เหตุผล:** ผู้ใช้ไม่รู้ว่าโปรกำลังทำงานอยู่ หรือทำ tool call อะไรอยู่ — ต้องการ feedback ที่ชัดขึ้น
