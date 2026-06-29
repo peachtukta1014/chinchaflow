@@ -1,3 +1,11 @@
+## 2026-06-29 — fix: เปลี่ยนชื่อ Pro Agent จาก "จีจี้" เป็น "V4-Pro" ในทุก progress message
+
+- **เหตุผล:** แยกแยะบริบทระหว่าง Flash (จีจี้) กับ Pro Agent ในหน้าแชทได้ชัดเจนขึ้น
+- **แก้:**
+  - `apps/webhook-core/src/shared/agentTools.js` — เปลี่ยน stepLabel และ error message จาก "จีจี้" → "V4-Pro"
+  - `apps/webhook-core/src/aiWorkflowAgent.js` — เปลี่ยน error reply จาก "จีจี้" → "V4-Pro"
+- **ผล:** PRO status bar จะแสดง "V4-Pro กำลังวิเคราะห์...", "V4-Pro กำลังดำเนินการ (รอบ N)..." แทน
+
 ## 2026-06-29 — fix: Tokens/Knowledge tab โหลดครั้งเดียว ไม่โหลดซ้ำทุกครั้งที่สลับ
 
 - **เหตุผล:** `useEffect` เดิม fetch ทุกครั้งที่ `activeTab` เปลี่ยน → แต่ละ tab สลับกลับมาก็โหลดใหม่ช้าทุกครั้ง
