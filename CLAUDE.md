@@ -8,7 +8,7 @@
 2. `docs/PEACH_WORKING_STYLE_TH.md` — วิธีพีช (Peach) สั่งงาน, คำศัพท์, ทบทวนก่อนลงมือ
 3. `docs/AGENT_HANDBOOK_TH.md` — แผนที่ repo, กฎอัปเดต docs
 4. `docs/AGENT_CHANGELOG_TH.md` — รอบก่อนแก้อะไร — อ่านก่อนไล่บั๊กทุกครั้ง
-5. `.jiiji/IDENTITY.md` — สถาปัตยกรรม AI ครบชุด (Flash / Pro / พี่ซี)
+5. `docs/AI_AGENT_DIAGRAM.md` — สถาปัตยกรรม AI ครบชุด (Flash/Pro/keys/flow) — ซิงค์เข้า Firestore อัตโนมัติทุก deploy
 
 **Agent Identity Files (แต่ละตัวอ่านของตัวเอง):**
 - `FLASH.md` — Flash (จีจี้): Planner, tools, workflow (inject เข้า system prompt)

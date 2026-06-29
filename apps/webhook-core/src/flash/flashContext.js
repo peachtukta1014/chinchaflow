@@ -60,6 +60,7 @@ async function fetchChatAgentDocs() {
     { path: 'docs/AGENT_CHANGELOG_TH.md', label: 'changelog ล่าสุด (แก้อะไรไปแล้ว)', maxLen: 5000 },
     { path: 'docs/PEACH_WORKING_STYLE_TH.md', label: 'สไตล์การทำงานของพี่พีช', maxLen: 5000 },
     { path: 'docs/AGENT_HANDBOOK_TH.md', label: 'คู่มือ agent + แผนที่ repo', maxLen: 5000 },
+    { path: 'docs/AI_AGENT_DIAGRAM.md', label: 'สถาปัตยกรรม AI ครบชุด (Flash/Pro/keys/flow)', maxLen: 4000 },
   ];
   let result = '';
   for (const f of list) {
