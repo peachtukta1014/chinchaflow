@@ -31,6 +31,7 @@ function getApp() {
   
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
   const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  const appId = import.meta.env.VITE_FIREBASE_APP_ID;
   
   // 💡 ป้องกันกรณีเอเจ้นเขียนโค้ดเพี้ยน หรือติดเครื่องหมาย < > / ขึ้นบรรทัดใหม่มาจากตัวบิลด์
   let authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
@@ -41,7 +42,7 @@ function getApp() {
   if (!apiKey || !projectId) return null;
   
   // ใช้ค่า authDomain ที่ถูกกรองจนสะอาดแล้ว
-  _app = getApps()[0] ?? initializeApp({ apiKey, projectId, authDomain });
+  _app = getApps()[0] ?? initializeApp({ apiKey, projectId, authDomain, appId });
   return _app;
 }
 
