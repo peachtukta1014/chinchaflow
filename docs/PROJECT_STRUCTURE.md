@@ -39,8 +39,6 @@ chinchaflow/
 │       ├── shrimp-stock-reset.yml
 │       ├── sync-project-tree.yml
 │       └── tea-db-reset.yml
-├── .jiiji
-│   └── IDENTITY.md
 ├── 00_peach
 │   └── i18n-3ภาษาเพิ่มเติม.md
 ├── apps
