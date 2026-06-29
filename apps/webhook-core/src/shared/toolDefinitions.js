@@ -203,7 +203,7 @@ path ต้องเป็น relative เสมอ เช่น "node apps/seaf
           },
           timeout_seconds: {
             type: 'number',
-            description: 'timeout (วินาที) สูงสุด 45, default 20 — เผื่อ buffer ก่อน Cloud Functions หมดเวลา',
+            description: 'timeout (วินาที) สูงสุด 300, default 30',
           },
         },
         required: ['command'],
