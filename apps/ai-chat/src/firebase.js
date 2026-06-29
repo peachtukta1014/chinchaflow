@@ -10,7 +10,6 @@ import {
   query,
   orderBy,
   limit,
-  getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
 import {
@@ -140,20 +139,18 @@ export async function saveCustomNotes(notes) {
   });
 }
 
-// ── Token logs ───────────────────────────────────────────────────────────────
-export async function getRecentTokenLogs(maxCount = 200) {
+// ── Token logs — real-time listener (onSnapshot ใช้ offline cache ทนเน็ตไม่ดี) ──
+export function listenTokenLogs(onLogs, maxCount = 200) {
   const db = getDb();
-  if (!db) return [];
-  try {
-    const q = query(
-      collection(db, 'tokenLogs'),
-      orderBy('createdAt', 'desc'),
-      limit(maxCount)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (err) {
-    console.error('[TokenLogs] query failed:', err.code, err.message);
-    return [];
-  }
+  if (!db) { onLogs([]); return () => {}; }
+  const q = query(
+    collection(db, 'tokenLogs'),
+    orderBy('createdAt', 'desc'),
+    limit(maxCount)
+  );
+  return onSnapshot(
+    q,
+    snap => onLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.warn('[TokenLogs] listener error:', err.code); onLogs([]); }
+  );
 }
