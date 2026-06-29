@@ -63,7 +63,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 |---|--------|-------|-----|
 | 1 | เลื่อน SUMMARY_CHECKPOINT จากรอบ 25 → 8-10 เพื่อลด context สะสม | ✅ เสร็จแล้ว (→ 9) + save summary Firestore | #432 |
 | 2 | ตรวจ payload รวม (requestId + history + Brief) ต้องไม่เกิน 10KB ก่อน dispatch | ✅ เสร็จแล้ว (size check 9800 bytes + error ถ้าเกิน) | #432 |
-| 3 | commit_and_pr atomicity — ป้องกัน orphan branch เมื่อ commit ผ่านแต่ PR fail | ⏳ ยังไม่ทำ (รับว่าซับซ้อน) | — |
+| 3 | commit_and_pr atomicity — ป้องกัน orphan branch เมื่อ commit ผ่านแต่ PR fail | ✅ เสร็จแล้ว (delete orphan branch + retry hint) | #435 |
 | 4 | Flash retry 1 ครั้งเมื่อ dispatch ล้มเหลว (non-204) | ✅ เสร็จแล้ว (retry 1 ครั้ง หลัง 2s) | #432 |
 | 5 | Flash สรุปงาน + รอ "ไฟเขียว" ก่อน dispatch Pro ทุกครั้ง | ✅ เสร็จแล้ว | #429 |
 | 6 | Monitoring dashboard — runs/วัน, ต้นทุน/task, success rate จาก tokenLogs | ✅ เสร็จแล้ว (stats block บน TokenDashboard) | #434 |
