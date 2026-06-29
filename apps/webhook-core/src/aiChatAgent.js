@@ -164,7 +164,7 @@ exports.aiChatAgentHttp = functions
         await dispatchToProAgent(ghPatForDispatch, {
           requestId,
           message: buildTaskBrief(classified, message, preloadedFiles),
-          history: (history || []).slice(-10),
+          history: [],
           scope: finalScope,
           isHighRisk: classified.isHighRisk !== false,
           confirmation: classified.confirmation || '',
