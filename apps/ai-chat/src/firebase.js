@@ -152,5 +152,8 @@ export async function getRecentTokenLogs(maxCount = 200) {
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch { return []; }
+  } catch (err) {
+    console.error('[TokenLogs] query failed:', err.code, err.message);
+    return [];
+  }
 }
