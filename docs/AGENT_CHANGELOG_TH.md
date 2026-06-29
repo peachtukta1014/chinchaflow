@@ -1,3 +1,10 @@
+## 2026-06-29 — debug: เปิด error log ใน getRecentTokenLogs เพื่อหาสาเหตุ Tokens tab ว่าง
+
+- **เหตุผล:** Tokens tab แสดง "ยังไม่มีข้อมูล" ทั้งที่มีการ run Flash/Pro — `catch { return []; }` กลืน error ทุกอย่าง ทำให้ไม่รู้สาเหตุ
+- **แก้:**
+  - `apps/ai-chat/src/firebase.js` — `getRecentTokenLogs` เปลี่ยน `catch { return []; }` เป็น `catch (err) { console.error('[TokenLogs]', err.code, err.message); return []; }`
+- **ผล:** Chrome DevTools Console จะแสดง error จริงเมื่อ query ล้มเหลว ให้ตรวจหลังกด Tokens tab
+
 ## 2026-06-29 — fix: ไฟเขียวไม่เด้งระหว่าง cold start — เปลี่ยน clearProgress → writeProgress หลัง dispatch
 
 - **เหตุผล:** Flash เรียก `clearProgress` ทันทีหลัง dispatch ทำให้ aiProgress document หายไปก่อน ack-pro-agent.cjs จะ boot ขึ้นมา (cold start 20-40 วิ) → PWA เห็น null ตลอด ไฟเขียวไม่เด้ง
