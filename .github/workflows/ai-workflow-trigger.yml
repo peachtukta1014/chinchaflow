@@ -44,6 +44,15 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
           AGENT_TASK_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
 
+      - name: Cleanup on failure — แจ้ง frontend ว่า Pro หยุดกลางคัน
+        if: failure()
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+          REQUEST_ID: ${{ github.event.client_payload.requestId }}
+          SCOPE: ${{ github.event.client_payload.scope }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node apps/webhook-core/scripts/fail-pro-agent.cjs || echo "fail-cleanup skipped (non-fatal)"
+
       - name: Sync project tree → Firestore
         if: always()
         env:

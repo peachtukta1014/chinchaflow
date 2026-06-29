@@ -80,6 +80,8 @@ const GITHUB_REPO = 'chinchaflow';
 const FETCH_FILE_MAX_CHARS = 3000;
 const FETCH_FILE_MAX_COUNT = 5;
 
+// GH_PAT_READ ต้องเป็น read-only เท่านั้น (Contents: Read + Actions: Read)
+// ห้ามใช้ token นี้สำหรับ write/create/delete — Flash อ่านโค้ดล่วงหน้าเท่านั้น
 async function fetchRepoFiles(pat, filePaths) {
   if (!pat || !Array.isArray(filePaths) || filePaths.length === 0) return {};
   const results = {};
