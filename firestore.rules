@@ -402,6 +402,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // สถานะความคืบหน้า Pro Agent — client อ่านผ่าน onSnapshot ได้, เขียนเฉพาะ backend
+    match /aiProgress/{requestId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // systemConfig — projectTree + agentDocs อ่านได้, customNotes อ่าน+เขียนได้จาก UI
     match /systemConfig/{doc} {
       allow read: if true;

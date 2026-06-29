@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-29 | refactor: แทน polling ด้วย Firestore onSnapshot (event-driven)
+- `src/App.jsx` — แทน `setInterval(pollProgress, 2s/3s)` + `setInterval(fetchResult, 5s)` ด้วย `listenProgress` + `listenForResult` onSnapshot subscriptions
+- `src/App.jsx` — `onVisible` recovery เปลี่ยนจาก 10-retry loop (30s) → `listenForResult` + 2 นาที timeout; เพิ่ม guard `if (unsubscribeRef.current) return` ป้องกัน double subscription
+- `src/firebase.js` — เพิ่ม `listenProgress(requestId, onStep)`; แก้ `listenForResult` return `() => {}` แทน null
+- `firestore.rules` — เพิ่ม rule `aiProgress/{requestId}: allow read: if true`
+
 ### 2026-06-29 | feat: PRO status bar ปักหมุดใต้ header + fix OpenRouter timeout + เพิ่ม max iterations
 - `src/App.jsx` — เพิ่ม PRO status bar ใต้ "จีจี้ / CHINCHA FLOW" เหนือ tab bar: เทาเมื่อไม่ทำงาน, เขียว animate-pulse + step text เมื่อโปรรัน
 - `apps/webhook-core/src/shared/agentTools.js` — OpenRouter fetch ใส่ AbortController 5 นาที; MAX_ITERATIONS 15→30, SUMMARY_CHECKPOINT 8→25

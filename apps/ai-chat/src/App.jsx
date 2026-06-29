@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chatWithAI, pollProgress, fetchResult, fetchDeployStatus } from './api';
-import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signOutUser, onAuthChanged } from './firebase';
+import { chatWithAI, fetchDeployStatus } from './api';
+import { getProjectTree, getAgentDocs, getCustomNotes, saveCustomNotes, getRecentTokenLogs, signOutUser, onAuthChanged, listenProgress, listenForResult } from './firebase';
 import { listSessions, createSession, updateSession, deleteSession, getSession } from './sessionStore';
 import { APP_VERSION } from './version';
 import { IconSend, IconMic, IconStop, IconTrash, IconImage, IconHistory, IconPlus, IconX, IconRefresh, IconFile, IconLogout } from './icons';
@@ -75,9 +75,10 @@ function AppShell({ user }) {
   // ── Background result recovery ─────────────────────────────────────────
   const PENDING_KEY = 'jiiji_pending_result';
   useEffect(() => {
-    const onVisible = async () => {
+    const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       if (loadingRef.current) return;
+      if (unsubscribeRef.current) return; // handleSend subscription ยังทำงานอยู่
       const raw = localStorage.getItem(PENDING_KEY);
       if (!raw) return;
       let pending;
@@ -87,33 +88,39 @@ function AppShell({ user }) {
       setLoading(true);
       setProgressStep('กำลังดึงผลลัพธ์จากฉากหลัง...');
 
-      let found = null;
-      for (let i = 0; i < 10; i++) {
-        found = await fetchResult(pending.requestId);
-        if (found) break;
-        await new Promise(r => setTimeout(r, 3000));
-      }
+      let recoverUnsub = null;
+      let recoverTimeout = null;
 
-      localStorage.removeItem(PENDING_KEY);
-      setProgressStep(null);
-      setLoading(false);
+      const finishRecovery = (found) => {
+        if (recoverTimeout) clearTimeout(recoverTimeout);
+        if (recoverUnsub) recoverUnsub();
+        unsubscribeRef.current = null;
+        localStorage.removeItem(PENDING_KEY);
+        setProgressStep(null);
+        setLoading(false);
+        if (found) {
+          setMessages(prev => {
+            const updated = [...prev, { role: 'assistant', content: found.reply }];
+            if (currentSessionId.current) {
+              updateSession(currentSessionId.current, updated);
+              setSessions(listSessions());
+            }
+            return updated;
+          });
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: 'จีจี้หาผลลัพธ์ในฉากหลังไม่เจอแล้วครับพี่ (อาจ timeout) — ลองส่งคำสั่งใหม่ได้เลย 🙏',
+          }]);
+        }
+      };
 
-      if (found) {
-        const replyMsg = { role: 'assistant', content: found.reply };
-        setMessages(prev => {
-          const updated = [...prev, replyMsg];
-          if (currentSessionId.current) {
-            updateSession(currentSessionId.current, updated);
-            setSessions(listSessions());
-          }
-          return updated;
-        });
-      } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'จีจี้หาผลลัพธ์ในฉากหลังไม่เจอแล้วครับพี่ (อาจ timeout) — ลองส่งคำสั่งใหม่ได้เลย 🙏',
-        }]);
-      }
+      recoverUnsub = listenForResult(pending.requestId, (found) => finishRecovery(found));
+      recoverTimeout = setTimeout(() => finishRecovery(null), 2 * 60 * 1000);
+      unsubscribeRef.current = () => {
+        if (recoverTimeout) clearTimeout(recoverTimeout);
+        if (recoverUnsub) recoverUnsub();
+      };
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -216,10 +223,10 @@ function AppShell({ user }) {
 
     localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, ts: Date.now() }));
 
-    pollIntervalRef.current = setInterval(async () => {
-      const data = await pollProgress(requestId);
-      if (data.step) setProgressStep(data.step);
-    }, 2000);
+    // onSnapshot — fires ทันทีเมื่อ backend เขียน step ลง aiProgress (ไม่ต้องรอ poll)
+    const unsubProgress = listenProgress(requestId, step => {
+      if (step) setProgressStep(step);
+    });
 
     const historyForAI = messagesWithUser.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
@@ -229,10 +236,6 @@ function AppShell({ user }) {
       images: images.length > 0 ? images : undefined,
       requestId,
     });
-
-    clearInterval(pollIntervalRef.current);
-    pollIntervalRef.current = null;
-    setProgressStep(null);
 
     if (reply.status === 'processing') {
       const processingMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
@@ -244,46 +247,47 @@ function AppShell({ user }) {
       setLoading(false);
       inputRef.current?.focus();
 
-      if (unsubscribeRef.current) unsubscribeRef.current();
-      pollIntervalRef.current = setInterval(async () => {
-        const data = await pollProgress(requestId);
-        if (data.step) setProgressStep(data.step);
-      }, 3000);
+      // onSnapshot — fires ทันทีเมื่อ Pro เขียน result ลง aiResults
+      let timeoutId = null;
+      let unsubResult = null;
 
-      const resultStartTime = Date.now();
-      const timerId = setInterval(async () => {
-        const found = await fetchResult(requestId);
-        if (!found && Date.now() - resultStartTime < 10 * 60 * 1000) return;
-        clearInterval(timerId);
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        unsubProgress();
+        if (unsubResult) unsubResult();
         unsubscribeRef.current = null;
+      };
+      unsubscribeRef.current = cleanup;
+
+      timeoutId = setTimeout(() => {
+        cleanup();
         setProgressStep(null);
         localStorage.removeItem(PENDING_KEY);
-        if (found) {
-          setMessages(prev => {
-            const updated = [...prev, { role: 'assistant', content: found.reply }];
-            if (currentSessionId.current) {
-              updateSession(currentSessionId.current, updated);
-              setSessions(listSessions());
-            }
-            return updated;
-          });
-        } else {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: 'จีจี้รอผลนานเกินไปแล้วครับพี่ 🌸 ถ้างานเสร็จแล้วลองแตะหน้าจอใหม่ หรือส่งคำสั่งใหม่ได้เลย',
-          }]);
-        }
-      }, 5000);
-      unsubscribeRef.current = () => {
-        clearInterval(timerId);
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      };
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'จีจี้รอผลนานเกินไปแล้วครับพี่ 🌸 ถ้างานเสร็จแล้วลองแตะหน้าจอใหม่ หรือส่งคำสั่งใหม่ได้เลย',
+        }]);
+      }, 10 * 60 * 1000);
+
+      unsubResult = listenForResult(requestId, (found) => {
+        cleanup();
+        setProgressStep(null);
+        localStorage.removeItem(PENDING_KEY);
+        setMessages(prev => {
+          const updated = [...prev, { role: 'assistant', content: found.reply }];
+          if (currentSessionId.current) {
+            updateSession(currentSessionId.current, updated);
+            setSessions(listSessions());
+          }
+          return updated;
+        });
+      });
+
       return;
     }
 
+    unsubProgress();
+    setProgressStep(null);
     localStorage.removeItem(PENDING_KEY);
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
