@@ -1,3 +1,12 @@
+## 2026-06-29 — docs: Flash + Pro รับรู้สิทธิ์ Admin-Level Operations
+
+- **เหตุผล:** Flash ไม่รู้ว่า Pro มีสิทธิ์ admin (delete branch, trigger workflow) → ไม่ระบุใน Task Brief → Pro ทำงาน admin ops โดยไม่มี protocol ชัดเจน
+- **แก้:**
+  - `FLASH.md` — เพิ่มข้อ 5 Operational Context: Flash รู้ว่า Pro มีสิทธิ์ admin (GH_PAT เต็ม) แต่ไม่รู้ token, ระบุ field "ระดับสิทธิ์" ใน Task Brief เมื่องานต้องการ
+  - `PRO.md` — เพิ่มข้อ 4 Operational Context: Pro รู้ว่าตัวเองมีสิทธิ์ admin + เพิ่ม section "Admin-Level Operations" กำหนด protocol verify ก่อน irreversible action
+  - `PRO.md` — เพิ่ม field `**ระดับสิทธิ์:**` ใน Task Brief format
+- **ผล:** Pro รู้เมื่อไหร่ควรระวัง, Flash ส่ง context ที่ถูกต้องให้ Pro ก่อนงาน admin-level
+
 ## 2026-06-29 — fix: Pro crash/timeout cleanup + GH_PAT_READ doc + committer name
 
 - **เหตุผล:** ถ้า Pro crash หรือ GitHub Actions timeout (30 นาที) frontend จะค้างรอ result ตลอดกาลโดยไม่รู้สาเหตุ + ขาด doc ว่า GH_PAT_READ ต้อง read-only
