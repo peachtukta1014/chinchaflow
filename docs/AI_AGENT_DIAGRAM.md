@@ -1,6 +1,6 @@
 # CHINCHA FLOW — AI Agent Architecture Diagram
 
-อัปเดต: 2026-06-28 · ตรงกับ codebase จริง (PR #349 + #351 + #352 + #394)
+อัปเดต: 2026-06-29 · ตรงกับ codebase จริง (PR #394 + Flash Code Reader)
 
 ---
 
@@ -55,7 +55,8 @@ flowchart TD
     CF --> Z
     A -->|พีชพิมพ์ ทำเลย\nneedsConfirmation=false| CL
 
-    D -->|code-action\nneedsConfirmation=false| CA[dispatchToProAgent\nGH_PAT\nPOST github.com/repos/dispatches\nevent_type=ai-code-action]
+    D -->|code-action\nneedsConfirmation=false| FCR[🔍 Flash Code Reader\nGH_PAT_READ → fetchRepoFiles\nfiles_hint สูงสุด 5 ไฟล์ × 3,000 chars\nแนบเข้า Task Brief]
+    FCR --> CA[dispatchToProAgent\nGH_PAT_DISPATCH||GH_PAT\nPOST github.com/repos/dispatches\nevent_type=ai-code-action\n+ Task Brief พร้อมโค้ด]
     CA --> FS2[(Firestore\naiProgress/requestId\nclear)]
     CA --> RP([💬 รับงานแล้ว กำลังดำเนินการ\nstatus=processing + requestId])
 
@@ -71,7 +72,7 @@ flowchart TD
         GH2 --> GH3[handleCodeActionV2\naiWorkflowAgent.js\nOPENROUTER_API_KEY_PRO]
         GH3 --> GH4[fetchAgentDocs\nอ่าน AGENTS.md + docs\nจาก GitHub API]
         GH4 --> GH5[buildAgentSystemPrompt\nSCOPE_FILE_TREE\nเลือกไฟล์ตาม scope]
-        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=15\nCHECKPOINT=8]
+        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=30\nCHECKPOINT=25]
 
         GH6 --> TOOL{AI เลือก tool\nทีละขั้น}
         TOOL -->|read_file| T1[GitHub API\nดึงเนื้อไฟล์]
@@ -83,12 +84,12 @@ flowchart TD
         TOOL -->|report_no_action_needed| T7[ไม่ต้องแก้ รายงานผล]
 
         T1 & T2 & T3 & T4 --> TOOL
-        T5 --> GH7[writeResult\nFirestore aiResults/requestId\nreply + PR URL + scope]
+        T5 --> GH7[writeResult\nFirestore aiResults/requestId\nreply + PR URL + scope\nTTL 2 ชั่วโมง]
         T7 --> GH7
     end
 
     GHA --> PR_V[pr-verify.yml\nsmoke test + build\ncomment ผลใน PR]
-    GH7 --> WR2[(Firestore\naiResults/requestId\nTTL 30 นาที)]
+    GH7 --> WR2[(Firestore\naiResults/requestId\nTTL 2 ชั่วโมง)]
     POLLING --> WR2
     WR2 --> Z2([💬 PWA แสดงผลสุดท้าย\nรวม PR URL])
 
@@ -182,8 +183,8 @@ Flash CF สร้าง requestId (ถ้าไม่มีจาก client)
 ## Loop Limits (agentTools.js)
 
 ```
-MAX_ITERATIONS  = 15   (เดิม 30)
-SUMMARY_CHECKPOINT = 8 (เดิม 15 — รอบ 8 จีจี้บังคับสรุปก่อนวิ่งต่อ)
+MAX_ITERATIONS     = 30   — หยุดแน่นอน + emergency commit ถ้ามีไฟล์ staged
+SUMMARY_CHECKPOINT = 25   — รอบ 25 บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
 timeout GitHub Actions = 30 นาที
 ```
 
