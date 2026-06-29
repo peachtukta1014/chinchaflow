@@ -1,3 +1,12 @@
+## 2026-06-29 — feat: compact Task Brief — Flash ย่อบริบทเป็น 4 บรรทัด ส่ง Pro
+
+- **เหตุผล:** Task Brief เดิมยาว ~8,000 chars ใส่ header ซ้ำ + dump code snippet → บวม token ที่ Pro ต้องอ่าน + เกิน GitHub payload limit ง่าย
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashTriggers.js` — `buildTaskBrief` เขียนใหม่: compact markdown 4-5 บรรทัด (`**งาน:**`, `**ไฟล์:**`, `**อ่านก่อน:**`, `**กฎ:**`) ตัด preload code dump + verbose header ออกหมด
+  - `apps/webhook-core/src/flash/flashTriggers.js` — classifier prompt: `description`/`expected_change` ให้สั้น 1 ประโยค/1 บรรทัด; `files_hint[0]` = ไฟล์หลักที่แก้, `files_hint[1-2]` = อ่านประกอบ
+  - `apps/webhook-core/src/aiChatAgent.js` — ตัด file preload block ออก (Pro มี repo checkout ครบอยู่แล้ว); ตัด `fetchRepoFiles` จาก import
+- **ผล:** Brief target < 400 chars — Pro เปิดตาเห็นทันทีว่าทำอะไร ไฟล์ไหน กฎอะไร — ไม่เสีย token อ่านสิ่งที่ไม่จำเป็น
+
 ## 2026-06-29 — feat: Flash confirm-before-dispatch + "ไฟเขียว" trigger
 
 - **เหตุผล:** Flash เคย dispatch Pro ทันทีโดยไม่สรุปงานให้พีชยืนยัน → พีชไม่รู้ว่า Flash เข้าใจถูกหรือไม่ → Pro ทำงานผิดทิศ เสีย token โดยไม่จำเป็น

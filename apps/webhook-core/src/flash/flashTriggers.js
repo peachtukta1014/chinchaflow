@@ -66,10 +66,10 @@ CHINCHA FLOW scopes:
   "intent": "code-action",
   "scope": "tea|seafood|webhook|root",
   "taskSpec": {
-    "description": "[อธิบายงาน technical: ส่วนไหนของระบบ, พฤติกรรมที่ต้องการ, ปัญหาที่เกิด]",
-    "files_hint": ["apps/.../ไฟล์ที่น่าจะต้องแก้", "..."],
-    "expected_change": "[อธิบายให้ชัดว่าโค้ดควรเปลี่ยนยังไง ฟังก์ชันไหน ค่าอะไร]",
-    "business_rules": ["กฎที่ Pro ต้องรักษา เช่น ห้ามแตะ FIFO", "ราคาต้องไม่ติดลบ"]
+    "description": "[1 ประโยค: แก้/เพิ่มอะไร ที่ function/component ไหน]",
+    "files_hint": ["apps/.../ไฟล์หลักที่แก้", "apps/.../ไฟล์อ่านประกอบถ้ามี"],
+    "expected_change": "[1 บรรทัด: logic/ค่า/condition ที่เปลี่ยน — เจาะจงที่สุด]",
+    "business_rules": ["กฎสำคัญที่ต้องรักษา — ใส่เฉพาะที่เกี่ยวจริงๆ"]
   },
   "confirmation": "[สรุปสั้น 1 ประโยค]",
   "needsConfirmation": true,
@@ -77,11 +77,13 @@ CHINCHA FLOW scopes:
   "isHighRisk": true
 }
 
-กฎ files_hint — ต้องระบุให้ถูกต้อง:
+กฎ files_hint — ระบุชื่อไฟล์จริง ไม่ใช่แค่โฟลเดอร์:
+- files_hint[0] = ไฟล์หลักที่ต้องแก้ (path เต็ม เช่น apps/seafood-pos/src/utils/pricing.js)
+- files_hint[1-2] = ไฟล์อ่านประกอบ (Pro จะ read_file เอง ถ้าจำเป็น)
 - seafood: apps/seafood-pos/src/utils/, src/services/, src/lib/, src/screens/, src/liff/
 - tea: apps/chincha-tea/src/lib/, src/services/, src/screens/, src/components/
 - webhook: apps/webhook-core/src/ (aiChatAgent.js, aiWorkflowAgent.js, seafood-oa/, tea/)
-- ถ้าไม่แน่ใจ ใส่ไฟล์ที่น่าจะเกี่ยวที่สุด 1-3 ไฟล์
+- ถ้าไม่แน่ใจ ใส่ไฟล์ที่น่าจะเกี่ยวที่สุด 1 ไฟล์
 
 กฎ business_rules — ใส่เฉพาะที่เกี่ยวกับงานนี้จริงๆ:
 - seafood: ราคา/คำนวณเงิน → "ราคาต้องไม่ติดลบ, ห้ามแตะ FIFO logic ใน saleFifo.js"
@@ -147,56 +149,26 @@ CHINCHA FLOW scopes:
   }
 }
 
-// สร้าง structured Task Brief สำหรับ Pro — Pro รับ brief นี้เป็น "message"
-// hard cap 8,000 chars เพื่อไม่เกิน GitHub client_payload 10KB limit
-const BRIEF_MAX_CHARS = 8000;
+// สร้าง compact Task Brief สำหรับ Pro — Flash ย่อบริบทจากพีชเป็น 4-5 บรรทัด
+// Pro มีโค้ดครบในตัวอยู่แล้ว (repo checkout) — ไม่ต้อง preload snippet
+function buildTaskBrief(classified, originalMessage) {
+  const { taskSpec = {} } = classified;
 
-function buildTaskBrief(classified, originalMessage, fileContents = {}) {
-  const { taskSpec = {}, confirmation } = classified;
-  const filesHint = Array.isArray(taskSpec.files_hint) && taskSpec.files_hint.length
-    ? taskSpec.files_hint.map(f => `- ${f}`).join('\n')
-    : '- (Pro ต้องสำรวจเองจาก scope)';
-  const rules = Array.isArray(taskSpec.business_rules) && taskSpec.business_rules.length
-    ? taskSpec.business_rules.map(r => `- ${r}`).join('\n')
-    : '- ปฏิบัติตาม AGENTS.md';
+  const task = taskSpec.description || originalMessage;
+  const change = taskSpec.expected_change || '';
+  const files = Array.isArray(taskSpec.files_hint) ? taskSpec.files_hint : [];
+  const rules = Array.isArray(taskSpec.business_rules) ? taskSpec.business_rules : [];
 
-  const preloadedEntries = Object.entries(fileContents).filter(([, v]) => v);
-  const hasPreloaded = preloadedEntries.length > 0;
+  const mainFile = files[0] ? `\`${files[0]}\`` : '(สำรวจเองจาก scope)';
+  const extraFiles = files.slice(1).map(f => `\`${f}\``).join(', ');
 
-  const coreSection = `## 📋 Task Brief (สร้างโดย Flash)
+  let brief = `**งาน:** ${task}`;
+  if (change && change !== task) brief += ` — ${change}`;
+  brief += `\n**ไฟล์:** ${mainFile}`;
+  if (extraFiles) brief += `\n**อ่านก่อน:** ${extraFiles}`;
+  if (rules.length) brief += `\n**กฎ:** ${rules.join(' · ')}`;
 
-**งานที่ต้องทำ:**
-${taskSpec.description || confirmation || originalMessage}
-
-**ผลลัพธ์ที่คาดหวัง:**
-${taskSpec.expected_change || '(วิเคราะห์จากโค้ดจริง)'}
-
-**กฎ Business ที่ต้องรักษา:**
-${rules}
-
-**ไฟล์ที่เกี่ยว:**
-${filesHint}
-${hasPreloaded ? '→ Flash อ่านล่วงหน้าแล้ว — ดูโค้ดด้านล่าง ไม่ต้อง read_file ซ้ำ' : '→ Flash ไม่ได้ preload — Pro ต้อง read_file ก่อนแก้'}
-
-**คำสั่งต้นฉบับจากพีช:**
-"${originalMessage}"`;
-
-  if (!hasPreloaded) return coreSection;
-
-  // แจก budget ที่เหลือให้โค้ด preload — ตัดสั้นถ้าเกิน cap
-  const budget = BRIEF_MAX_CHARS - coreSection.length - 60;
-  if (budget <= 200) return coreSection; // core ยาวเกินไป ตัด preload ออก
-
-  const perFile = Math.floor(budget / preloadedEntries.length);
-  let preloadedSection = '\n\n**โค้ดที่ Flash อ่านล่วงหน้า:**';
-  for (const [path, content] of preloadedEntries) {
-    const maxLen = Math.max(perFile - 60, 100);
-    const snippet = content.slice(0, maxLen);
-    const truncated = content.length > maxLen ? '\n...(ตัดบางส่วน)' : '';
-    preloadedSection += `\n\n--- ${path} ---\n\`\`\`\n${snippet}${truncated}\n\`\`\``;
-  }
-
-  return coreSection + preloadedSection;
+  return brief;
 }
 
 module.exports = { normalizeThai, detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief };
