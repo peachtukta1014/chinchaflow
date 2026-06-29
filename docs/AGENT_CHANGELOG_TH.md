@@ -10,6 +10,14 @@
 - **ผล:** Flash แสดง "Flash กำลังอ่านโค้ดล่วงหน้า..." ใน PRO status bar ก่อน dispatch; Pro รับ Task Brief พร้อมโค้ดที่เกี่ยวข้องแนบมาด้วย ไม่ต้อง read_file ซ้ำ — ลดจำนวน iterations ลงได้ชัดเจน
 - ถ้าพัง: ตรวจ `GH_PAT_READ` ใน Google Cloud Secret Manager ว่า Enable แล้วหรือยัง; ตรวจ `.env` ใน Cloud Function ว่ามี `GH_PAT_READ=` จริง; ถ้า PAT หมดอายุ `fetchRepoFiles` จะ return `{}` (silently skip) ไม่ทำให้ dispatch พัง
 
+## 2026-06-30 — docs: อัปเดต CLAUDE.md + .jiiji/IDENTITY.md ให้ตรงกับสถาปัตยกรรมปัจจุบัน
+
+- **อัปเดต:** MAX_ITERATIONS 15→30, SUMMARY_CHECKPOINT 8→25, aiResults TTL 30m→2h
+- **เพิ่ม:** Error boundary ชั้น 3 — per-tool error counter (toolErrorCounts ≥4 ครั้ง หยุด)
+- **เพิ่ม:** Planned architecture — Flash reads code ด้วย `GH_PAT_READ` (Contents: Read-only) ก่อน dispatch
+- **อัปเดต:** PR History ล่าสุด #401–#411, Security model, Firestore collection description
+- **ไฟล์:** `CLAUDE.md`, `.jiiji/IDENTITY.md`
+
 ## 2026-06-30 — fix: เพิ่มกฎเหล็กใน JIIJI.md — ก่อน dispatch ต้องสรุปคำสั่งและรออนุมัติ + test PR ใน CHANGELOG
 
 - **ปัญหา/คำขอ:** จีจี้ตอบ "รับงานแล้ว" แล้วยิง dispatch ทันทีโดยไม่สรุปคำสั่งพี่ก่อน — ขัดกฎ PEACH_WORKING_STYLE_TH.md ที่กำหนดให้ทบทวนก่อนลงมือ

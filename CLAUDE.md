@@ -79,7 +79,7 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 │  key:   OPENROUTER_API_KEY_PRO (GitHub Secrets เท่านั้น)    │
 │  PAT:   GH_PAT (read/write repo เต็ม)                       │
 │  file:  apps/webhook-core/scripts/run-github-agent.mjs      │
-│  loop:  MAX_ITERATIONS=15, SUMMARY_CHECKPOINT=8             │
+│  loop:  MAX_ITERATIONS=30, SUMMARY_CHECKPOINT=25            │
 └────────────────────────┬────────────────────────────────────┘
                          │ writeResult → Firestore aiResults
                          ▼ Flash polling → PWA แสดงให้พีช
@@ -92,6 +92,8 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 ```
 
 **Security Isolation:** Flash มีแค่ `GH_PAT_DISPATCH` dispatch ได้อย่างเดียว — ไม่รู้จัก `OPENROUTER_API_KEY_PRO` และ `GH_PAT` เต็ม ถ้า Flash key หลุด attacker เขียน repo ไม่ได้
+
+**Planned — Flash Code Reader:** เพิ่ม `GH_PAT_READ` (fine-grained PAT: Contents Read-only) ให้ Flash อ่านไฟล์โค้ดจาก GitHub API ได้ก่อน dispatch → Flash วางแผน + ส่ง brief ละเอียดให้ Pro → Pro ประหยัด iteration ไม่ต้องอ่านโค้ดเอง
 
 ### Key Files ระบบ AI
 
@@ -114,7 +116,7 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 | Collection / Doc | เขียนโดย | หน้าที่ |
 |-----------------|----------|--------|
 | `aiProgress/{requestId}` | Pro | step ปัจจุบัน — ai-chat poll ทุก 3 วิ |
-| `aiResults/{requestId}` | Pro | ผลลัพธ์สุดท้าย (TTL 30 นาที) |
+| `aiResults/{requestId}` | Pro | ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง) |
 | `agentRunLogs/{requestId}/steps` | Pro | log ถาวรทุก iteration (debug) |
 | `systemConfig/projectTree` | sync-project-tree.yml | โครงสร้าง repo ให้ Flash อ่าน |
 | `systemConfig/agentDocs` | deploy-functions.yml | docs ให้ Flash อ่าน (JIIJI.md + AGENTS.md + handbook) |
@@ -139,6 +141,7 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 | `OPENROUTER_API_KEY_PRO` | GitHub Secrets | Pro agentic loop (ไม่ให้ Flash รู้) |
 | `GH_PAT` | GitHub Secrets + `.env` (deploy only) | Pro เขียน repo + deployNotifyHttp auth |
 | `GH_PAT_DISPATCH` | `.env` (Secret Manager) | Flash ส่ง dispatch เท่านั้น |
+| `GH_PAT_READ` | `.env` (Secret Manager) — **Planned** | Flash อ่านโค้ดจาก GitHub API (Contents: Read-only, ไม่เขียน repo) |
 | `FIREBASE_SERVICE_ACCOUNT` | GitHub Secrets | CI scripts เขียน Firestore ตรง (sync-agent-docs, ack-pro-agent) |
 | `VITE_FIREBASE_APP_ID_SHRIMP` | GitHub Secrets | build กุ้ง |
 | `VITE_FIREBASE_APP_ID_TEA` | GitHub Secrets | build ชา |
