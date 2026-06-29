@@ -10,6 +10,11 @@
 4. `docs/AGENT_CHANGELOG_TH.md` — รอบก่อนแก้อะไร — อ่านก่อนไล่บั๊กทุกครั้ง
 5. `.jiiji/IDENTITY.md` — สถาปัตยกรรม AI ครบชุด (Flash / Pro / พี่ซี)
 
+**Agent Identity Files (แต่ละตัวอ่านของตัวเอง):**
+- `FLASH.md` — Flash (จีจี้): Planner, tools, workflow (inject เข้า system prompt)
+- `PRO.md` — Pro Agent: tools 10 ตัว, Task Brief format, scope rules (อ่านก่อน loop)
+- `CLAUDE.md` — พี่ซี (ไฟล์นี้): กฎ Claude Code CLI session นี้
+
 ---
 
 ## กฎหลัก

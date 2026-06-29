@@ -23,7 +23,7 @@ const readFile = (relPath) => {
 };
 
 const files = {
-  'JIIJI.md': readFile('JIIJI.md'),
+  'FLASH.md': readFile('FLASH.md'),
   'AGENTS.md': readFile('AGENTS.md'),
   'docs/PROJECT_STRUCTURE.md': readFile('docs/PROJECT_STRUCTURE.md'),
   'docs/AGENT_CHANGELOG_TH.md': readFile('docs/AGENT_CHANGELOG_TH.md'),

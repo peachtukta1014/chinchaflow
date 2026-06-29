@@ -1,4 +1,10 @@
 ---
+deprecated: true
+moved_to: FLASH.md
+note: ไฟล์นี้ถูกแทนที่ด้วย FLASH.md — sync-agent-docs.cjs อัปเดตแล้ว
+---
+<!-- DEPRECATED: ดู FLASH.md แทน — ไฟล์นี้มีไว้เพื่อ backward compat เท่านั้น -->
+---
 name: jiiji
 version: 2.2
 type: ai-agent
