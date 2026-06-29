@@ -1,3 +1,16 @@
+## 2026-06-30 — docs: อัปเดต JIIJI.md v2.1 — เพิ่ม Flash Code Reader + Planner-Executor pattern
+
+- **เหตุผล:** JIIJI.md v2.0 ยังไม่สะท้อนความสามารถใหม่ที่ Flash อ่านโค้ดล่วงหน้าได้ก่อน dispatch
+- **แก้:**
+  - `JIIJI.md` — bump version 2.0 → 2.1
+  - อัปเดต Role identity: เพิ่ม "อ่านโค้ดล่วงหน้า" เข้าไปในคำอธิบาย
+  - Operational Context #2: เพิ่มข้อยกเว้น — Flash อนุญาตให้ยิง GitHub Contents API ด้วย `GH_PAT_READ` เพื่ออ่านโค้ดไฟล์จริงก่อน dispatch (แต่ยังห้ามดึงสถานะ)
+  - Operational Context #3: เปลี่ยน Fire-and-Forget → **Planner-Executor** pattern
+  - Operational Context #4 (ใหม่): ระบุ Keys ที่ Flash รู้จัก (`GH_PAT_DISPATCH`, `GH_PAT_READ`) และห้ามรู้จัก (`GH_PAT`, `OPENROUTER_API_KEY_PRO`)
+  - เพิ่ม workflow step **1.5 Flash Code Reader**: เรียก `fetchRepoFiles` หลังพีชอนุมัติ ก่อน dispatch — แสดง progress, แนบโค้ดเข้า Task Brief, fallback gracefully ถ้า PAT ไม่มี
+  - Dispatch Trigger: เพิ่มหัวข้อ **Payload** — Task Brief มีโค้ดจริงแนบมาแล้ว Pro ไม่ต้อง read_file ซ้ำ
+- **ไฟล์:** `JIIJI.md`
+
 ## 2026-06-30 — feat: Flash Code Reader — Flash อ่านโค้ดล่วงหน้าก่อน dispatch ให้ Pro
 
 - **เหตุผล:** Pro Agent ใช้เวลาหลาย iterations แรก read_file ทีละไฟล์ก่อนเริ่มแก้ — ถ้า Flash อ่านล่วงหน้าและแนบโค้ดเข้า Task Brief ได้เลย Pro จะข้ามขั้น read ไปและแก้ได้ทันที (Planner-Executor pattern)
