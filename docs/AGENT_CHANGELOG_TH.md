@@ -1,3 +1,18 @@
+## 2026-06-29 — fix: Pro Agent วน Loop ไม่จบ — per-tool total error counter
+
+- **อาการ:** Pro Agent วนรอบ 10-20+ นาทีไม่เสร็จ โดยเฉพาะ task ง่ายๆ เช่น แก้ไฟล์แล้ว commit — ต้องกด Cancel เองทุกครั้ง
+- **สาเหตุ:** `consecutiveToolErrors` รีเซ็ตเป็น 0 ทุกครั้งที่ tool ใดๆ สำเร็จ → pattern `read_file✅ → patch_file✅ → commit_and_pr❌ → read_file✅ → patch_file✅ → commit_and_pr❌ → ...` วนได้จนถึง MAX_ITERATIONS=30 โดย consecutive counter ไม่เคยถึง 4
+- **แก้:** `apps/webhook-core/src/shared/agentTools.js` — เพิ่ม `toolErrorCounts` dict สะสมจำนวน ❌ แยกตาม tool name ตลอดทั้งรัน (ไม่รีเซ็ตเมื่อ tool อื่นสำเร็จ) → ถ้า tool เดิมล้มเหลวรวม ≥4 ครั้ง throw error หยุดทันที
+- ถ้าพัง: error message จะบอก `"commit_and_pr ล้มเหลวรวม N ครั้ง"` — ดู log ของ tool error นั้นแล้วแก้สาเหตุ (permission/network/branch conflict)
+
+## 2026-06-29 — fix: ACK "Pro ได้รับงานแล้ว" ไม่โผล่ใน PRO status bar — เขียนผิด collection
+
+- **อาการ:** หลัง Flash dispatch ไปหา Pro แล้ว GitHub Actions เริ่มรัน ACK step — ข้อความ "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ไม่โผล่ใน PRO status bar ของ ai-chat เลย
+- **สาเหตุ:** `apps/webhook-core/scripts/ack-pro-agent.cjs` เขียนลง `agentProgress/{requestId}` แต่ frontend (`firebase.js` → `listenProgress`) subscribe ที่ `aiProgress/{requestId}` — คนละ collection ทำให้ client ไม่เห็น ACK
+- **แก้:** `ack-pro-agent.cjs` บรรทัด 20 เปลี่ยน `db.collection('agentProgress')` → `db.collection('aiProgress')` (ACK ใช้ firebase-admin → bypass security rules ได้ เขียน collection ใดก็ได้)
+- **ผล:** ตั้งแต่นี้หลัง Flash ส่งงานไปหา Pro ประมาณ 2-3 นาที (GitHub Actions setup) PRO status bar จะเขียวพร้อม step "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ก่อน Pro เริ่ม iterate
+- ถ้าพัง: เช็ก Firebase Console → Firestore → `aiProgress/{requestId}` มีเอกสารไหม (หลัง ACK step รันใน GitHub Actions); ถ้าไม่มี ตรวจ `FIREBASE_SERVICE_ACCOUNT` secret
+
 ## 2026-06-29 — refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) สำหรับ Pro Agent progress + result
 
 - **เหตุผล:** ระบบเดิมใช้ `setInterval(pollProgress, 3s)` + `setInterval(fetchResult, 5s)` ทำให้ UI อัปเดตช้าสูงสุด 5 วินาที หลัง Pro เขียน step หรือ result — onSnapshot fires ทันทีในเวลาไม่กี่ milliseconds
