@@ -16,6 +16,7 @@
 │  runs:    Cloud Function asia-southeast1 · 540s · 512MB    │
 │  key:     OPENROUTER_API_KEY (ใน .env)                     │
 │  PAT:     GH_PAT_DISPATCH || GH_PAT (dispatch เท่านั้น)    │
+│  PAT:     GH_PAT_READ (planned — อ่านโค้ดก่อน dispatch)   │
 │  context: Firestore systemConfig/projectTree + agentDocs   │
 └────────────────────────┬───────────────────────────────────┘
                          │ repository_dispatch (ai-code-action)
@@ -26,7 +27,7 @@
 │  runs:    GitHub Actions · ai-workflow-trigger.yml · ∞     │
 │  key:     OPENROUTER_API_KEY_PRO (GitHub Secrets เท่านั้น) │
 │  PAT:     GH_PAT (read/write repo เต็ม)                    │
-│  loop:    MAX_ITERATIONS=15, SUMMARY_CHECKPOINT=8          │
+│  loop:    MAX_ITERATIONS=30, SUMMARY_CHECKPOINT=25         │
 └────────────────────────┬───────────────────────────────────┘
                          │ writeResult → Firestore aiResults
                          ▼
@@ -60,7 +61,8 @@
 | **Timeout** | 540 วินาที |
 | **API key** | `OPENROUTER_API_KEY` — อยู่ใน `.env` (เขียนโดย `deploy-functions.yml`) |
 | **Dispatch PAT** | `GH_PAT_DISPATCH` (dispatch-only) fallback `GH_PAT` — ห้ามรู้จัก `GH_PAT` เต็ม |
-| **Context** | `systemConfig/projectTree` (TTL 5 min) + `systemConfig/agentDocs` (TTL 10 min) — อ่านจาก Firestore เท่านั้น ห้ามยิง GitHub API ตรงๆ |
+| **Read PAT** | `GH_PAT_READ` — **Planned** — fine-grained PAT: Contents Read-only ใช้อ่านโค้ดก่อน dispatch |
+| **Context** | `systemConfig/projectTree` (TTL 5 min) + `systemConfig/agentDocs` (TTL 10 min) จาก Firestore; **Planned:** อ่านไฟล์โค้ดตรงจาก GitHub API ด้วย GH_PAT_READ ก่อนสร้าง task brief |
 
 ### Flow ของการตอบ
 
@@ -85,6 +87,7 @@
              ④ ถ้า intent = "code-action":
                   - needsConfirmation? → ส่งยืนยันก่อน (รอ "ทำเลย")
                   - buildTaskBrief() → structured brief
+                  - [Planned] GH_PAT_READ → อ่านไฟล์โค้ดที่เกี่ยวข้อง → แนบใน brief
                   - GH_PAT_DISPATCH||GH_PAT → dispatchToProAgent()
                   - clearProgress → reply "รับงานแล้ว กำลังดำเนินการ"
 ```
@@ -153,8 +156,8 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
 | **API key** | `OPENROUTER_API_KEY_PRO` — GitHub Secrets เท่านั้น (Flash ไม่รู้จักเลย) |
 | **PAT** | `GH_PAT` — read/write repo เต็ม (GitHub Secrets) |
 | **Firestore** | `FIREBASE_SERVICE_ACCOUNT` — GitHub Secrets เท่านั้น |
-| **MAX_ITERATIONS** | 15 รอบ |
-| **SUMMARY_CHECKPOINT** | รอบที่ 8 — บังคับสรุปความคืบหน้า แล้วดำเนินต่อ |
+| **MAX_ITERATIONS** | 30 รอบ |
+| **SUMMARY_CHECKPOINT** | รอบที่ 25 — บังคับสรุปความคืบหน้า แล้วดำเนินต่อ |
 
 ### Flow ของการทำงาน
 
@@ -166,11 +169,11 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
    - fetchAgentDocs()    → AGENTS.md + scope AGENTS.md
    - .jiiji/PRO_AGENT.md → identity + protocol
         │
-③ runAgentLoop(MAX=15, CHECKPOINT=8):
-   รอบที่ 1–7:  tool loop ปกติ
-   รอบที่ 8:    SUMMARY_CHECKPOINT → บังคับ Pro สรุปความคืบหน้า
-   รอบที่ 9–15: tool loop ต่อ
-   รอบที่ 16+:  หยุด → emergency partial commit ถ้ามีไฟล์ staged
+③ runAgentLoop(MAX=30, CHECKPOINT=25):
+   รอบที่ 1–24:  tool loop ปกติ
+   รอบที่ 25:    SUMMARY_CHECKPOINT → บังคับ Pro สรุปความคืบหน้า
+   รอบที่ 26–30: tool loop ต่อ
+   รอบที่ 31+:   หยุด → emergency partial commit ถ้ามีไฟล์ staged
         │
 ④ Tools ที่ใช้ได้ (ทุก tool call ผ่าน toolExecutors.js):
    read_file(path)
@@ -192,8 +195,9 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
 | ชั้น | เงื่อนไข | การตอบสนอง |
 |-----|----------|------------|
 | **Spin detection** | tool+args เดิมซ้ำ ≥3 ครั้งใน 6 รอบ | หยุดทันที |
-| **Error budget** | tool return ❌ ติดกัน ≥4 ครั้ง | หยุดทันที |
-| **Emergency commit** | ถึง MAX=15 แต่มีไฟล์ staged | commit `[WIP]` แล้วหยุด |
+| **Error budget (consecutive)** | tool return ❌ ติดกัน ≥4 ครั้ง | หยุดทันที |
+| **Error budget (per-tool)** | tool เดียวกันล้มเหลวรวม ≥4 ครั้งตลอดรัน | หยุดทันที (ป้องกัน read✅→patch✅→commit❌→read✅→loop) |
+| **Emergency commit** | ถึง MAX=30 แต่มีไฟล์ staged | commit `[WIP]` แล้วหยุด |
 
 ### isHighRisk Protocol
 
@@ -224,7 +228,8 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
 │  ✅ OPENROUTER_API_KEY   (.env)         │   │  ✅ OPENROUTER_API_KEY_PRO  (GH Secrets)  │
 │  ✅ GH_PAT_DISPATCH      (.env)         │   │  ✅ GH_PAT                  (GH Secrets)  │
 │     fallback → GH_PAT   (.env)          │   │  ✅ FIREBASE_SERVICE_ACCOUNT (GH Secrets) │
-│  ❌ GH_PAT เต็ม — ไม่รู้จักเลย        │   │  ❌ OPENROUTER_API_KEY Flash ไม่ใช้        │
+│  ✅ GH_PAT_READ  (planned)  (.env)      │   │  ❌ OPENROUTER_API_KEY Flash ไม่ใช้        │
+│  ❌ GH_PAT เต็ม — ไม่รู้จักเลย        │   │                                            │
 │  ❌ OPENROUTER_API_KEY_PRO — ไม่รู้จัก │   │                                            │
 │  ❌ FIREBASE_SERVICE_ACCOUNT — ไม่รู้จัก│  │                                            │
 └─────────────────────────────────────────┘   └────────────────────────────────────────────┘
@@ -262,7 +267,7 @@ apps/webhook-core/
     aiChatAgent.js          ← Flash: HTTP handler, classifier, dispatcher
     aiWorkflowAgent.js      ← Pro: handleCodeActionV2, fetchAgentDocs
     shared/
-      agentTools.js         ← Pro: runAgentLoop (MAX=15, CHECKPOINT=8)
+      agentTools.js         ← Pro: runAgentLoop (MAX=30, CHECKPOINT=25) + toolErrorCounts per-tool error budget
       toolExecutors.js      ← Pro: tool execution (exec_command timeout 300s)
       toolDefinitions.js    ← Pro: tool schemas
       progressTracker.js    ← R/W Firestore aiProgress / aiResults
@@ -292,28 +297,28 @@ JIIJI.md                    ← Flash agent identity + workflow 6 ขั้น
 
 | Collection | เขียนโดย | อ่านโดย | หน้าที่ |
 |-----------|----------|---------|---------|
-| `aiProgress/{requestId}` | Pro | Flash (polling) | step ปัจจุบัน |
-| `aiResults/{requestId}` | Pro | Flash (polling) | ผลลัพธ์สุดท้าย (TTL 30 min) |
+| `aiProgress/{requestId}` | Pro + ACK script | Flash (onSnapshot) | step ปัจจุบัน |
+| `aiResults/{requestId}` | Pro | Flash (onSnapshot) | ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง) |
 | `agentRunLogs/{requestId}/steps` | Pro | - | debug log ถาวร |
 | `systemConfig/projectTree` | sync-project-tree.yml | Flash | โครงสร้าง repo |
 | `systemConfig/agentDocs` | deploy-functions.yml / sync-project-tree.yml | Flash | JIIJI.md + AGENTS.md + docs |
 
 ---
 
-## PR History ล่าสุด (2026-06-24 – 2026-06-26)
+## PR History ล่าสุด (2026-06-28 – 2026-06-29)
 
 | PR | เรื่อง | Merged |
 |----|--------|--------|
-| **#371** | fix: `normalizeThai()` + DSML strip + `DEPLOY_NOTIFY_URL` hardcode + GH_PAT fallback | 2026-06-26 |
-| **#370** | fix: โอเคกุ้ง ไม่ match (Unicode) + DSML strip + error display ใน api.js | 2026-06-25 |
-| **#369** | fix: repository_dispatch ไม่ทำงาน — fallback `GH_PAT_DISPATCH → GH_PAT` | 2026-06-25 |
-| **#368** | fix: strip newlines จาก secrets ใน `.env` ป้องกัน dotenv parse error | 2026-06-25 |
-| **#367** | fix: ย้าย secrets ออกจาก `runWith` → `.env` แก้ deploy 403 | 2026-06-24 |
-| **#366** | fix: เอา `OPENROUTER_API_KEY` กลับเข้า `.env` แก้ Error 500 | 2026-06-24 |
-| **#365** | fix: sync project tree ไป Firestore เสมอ (`if: always()`) | 2026-06-24 |
-| **#364** | security: แยก `GH_PAT_DISPATCH` (dispatch-only) + lock `GH_PAT` ออกจาก Flash | 2026-06-24 |
-| **#363** | security: Flash เลิกอ่าน GitHub ตรงๆ — ย้าย docs ไป Firestore | 2026-06-24 |
-| **#362** | fix: storage rule `catalogImages/` สำหรับ chincha-tea | 2026-06-24 |
+| **#411** | fix: เพิ่มกฎเหล็กใน JIIJI.md — ก่อน dispatch ต้องสรุปคำสั่งและรออนุมัติ (Pro ทำ) | 2026-06-29 |
+| **#410** | fix: ACK "Pro ได้รับงานแล้ว" ไม่โผล่ใน PRO status bar — เขียนผิด collection agentProgress→aiProgress | 2026-06-29 |
+| **#408** | refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) | 2026-06-29 |
+| **#407** | feat: PRO status bar + fix OpenRouter timeout + MAX_ITERATIONS 15→30 | 2026-06-29 |
+| **#406** | feat: progress indicator แสดง PRO badge + step จาก tool call จริง | 2026-06-28 |
+| **#405** | fix: Pro Agent รันเสร็จแต่ UI เงียบ — progress indicator + isMaxIter + TTL 30m→2h | 2026-06-28 |
+| **#404** | fix: เลขเวอร์ชัน ai-chat แสดงวันที่ผิด (UTC vs ไทย UTC+7) | 2026-06-28 |
+| **#403** | fix: Knowledge tab แสดง error จริงแทนที่กลืน catch เงียบ | 2026-06-28 |
+| **#402** | refactor: แยก App.jsx → icons, LoginScreen, KnowledgePanel, TokenDashboard | 2026-06-28 |
+| **#401** | fix: Knowledge tab "Project Tree" ว่าง — ใช้ Service Account แทน curl+GH_PAT | 2026-06-28 |
 
 ---
 
