@@ -7,6 +7,10 @@
 
 ## 2026-06
 
+### 2026-06-29 | fix: Knowledge tab "unavailable" — Firebase config ขาด appId
+- `src/firebase.js` — เพิ่ม `appId` จาก `VITE_FIREBASE_APP_ID` ใน `initializeApp()` config
+- `.github/workflows/deploy-hosting.yml` — เพิ่ม `VITE_FIREBASE_APP_ID` env var (fallback `APP_ID_TEA`)
+
 ### 2026-06-29 | refactor: แทน polling ด้วย Firestore onSnapshot (event-driven)
 - `src/App.jsx` — แทน `setInterval(pollProgress, 2s/3s)` + `setInterval(fetchResult, 5s)` ด้วย `listenProgress` + `listenForResult` onSnapshot subscriptions
 - `src/App.jsx` — `onVisible` recovery เปลี่ยนจาก 10-retry loop (30s) → `listenForResult` + 2 นาที timeout; เพิ่ม guard `if (unsubscribeRef.current) return` ป้องกัน double subscription
