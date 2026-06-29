@@ -17,7 +17,7 @@ if (!requestId) {
   process.exit(0);
 }
 
-db.collection('agentProgress').doc(requestId)
+db.collection('aiProgress').doc(requestId)
   .set({
     step: 'Pro ได้รับงานแล้ว กำลังเริ่มทำ...',
     status: 'received_by_pro',
@@ -26,7 +26,7 @@ db.collection('agentProgress').doc(requestId)
     ackedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true })
   .then(() => {
-    console.log(`✅ ACK เขียน Firestore agentProgress/${requestId} สำเร็จ`);
+    console.log(`✅ ACK เขียน Firestore aiProgress/${requestId} สำเร็จ`);
     process.exit(0);
   })
   .catch((err) => {

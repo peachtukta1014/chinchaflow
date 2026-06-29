@@ -1,3 +1,11 @@
+## 2026-06-29 — fix: ACK "Pro ได้รับงานแล้ว" ไม่โผล่ใน PRO status bar — เขียนผิด collection
+
+- **อาการ:** หลัง Flash dispatch ไปหา Pro แล้ว GitHub Actions เริ่มรัน ACK step — ข้อความ "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ไม่โผล่ใน PRO status bar ของ ai-chat เลย
+- **สาเหตุ:** `apps/webhook-core/scripts/ack-pro-agent.cjs` เขียนลง `agentProgress/{requestId}` แต่ frontend (`firebase.js` → `listenProgress`) subscribe ที่ `aiProgress/{requestId}` — คนละ collection ทำให้ client ไม่เห็น ACK
+- **แก้:** `ack-pro-agent.cjs` บรรทัด 20 เปลี่ยน `db.collection('agentProgress')` → `db.collection('aiProgress')` (ACK ใช้ firebase-admin → bypass security rules ได้ เขียน collection ใดก็ได้)
+- **ผล:** ตั้งแต่นี้หลัง Flash ส่งงานไปหา Pro ประมาณ 2-3 นาที (GitHub Actions setup) PRO status bar จะเขียวพร้อม step "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ก่อน Pro เริ่ม iterate
+- ถ้าพัง: เช็ก Firebase Console → Firestore → `aiProgress/{requestId}` มีเอกสารไหม (หลัง ACK step รันใน GitHub Actions); ถ้าไม่มี ตรวจ `FIREBASE_SERVICE_ACCOUNT` secret
+
 ## 2026-06-29 — refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) สำหรับ Pro Agent progress + result
 
 - **เหตุผล:** ระบบเดิมใช้ `setInterval(pollProgress, 3s)` + `setInterval(fetchResult, 5s)` ทำให้ UI อัปเดตช้าสูงสุด 5 วินาที หลัง Pro เขียน step หรือ result — onSnapshot fires ทันทีในเวลาไม่กี่ milliseconds
