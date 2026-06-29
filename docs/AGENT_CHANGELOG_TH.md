@@ -1,3 +1,9 @@
+## 2026-06-29 — [WIP] งานค้าง: ## 📋 Task Brief (สร้างโดย Flash จากคำสั่งพีช)
+
+**งานที่ต้อง
+- ไฟล์ที่แก้: apps/ai-chat/src/firebase.js, .github/workflows/deploy-hosting.yml, docs/AGENT_CHANGELOG_TH.md, apps/ai-chat/CHANGELOG.md
+- Branch: dev/ai-partial-mqyman3e
+
 ## 2026-06-29 — fix: ai-chat Knowledge tab โหลดไม่ได้ "unavailable" — Firebase config ขาด appId
 
 - **อาการ:** AI Chat PWA → Knowledge tab → Project Tree / Agent Docs แสดง "⚠️ โหลดไม่ได้: unavailable" — Firestore อ่าน `systemConfig` ไม่ได้
