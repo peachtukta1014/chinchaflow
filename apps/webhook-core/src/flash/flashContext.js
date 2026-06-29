@@ -106,4 +106,31 @@ async function fetchRepoFiles(pat, filePaths) {
   return results;
 }
 
-module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles };
+// pendingActions/{requestId} — เก็บ Task Brief ระหว่างรอพีชพิมพ์ "ไฟเขียว"
+const PENDING_ACTION_TTL_MS = 15 * 60 * 1000; // 15 นาที
+
+async function savePendingAction(requestId, data) {
+  const expiresAt = new Date(Date.now() + PENDING_ACTION_TTL_MS);
+  await _fsDb().collection('pendingActions').doc(requestId).set({ ...data, expiresAt });
+}
+
+async function loadPendingAction(requestId) {
+  if (!requestId) return null;
+  try {
+    const snap = await _fsDb().collection('pendingActions').doc(requestId).get();
+    if (!snap.exists) return null;
+    const data = snap.data();
+    if (data.expiresAt?.toDate() < new Date()) {
+      snap.ref.delete().catch(() => {});
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+async function clearPendingAction(requestId) {
+  if (!requestId) return;
+  await _fsDb().collection('pendingActions').doc(requestId).delete().catch(() => {});
+}
+
+module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, savePendingAction, loadPendingAction, clearPendingAction };

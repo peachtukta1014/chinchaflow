@@ -15,7 +15,7 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
@@ -93,6 +93,54 @@ exports.aiChatAgentHttp = functions
       return;
     }
 
+    // ── "ไฟเขียว" — พีชยืนยันส่งงาน Pro จาก pending brief ──────────────
+    if (/ไฟเขียว/.test(message)) {
+      const pendingId = req.body.pendingRequestId;
+      if (pendingId) {
+        const pending = await loadPendingAction(pendingId);
+        if (pending) {
+          if (!requestId) {
+            res.status(400).json({ reply: 'ต้องมี requestId สำหรับ code-action ครับพี่', scope: pending.scope });
+            return;
+          }
+          const ghPatForDispatch = (process.env.GH_PAT_DISPATCH || '').trim();
+          if (!ghPatForDispatch) {
+            res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: pending.scope });
+            return;
+          }
+          await clearPendingAction(pendingId);
+          try {
+            await dispatchToProAgent(ghPatForDispatch, {
+              requestId,
+              message: pending.taskBrief,
+              history: [],
+              scope: pending.scope,
+              isHighRisk: pending.isHighRisk !== false,
+              confirmation: pending.confirmation || '',
+            });
+            await writeProgress(requestId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก V4-Pro...');
+            res.json({
+              reply: 'จีจี้ส่งงานให้ V4-Pro แล้วครับพี่ 🌸 ติดตามความคืบหน้าได้เลย',
+              status: 'processing',
+              requestId,
+              scope: pending.scope,
+              intent: 'code-action',
+            });
+          } catch (err) {
+            console.error('ไฟเขียว dispatch error:', err);
+            await clearProgress(requestId);
+            res.status(500).json({
+              reply: `จีจี้ส่งคำสั่งไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}`,
+              scope: pending.scope,
+              status: 'error',
+            });
+          }
+          return;
+        }
+      }
+      // ไม่มี pending → ตกลง flow ปกติ (อาจเป็นการพูดถึง "ไฟเขียว" ในบริบทอื่น)
+    }
+
     // ── Quick trigger: โอเคกุ้ง / โอเคชา ───────────────────────────────
     const quickTrigger = detectQuickTrigger(message);
     if (quickTrigger) {
@@ -132,27 +180,13 @@ exports.aiChatAgentHttp = functions
     const finalScope = classified.scope || resolvedScope;
 
     if (classified.intent === 'code-action') {
-      if (classified.needsConfirmation) {
-        const confirmMsg = classified.confirmationMessage ||
-          `จีจี้เข้าใจแล้วนะครับ: ${classified.confirmation}\n\nถูกต้องไหมครับพี่? พิมพ์ "ทำเลย" ยืนยันได้เลย 🙂`;
-        await clearProgress(requestId);
-        res.json({ reply: confirmMsg, scope: finalScope, intent: 'pending-code-action' });
-        return;
-      }
-
       if (!requestId) {
         await clearProgress(requestId);
         res.status(400).json({ reply: 'ต้องมี requestId สำหรับ code-action ครับพี่', scope: finalScope });
         return;
       }
 
-      const ghPatForDispatch = (process.env.GH_PAT_DISPATCH || '').trim();
-      if (!ghPatForDispatch) {
-        await clearProgress(requestId);
-        res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: finalScope });
-        return;
-      }
-
+      // Flash อ่านโค้ดล่วงหน้าก่อนแสดง confirmation เสมอ
       const ghPatRead = (process.env.GH_PAT_READ || '').trim();
       let preloadedFiles = {};
       if (ghPatRead && classified.taskSpec?.files_hint?.length) {
@@ -160,38 +194,28 @@ exports.aiChatAgentHttp = functions
         preloadedFiles = await fetchRepoFiles(ghPatRead, classified.taskSpec.files_hint).catch(() => ({}));
       }
 
-      try {
-        await dispatchToProAgent(ghPatForDispatch, {
-          requestId,
-          message: buildTaskBrief(classified, message, preloadedFiles),
-          history: [],
-          scope: finalScope,
-          isHighRisk: classified.isHighRisk !== false,
-          confirmation: classified.confirmation || '',
-        });
-        await writeProgress(requestId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก Pro Agent...');
-        const prefix = classified.confirmation
-          ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
-          : '';
-        res.json({
-          reply: prefix + 'จีจี้รับงานแล้วนะคะ กำลังดำเนินการอยู่ครับพี่ — ติดตามความคืบหน้าได้เลย 🌸',
-          status: 'processing',
-          requestId,
-          scope: finalScope,
-          intent: 'code-action',
-        });
-        return;
-      } catch (err) {
-        console.error('aiChatAgentHttp: dispatch error:', err);
-        await clearProgress(requestId);
-        res.status(500).json({
-          reply: `จีจี้ส่งคำสั่งไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}`,
-          scope: finalScope,
-          intent: 'code-action',
-          status: 'error',
-        });
-        return;
-      }
+      const taskBrief = buildTaskBrief(classified, message, preloadedFiles);
+
+      // บันทึก Task Brief รอพีชพิมพ์ "ไฟเขียว"
+      await savePendingAction(requestId, {
+        taskBrief,
+        scope: finalScope,
+        isHighRisk: classified.isHighRisk !== false,
+        confirmation: classified.confirmation || '',
+      });
+
+      await clearProgress(requestId);
+
+      const confirmMsg = classified.confirmationMessage ||
+        `จีจี้เข้าใจแล้วนะครับพี่ 🌸\n\n${classified.confirmation || 'วิเคราะห์งานเสร็จแล้ว'}\n\nพิมพ์ "ไฟเขียว" เพื่อส่งงานให้ V4-Pro ได้เลยครับ 🟢`;
+
+      res.json({
+        reply: confirmMsg,
+        scope: finalScope,
+        intent: 'pending-code-action',
+        pendingRequestId: requestId,
+      });
+      return;
     }
 
     // ── Chat mode: ตอบตรงจากบริบทที่มี ─────────────────────────────────

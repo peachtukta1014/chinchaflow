@@ -1,3 +1,16 @@
+## 2026-06-29 — feat: Flash confirm-before-dispatch + "ไฟเขียว" trigger
+
+- **เหตุผล:** Flash เคย dispatch Pro ทันทีโดยไม่สรุปงานให้พีชยืนยัน → พีชไม่รู้ว่า Flash เข้าใจถูกหรือไม่ → Pro ทำงานผิดทิศ เสีย token โดยไม่จำเป็น
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashContext.js` — เพิ่ม `savePendingAction`, `loadPendingAction`, `clearPendingAction` (Firestore `pendingActions/{requestId}` TTL 15 นาที)
+  - `apps/webhook-core/src/aiChatAgent.js` — code-action path ใหม่: Flash อ่านโค้ดล่วงหน้า → บันทึก Task Brief → แสดง confirmation ภาษา developer → รอ "ไฟเขียว"
+  - `apps/webhook-core/src/aiChatAgent.js` — เพิ่ม "ไฟเขียว" detection block รับ `pendingRequestId` → โหลด brief จาก Firestore → dispatch Pro → clear pending
+  - `apps/webhook-core/src/flash/flashTriggers.js` — อัปเดต `confirmationMessage` format: technical + จบด้วย 'ไฟเขียว'
+  - `apps/ai-chat/src/api.js` — เพิ่ม `pendingRequestId` param + return ใน response
+  - `apps/ai-chat/src/App.jsx` — เพิ่ม `pendingRequestIdRef`: เก็บ/ส่ง/clear pending state
+- **Flow ใหม่:** พีชพิมพ์ → Flash วิเคราะห์+อ่านโค้ด → แสดงสรุป technical → พีชพิมพ์ "ไฟเขียว" → Flash dispatch Pro พร้อม Task Brief ที่ยืนยันแล้ว
+- **คำยืนยัน:** "ไฟเขียว" — ยาวพอไม่พูดลอยๆ ในบริบทปกติ ป้องกัน false trigger
+
 ## 2026-06-29 — docs: Flash + Pro รับรู้สิทธิ์ Admin-Level Operations
 
 - **เหตุผล:** Flash ไม่รู้ว่า Pro มีสิทธิ์ admin (delete branch, trigger workflow) → ไม่ระบุใน Task Brief → Pro ทำงาน admin ops โดยไม่มี protocol ชัดเจน
