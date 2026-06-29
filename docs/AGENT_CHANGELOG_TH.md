@@ -1,18 +1,37 @@
-## 2026-06-29 — [WIP] งานค้าง: ## 📋 Task Brief (สร้างโดย Flash จากคำสั่งพีช)
+## 2026-06-30 — fix: เพิ่มกฎเหล็กใน JIIJI.md — ก่อน dispatch ต้องสรุปคำสั่งและรออนุมัติ + test PR ใน CHANGELOG
 
-**งานที่ต้อง
-- ไฟล์ที่แก้: apps/ai-chat/src/firebase.js, .github/workflows/deploy-hosting.yml, docs/AGENT_CHANGELOG_TH.md, apps/ai-chat/CHANGELOG.md
-- Branch: dev/ai-partial-mqyman3e
+- **ปัญหา/คำขอ:** จีจี้ตอบ "รับงานแล้ว" แล้วยิง dispatch ทันทีโดยไม่สรุปคำสั่งพี่ก่อน — ขัดกฎ PEACH_WORKING_STYLE_TH.md ที่กำหนดให้ทบทวนก่อนลงมือ
+- **แก้แล้ว:**
+  - `JIIJI.md` — เพิ่มกฎเหล็กในหัวข้อ "ขาเข้า: รับข้อมูลและวางแผนงาน": ก่อน dispatch ต้องสรุปคำสั่งพี่ให้ชัดเจนและรออนุมัติก่อนเสมอ — ห้ามตอบรับคำสั่งแล้วยิง dispatch ทันทีเด็ดขาด
+  - `apps/ai-chat/CHANGELOG.md` — เพิ่ม `<!-- test PR -->` ที่บรรทัดแรกสุด (test comment)
+- **ไฟล์/จุดสำคัญ:** `JIIJI.md`, `apps/ai-chat/CHANGELOG.md`
+- **พฤติกรรมหลังแก้:** จีจี้ต้องสรุปคำสั่งพี่เป็น bullet ก่อน แล้วรอพี่พูด "โอเค" หรือ "ทำเลย" ก่อนถึงจะ dispatch ไปหา Pro Agent
+- **ถ้าพังอีก ให้เช็กก่อน:** ดู `JIIJI.md` หัวข้อ "ขาเข้า" ว่ามีกฎเหล็กอยู่ไหม
+
+## 2026-06-29 — fix: Pro Agent วน Loop ไม่จบ — per-tool total error counter
+
+- **อาการ:** Pro Agent วนรอบ 10-20+ นาทีไม่เสร็จ โดยเฉพาะ task ง่ายๆ เช่น แก้ไฟล์แล้ว commit — ต้องกด Cancel เองทุกครั้ง
+- **สาเหตุ:** `consecutiveToolErrors` รีเซ็ตเป็น 0 ทุกครั้งที่ tool ใดๆ สำเร็จ → pattern `read_file✅ → patch_file✅ → commit_and_pr❌ → read_file✅ → patch_file✅ → commit_and_pr❌ → ...` วนได้จนถึง MAX_ITERATIONS=30 โดย consecutive counter ไม่เคยถึง 4
+- **แก้:** `apps/webhook-core/src/shared/agentTools.js` — เพิ่ม `toolErrorCounts` dict สะสมจำนวน ❌ แยกตาม tool name ตลอดทั้งรัน (ไม่รีเซ็ตเมื่อ tool อื่นสำเร็จ) → ถ้า tool เดิมล้มเหลวรวม ≥4 ครั้ง throw error หยุดทันที
+- ถ้าพัง: error message จะบอก `"commit_and_pr ล้มเหลวรวม N ครั้ง"` — ดู log ของ tool error นั้นแล้วแก้สาเหตุ (permission/network/branch conflict)
+
+## 2026-06-29 — fix: ACK "Pro ได้รับงานแล้ว" ไม่โผล่ใน PRO status bar — เขียนผิด collection
+
+- **อาการ:** หลัง Flash dispatch ไปหา Pro แล้ว GitHub Actions เริ่มรัน ACK step — ข้อความ "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ไม่โผล่ใน PRO status bar ของ ai-chat เลย
+- **สาเหตุ:** `apps/webhook-core/scripts/ack-pro-agent.cjs` เขียนลง `agentProgress/{requestId}` แต่ frontend (`firebase.js` → `listenProgress`) subscribe ที่ `aiProgress/{requestId}` — คนละ collection ทำให้ client ไม่เห็น ACK
+- **แก้:** `ack-pro-agent.cjs` บรรทัด 20 เปลี่ยน `db.collection('agentProgress')` → `db.collection('aiProgress')` (ACK ใช้ firebase-admin → bypass security rules ได้ เขียน collection ใดก็ได้)
+- **ผล:** ตั้งแต่นี้หลัง Flash ส่งงานไปหา Pro ประมาณ 2-3 นาที (GitHub Actions setup) PRO status bar จะเขียวพร้อม step "Pro ได้รับงานแล้ว กำลังเริ่มทำ..." ก่อน Pro เริ่ม iterate
+- ถ้าพัง: เช็ก Firebase Console → Firestore → `aiProgress/{requestId}` มีเอกสารไหม (หลัง ACK step รันใน GitHub Actions); ถ้าไม่มี ตรวจ `FIREBASE_SERVICE_ACCOUNT` secret
 
 ## 2026-06-29 — fix: ai-chat Knowledge tab โหลดไม่ได้ "unavailable" — Firebase config ขาด appId
 
 - **อาการ:** AI Chat PWA → Knowledge tab → Project Tree / Agent Docs แสดง "⚠️ โหลดไม่ได้: unavailable" — Firestore อ่าน `systemConfig` ไม่ได้
-- **สาเหตุ:** `apps/ai-chat/src/firebase.js` — `initializeApp()` ส่งแค่ `{ apiKey, projectId, authDomain }` ไม่มี `appId` → Firebase JS SDK อาจเชื่อมต่อ Firestore ไม่สมบูรณ์ในบางสภาพแวดล้อม (โดยเฉพาะ PWA ที่ลงทะเบียน appId ใน Firebase Console แล้ว)
+- **สาเหตุ:** `apps/ai-chat/src/firebase.js` — `initializeApp()` ส่งแค่ `{ apiKey, projectId, authDomain }` ไม่มี `appId` → Firebase JS SDK อาจเชื่อมต่อ Firestore ไม่สมบูรณ์ในบางสภาพแวดล้อม
 - **แก้:**
   - `apps/ai-chat/src/firebase.js` — เพิ่ม `appId` จาก `VITE_FIREBASE_APP_ID` ใน config object
   - `.github/workflows/deploy-hosting.yml` — เพิ่ม `VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID_AI_CHAT || secrets.VITE_FIREBASE_APP_ID_TEA }}` ใน Build ai-chat step
-- **สิ่งที่พีชต้องทำ:** ถ้ายังไม่มี secret `VITE_FIREBASE_APP_ID_AI_CHAT` ใน GitHub → ระบบ fallback ใช้ `VITE_FIREBASE_APP_ID_TEA` ให้ก่อน; ถ้าอยากแยก appId ของ ai-chat เอง → สร้าง secret `VITE_FIREBASE_APP_ID_AI_CHAT` จาก Firebase Console → Project Settings → Your apps → ai-chat → App ID
-- ถ้าพัง: เช็ค Firestore rules deploy แล้วหรือยัง (`deploy-rules.yml`); เช็ค `systemConfig/projectTree` + `systemConfig/agentDocs` มีข้อมูลใน Firestore Console ไหม; ถ้าไม่มี → trigger `deploy-functions.yml` (workflow_dispatch) เพื่อรัน sync-agent-docs
+- **สิ่งที่พีชต้องทำ:** ถ้าไม่มี secret `VITE_FIREBASE_APP_ID_AI_CHAT` ใน GitHub → ระบบ fallback ใช้ `VITE_FIREBASE_APP_ID_TEA` ก่อน; ถ้าอยากแยก appId ของ ai-chat เอง → สร้าง secret `VITE_FIREBASE_APP_ID_AI_CHAT` จาก Firebase Console → Project Settings → Your apps → ai-chat → App ID
+- ถ้าพัง: เช็ค Firestore rules deploy แล้วหรือยัง; เช็ค `systemConfig/projectTree` + `systemConfig/agentDocs` มีข้อมูลใน Firestore Console ไหม; ถ้าไม่มี → trigger `deploy-functions.yml` (workflow_dispatch)
 
 ## 2026-06-29 — refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) สำหรับ Pro Agent progress + result
 
