@@ -1,3 +1,4 @@
+<!-- test PR -->
 # CHANGELOG — ai-chat
 
 บันทึกการเปลี่ยนแปลงของ AI Admin Chat PWA  
