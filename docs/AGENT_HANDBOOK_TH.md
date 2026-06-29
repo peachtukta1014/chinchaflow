@@ -66,7 +66,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 | 3 | commit_and_pr atomicity — ป้องกัน orphan branch เมื่อ commit ผ่านแต่ PR fail | ⏳ ยังไม่ทำ (รับว่าซับซ้อน) | — |
 | 4 | Flash retry 1 ครั้งเมื่อ dispatch ล้มเหลว (non-204) | ✅ เสร็จแล้ว (retry 1 ครั้ง หลัง 2s) | #432 |
 | 5 | Flash สรุปงาน + รอ "ไฟเขียว" ก่อน dispatch Pro ทุกครั้ง | ✅ เสร็จแล้ว | #429 |
-| 6 | Monitoring dashboard — runs/วัน, ต้นทุน/task, success rate จาก tokenLogs | ⏳ ยังไม่ทำ | — |
+| 6 | Monitoring dashboard — runs/วัน, ต้นทุน/task, success rate จาก tokenLogs | ✅ เสร็จแล้ว (stats block บน TokenDashboard) | #434 |
 | 7 | compact Task Brief — Flash ย่อบริบทเป็น 4 บรรทัด ส่ง Pro (งาน/ไฟล์/อ่านก่อน/กฎ) | ✅ เสร็จแล้ว | #431 |
 
 **ไฟล์ที่เกี่ยวข้องกับ AI loop:**

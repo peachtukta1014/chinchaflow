@@ -1,3 +1,14 @@
+## 2026-06-29 — feat: Monitoring Dashboard — stats summary บน TokenDashboard (Roadmap #6)
+
+- **เหตุผล:** TokenDashboard แสดงแค่รายการ logs ต่อวัน ไม่มีตัวเลขสรุป ทำให้ยากต่อการประเมิน cost และ usage trend
+- **แก้:**
+  - `apps/ai-chat/src/components/TokenDashboard.jsx` — เพิ่ม stats section ด้านบน (แสดงก่อน list วันที่):
+    - Row 1: วันนี้ (task count) · 7-วัน avg (tasks/day) · Pro rate (% requests ที่ Pro run)
+    - Row 2: ต้นทุนรวม ~ ($USD) · เฉลี่ย/task ~ (Pro avg ถ้ามี)
+  - cost ประเมินจาก OpenRouter pricing (Flash $0.14/$0.28 · Vision $0.15/$0.60 · Pro $0.55/$2.19 per 1M tokens)
+  - `StatCard` mini-component (inline) สำหรับ card UI แต่ละ metric
+- **ผล:** เปิดแท็บ Tokens เห็น summary ทันที — runs/วัน, Pro rate, ต้นทุนสะสม, ต้นทุนเฉลี่ยต่องาน
+
 ## 2026-06-29 — fix: TokenDashboard เปลี่ยนจาก getDocs → onSnapshot (real-time + offline cache)
 
 - **เหตุผล:** `getDocs` บน network ไม่ดีจะ timeout → ข้อมูล tokenLogs ไม่โหลดขึ้น; dashboard ค้างหรือว่างเปล่า
