@@ -15,7 +15,7 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
@@ -153,10 +153,17 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
+      const ghPatRead = (process.env.GH_PAT_READ || '').trim();
+      let preloadedFiles = {};
+      if (ghPatRead && classified.taskSpec?.files_hint?.length) {
+        await writeProgress(requestId, 'Flash กำลังอ่านโค้ดล่วงหน้า...');
+        preloadedFiles = await fetchRepoFiles(ghPatRead, classified.taskSpec.files_hint).catch(() => ({}));
+      }
+
       try {
         await dispatchToProAgent(ghPatForDispatch, {
           requestId,
-          message: buildTaskBrief(classified, message),
+          message: buildTaskBrief(classified, message, preloadedFiles),
           history: (history || []).slice(-10),
           scope: finalScope,
           isHighRisk: classified.isHighRisk !== false,

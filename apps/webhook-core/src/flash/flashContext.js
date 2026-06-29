@@ -74,4 +74,33 @@ async function fetchCodeMetrics() {
   return files['docs/CODE_METRICS.md'] || null;
 }
 
-module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics };
+const GITHUB_OWNER = 'peachtukta1014';
+const GITHUB_REPO = 'chinchaflow';
+const FETCH_FILE_MAX_CHARS = 3000;
+const FETCH_FILE_MAX_COUNT = 5;
+
+async function fetchRepoFiles(pat, filePaths) {
+  if (!pat || !Array.isArray(filePaths) || filePaths.length === 0) return {};
+  const results = {};
+  await Promise.all(
+    filePaths.slice(0, FETCH_FILE_MAX_COUNT).map(async (filePath) => {
+      try {
+        const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(filePath)}`;
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `token ${pat}`,
+            'Accept': 'application/vnd.github.v3.raw',
+            'User-Agent': 'CHINCHA-FLOW-Flash',
+          },
+        });
+        if (res.ok) {
+          const text = await res.text();
+          results[filePath] = text.slice(0, FETCH_FILE_MAX_CHARS);
+        }
+      } catch { /* skip ไฟล์ที่อ่านไม่ได้ */ }
+    })
+  );
+  return results;
+}
+
+module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles };

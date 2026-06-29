@@ -1,3 +1,15 @@
+## 2026-06-30 — feat: Flash Code Reader — Flash อ่านโค้ดล่วงหน้าก่อน dispatch ให้ Pro
+
+- **เหตุผล:** Pro Agent ใช้เวลาหลาย iterations แรก read_file ทีละไฟล์ก่อนเริ่มแก้ — ถ้า Flash อ่านล่วงหน้าและแนบโค้ดเข้า Task Brief ได้เลย Pro จะข้ามขั้น read ไปและแก้ได้ทันที (Planner-Executor pattern)
+- **แก้:**
+  - `apps/webhook-core/src/flash/flashContext.js` — เพิ่ม `fetchRepoFiles(pat, filePaths)`: เรียก GitHub REST API `GET /repos/.../contents/{path}` (Accept: raw) สูงสุด 5 ไฟล์, ตัดที่ 3,000 ตัวอักษรต่อไฟล์ — ใช้ `GH_PAT_READ` (read-only fine-grained PAT)
+  - `apps/webhook-core/src/flash/flashTriggers.js` — `buildTaskBrief()` รับ param ที่ 3 `fileContents = {}` — ถ้ามีไฟล์ที่ Flash อ่านล่วงหน้า จะแนบเป็น section "`โค้ดที่ Flash อ่านล่วงหน้า`" ใน Task Brief
+  - `apps/webhook-core/src/aiChatAgent.js` — code-action flow: ก่อน dispatch เพิ่มขั้นตอน `fetchRepoFiles(GH_PAT_READ, files_hint)` แล้วส่ง `preloadedFiles` เข้า `buildTaskBrief()` — ถ้าไม่มี `GH_PAT_READ` หรืออ่านไม่ได้ ข้ามไปได้โดยไม่ error
+  - `.github/workflows/deploy-functions.yml` — เพิ่ม `_GH_PAT_READ: ${{ secrets.GH_PAT_READ }}` ใน env block + `printf 'GH_PAT_READ=%s\n'` ใน printf block เพื่อ inject เข้า Cloud Function `.env`
+- **Secret ที่ต้องตั้ง:** `GH_PAT_READ` ใน Google Cloud Secret Manager (fine-grained PAT: Contents read-only, Actions read-only, Metadata read-only — scoped to chinchaflow only) — ไม่มีสิทธิ์เขียน ปลอดภัย 100%
+- **ผล:** Flash แสดง "Flash กำลังอ่านโค้ดล่วงหน้า..." ใน PRO status bar ก่อน dispatch; Pro รับ Task Brief พร้อมโค้ดที่เกี่ยวข้องแนบมาด้วย ไม่ต้อง read_file ซ้ำ — ลดจำนวน iterations ลงได้ชัดเจน
+- ถ้าพัง: ตรวจ `GH_PAT_READ` ใน Google Cloud Secret Manager ว่า Enable แล้วหรือยัง; ตรวจ `.env` ใน Cloud Function ว่ามี `GH_PAT_READ=` จริง; ถ้า PAT หมดอายุ `fetchRepoFiles` จะ return `{}` (silently skip) ไม่ทำให้ dispatch พัง
+
 ## 2026-06-30 — fix: เพิ่มกฎเหล็กใน JIIJI.md — ก่อน dispatch ต้องสรุปคำสั่งและรออนุมัติ + test PR ใน CHANGELOG
 
 - **ปัญหา/คำขอ:** จีจี้ตอบ "รับงานแล้ว" แล้วยิง dispatch ทันทีโดยไม่สรุปคำสั่งพี่ก่อน — ขัดกฎ PEACH_WORKING_STYLE_TH.md ที่กำหนดให้ทบทวนก่อนลงมือ

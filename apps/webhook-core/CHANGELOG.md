@@ -7,6 +7,12 @@
 
 ## 2026-06
 
+### 2026-06-30 | feat: Flash Code Reader — Flash อ่านโค้ดล่วงหน้าก่อน dispatch ให้ Pro
+- `src/flash/flashContext.js` — เพิ่ม `fetchRepoFiles(pat, filePaths)` อ่าน GitHub API (raw) สูงสุด 5 ไฟล์ × 3,000 chars — ใช้ `GH_PAT_READ` (read-only PAT)
+- `src/flash/flashTriggers.js` — `buildTaskBrief()` รับ `fileContents` param ที่ 3 แนบโค้ดที่ Flash อ่านล่วงหน้าเข้า Task Brief
+- `src/aiChatAgent.js` — code-action flow เรียก `fetchRepoFiles` ก่อน dispatch — ถ้า `GH_PAT_READ` ไม่มี fallback เป็น `{}` ไม่ error
+- `.github/workflows/deploy-functions.yml` — เพิ่ม `GH_PAT_READ` ใน env inject
+
 ### 2026-06-29 | fix: Pro Agent ค้าง 20+ นาที + เพิ่ม max iterations
 - `src/shared/agentTools.js` — AbortController 5 นาที บน OpenRouter fetch; MAX_ITERATIONS 15→30, SUMMARY_CHECKPOINT 8→25
 - `src/shared/agentTools.js` — เพิ่ม `AbortController` + timeout 5 นาที บน `fetch` ไปยัง OpenRouter ใน `callOpenRouterWithTools`; ถ้า DeepSeek ไม่ตอบใน 5 นาที throw error ชัดเจนแทนการค้างไม่มีกำหนด

@@ -148,7 +148,7 @@ CHINCHA FLOW scopes:
 }
 
 // สร้าง structured Task Brief สำหรับ Pro — Pro รับ brief นี้เป็น "message"
-function buildTaskBrief(classified, originalMessage) {
+function buildTaskBrief(classified, originalMessage, fileContents = {}) {
   const { taskSpec = {}, confirmation } = classified;
   const filesHint = Array.isArray(taskSpec.files_hint) && taskSpec.files_hint.length
     ? taskSpec.files_hint.map(f => `- ${f}`).join('\n')
@@ -156,6 +156,14 @@ function buildTaskBrief(classified, originalMessage) {
   const rules = Array.isArray(taskSpec.business_rules) && taskSpec.business_rules.length
     ? taskSpec.business_rules.map(r => `- ${r}`).join('\n')
     : '- (ไม่มีกฎพิเศษ — ปฏิบัติตาม AGENTS.md และ scope AGENTS.md)';
+
+  const preloadedEntries = Object.entries(fileContents).filter(([, v]) => v);
+  const preloadedSection = preloadedEntries.length
+    ? '\n\n**โค้ดที่ Flash อ่านล่วงหน้า (อ่านแล้ว — ใช้ได้เลย ไม่ต้อง read_file ซ้ำ):**\n' +
+      preloadedEntries.map(([path, content]) =>
+        `\n--- ${path} ---\n\`\`\`\n${content}\n\`\`\``
+      ).join('\n')
+    : '';
 
   return `## 📋 Task Brief (สร้างโดย Flash จากคำสั่งพีช)
 
@@ -169,7 +177,7 @@ ${filesHint}
 ${taskSpec.expected_change || '(วิเคราะห์จากโค้ดจริงที่อ่าน)'}
 
 **กฎ Business ที่ต้องรักษา:**
-${rules}
+${rules}${preloadedSection}
 
 **คำสั่งต้นฉบับจากพีช:**
 "${originalMessage}"`;
