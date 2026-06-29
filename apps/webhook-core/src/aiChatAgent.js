@@ -112,7 +112,7 @@ exports.aiChatAgentHttp = functions
           isHighRisk: false,
           confirmation: '',
         });
-        await clearProgress(taskId);
+        await writeProgress(taskId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก Pro Agent...');
         res.json({
           reply: `จีจี้ส่งงานตรวจสุขภาพ ${label} ไปแล้วนะคะ กำลังดำเนินการอยู่ครับพี่ 🌸`,
           status: 'processing',
@@ -169,7 +169,7 @@ exports.aiChatAgentHttp = functions
           isHighRisk: classified.isHighRisk !== false,
           confirmation: classified.confirmation || '',
         });
-        await clearProgress(requestId);
+        await writeProgress(requestId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก Pro Agent...');
         const prefix = classified.confirmation
           ? `จีจี้เข้าใจแล้วนะคะ: "${classified.confirmation}"\n\n`
           : '';

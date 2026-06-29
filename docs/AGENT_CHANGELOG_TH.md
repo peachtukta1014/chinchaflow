@@ -1,3 +1,10 @@
+## 2026-06-29 — fix: ไฟเขียวไม่เด้งระหว่าง cold start — เปลี่ยน clearProgress → writeProgress หลัง dispatch
+
+- **เหตุผล:** Flash เรียก `clearProgress` ทันทีหลัง dispatch ทำให้ aiProgress document หายไปก่อน ack-pro-agent.cjs จะ boot ขึ้นมา (cold start 20-40 วิ) → PWA เห็น null ตลอด ไฟเขียวไม่เด้ง
+- **แก้:**
+  - `apps/webhook-core/src/aiChatAgent.js` — เปลี่ยน `clearProgress` หลัง dispatch ทั้ง 2 path (code-action + quickTrigger) เป็น `writeProgress("ส่งงานเข้าคิวแล้ว กำลังปลุก Pro Agent...")`
+- **ผล:** PWA เห็น progress ต่อเนื่องตั้งแต่ Flash dispatch → ack-pro-agent.cjs overwrite เอง เมื่อ GitHub Actions boot เสร็จ
+
 ## 2026-06-29 — fix: ตัด history ออกจาก Pro dispatch — Task Brief อย่างเดียวพอ
 
 - **เหตุผล:** Flash สรุปคำสั่งเป็น Task Brief ครบแล้ว ไม่จำเป็นต้องส่ง raw conversation history (slice(-10)) ไปให้ Pro อีก — ลด token waste + ลด noise
