@@ -1,3 +1,15 @@
+## 2026-06-29 — docs: sync AI agent workflow docs ครบชุด — ตัดซ้ำ + อัปเดตตัวเลขผิด + JIIJI.md v2.2
+
+- **เหตุผล:** เอกสารหลายไฟล์มีข้อมูลซ้ำซ้อนกัน (CLAUDE.md ซ้ำ IDENTITY.md, IDENTITY.md ซ้ำ KEY_FILES) ทำให้ AI agents โฟกัสยุ่งเหยิง + ตัวเลข MAX_ITERATIONS=15 (จริง 30), TTL=30m (จริง 2h), GH_PAT_READ ยังติด "Planned" ทั้งที่ implement แล้ว
+- **แก้:**
+  - `.jiiji/IDENTITY.md` — GH_PAT_READ สถานะ "Planned" → "active"; flash/ modules เพิ่มเข้า Key Files Map; Key Files Map และ Firestore section → เปลี่ยนเป็น pointer ไป docs/AI_AGENT_KEY_FILES.md แทน (ตัดซ้ำ)
+  - `.jiiji/PRO_AGENT.md` — เขียนใหม่ทั้งไฟล์: เพิ่ม tools list 10 ตัว, Task Brief format ที่ Pro รับ, Scope Rules table, isHighRisk rules, Loop Limits & Error Boundaries, Core Protocol 4 ขั้น
+  - `docs/AI_AGENT_DIAGRAM.md` — MAX_ITERATIONS 15→30, CHECKPOINT 8→25, TTL 30m→2h, เพิ่ม Flash Code Reader node ในไดอะแกรม
+  - `docs/AI_AGENT_KEY_FILES.md` — เพิ่ม flash/ directory ครบ 5 ไฟล์ + function list, แก้ MAX_ITERATIONS, TTL, secrets table + เพิ่ม GH_PAT_READ/GH_PAT_DISPATCH, Data Flow ย่อ update
+  - `CLAUDE.md` — ตัด "ระบบ AI" section ออก (ซ้ำ IDENTITY.md) เหลือแค่ pointer + secrets table กระชับ, ลบ "Planned" จาก GH_PAT_READ
+  - `JIIJI.md` — bump v2.1→v2.2: เขียนใหม่ชัดขึ้น — Flash คือ Planner/Director (ห้ามเขียนโค้ดเอง), ตัด per-scope role descriptions ออก (ไม่ใช่หน้าที่ Flash), workflow 4 ขั้นชัดเจน, tools table, security keys ที่รู้/ไม่รู้
+- **ผล:** แต่ละ agent มีเอกสารเป็น Single Source of Truth — ไม่ซ้ำซ้อน ไม่ขัดแย้ง
+
 ## 2026-06-30 — docs: อัปเดต JIIJI.md v2.1 — เพิ่ม Flash Code Reader + Planner-Executor pattern
 
 - **เหตุผล:** JIIJI.md v2.0 ยังไม่สะท้อนความสามารถใหม่ที่ Flash อ่านโค้ดล่วงหน้าได้ก่อน dispatch

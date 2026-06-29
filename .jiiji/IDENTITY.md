@@ -16,7 +16,7 @@
 │  runs:    Cloud Function asia-southeast1 · 540s · 512MB    │
 │  key:     OPENROUTER_API_KEY (ใน .env)                     │
 │  PAT:     GH_PAT_DISPATCH || GH_PAT (dispatch เท่านั้น)    │
-│  PAT:     GH_PAT_READ (planned — อ่านโค้ดก่อน dispatch)   │
+│  PAT:     GH_PAT_READ (อ่านโค้ดก่อน dispatch — ใช้งานแล้ว)│
 │  context: Firestore systemConfig/projectTree + agentDocs   │
 └────────────────────────┬───────────────────────────────────┘
                          │ repository_dispatch (ai-code-action)
@@ -61,8 +61,8 @@
 | **Timeout** | 540 วินาที |
 | **API key** | `OPENROUTER_API_KEY` — อยู่ใน `.env` (เขียนโดย `deploy-functions.yml`) |
 | **Dispatch PAT** | `GH_PAT_DISPATCH` (dispatch-only) fallback `GH_PAT` — ห้ามรู้จัก `GH_PAT` เต็ม |
-| **Read PAT** | `GH_PAT_READ` — **Planned** — fine-grained PAT: Contents Read-only ใช้อ่านโค้ดก่อน dispatch |
-| **Context** | `systemConfig/projectTree` (TTL 5 min) + `systemConfig/agentDocs` (TTL 10 min) จาก Firestore; **Planned:** อ่านไฟล์โค้ดตรงจาก GitHub API ด้วย GH_PAT_READ ก่อนสร้าง task brief |
+| **Read PAT** | `GH_PAT_READ` — fine-grained PAT: Contents Read-only ใช้อ่านโค้ดก่อน dispatch (ใช้งานแล้ว) |
+| **Context** | `systemConfig/projectTree` (TTL 5 min) + `systemConfig/agentDocs` (TTL 10 min) จาก Firestore; อ่านไฟล์โค้ดตรงจาก GitHub API ด้วย `GH_PAT_READ` ก่อนสร้าง Task Brief (Flash Code Reader — ใช้งานแล้ว) |
 
 ### Flow ของการตอบ
 
@@ -87,7 +87,7 @@
              ④ ถ้า intent = "code-action":
                   - needsConfirmation? → ส่งยืนยันก่อน (รอ "ทำเลย")
                   - buildTaskBrief() → structured brief
-                  - [Planned] GH_PAT_READ → อ่านไฟล์โค้ดที่เกี่ยวข้อง → แนบใน brief
+                  - GH_PAT_READ → fetchRepoFiles(files_hint) → แนบโค้ดใน brief
                   - GH_PAT_DISPATCH||GH_PAT → dispatchToProAgent()
                   - clearProgress → reply "รับงานแล้ว กำลังดำเนินการ"
 ```
@@ -228,7 +228,7 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
 │  ✅ OPENROUTER_API_KEY   (.env)         │   │  ✅ OPENROUTER_API_KEY_PRO  (GH Secrets)  │
 │  ✅ GH_PAT_DISPATCH      (.env)         │   │  ✅ GH_PAT                  (GH Secrets)  │
 │     fallback → GH_PAT   (.env)          │   │  ✅ FIREBASE_SERVICE_ACCOUNT (GH Secrets) │
-│  ✅ GH_PAT_READ  (planned)  (.env)      │   │  ❌ OPENROUTER_API_KEY Flash ไม่ใช้        │
+│  ✅ GH_PAT_READ  (active)   (.env)      │   │  ❌ OPENROUTER_API_KEY Flash ไม่ใช้        │
 │  ❌ GH_PAT เต็ม — ไม่รู้จักเลย        │   │                                            │
 │  ❌ OPENROUTER_API_KEY_PRO — ไม่รู้จัก │   │                                            │
 │  ❌ FIREBASE_SERVICE_ACCOUNT — ไม่รู้จัก│  │                                            │
@@ -259,49 +259,19 @@ raw.replace(/<\s*\/?\s*\|\s*DSML\s*\|[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').tr
 
 ---
 
-## Key Files Map (ระบบ AI ครบชุด)
+## Key Files & Architecture
 
-```
-apps/webhook-core/
-  src/
-    aiChatAgent.js          ← Flash: HTTP handler, classifier, dispatcher
-    aiWorkflowAgent.js      ← Pro: handleCodeActionV2, fetchAgentDocs
-    shared/
-      agentTools.js         ← Pro: runAgentLoop (MAX=30, CHECKPOINT=25) + toolErrorCounts per-tool error budget
-      toolExecutors.js      ← Pro: tool execution (exec_command timeout 300s)
-      toolDefinitions.js    ← Pro: tool schemas
-      progressTracker.js    ← R/W Firestore aiProgress / aiResults
-    index.js                ← deployNotifyHttp (รับ project_tree + agent_docs)
-  scripts/
-    run-github-agent.mjs    ← Pro: entry point (GitHub Actions)
-apps/ai-chat/
-  src/
-    api.js                  ← Frontend: chatWithAI, fetchResult, pollProgress
+> รายละเอียดครบชุดอยู่ใน `docs/AI_AGENT_KEY_FILES.md` และ `docs/AI_AGENT_DIAGRAM.md`
 
-.jiiji/
-  IDENTITY.md               ← ไฟล์นี้ (Claude Code CLI + Pro อ่าน)
-  PRO_AGENT.md              ← Pro agent identity + protocol (อ่านก่อน loop)
-JIIJI.md                    ← Flash agent identity + workflow 6 ขั้น
-
-.github/workflows/
-  ai-workflow-trigger.yml   ← รับ repository_dispatch → รัน Pro loop
-  sync-project-tree.yml     ← push main → sync PROJECT_STRUCTURE.md → Firestore
-  deploy-functions.yml      ← deploy CF + sync agent docs → Firestore
-  deploy-hosting.yml        ← deploy React apps
-  pr-verify.yml             ← smoke test + build check ก่อน merge
-```
-
----
-
-## Firestore Collections (AI ใช้)
-
-| Collection | เขียนโดย | อ่านโดย | หน้าที่ |
-|-----------|----------|---------|---------|
-| `aiProgress/{requestId}` | Pro + ACK script | Flash (onSnapshot) | step ปัจจุบัน |
-| `aiResults/{requestId}` | Pro | Flash (onSnapshot) | ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง) |
-| `agentRunLogs/{requestId}/steps` | Pro | - | debug log ถาวร |
-| `systemConfig/projectTree` | sync-project-tree.yml | Flash | โครงสร้าง repo |
-| `systemConfig/agentDocs` | deploy-functions.yml / sync-project-tree.yml | Flash | JIIJI.md + AGENTS.md + docs |
+ไฟล์หลักสรุป:
+- `apps/webhook-core/src/aiChatAgent.js` — Flash HTTP handler + code-action flow
+- `apps/webhook-core/src/flash/` — Flash sub-modules (context, triggers, dispatch, models, prompts)
+- `apps/webhook-core/src/aiWorkflowAgent.js` — Pro orchestrator + SCOPE_FILE_TREE
+- `apps/webhook-core/src/shared/` — Pro: agentTools, toolExecutors, toolDefinitions, progressTracker
+- `apps/webhook-core/scripts/run-github-agent.mjs` — Pro entry point (GitHub Actions)
+- `apps/ai-chat/src/api.js` — Frontend: chatWithAI, pollProgress (onSnapshot)
+- `.jiiji/PRO_AGENT.md` — Pro: tools list, Task Brief format, scope rules (อ่านก่อน loop)
+- `JIIJI.md` — Flash: identity + workflow + tools (inject เข้า system prompt)
 
 ---
 

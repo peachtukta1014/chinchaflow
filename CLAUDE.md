@@ -56,80 +56,18 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 
 ---
 
-## ระบบ AI ของโปรเจกต์ (ห้ามสับสน)
+## ระบบ AI ของโปรเจกต์
 
-```
-พีชพิมพ์ใน PWA (ai-chat)
-        │
-        ▼
-┌─────────────────────────────────────────────────────────────┐
-│  FLASH AGENT — จีจี้แชท                                     │
-│  model: deepseek/deepseek-v4-flash (OpenRouter)             │
-│  runs:  Cloud Function aiChatAgentHttp · asia-southeast1    │
-│  key:   OPENROUTER_API_KEY (Secret Manager)                 │
-│  PAT:   GH_PAT_DISPATCH || GH_PAT (dispatch เท่านั้น)       │
-│  file:  apps/webhook-core/src/aiChatAgent.js                │
-└────────────────────────┬────────────────────────────────────┘
-                         │ repository_dispatch (ai-code-action)
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│  PRO AGENT — จีจี้โปร                                       │
-│  model: deepseek/deepseek-v4-pro (OpenRouter)               │
-│  runs:  GitHub Actions · ai-workflow-trigger.yml            │
-│  key:   OPENROUTER_API_KEY_PRO (GitHub Secrets เท่านั้น)    │
-│  PAT:   GH_PAT (read/write repo เต็ม)                       │
-│  file:  apps/webhook-core/scripts/run-github-agent.mjs      │
-│  loop:  MAX_ITERATIONS=30, SUMMARY_CHECKPOINT=25            │
-└────────────────────────┬────────────────────────────────────┘
-                         │ writeResult → Firestore aiResults
-                         ▼ Flash polling → PWA แสดงให้พีช
-┌─────────────────────────────────────────────────────────────┐
-│  CLAUDE CODE CLI — พี่ซี (session นี้)                      │
-│  model: claude-opus-4-8 (Anthropic)                         │
-│  runs:  Remote container — ephemeral (push ก่อนหมด session) │
-│  role:  implement, maintain, ตรวจ PR, อัปเดตระบบ            │
-└─────────────────────────────────────────────────────────────┘
-```
+> รายละเอียดเต็มอยู่ใน `.jiiji/IDENTITY.md` — **อ่านก่อนแตะระบบ AI ทุกครั้ง**
 
-**Security Isolation:** Flash มีแค่ `GH_PAT_DISPATCH` dispatch ได้อย่างเดียว — ไม่รู้จัก `OPENROUTER_API_KEY_PRO` และ `GH_PAT` เต็ม ถ้า Flash key หลุด attacker เขียน repo ไม่ได้
+สรุปสั้น: Flash (จีจี้) → Pro (จีจี้โปร) → พี่ซี (Claude Code CLI นี้) คนละตัว คนละ key
+- **Flash**: Cloud Function · OPENROUTER_API_KEY · GH_PAT_DISPATCH · GH_PAT_READ
+- **Pro**: GitHub Actions · OPENROUTER_API_KEY_PRO · GH_PAT เต็ม
+- **พี่ซี**: Anthropic session นี้ — implement, maintain, ตรวจ PR
 
-**Planned — Flash Code Reader:** เพิ่ม `GH_PAT_READ` (fine-grained PAT: Contents Read-only) ให้ Flash อ่านไฟล์โค้ดจาก GitHub API ได้ก่อน dispatch → Flash วางแผน + ส่ง brief ละเอียดให้ Pro → Pro ประหยัด iteration ไม่ต้องอ่านโค้ดเอง
-
-### Key Files ระบบ AI
-
-| ไฟล์ | หน้าที่ |
-|------|--------|
-| `apps/webhook-core/src/aiChatAgent.js` | Flash: HTTP handler, classifier, dispatcher, quick triggers |
-| `apps/webhook-core/src/aiWorkflowAgent.js` | Pro: handleCodeActionV2, fetchAgentDocs, isHighRisk |
-| `apps/webhook-core/src/shared/agentTools.js` | Pro: runAgentLoop orchestrator + OpenRouter caller |
-| `apps/webhook-core/src/shared/toolDefinitions.js` | Pro: TOOL_DEFINITIONS (10 tools) + constants |
-| `apps/webhook-core/src/shared/toolExecutors.js` | Pro: executeTool switch-case + fetchRepoFile |
-| `apps/webhook-core/src/shared/progressTracker.js` | R/W Firestore aiProgress / aiResults / agentRunLogs |
-| `apps/webhook-core/scripts/run-github-agent.mjs` | Pro entry point (GitHub Actions runner) |
-| `apps/ai-chat/src/App.jsx` | PWA: Chat UI + progress polling + deploy banner + result recovery |
-| `apps/ai-chat/src/api.js` | Frontend: chatWithAI, fetchResult, pollProgress, fetchDeployStatus |
-| `.jiiji/IDENTITY.md` | ตัวตน + สถาปัตยกรรม AI ครบชุด (อ่านก่อนแตะระบบ AI) |
-| `JIIJI.md` | Flash identity + workflow 6 ขั้น (inject เข้า system prompt Flash) |
-
-### Firestore Collections (AI ใช้)
-
-| Collection / Doc | เขียนโดย | หน้าที่ |
-|-----------------|----------|--------|
-| `aiProgress/{requestId}` | Pro | step ปัจจุบัน — ai-chat poll ทุก 3 วิ |
-| `aiResults/{requestId}` | Pro | ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง) |
-| `agentRunLogs/{requestId}/steps` | Pro | log ถาวรทุก iteration (debug) |
-| `systemConfig/projectTree` | sync-project-tree.yml | โครงสร้าง repo ให้ Flash อ่าน |
-| `systemConfig/agentDocs` | deploy-functions.yml | docs ให้ Flash อ่าน (JIIJI.md + AGENTS.md + handbook) |
-| `system/deploy_status` | deployNotifyHttp | สถานะ deploy ล่าสุด — ai-chat แสดง banner |
-
-### Quick Triggers (Flash bypass classifier — dispatch ทันที)
-
-| พิมพ์ว่า | งาน |
-|----------|-----|
-| โอเคกุ้ง / ตรวจกุ้ง / auto-shrimp / เช็คกุ้ง | ตรวจสุขภาพ seafood-pos (อ่านอย่างเดียว) |
-| โอเคชา / ตรวจชา / auto-tea / เช็คชา | ตรวจสุขภาพ chincha-tea (อ่านอย่างเดียว) |
-
-> `normalizeThai()` swap tone mark ก่อนสระล่าง (ุ ู) ก่อน regex — รองรับ iPhone Unicode order ผิด
+ไฟล์หลัก: `apps/webhook-core/src/aiChatAgent.js` (Flash) · `apps/webhook-core/src/aiWorkflowAgent.js` (Pro)  
+Docs: `.jiiji/IDENTITY.md` · `.jiiji/PRO_AGENT.md` · `JIIJI.md`  
+Diagram: `docs/AI_AGENT_DIAGRAM.md` · Key files: `docs/AI_AGENT_KEY_FILES.md`
 
 ---
 
@@ -141,8 +79,8 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 | `OPENROUTER_API_KEY_PRO` | GitHub Secrets | Pro agentic loop (ไม่ให้ Flash รู้) |
 | `GH_PAT` | GitHub Secrets + `.env` (deploy only) | Pro เขียน repo + deployNotifyHttp auth |
 | `GH_PAT_DISPATCH` | `.env` (Secret Manager) | Flash ส่ง dispatch เท่านั้น |
-| `GH_PAT_READ` | `.env` (Secret Manager) — **Planned** | Flash อ่านโค้ดจาก GitHub API (Contents: Read-only, ไม่เขียน repo) |
-| `FIREBASE_SERVICE_ACCOUNT` | GitHub Secrets | CI scripts เขียน Firestore ตรง (sync-agent-docs, ack-pro-agent) |
+| `GH_PAT_READ` | `.env` (Secret Manager) | Flash อ่านโค้ดก่อน dispatch (Contents: Read-only) |
+| `FIREBASE_SERVICE_ACCOUNT` | GitHub Secrets | CI scripts เขียน Firestore ตรง |
 | `VITE_FIREBASE_APP_ID_SHRIMP` | GitHub Secrets | build กุ้ง |
 | `VITE_FIREBASE_APP_ID_TEA` | GitHub Secrets | build ชา |
 
