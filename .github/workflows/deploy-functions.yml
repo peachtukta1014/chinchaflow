@@ -87,6 +87,7 @@ jobs:
           _OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           _GH_PAT_DISPATCH: ${{ secrets.GH_PAT_DISPATCH }}
           _GH_PAT: ${{ secrets.GH_PAT }}
+          _GH_PAT_READ: ${{ secrets.GH_PAT_READ }}
         run: |
           # ใช้ env: + printf เพื่อ strip newline ที่อาจติดมาตอน paste secret
           strip() { printf '%s' "$1" | tr -d '\r\n'; }
@@ -101,6 +102,7 @@ jobs:
             printf 'OPENROUTER_API_KEY=%s\n' "$(strip "${_OPENROUTER_API_KEY}")"
             printf 'GH_PAT_DISPATCH=%s\n'    "$(strip "${_GH_PAT_DISPATCH}")"
             printf 'GH_PAT=%s\n'             "$(strip "${_GH_PAT}")"
+            printf 'GH_PAT_READ=%s\n'        "$(strip "${_GH_PAT_READ}")"
           } > apps/webhook-core/.env
 
       - name: Deploy all LINE functions
