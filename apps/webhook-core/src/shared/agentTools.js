@@ -147,7 +147,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 // "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
 async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt, isHighRisk = true }) {
   const MAX_ITERATIONS = 30;        // รอบสูงสุด 30 รอบ
-  const SUMMARY_CHECKPOINT = 25;    // รอบ 25: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
+  const SUMMARY_CHECKPOINT = 9;     // รอบ 9: บังคับสรุปความคืบหน้า → save Firestore → ดำเนินการต่อ
   const stagedFiles = {};
 
   // ── Error boundary state ───────────────────────────────────────────────────
@@ -225,14 +225,14 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
-    // Checkpoint รอบ 25 — ให้จีจี้สรุปความคืบหน้าก่อนดำเนินการต่อ
+    // Checkpoint รอบ 9 — บังคับสรุป context ก่อน overflow → save → ดำเนินการต่อ
     if (iterations === SUMMARY_CHECKPOINT && !taskCompleted) {
       messages.push({
         role: 'user',
-        content: `[สรุปความคืบหน้า] คุณทำงานมา ${SUMMARY_CHECKPOINT - 1} รอบแล้ว ` +
-          `สรุปสั้นๆ ก่อนดำเนินการต่อ:\n` +
-          `1. งานที่ทำเสร็จไปแล้ว\n` +
-          `2. งานที่ยังเหลืออยู่\n\n` +
+        content: `[Checkpoint รอบ ${iterations}] สรุปสั้นๆ ก่อนดำเนินการต่อ:\n` +
+          `1. ไฟล์ที่อ่านไปแล้ว + สิ่งที่ค้นพบสำคัญ\n` +
+          `2. งานที่แก้ไปแล้ว (ถ้ามี)\n` +
+          `3. ขั้นตอนต่อไป\n\n` +
           `หลังสรุปแล้วดำเนินการต่อได้เลย`,
       });
     }
@@ -323,6 +323,10 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       // รอบ checkpoint — text สรุปคือสิ่งที่เราขอ ไม่นับเป็น text-only ผิดรูปแบบ
       if (iterations === SUMMARY_CHECKPOINT) {
         consecutiveTextOnlyReplies = 0;
+        const summarySnippet = (stripDsml(assistantMessage.content || '')).slice(0, 600);
+        if (summarySnippet) {
+          await writeProgress(requestId, `📋 V4-Pro Checkpoint (รอบ ${iterations}):\n${summarySnippet}`);
+        }
         continue;
       }
 

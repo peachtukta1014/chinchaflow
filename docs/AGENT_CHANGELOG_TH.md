@@ -7,6 +7,14 @@
   - `apps/webhook-core/src/aiChatAgent.js` — ตัด file preload block ออก (Pro มี repo checkout ครบอยู่แล้ว); ตัด `fetchRepoFiles` จาก import
 - **ผล:** Brief target < 400 chars — Pro เปิดตาเห็นทันทีว่าทำอะไร ไฟล์ไหน กฎอะไร — ไม่เสีย token อ่านสิ่งที่ไม่จำเป็น
 
+## 2026-06-29 — feat: AI Loop improvements — SUMMARY_CHECKPOINT + payload size check + dispatch retry
+
+- **เหตุผล:** Pro context เต็มช้าเกินไป (checkpoint รอบ 25 จาก 30); Flash ส่ง payload โดยไม่ตรวจ size; ถ้า dispatch fail ครั้งแรกไม่มี retry
+- **แก้:**
+  - `apps/webhook-core/src/shared/agentTools.js` — `SUMMARY_CHECKPOINT` 25 → 9; update checkpoint message ให้ชัดขึ้น; save summary snippet → Firestore `agentProgress/{requestId}` ให้พีชเห็นความคืบหน้าก่อนครึ่งทาง
+  - `apps/webhook-core/src/flash/flashDispatch.js` — ตรวจ payload size < 9800 bytes ก่อน dispatch (throw ถ้าเกิน); retry 1 ครั้งหลัง 2s เมื่อ dispatch non-204
+- **ผล:** Pro สรุป context ที่รอบ 9 (ก่อนเต็ม) + Firestore บันทึกให้ติดตาม; Flash ไม่ส่ง payload เกิน limit เงียบๆ; dispatch มี resilience เบื้องต้น
+
 ## 2026-06-29 — feat: Flash confirm-before-dispatch + "ไฟเขียว" trigger
 
 - **เหตุผล:** Flash เคย dispatch Pro ทันทีโดยไม่สรุปงานให้พีชยืนยัน → พีชไม่รู้ว่า Flash เข้าใจถูกหรือไม่ → Pro ทำงานผิดทิศ เสีย token โดยไม่จำเป็น
