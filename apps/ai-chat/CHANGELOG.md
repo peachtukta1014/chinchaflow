@@ -7,6 +7,9 @@
 
 ## 2026-06
 
+### 2026-06-29 | fix: Pro Agent วน Loop ไม่จบ — per-tool total error counter
+- `apps/webhook-core/src/shared/agentTools.js` — เพิ่ม `toolErrorCounts` dict นับ ❌ แยกตาม tool name ตลอดรัน; ถ้า tool เดิมล้มเหลวรวม ≥4 ครั้ง หยุดทันที (ป้องกัน read✅→patch✅→commit❌ loop)
+
 ### 2026-06-29 | fix: ACK "Pro ได้รับงานแล้ว" ไม่โผล่ใน PRO status bar
 - `apps/webhook-core/scripts/ack-pro-agent.cjs` — เปลี่ยน collection จาก `agentProgress` → `aiProgress` ให้ frontend รับ ACK ผ่าน `listenProgress` onSnapshot ได้จริง
 

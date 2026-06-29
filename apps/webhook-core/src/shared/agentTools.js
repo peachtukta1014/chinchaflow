@@ -154,6 +154,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   // recentCalls: circular buffer สำหรับ spin detection (same tool+args ซ้ำ ≥3 ใน 6 รอบล่าสุด)
   const recentCalls = [];
   let consecutiveToolErrors = 0; // นับ ❌ ติดกัน — ถ้าเกิน 3 หยุดป้องกัน token leak
+  const toolErrorCounts = {};    // นับ ❌ รวมทุกครั้ง แยกตาม tool name (ไม่รีเซ็ตเมื่อ tool อื่นสำเร็จ)
 
   // ── Helper: spin guard + error budget (ใช้ทั้ง structured และ XML path) ───
   async function executeToolGuarded(toolName, args) {
@@ -181,14 +182,28 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
 
     if (resultText.startsWith('❌')) {
       consecutiveToolErrors++;
+      toolErrorCounts[toolName] = (toolErrorCounts[toolName] || 0) + 1;
+
+      // ตรวจ consecutive errors (ป้องกัน burst failure)
       if (consecutiveToolErrors >= 4) {
         throw new Error(
           `❌ Tool ล้มเหลวติดต่อกัน ${consecutiveToolErrors} ครั้ง — หยุดป้องกัน token leak\n` +
           `ล่าสุด (${toolName}): ${resultText.slice(0, 300)}`
         );
       }
+
+      // ตรวจ total errors per tool (ป้องกัน read→patch→commit(fail)→read→patch→commit(fail)→... loop)
+      // tool เดิมล้มเหลวรวม ≥4 ครั้ง = ปัญหาเชิงระบบ ไม่มีประโยชน์วนต่อ
+      if (toolErrorCounts[toolName] >= 4) {
+        throw new Error(
+          `❌ "${toolName}" ล้มเหลวรวม ${toolErrorCounts[toolName]} ครั้งในรันนี้ — หยุดป้องกัน token leak\n` +
+          `สาเหตุน่าจะเป็นปัญหาเชิงระบบ (permission/network/conflict) ไม่ใช่แค่ข้อมูลผิด\n` +
+          `ล่าสุด (${toolName}): ${resultText.slice(0, 300)}`
+        );
+      }
     } else {
       consecutiveToolErrors = 0;
+      // toolErrorCounts ไม่รีเซ็ต — นับสะสมตลอดทั้งรัน
     }
 
     return resultText;
