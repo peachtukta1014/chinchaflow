@@ -1,3 +1,13 @@
+## 2026-06-29 — fix: ai-chat Knowledge tab โหลดไม่ได้ "unavailable" — Firebase config ขาด appId
+
+- **อาการ:** AI Chat PWA → Knowledge tab → Project Tree / Agent Docs แสดง "⚠️ โหลดไม่ได้: unavailable" — Firestore อ่าน `systemConfig` ไม่ได้
+- **สาเหตุ:** `apps/ai-chat/src/firebase.js` — `initializeApp()` ส่งแค่ `{ apiKey, projectId, authDomain }` ไม่มี `appId` → Firebase JS SDK อาจเชื่อมต่อ Firestore ไม่สมบูรณ์ในบางสภาพแวดล้อม (โดยเฉพาะ PWA ที่ลงทะเบียน appId ใน Firebase Console แล้ว)
+- **แก้:**
+  - `apps/ai-chat/src/firebase.js` — เพิ่ม `appId` จาก `VITE_FIREBASE_APP_ID` ใน config object
+  - `.github/workflows/deploy-hosting.yml` — เพิ่ม `VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID_AI_CHAT || secrets.VITE_FIREBASE_APP_ID_TEA }}` ใน Build ai-chat step
+- **สิ่งที่พีชต้องทำ:** ถ้ายังไม่มี secret `VITE_FIREBASE_APP_ID_AI_CHAT` ใน GitHub → ระบบ fallback ใช้ `VITE_FIREBASE_APP_ID_TEA` ให้ก่อน; ถ้าอยากแยก appId ของ ai-chat เอง → สร้าง secret `VITE_FIREBASE_APP_ID_AI_CHAT` จาก Firebase Console → Project Settings → Your apps → ai-chat → App ID
+- ถ้าพัง: เช็ค Firestore rules deploy แล้วหรือยัง (`deploy-rules.yml`); เช็ค `systemConfig/projectTree` + `systemConfig/agentDocs` มีข้อมูลใน Firestore Console ไหม; ถ้าไม่มี → trigger `deploy-functions.yml` (workflow_dispatch) เพื่อรัน sync-agent-docs
+
 ## 2026-06-29 — refactor: แทน polling ด้วย Firestore onSnapshot (event-driven) สำหรับ Pro Agent progress + result
 
 - **เหตุผล:** ระบบเดิมใช้ `setInterval(pollProgress, 3s)` + `setInterval(fetchResult, 5s)` ทำให้ UI อัปเดตช้าสูงสุด 5 วินาที หลัง Pro เขียน step หรือ result — onSnapshot fires ทันทีในเวลาไม่กี่ milliseconds
