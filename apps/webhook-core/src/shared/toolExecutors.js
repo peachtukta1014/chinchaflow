@@ -144,7 +144,7 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
             message: commitMsg,
             content: Buffer.from(fileData.content).toString('base64'),
             branch: branchName,
-            committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
+            committer: { name: 'V4-Pro (AI)', email: ADMIN_EMAIL },
           };
           if (liveSha) commitBody.sha = liveSha;
 
@@ -186,7 +186,7 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
                 content: Buffer.from(newChangelog).toString('base64'),
                 branch: branchName,
                 sha: changelog.sha,
-                committer: { name: 'จีจี้ (AI)', email: ADMIN_EMAIL },
+                committer: { name: 'V4-Pro (AI)', email: ADMIN_EMAIL },
               }),
             });
           }

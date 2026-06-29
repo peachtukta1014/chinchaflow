@@ -1,3 +1,13 @@
+## 2026-06-29 — fix: Pro crash/timeout cleanup + GH_PAT_READ doc + committer name
+
+- **เหตุผล:** ถ้า Pro crash หรือ GitHub Actions timeout (30 นาที) frontend จะค้างรอ result ตลอดกาลโดยไม่รู้สาเหตุ + ขาด doc ว่า GH_PAT_READ ต้อง read-only
+- **แก้:**
+  - `apps/webhook-core/scripts/fail-pro-agent.cjs` — script ใหม่: เขียน error result + clear progress เมื่อ Pro fail
+  - `.github/workflows/ai-workflow-trigger.yml` — เพิ่ม step `if: failure()` รัน fail-pro-agent.cjs
+  - `apps/webhook-core/src/flash/flashContext.js` — เพิ่ม comment ระบุ GH_PAT_READ ต้อง read-only เท่านั้น
+  - `apps/webhook-core/src/shared/toolExecutors.js` — เปลี่ยน committer name จาก "จีจี้ (AI)" → "V4-Pro (AI)"
+- **ผล:** เมื่อ Pro timeout/crash → frontend เห็น error message ใน 30+N วินาที แทนรอ 10 นาที
+
 ## 2026-06-29 — fix: เปลี่ยนชื่อ Pro Agent จาก "จีจี้" เป็น "V4-Pro" ในทุก progress message
 
 - **เหตุผล:** แยกแยะบริบทระหว่าง Flash (จีจี้) กับ Pro Agent ในหน้าแชทได้ชัดเจนขึ้น
