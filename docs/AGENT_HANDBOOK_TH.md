@@ -55,6 +55,25 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 
 **ไม่ต้อง** copy ทั้ง repo ลงไฟล์ใหม่ทุกครั้ง — แก้ section ที่เกี่ยวพอ
 
+## แผนพัฒนา AI Loop (Roadmap) — อัปเดต 2026-06-29
+
+ตรวจสอบจุดนี้ก่อนลงมือแก้ระบบ AI เพื่อให้รู้ว่าทำไปถึงไหนแล้ว
+
+| # | เรื่อง | สถานะ | PR |
+|---|--------|-------|-----|
+| 1 | เลื่อน SUMMARY_CHECKPOINT จากรอบ 25 → 8-10 เพื่อลด context สะสม | ⏳ ยังไม่ทำ | — |
+| 2 | ตรวจ payload รวม (requestId + history + Brief) ต้องไม่เกิน 10KB ก่อน dispatch | 🔸 Brief สั้นลงมากแล้ว (ข้อ 7) — ยังขาด size check จริงก่อน dispatch | — |
+| 3 | commit_and_pr atomicity — ป้องกัน orphan branch เมื่อ commit ผ่านแต่ PR fail | ⏳ ยังไม่ทำ (รับว่าซับซ้อน) | — |
+| 4 | Flash retry 1 ครั้งเมื่อ dispatch ล้มเหลว (non-204) | ⏳ ยังไม่ทำ | — |
+| 5 | Flash สรุปงาน + รอ "ไฟเขียว" ก่อน dispatch Pro ทุกครั้ง | ✅ เสร็จแล้ว | #429 |
+| 6 | Monitoring dashboard — runs/วัน, ต้นทุน/task, success rate จาก tokenLogs | ⏳ ยังไม่ทำ | — |
+| 7 | compact Task Brief — Flash ย่อบริบทเป็น 4 บรรทัด ส่ง Pro (งาน/ไฟล์/อ่านก่อน/กฎ) | ✅ เสร็จแล้ว | #431 |
+
+**ไฟล์ที่เกี่ยวข้องกับ AI loop:**
+- Flash: `apps/webhook-core/src/aiChatAgent.js`, `flash/flashTriggers.js`, `flash/flashContext.js`
+- Pro: `apps/webhook-core/src/shared/agentTools.js` (SUMMARY_CHECKPOINT อยู่ที่นี่)
+- Workflow: `.github/workflows/ai-workflow-trigger.yml`
+
 ## ลำดับอ่านก่อนลงมือ (กุ้ง)
 
 1. `AGENTS.md`
