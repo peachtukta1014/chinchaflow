@@ -69,6 +69,8 @@ function AppShell({ user }) {
   const unsubscribeRef = useRef(null);
   const currentSessionId = useRef(null);
   const loadingRef = useRef(false);
+  const knowledgeLoadedRef = useRef(false);
+  const tokenLogsLoadedRef = useRef(false);
 
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
@@ -273,6 +275,8 @@ function AppShell({ user }) {
         cleanup();
         setProgressStep(null);
         localStorage.removeItem(PENDING_KEY);
+        // อัปเดต token logs อัตโนมัติหลัง Pro ตอบกลับ
+        getRecentTokenLogs().then(logs => setTokenLogs(logs)).catch(() => {});
         setMessages(prev => {
           const updated = [...prev, { role: 'assistant', content: found.reply }];
           if (currentSessionId.current) {
@@ -291,6 +295,8 @@ function AppShell({ user }) {
     localStorage.removeItem(PENDING_KEY);
     const finalMessages = [...messagesWithUser, { role: 'assistant', content: reply.reply }];
     setMessages(finalMessages);
+    // อัปเดต token logs อัตโนมัติหลัง Flash ตอบกลับ
+    getRecentTokenLogs().then(logs => setTokenLogs(logs)).catch(() => {});
 
     if (currentSessionId.current) {
       updateSession(currentSessionId.current, finalMessages);
@@ -385,9 +391,14 @@ function AppShell({ user }) {
     setKnowledgeData({ tree, docs, notes, notesLoading: false, notesSaving: false, treeError, docsError });
   }, []);
 
+  // โหลด tab data เฉพาะครั้งแรก — ไม่โหลดซ้ำทุกครั้งที่สลับแท็บ
   useEffect(() => {
-    if (activeTab === 'knowledge') loadKnowledge();
-    if (activeTab === 'tokens') {
+    if (activeTab === 'knowledge' && !knowledgeLoadedRef.current) {
+      knowledgeLoadedRef.current = true;
+      loadKnowledge();
+    }
+    if (activeTab === 'tokens' && !tokenLogsLoadedRef.current) {
+      tokenLogsLoadedRef.current = true;
       setTokenLogsLoading(true);
       getRecentTokenLogs().then(logs => { setTokenLogs(logs); setTokenLogsLoading(false); });
     }

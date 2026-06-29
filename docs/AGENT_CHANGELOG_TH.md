@@ -1,3 +1,12 @@
+## 2026-06-29 — fix: Tokens/Knowledge tab โหลดครั้งเดียว ไม่โหลดซ้ำทุกครั้งที่สลับ
+
+- **เหตุผล:** `useEffect` เดิม fetch ทุกครั้งที่ `activeTab` เปลี่ยน → แต่ละ tab สลับกลับมาก็โหลดใหม่ช้าทุกครั้ง
+- **แก้:**
+  - `apps/ai-chat/src/App.jsx` — เพิ่ม `knowledgeLoadedRef` + `tokenLogsLoadedRef` ป้องกันโหลดซ้ำ
+  - โหลดเฉพาะครั้งแรกที่เปิด tab, กด Refresh ปุ่มมือถือเมื่ออยากโหลดใหม่
+  - เพิ่ม silent refresh `tokenLogs` อัตโนมัติหลัง Flash/Pro ตอบกลับทุก reply
+- **ผล:** สลับ tab กลับมาเห็นข้อมูลทันที ไม่มี loading spinner ซ้ำ, token log อัปเดตเองหลัง AI ตอบ
+
 ## 2026-06-29 — fix: Task Brief cap 8K chars + Pro ไม่ต้อง read_file ซ้ำเมื่อ Flash preload แล้ว
 
 - **เหตุผล:** `buildTaskBrief` ไม่มี size cap → ถ้า preload 5 ไฟล์ใหญ่อาจเกิน GitHub `client_payload` 10KB → dispatch 500. และ format เดิมบอก Pro ว่า "read_file ก่อนเสมอ" ทำให้กิน token โดยไม่จำเป็น
