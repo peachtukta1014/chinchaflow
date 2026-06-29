@@ -1,3 +1,10 @@
+## 2026-06-29 — fix: ตัด history ออกจาก Pro dispatch — Task Brief อย่างเดียวพอ
+
+- **เหตุผล:** Flash สรุปคำสั่งเป็น Task Brief ครบแล้ว ไม่จำเป็นต้องส่ง raw conversation history (slice(-10)) ไปให้ Pro อีก — ลด token waste + ลด noise
+- **แก้:**
+  - `apps/webhook-core/src/aiChatAgent.js` — `history: (history || []).slice(-10)` → `history: []` ใน code-action dispatch path
+- **ผล:** Pro รับแค่ Task Brief อย่างเดียว ไม่มี raw chat context ซ้อน ประหยัด token และ focus กว่าเดิม
+
 ## 2026-06-29 — refactor: ลบ IDENTITY.md + เพิ่ม AI_AGENT_DIAGRAM เข้า sync pipeline
 
 - **เหตุผล:** `.jiiji/IDENTITY.md` ซ้ำกับ FLASH.md/PRO.md และมักเก่าช้า → ลบออก แล้วย้ายส่วน unique (architecture diagram + security model) ไปไว้ใน `docs/AI_AGENT_DIAGRAM.md` ซึ่ง sync เข้า Firestore อัตโนมัติทุก deploy
