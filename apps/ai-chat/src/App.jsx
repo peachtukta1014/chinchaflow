@@ -501,6 +501,15 @@ function AppShell({ user }) {
             </button>
           </div>
         </div>
+        {/* PRO status bar — pinned ใต้ชื่อ เหนือ tab */}
+        <div className="flex items-center gap-1.5 px-4 py-1 border-t border-ai-border/50">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${progressStep ? 'bg-green-400 animate-pulse' : 'bg-ai-muted/40'}`} />
+          <span className={`text-[10px] font-semibold tracking-widest shrink-0 ${progressStep ? 'text-green-400' : 'text-ai-muted/40'}`}>PRO</span>
+          <span className={`text-[10px] truncate ${progressStep ? 'text-ai-muted' : 'text-ai-muted/40'}`}>
+            {progressStep ? `· ${progressStep}` : '· พร้อมทำงาน'}
+          </span>
+        </div>
+
         {/* Tab bar */}
         <div className="flex border-t border-ai-border">
           {[

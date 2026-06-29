@@ -66,10 +66,14 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
   const useModel = model || process.env.CODE_MODEL || AGENT_MODEL;
   const toolChoice = forceToolUse ? 'required' : 'auto';
 
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 นาที
+
   let res;
   try {
     res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -86,6 +90,10 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
       }),
     });
   } catch (fetchErr) {
+    clearTimeout(abortTimer);
+    if (fetchErr.name === 'AbortError') {
+      throw new Error('OpenRouter timeout (>5 นาที) — DeepSeek ไม่ตอบ ลองสั่งงานใหม่ได้เลยครับพี่');
+    }
     // Retry once on transient network errors (ECONNRESET, ETIMEDOUT, fetch failed)
     if (!_retried) {
       console.warn('callOpenRouterWithTools fetch error — retrying once:', fetchErr.message);
@@ -94,6 +102,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
     }
     throw fetchErr;
   }
+  clearTimeout(abortTimer);
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
@@ -137,8 +146,8 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 // เปล่าๆ แทนการยิง structured tool_calls) ถ้าเชื่อ finish_reason เฉยๆ จะได้ผลลัพธ์
 // "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
 async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt, isHighRisk = true }) {
-  const MAX_ITERATIONS = 15;        // ลด 30→15: หลัง SUMMARY_CHECKPOINT รอบ 8 ถ้าวิ่งเกิน 15 ให้หยุด
-  const SUMMARY_CHECKPOINT = 8;     // รอบ 8: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
+  const MAX_ITERATIONS = 30;        // รอบสูงสุด 30 รอบ
+  const SUMMARY_CHECKPOINT = 25;    // รอบ 25: บังคับสรุปความคืบหน้า แล้วดำเนินการต่อ
   const stagedFiles = {};
 
   // ── Error boundary state ───────────────────────────────────────────────────

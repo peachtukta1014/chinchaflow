@@ -7,6 +7,10 @@
 
 ## 2026-06
 
+### 2026-06-29 | fix: Pro Agent ค้าง 20+ นาที + เพิ่ม max iterations
+- `src/shared/agentTools.js` — AbortController 5 นาที บน OpenRouter fetch; MAX_ITERATIONS 15→30, SUMMARY_CHECKPOINT 8→25
+- `src/shared/agentTools.js` — เพิ่ม `AbortController` + timeout 5 นาที บน `fetch` ไปยัง OpenRouter ใน `callOpenRouterWithTools`; ถ้า DeepSeek ไม่ตอบใน 5 นาที throw error ชัดเจนแทนการค้างไม่มีกำหนด
+
 ### 2026-06-28 | fix: sync-agent-docs.cjs เขียน projectTree ด้วย + sync-project-tree.yml ใช้ Service Account
 - **อาการ:** Knowledge tab → Project Tree ว่างตลอด — `systemConfig/projectTree` ไม่มีข้อมูลใน Firestore
 - **แก้:** `scripts/sync-agent-docs.cjs` — เพิ่ม write `systemConfig/projectTree` (tree field) ควบคู่ agentDocs ใน `Promise.all`
