@@ -22,7 +22,7 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 ├── .github/workflows/     # deploy hosting / functions / rules
 ├── docs/                  # เอกสารทีม + สถาปัตยกรรม
 ├── .claude/commands/      # land-it, peter-ser, ship-*, auto-* (Claude Code skills)
-└── .jiiji/                # IDENTITY.md, PRO_AGENT.md (AI agent config)
+└── .skill/                # scope-*.md (AI agent guardrail skills)
 ```
 
 รายละเอียดเชิงลึก:
@@ -30,7 +30,8 @@ CHINCHA FLOW (ระบบรวม) · repo chincha-business-os · Firebase chi
 | เอกสาร | ใช้เมื่อไหร่ |
 |--------|-------------|
 | [CHINCHA_FLOW_NAMING_TH.md](./CHINCHA_FLOW_NAMING_TH.md) | ชื่อระบบ CHINCHA FLOW vs repo, คำเรียกสากล (ไม่ใช่แค่ POS) |
-| [ARCHITECTURE_TH.md](./ARCHITECTURE_TH.md) | ภาพรวมระบบ, Firestore collections, deploy, **AI agent แยก 2 ฝ่าย** (Flash chat ใน Cloud Function ↔ Pro workflow ใน GitHub Actions) |
+| [ARCHITECTURE_TH.md](./ARCHITECTURE_TH.md) | ภาพรวมระบบ, Firestore collections, deploy — AI agent สรุปสั้น (รายละเอียดครบ → AI_AGENT_SYSTEM.md) |
+| [AI_AGENT_SYSTEM.md](./AI_AGENT_SYSTEM.md) | สถาปัตยกรรม AI ครบชุด — Flash/Pro/scopes/loop limits/key files (Flash อ่านส่วนแรก, Pro อ่านทั้งหมด) |
 | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | โฟลเดอร์/ไฟล์สำคัญแต่ละแอป |
 | [LINE_OA_ORDER_SCOPE_TH.md](./LINE_OA_ORDER_SCOPE_TH.md) | ขอบเขต LINE OA กุ้ง, LIFF, Rich Menu |
 | [LINE_OA_PARTITION_TH.md](./LINE_OA_PARTITION_TH.md) | จัด partition LINE 4 สายงาน (OA กุ้ง · ครอบครัวกุ้ง · แจ้งเตือนกุ้ง · แอปชา) |

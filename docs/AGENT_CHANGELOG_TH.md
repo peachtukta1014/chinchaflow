@@ -1,3 +1,18 @@
+## 2026-06-30 — refactor: รวม AI docs + auto-sync CI + auto-changelog CI
+
+- **เหตุผล:** docs ซ้ำซ้อน 4 ไฟล์ทำให้ค่า MAX/CHECKPOINT/TTL stale ทุก PR — ต้องการ SSoT เดียวและ auto-sync อัตโนมัติ
+- **แก้:**
+  - สร้าง `docs/AI_AGENT_SYSTEM.md` — รวม `AI_AGENT_DIAGRAM.md` + `AI_AGENT_KEY_FILES.md` เป็นไฟล์เดียว (Flash อ่านส่วนแรก 4,000 chars = sections 1-4: 3-agent overview, security, scopes, loop limits; Pro อ่านทั้งหมด)
+  - ลบ `docs/AI_AGENT_DIAGRAM.md` + `docs/AI_AGENT_KEY_FILES.md`
+  - `apps/webhook-core/src/flash/flashContext.js` — เปลี่ยน AI_AGENT_DIAGRAM → AI_AGENT_SYSTEM
+  - `apps/webhook-core/scripts/sync-agent-docs.cjs` — เปลี่ยน AI_AGENT_DIAGRAM → AI_AGENT_SYSTEM
+  - `PRO.md:129` — fix stale `SUMMARY_CHECKPOINT = 25` → `9`
+  - `docs/ARCHITECTURE_TH.md` — ตัด AI table ออก เหลือ 2 บรรทัด + pointer ไป AI_AGENT_SYSTEM.md
+  - `docs/AGENT_HANDBOOK_TH.md` — แก้ `.jiiji/` reference → `.skill/`, เพิ่ม AI_AGENT_SYSTEM.md ในตาราง
+  - สร้าง `.github/workflows/sync-ai-constants.yml` — auto-patch MAX_ITERATIONS + SUMMARY_CHECKPOINT จาก `agentTools.js` → `AI_AGENT_SYSTEM.md` ทุกครั้งที่ agentTools.js เปลี่ยน
+  - สร้าง `.github/workflows/auto-changelog.yml` — ทุก PR merge → prepend PR title+body เข้า `AGENT_CHANGELOG_TH.md` อัตโนมัติ
+- **ผล:** docs ที่ซ้ำ 4 ไฟล์ → 1 ไฟล์; ค่า constants auto-synced; changelog เขียนเองไม่ต้องทำ manual อีก
+
 ## 2026-06-30 — docs: แก้ค่า stale ใน AGENTS.md + AI_AGENT_KEY_FILES.md
 
 - **แก้:**

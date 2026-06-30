@@ -30,7 +30,7 @@ const files = {
   'docs/PEACH_WORKING_STYLE_TH.md': readFile('docs/PEACH_WORKING_STYLE_TH.md'),
   'docs/AGENT_HANDBOOK_TH.md': readFile('docs/AGENT_HANDBOOK_TH.md'),
   'docs/CODE_METRICS.md': readFile('docs/CODE_METRICS.md'),
-  'docs/AI_AGENT_DIAGRAM.md': readFile('docs/AI_AGENT_DIAGRAM.md'),
+  'docs/AI_AGENT_SYSTEM.md': readFile('docs/AI_AGENT_SYSTEM.md'),
 };
 
 const trimmed = Object.fromEntries(Object.entries(files).filter(([, v]) => v));
