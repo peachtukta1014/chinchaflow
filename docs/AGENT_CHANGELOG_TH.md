@@ -1,3 +1,11 @@
+## 2026-06-30 — docs: sync AI_AGENT_DIAGRAM — อัปเดต SUMMARY_CHECKPOINT จาก 25 → 9
+
+- **เหตุผล:** PR #432 เปลี่ยน `SUMMARY_CHECKPOINT = 25` → `9` ใน `agentTools.js` แต่ diagram ไม่ถูกอัปเดตตาม → Flash Audit รอบ 2 พบว่า diagram แสดงค่าเก่า (ทำให้ดูเหมือน "Logic Deadlock" ทั้งที่โค้ดจริงถูกต้อง)
+- **แก้:**
+  - `docs/AI_AGENT_DIAGRAM.md` บรรทัด 75: `CHECKPOINT=25` → `CHECKPOINT=9` ใน Mermaid node GH6
+  - `docs/AI_AGENT_DIAGRAM.md` บรรทัด 189: `SUMMARY_CHECKPOINT = 25` → `SUMMARY_CHECKPOINT = 9` ใน Loop Limits section
+- **ผล:** Diagram ตรงกับโค้ดจริง; Flash Audit จะไม่ flag false-positive อีก
+
 ## 2026-06-29 — fix: Audit Max Limit — เพิ่ม .limit() ทุกจุดที่ดึง Firestore collection โดยไม่จำกัด
 
 - **เหตุผล:** Audit พบ 10 จุดที่ดึง Firestore collection ไม่มี limit → Cloud Function OOM เมื่อข้อมูลโตขึ้น

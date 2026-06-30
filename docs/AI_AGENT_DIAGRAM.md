@@ -72,7 +72,7 @@ flowchart TD
         GH2 --> GH3[handleCodeActionV2\naiWorkflowAgent.js\nOPENROUTER_API_KEY_PRO]
         GH3 --> GH4[fetchAgentDocs\nอ่าน AGENTS.md + docs\nจาก GitHub API]
         GH4 --> GH5[buildAgentSystemPrompt\nSCOPE_FILE_TREE\nเลือกไฟล์ตาม scope]
-        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=30\nCHECKPOINT=25]
+        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=30\nCHECKPOINT=9]
 
         GH6 --> TOOL{AI เลือก tool\nทีละขั้น}
         TOOL -->|read_file| T1[GitHub API\nดึงเนื้อไฟล์]
@@ -186,7 +186,7 @@ Flash CF สร้าง requestId (ถ้าไม่มีจาก client)
 
 ```
 MAX_ITERATIONS     = 30   — หยุดแน่นอน + emergency commit ถ้ามีไฟล์ staged
-SUMMARY_CHECKPOINT = 25   — รอบ 25 บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
+SUMMARY_CHECKPOINT = 9    — รอบ 9 บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
 timeout GitHub Actions = 30 นาที
 ```
 
