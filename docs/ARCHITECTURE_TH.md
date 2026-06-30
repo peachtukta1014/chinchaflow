@@ -159,7 +159,7 @@ flowchart TB
 | ฝ่าย | อยู่ที่ | key | หน้าที่ |
 |------|--------|-----|--------|
 | Chat (Flash) | Cloud Function `aiChatAgentHttp` | `OPENROUTER_API_KEY` | คุยกับพี่พีช, classify intent, สรุปคำสั่ง, ส่งงานต่อ, รายงานผล — ไม่มี tool แก้ไฟล์ |
-| Workflow (Pro) | GitHub Actions `.github/workflows/ai-workflow-trigger.yml` (`scripts/run-github-agent.mjs` → `aiWorkflowAgent.js` → `runAgentLoop` agentic loop, MAX 15 รอบ) | `OPENROUTER_API_KEY_PRO` + `GH_PAT` | อ่าน/แก้โค้ด, commit, เปิด PR; เขียนผลกลับ Firestore (`progressTracker`) ให้ Flash แจ้งพี่ |
+| Workflow (Pro) | GitHub Actions `.github/workflows/ai-workflow-trigger.yml` (`scripts/run-github-agent.mjs` → `aiWorkflowAgent.js` → `runAgentLoop` agentic loop, MAX 30 รอบ) | `OPENROUTER_API_KEY_PRO` + `GH_PAT` | อ่าน/แก้โค้ด, commit, เปิด PR; เขียนผลกลับ Firestore (`progressTracker`) ให้ Flash แจ้งพี่ |
 
 flow: พีช → Flash classify → `repository_dispatch (ai-code-action)` → GitHub Actions รัน Pro → writeResult ลง Firestore → PWA polling อ่านผล. Flash CF ไม่รู้จัก `OPENROUTER_API_KEY_PRO` เลย
 

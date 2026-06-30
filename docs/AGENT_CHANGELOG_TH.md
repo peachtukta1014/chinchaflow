@@ -1,3 +1,11 @@
+## 2026-06-30 — docs: sync docs ชุดใหญ่ — แก้ค่า CHECKPOINT/MAX ล้าสมัยทุกไฟล์
+
+- **เหตุผล:** หลัง PR #432 (CHECKPOINT 25→9) และ #432 (MAX_ITERATIONS=30) docs หลายไฟล์ยังแสดงค่าเก่า
+- **แก้:**
+  - `docs/AI_AGENT_KEY_FILES.md` บรรทัด 87: `CHECKPOINT=25` → `CHECKPOINT=9`
+  - `docs/ARCHITECTURE_TH.md` บรรทัด 162: `MAX 15 รอบ` → `MAX 30 รอบ`
+- **ไม่แตะ:** `docs/CODE_METRICS.md` — CI (`code-metrics.yml`) สร้างให้อัตโนมัติทุก push main
+
 ## 2026-06-30 — docs: sync AI_AGENT_DIAGRAM — อัปเดต SUMMARY_CHECKPOINT จาก 25 → 9
 
 - **เหตุผล:** PR #432 เปลี่ยน `SUMMARY_CHECKPOINT = 25` → `9` ใน `agentTools.js` แต่ diagram ไม่ถูกอัปเดตตาม → Flash Audit รอบ 2 พบว่า diagram แสดงค่าเก่า (ทำให้ดูเหมือน "Logic Deadlock" ทั้งที่โค้ดจริงถูกต้อง)
