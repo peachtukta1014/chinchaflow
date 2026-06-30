@@ -84,7 +84,7 @@ chincha-business-os/
 │   │
 │   └── shared/
 │       ├── agentTools.js                 ← ✨ LOOP: agentic loop orchestrator
-│       │   ├── runAgentLoop()            ← MAX_ITERATIONS=30, CHECKPOINT=25
+│       │   ├── runAgentLoop()            ← MAX_ITERATIONS=30, CHECKPOINT=9
 │       │   ├── parseXmlToolCalls()       ← DeepSeek XML fallback parser
 │       │   ├── stripDsml()               ← ลบ DSML markup จาก output
 │       │   └── stripXmlToolCalls()       ← ลบ XML tool call ออกจากข้อความสุดท้าย
