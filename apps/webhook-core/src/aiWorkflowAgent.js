@@ -370,7 +370,7 @@ async function fetchRepoFile(pat, filePath, ref) {
 }
 
 // ── Build system prompt for agentic loop ─────────────────────────────────
-function buildAgentSystemPrompt(scopeInfo, agentDocs) {
+function buildAgentSystemPrompt(scopeInfo, agentDocs, scope) {
   const fileList = scopeInfo.files.slice(0, 25).join('\n');
   const overflow = scopeInfo.files.length > 25
     ? `\n... (และอีก ${scopeInfo.files.length - 25} ไฟล์ — เรียก list_files เพื่อดูทั้งหมด)`
@@ -395,7 +395,8 @@ function buildAgentSystemPrompt(scopeInfo, agentDocs) {
   - \`apps/<app>/CHANGELOG.md\` — ของแอปที่เปลี่ยน
 
 ## ลำดับการทำงาน
-ขั้น 0 → read_file docs/AGENT_CHANGELOG_TH.md (อ่านก่อนทุกครั้ง)
+ขั้น 0a → get_skill(name="scope-${scope || 'root'}") — โหลดกฎ scope, สิ่งที่แตะได้/ห้าม, คำสั่งตรวจสุขภาพ
+ขั้น 0b → read_file docs/AGENT_CHANGELOG_TH.md (อ่านก่อนทุกครั้ง)
 ขั้น 1 → list_files (ถ้าไม่รู้ว่าไฟล์ไหนเกี่ยว)
 ขั้น 2 → read_file (อ่านโค้ดจริงก่อนแก้ทุกครั้ง)
 ขั้น 3 → patch_file หรือ write_file
@@ -442,7 +443,7 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     await writeProgress(requestId, 'กำลังโหลดบริบทระบบ...');
     const agentDocs = await fetchAgentDocs(ghPat, currentScope);
 
-    const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs);
+    const systemPrompt = buildAgentSystemPrompt(scopeInfo, agentDocs, currentScope);
 
     // รัน agentic loop — จีจี้เลือก tool เองจนงานเสร็จ
     const result = await runAgentLoop(openRouterKey, ghPat, {
