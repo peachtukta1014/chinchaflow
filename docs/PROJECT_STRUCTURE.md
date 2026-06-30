@@ -24,11 +24,6 @@ chinchaflow/
 │       ├── auto-tea.md
 │       ├── land-it.md
 │       ├── peter-ser.md
-│       ├── scope-root.md
-│       ├── scope-scheduled.md
-│       ├── scope-seafood.md
-│       ├── scope-tea.md
-│       ├── scope-webhook.md
 │       ├── ship-shrimp.md
 │       └── ship-tea.md
 ├── .github
@@ -44,6 +39,12 @@ chinchaflow/
 │       ├── shrimp-stock-reset.yml
 │       ├── sync-project-tree.yml
 │       └── tea-db-reset.yml
+├── .skill
+│   ├── scope-root.md
+│   ├── scope-scheduled.md
+│   ├── scope-seafood.md
+│   ├── scope-tea.md
+│   └── scope-webhook.md
 ├── 00_peach
 │   └── i18n-3ภาษาเพิ่มเติม.md
 ├── apps
