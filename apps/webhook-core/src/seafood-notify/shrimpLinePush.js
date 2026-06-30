@@ -80,7 +80,7 @@ async function findCustomerNameByLineUserId(db, lineUserId) {
       const name = snap.docs[0].data()?.name;
       return name ? String(name).trim() : null;
     }
-    const all = await db.collection('customers').get();
+    const all = await db.collection('customers').limit(2000).get();
     for (const doc of all.docs) {
       const data = doc.data() || {};
       if (customerHasLineUserId(data, uid)) {
@@ -97,7 +97,7 @@ async function findCustomerNameByLineUserId(db, lineUserId) {
 /** map LINE UID → ชื่อลูกค้า (สำหรับสรุปออเดอร์หลายรายการ) */
 async function buildCustomerNameByLineUidMap(db) {
   const map = new Map();
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     const name = String(data.name || '').trim();
@@ -122,7 +122,7 @@ async function linkLineUserToCustomers(db, admin, { lineUserId, customerNames })
   const names = [...new Set((customerNames || []).map((n) => String(n || '').trim()).filter(Boolean))];
   if (!names.length) return;
 
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   const batch = db.batch();
   let count = 0;
   const ts = admin.firestore.FieldValue.serverTimestamp();

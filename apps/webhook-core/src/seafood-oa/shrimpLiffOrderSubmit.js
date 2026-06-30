@@ -68,7 +68,7 @@ async function releaseLineUserIdFromOthers(db, admin, lineUserId, keepCustomerId
   if (!uid || !keepCustomerId) return;
 
   const MAIN = new Set(Array.from({ length: 27 }, (_, i) => `c${i + 1}`));
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   const batch = db.batch();
   let touched = false;
   const ts = admin.firestore.FieldValue.serverTimestamp();

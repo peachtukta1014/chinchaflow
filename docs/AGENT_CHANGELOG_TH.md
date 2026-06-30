@@ -1,3 +1,15 @@
+## 2026-06-29 — fix: Audit Max Limit — เพิ่ม .limit() ทุกจุดที่ดึง Firestore collection โดยไม่จำกัด
+
+- **เหตุผล:** Audit พบ 10 จุดที่ดึง Firestore collection ไม่มี limit → Cloud Function OOM เมื่อข้อมูลโตขึ้น
+- **แก้:**
+  - `shrimpLinePush.js` (3 จุด) — `customers.get()` → `.limit(2000).get()` ใน `findCustomerNameByLineUserId`, `buildCustomerNameByLineUidMap`, `linkLineUserToCustomers`
+  - `shrimpLineCustomerProfile.js` (3 จุด) — `customers.get()` → `.limit(2000).get()` ใน fallback find, `countLinkedMainCatalogShops`, `findCustomerByName`
+  - `shrimpLiffOrderSubmit.js` (1 จุด) — `customers.get()` → `.limit(2000).get()` ใน `releaseLineUserIdFromOthers`
+  - `customerZone.js` (1 จุด) — `customers.get()` → `.limit(2000).get()` ใน catalog builder
+  - `shrimpBuiltinCustomers.js` (1 จุด) — `customers.get()` → `.limit(2000).get()` ใน LIFF catalog
+  - `shrimpDailySummary.js` (1 จุด) — `sales.where('dateKey').get()` → `.limit(3000).get()` Safety valve ต่อวัน
+- **ผล:** ป้องกัน OOM crash ถ้าลูกค้า/ยอดขายโตกว่าที่คาด โดยไม่กระทบการทำงานปกติ (limit สูงเกินปริมาณจริงมาก)
+
 ## 2026-06-29 — feat: commit_and_pr atomicity — ลบ orphan branch เมื่อ PR create ล้มเหลว (Roadmap #3)
 
 - **เหตุผล:** ถ้า commit ผ่านแต่ PR create ล้มเหลว branch จะลอยอยู่ใน repo โดยไม่มี PR (orphan branch) — Pro loop จะ error และ branch ค้างไว้

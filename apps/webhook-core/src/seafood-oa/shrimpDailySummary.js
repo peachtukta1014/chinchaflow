@@ -120,7 +120,7 @@ function buildShrimpSummaryMessage(s, dateKey, { familyGroup = false } = {}) {
 }
 
 async function buildShrimpSummaryForDate(db, dateKey, { familyGroup = false } = {}) {
-  const snap = await db.collection('sales').where('dateKey', '==', dateKey).get();
+  const snap = await db.collection('sales').where('dateKey', '==', dateKey).limit(3000).get();
   const bills = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const s = aggregateDailySales(bills);
 
