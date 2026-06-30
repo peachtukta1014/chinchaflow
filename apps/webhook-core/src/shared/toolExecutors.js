@@ -299,11 +299,11 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
         'ship-tea': '.claude/commands/ship-tea.md',
         'land-it': '.claude/commands/land-it.md',
         'peter-ser': '.claude/commands/peter-ser.md',
-        'scope-seafood': '.claude/commands/scope-seafood.md',
-        'scope-tea': '.claude/commands/scope-tea.md',
-        'scope-webhook': '.claude/commands/scope-webhook.md',
-        'scope-scheduled': '.claude/commands/scope-scheduled.md',
-        'scope-root': '.claude/commands/scope-root.md',
+        'scope-seafood': '.skill/scope-seafood.md',
+        'scope-tea': '.skill/scope-tea.md',
+        'scope-webhook': '.skill/scope-webhook.md',
+        'scope-scheduled': '.skill/scope-scheduled.md',
+        'scope-root': '.skill/scope-root.md',
       };
       const skillPath = skillPaths[args.name];
       if (!skillPath) return `❌ ไม่รู้จัก skill "${args.name}"`;

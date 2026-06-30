@@ -1,3 +1,14 @@
+## 2026-06-30 — refactor: ย้าย scope skills จาก .claude/commands/ → .skill/ (แยก AI vs CLI)
+
+- **เหตุผล:** สกิล scope-* เป็น project-level skills สำหรับ AI agents ไม่ใช่ Claude Code CLI → แยก folder ให้ชัดเจน
+- **แก้:**
+  - สร้าง `.skill/` folder ที่ root — สำหรับ Flash + Pro ใช้งาน
+  - ย้าย 5 scope skill files จาก `.claude/commands/scope-*.md` → `.skill/scope-*.md`
+  - `.claude/commands/` เหลือเฉพาะ CLI skills ของพี่ซี (auto-shrimp, ship-*, land-it, peter-ser)
+  - `apps/webhook-core/src/shared/toolExecutors.js` — อัปเดต skillPaths `scope-*` ชี้ไป `.skill/`
+  - `apps/webhook-core/src/flash/flashContext.js` — เพิ่ม `fetchScopeSkill(pat, scope)` ดึง `.skill/scope-{scope}.md` ผ่าน GH_PAT_READ; export พร้อมใช้
+- **ผล:** Pro เรียก `get_skill('scope-seafood')` → อ่านจาก `.skill/`; Flash มี `fetchScopeSkill` สำหรับโหลด scope context ล่วงหน้าก่อน dispatch
+
 ## 2026-06-30 — feat: scope skills — guardrail ประจำ scope สำหรับ Pro + พี่ซี
 
 - **เหตุผล:** Pro agent ไม่มีกฎชัดเจนว่าห้ามแตะโฟลเดอร์ใดในแต่ละ scope → มีโอกาส logic ข้ามแอปกระทบกัน
