@@ -20,7 +20,7 @@ src/
 ├── seafood-notify/           ← LINE push / bill render กุ้ง
 ├── tea/                      ← LINE Bot ชา + cron summary
 └── shared/
-    ├── agentTools.js         ← agentic loop (MAX_ITERATIONS=15, CHECKPOINT=8)
+    ├── agentTools.js         ← agentic loop (MAX_ITERATIONS=30, CHECKPOINT=9)
     ├── toolDefinitions.js    ← tool schemas (read_file, patch_file, commit_and_pr …)
     ├── toolExecutors.js      ← execute tool calls จริงผ่าน GitHub API
     ├── progressTracker.js    ← Firestore R/W (aiProgress, aiResults, agentRunLogs)
@@ -55,7 +55,7 @@ Flash polling → PWA แสดงผล
 | Collection | ใช้โดย | หน้าที่ |
 |-----------|--------|---------|
 | `aiProgress/{requestId}` | Pro → Flash | สถานะ step ปัจจุบัน |
-| `aiResults/{requestId}` | Pro → Flash | ผลลัพธ์สุดท้าย (TTL 30 min) |
+| `aiResults/{requestId}` | Pro → Flash | ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง) |
 | `agentRunLogs/{requestId}/steps` | Pro | debug log ถาวร |
 | `systemConfig/projectTree` | sync-project-tree.yml → Flash | project structure |
 | `webhookDedup/{eventId}` | LINE webhook | กัน event ซ้ำ |

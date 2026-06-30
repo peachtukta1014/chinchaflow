@@ -122,7 +122,7 @@ chincha-business-os/
 │   │   step: "กำลังอ่านไฟล์..."
 │   │   ts: timestamp
 │   │
-│   aiResults/{requestId}                 ← Pro → Flash: ผลลัพธ์สุดท้าย (TTL 30 min)
+│   aiResults/{requestId}                 ← Pro → Flash: ผลลัพธ์สุดท้าย (TTL 2 ชั่วโมง)
 │   │   reply: "เสร็จแล้ว ดู PR #xxx"
 │   │   scope: "seafood"
 │   │   status: "completed"|"error"

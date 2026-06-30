@@ -1,3 +1,13 @@
+## 2026-06-30 — docs: แก้ค่า stale ใน AGENTS.md + AI_AGENT_KEY_FILES.md
+
+- **แก้:**
+  - `apps/webhook-core/AGENTS.md:23`: `MAX_ITERATIONS=15, CHECKPOINT=8` → `MAX_ITERATIONS=30, CHECKPOINT=9`
+  - `apps/webhook-core/AGENTS.md:58`: TTL 30 min → TTL 2 ชั่วโมง
+  - `docs/AI_AGENT_KEY_FILES.md:87`: `CHECKPOINT=25` → `CHECKPOINT=9`
+  - `docs/AI_AGENT_KEY_FILES.md:125`: TTL 30 min → TTL 2 ชั่วโมง
+- **เหตุผล:** ค่าเหล่านี้ล้าสมัยจาก PR ก่อนหน้า (MAX_ITERATIONS 15→30, CHECKPOINT 25→9, TTL 30min→2hr ใน progressTracker.js)
+
+
 ## 2026-06-30 — refactor: ย้าย scope skills จาก .claude/commands/ → .skill/ (แยก AI vs CLI)
 
 - **เหตุผล:** สกิล scope-* เป็น project-level skills สำหรับ AI agents ไม่ใช่ Claude Code CLI → แยก folder ให้ชัดเจน
