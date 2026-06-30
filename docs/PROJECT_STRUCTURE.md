@@ -51,6 +51,7 @@ chinchaflow/
 │   └── i18n-3ภาษาเพิ่มเติม.md
 ├── apps
 │   ├── ai-chat
+│   │   ├── .claude
 │   │   ├── public
 │   │   ├── src
 │   │   ├── CHANGELOG.md
@@ -60,6 +61,7 @@ chinchaflow/
 │   │   ├── tailwind.config.js
 │   │   └── vite.config.js
 │   ├── chincha-tea
+│   │   ├── .claude
 │   │   ├── .cursor
 │   │   ├── lib
 │   │   ├── public
@@ -72,6 +74,7 @@ chinchaflow/
 │   │   ├── tailwind.config.js
 │   │   └── vite.config.js
 │   ├── seafood-pos
+│   │   ├── .claude
 │   │   ├── .cursor
 │   │   ├── docs
 │   │   ├── public
@@ -89,6 +92,7 @@ chinchaflow/
 │   │   ├── tailwind.config.js
 │   │   └── vite.config.js
 │   ├── webhook-core
+│   │   ├── .claude
 │   │   ├── assets
 │   │   ├── scripts
 │   │   ├── src
