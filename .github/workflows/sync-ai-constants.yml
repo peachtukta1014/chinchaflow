@@ -44,6 +44,7 @@ jobs:
             echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
           else
             git commit -m "chore: auto-sync AI constants from agentTools.js [skip ci]"
+            git pull --rebase origin main
             git push
             echo "✅ push สำเร็จ"
           fi
