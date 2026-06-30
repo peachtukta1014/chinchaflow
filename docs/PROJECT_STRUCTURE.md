@@ -29,6 +29,7 @@ chinchaflow/
 ├── .github
 │   └── workflows
 │       ├── ai-workflow-trigger.yml
+│       ├── auto-changelog.yml
 │       ├── code-metrics.yml
 │       ├── deploy-functions.yml
 │       ├── deploy-hosting.yml
@@ -37,6 +38,7 @@ chinchaflow/
 │       ├── shrimp-fix-line-customer.yml
 │       ├── shrimp-full-reset-on-demand.yml
 │       ├── shrimp-stock-reset.yml
+│       ├── sync-ai-constants.yml
 │       ├── sync-project-tree.yml
 │       └── tea-db-reset.yml
 ├── .skill
@@ -103,8 +105,7 @@ chinchaflow/
 ├── docs
 │   ├── AGENT_CHANGELOG_TH.md
 │   ├── AGENT_HANDBOOK_TH.md
-│   ├── AI_AGENT_DIAGRAM.md
-│   ├── AI_AGENT_KEY_FILES.md
+│   ├── AI_AGENT_SYSTEM.md
 │   ├── ARCHITECTURE_TH.md
 │   ├── CHINCHA_FLOW_NAMING_TH.md
 │   ├── CODE_METRICS.md
