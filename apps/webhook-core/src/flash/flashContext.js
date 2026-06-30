@@ -133,4 +133,24 @@ async function clearPendingAction(requestId) {
   await _fsDb().collection('pendingActions').doc(requestId).delete().catch(() => {});
 }
 
-module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, savePendingAction, loadPendingAction, clearPendingAction };
+const VALID_SCOPES = ['seafood', 'tea', 'webhook', 'scheduled', 'root'];
+
+async function fetchScopeSkill(pat, scope) {
+  if (!pat || !VALID_SCOPES.includes(scope)) return '';
+  const path = `.skill/scope-${scope}.md`;
+  try {
+    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(path)}`;
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `token ${pat}`,
+        'Accept': 'application/vnd.github.v3.raw',
+        'User-Agent': 'CHINCHA-FLOW-Flash',
+      },
+    });
+    if (!res.ok) return '';
+    const text = await res.text();
+    return text.slice(0, 2000);
+  } catch { return ''; }
+}
+
+module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, fetchScopeSkill, savePendingAction, loadPendingAction, clearPendingAction };
