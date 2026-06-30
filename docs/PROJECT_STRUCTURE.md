@@ -24,6 +24,11 @@ chinchaflow/
 │       ├── auto-tea.md
 │       ├── land-it.md
 │       ├── peter-ser.md
+│       ├── scope-root.md
+│       ├── scope-scheduled.md
+│       ├── scope-seafood.md
+│       ├── scope-tea.md
+│       ├── scope-webhook.md
 │       ├── ship-shrimp.md
 │       └── ship-tea.md
 ├── .github
