@@ -52,6 +52,7 @@ jobs:
             echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
           else
             git commit -m "chore: auto-changelog PR #${{ github.event.pull_request.number }} [skip ci]"
+            git pull --rebase origin main
             git push
             echo "✅ push changelog สำเร็จ"
           fi
