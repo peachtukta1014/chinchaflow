@@ -1,3 +1,17 @@
+## 2026-06-30 — feat: scope skills — guardrail ประจำ scope สำหรับ Pro + พี่ซี
+
+- **เหตุผล:** Pro agent ไม่มีกฎชัดเจนว่าห้ามแตะโฟลเดอร์ใดในแต่ละ scope → มีโอกาส logic ข้ามแอปกระทบกัน
+- **แก้:**
+  - สร้าง 5 scope skill files ใน `.claude/commands/`:
+    - `scope-seafood.md` — กุ้ง: ห้ามแตะชา/webhook/ai-chat; smoke test; customers sync gotcha
+    - `scope-tea.md` — ชา: ห้ามแตะกุ้ง; i18n 3 ภาษา gotcha; dateKey gotcha
+    - `scope-webhook.md` — LINE backend: ByteString/DSML/reasoning_content gotchas; ห้าม ESM
+    - `scope-scheduled.md` — cron: logic ร่วมใน webhook-core (อ่านได้ ห้ามแก้); CommonJS
+    - `scope-root.md` — infrastructure: CI/CD, firestore rules, docs; scope เปิดกว้าง — ระวัง
+  - `apps/webhook-core/src/shared/toolExecutors.js` — เพิ่ม 5 entries ใน `skillPaths` (`scope-*`)
+  - `apps/webhook-core/src/aiWorkflowAgent.js` — `buildAgentSystemPrompt()` รับ `scope` param ใหม่; เพิ่ม "ขั้น 0a: get_skill(scope-{scope})" ในลำดับงาน Pro
+- **ผล:** Pro loop เรียก `get_skill('scope-seafood')` ฯลฯ เป็นขั้นแรก → โหลดกฎ scope ก่อนแตะโค้ด; พี่ซีเรียกผ่าน `/scope-xxx` ได้เช่นกัน
+
 ## 2026-06-30 — docs: sync docs ชุดใหญ่ — แก้ค่า CHECKPOINT/MAX ล้าสมัยทุกไฟล์
 
 - **เหตุผล:** หลัง PR #432 (CHECKPOINT 25→9) และ #432 (MAX_ITERATIONS=30) docs หลายไฟล์ยังแสดงค่าเก่า
