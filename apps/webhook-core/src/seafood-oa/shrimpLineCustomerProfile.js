@@ -51,7 +51,7 @@ async function findCustomerByLineUserId(db, lineUserId) {
     const doc = snap.docs[0];
     return { id: doc.id, ...doc.data() };
   }
-  const all = await db.collection('customers').get();
+  const all = await db.collection('customers').limit(2000).get();
   for (const doc of all.docs) {
     const data = doc.data() || {};
     if (customerHasLineUserId(data, uid)) {
@@ -62,7 +62,7 @@ async function findCustomerByLineUserId(db, lineUserId) {
 }
 
 async function countLinkedMainCatalogShops(db) {
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   let count = 0;
   for (const doc of snap.docs) {
     if (!MAIN_CATALOG_SHOP_IDS.has(doc.id)) continue;
@@ -80,7 +80,7 @@ async function isNewCustomerProfileGateActive(db) {
 async function findCustomerByName(db, customerName) {
   const want = String(customerName || '').trim();
   if (!want) return null;
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     if (customerMatchesName(data, want)) {

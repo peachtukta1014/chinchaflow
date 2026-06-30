@@ -53,7 +53,7 @@ async function buildCustomerZoneCatalog(db) {
   }
 
   if (db) {
-    const snap = await db.collection('customers').get();
+    const snap = await db.collection('customers').limit(2000).get();
     for (const doc of snap.docs) {
       const data = { id: doc.id, ...(doc.data() || {}) };
       const merged = catalogRow(data, BUILTIN_BY_ID[doc.id]);

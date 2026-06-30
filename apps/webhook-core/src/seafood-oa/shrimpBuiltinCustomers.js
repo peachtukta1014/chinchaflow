@@ -61,7 +61,7 @@ function compareThaiName(a, b) {
 
 /** รายชื่อสำหรับ LIFF เลือกร้าน — merge ร้านหลัก + ลูกค้า Firestore (รวมจาก OA) */
 async function buildLiffCustomerCatalog(db) {
-  const snap = await db.collection('customers').get();
+  const snap = await db.collection('customers').limit(2000).get();
   const fsMap = {};
   for (const doc of snap.docs) {
     fsMap[doc.id] = { id: doc.id, ...(doc.data() || {}) };
