@@ -126,7 +126,7 @@ Pro มีสิทธิ์ admin เต็ม ผ่าน `GH_PAT` — ใช
 
 ```
 MAX_ITERATIONS     = 30   — หยุดแน่นอน + emergency commit ถ้ามีไฟล์ staged
-SUMMARY_CHECKPOINT = 25   — บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
+SUMMARY_CHECKPOINT = 9    — บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
 ```
 
 | ชั้น | เงื่อนไข | การตอบสนอง |

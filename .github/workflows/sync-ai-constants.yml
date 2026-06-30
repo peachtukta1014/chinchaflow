@@ -1,0 +1,49 @@
+name: sync-ai-constants
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/webhook-core/src/shared/agentTools.js'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Extract constants from agentTools.js
+        id: extract
+        run: |
+          MAX=$(grep -oP '(?<=MAX_ITERATIONS = )\d+' apps/webhook-core/src/shared/agentTools.js | head -1)
+          CHECKPOINT=$(grep -oP '(?<=SUMMARY_CHECKPOINT = )\d+' apps/webhook-core/src/shared/agentTools.js | head -1)
+          echo "MAX=$MAX" >> $GITHUB_OUTPUT
+          echo "CHECKPOINT=$CHECKPOINT" >> $GITHUB_OUTPUT
+          echo "📌 MAX_ITERATIONS=$MAX SUMMARY_CHECKPOINT=$CHECKPOINT"
+
+      - name: Patch docs/AI_AGENT_SYSTEM.md
+        run: |
+          MAX="${{ steps.extract.outputs.MAX }}"
+          CHECKPOINT="${{ steps.extract.outputs.CHECKPOINT }}"
+          sed -i "s/MAX_ITERATIONS     = [0-9]*/MAX_ITERATIONS     = $MAX/" docs/AI_AGENT_SYSTEM.md
+          sed -i "s/SUMMARY_CHECKPOINT = [0-9]*/SUMMARY_CHECKPOINT = $CHECKPOINT/" docs/AI_AGENT_SYSTEM.md
+          sed -i "s/MAX_ITERATIONS=[0-9]*/MAX_ITERATIONS=$MAX/g" docs/AI_AGENT_SYSTEM.md
+          sed -i "s/CHECKPOINT=[0-9]*/CHECKPOINT=$CHECKPOINT/g" docs/AI_AGENT_SYSTEM.md
+          echo "✅ patch docs/AI_AGENT_SYSTEM.md เสร็จ"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/AI_AGENT_SYSTEM.md
+          if git diff --cached --quiet; then
+            echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
+          else
+            git commit -m "chore: auto-sync AI constants from agentTools.js [skip ci]"
+            git push
+            echo "✅ push สำเร็จ"
+          fi

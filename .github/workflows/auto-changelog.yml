@@ -1,0 +1,57 @@
+name: auto-changelog
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  append:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          ref: main
+
+      - name: Build changelog entry
+        id: entry
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_DATE: ${{ github.event.pull_request.merged_at }}
+        run: |
+          DATE=$(echo "$PR_DATE" | cut -c1-10)
+          # เขียน entry ลงไฟล์ชั่วคราว
+          {
+            echo "## ${DATE} — ${PR_TITLE} (PR #${PR_NUMBER})"
+            echo ""
+            # เอา body แค่ 2000 chars แรกป้องกัน changelog พอง
+            echo "$PR_BODY" | head -c 2000
+            echo ""
+            echo ""
+          } > /tmp/new_entry.md
+          echo "✅ entry พร้อมแล้ว"
+
+      - name: Prepend to AGENT_CHANGELOG_TH.md
+        run: |
+          cat /tmp/new_entry.md docs/AGENT_CHANGELOG_TH.md > /tmp/merged_changelog.md
+          mv /tmp/merged_changelog.md docs/AGENT_CHANGELOG_TH.md
+          echo "✅ prepend สำเร็จ"
+
+      - name: Commit changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/AGENT_CHANGELOG_TH.md
+          if git diff --cached --quiet; then
+            echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
+          else
+            git commit -m "chore: auto-changelog PR #${{ github.event.pull_request.number }} [skip ci]"
+            git push
+            echo "✅ push changelog สำเร็จ"
+          fi
