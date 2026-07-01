@@ -7,13 +7,13 @@
 - **กุ้ง:** `apps/seafood-pos` · **ชา:** `apps/chincha-tea` · **LINE functions:** `apps/webhook-core`
 - Slack default model: **Claude 4.6 Sonnet** (Dashboard → Cloud Agents → My Settings). Composer in Slack: `@cursor with composer, …`
 - Dependencies on boot: `npm install` (see `.cursor/environment.json`)
-- **Agent Skills (monorepo):** repo-wide `.cursor/skills/` (`peter-ser`, `land-it`) · app-scoped `apps/seafood-pos/.cursor/skills/` (`auto-shrip`, `deploy-shrimp`, `ship-shrimp`) · `apps/chincha-tea/.cursor/skills/` (`auto-tea`, `deploy-tea`, `ship-tea`). Nested skills auto-apply only when working under that app directory.
+- **Agent Skills (monorepo):** repo-wide `.claude/commands/` (`peter-ser`, `land-it`, `auto-shrimp`, `auto-tea`, `ship-shrimp`, `ship-tea`) · app-scoped `apps/seafood-pos/.claude/skills/` (`run-seafood-pos`) · `apps/chincha-tea/.claude/skills/` (`run-chincha-tea`) · `apps/ai-chat/.claude/skills/` (`run-ai-chat`) · `apps/webhook-core/.claude/skills/` (`run-webhook-core`). Run skills ใช้สำหรับ dev-server, screenshot, syntax check — โหลดผ่าน `get_skill`
 
 ## ก่อนเพิ่มของใหม่ — แจ้งเตือนถ้าไม่จำเป็น (บังคับสำหรับเอเจนต์)
 
 เมื่อผู้ใช้หรือไอเดียจากแชทขอ **CI/CD ใหม่, workflow ใหม่, dependency ใหม่, สคริปต์ซ้ำ, หรือ infra ข้ามแอป** ให้ทำตามนี้ **ก่อนเขียนโค้ดหรือเปิด PR**:
 
-1. **ค้นหาใน repo** ว่ามีทางเดิมแล้วหรือไม่ (`.github/workflows/`, `scripts/`, `.cursor/skills/`, `AGENTS.md`, `docs/`).
+1. **ค้นหาใน repo** ว่ามีทางเดิมแล้วหรือไม่ (`.github/workflows/`, `scripts/`, `.claude/commands/`, `apps/*/.claude/skills/`, `AGENTS.md`, `docs/`).
 2. **ถ้ามีทางเดิมครอบคลุมแล้ว** — หยุด implement; **แจ้งผู้ใช้ชัดเจน** ว่า:
    - ระบบมีอะไรอยู่แล้ว (คำสั่ง / skill / workflow)
    - ทำไมการเพิ่มซ้ำ **ไม่จำเป็น** หรือ **เสี่ยง** (ความซับซ้อน, secret, เวลา CI, deploy ซ้ำซ้อน)
@@ -25,16 +25,20 @@
 | ความต้องการ | ของเดิมใน monorepo | หมายเหตุ |
 |-------------|-------------------|----------|
 | ตรวจ logic กุ้ง (ไม่ต้อง Firebase) | `node apps/seafood-pos/scripts/smoke-test.mjs` | ใช้ก่อน merge / ในแชท agent |
-| ตรวจกุ้ง + รายงาน Slack | skill `auto-shrip` (`/auto-shrip`) | ไม่แก้โค้ดถ้าแค่เช็กสุขภาพ |
-| build / deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` · skill `deploy-shrimp` | **ไม่มี** PR CI smoke ตามนโยบายทีม (ไม่จำเป็น — smoke มือ/skill พอ) |
-| ปิดงานกุ้ง (smoke → build → merge main → deploy) | skill `ship-shrimp` (`/ship-shrimp` หรือพูด **โอเค/แอปกุ้ง**) | หลัง PR พร้อม |
-| deploy ชา | `deploy-hosting.yml` (target tea) · skill `deploy-tea` | |
-| ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`/ship-tea` หรือพูด **โอเค/ชินชา**) | หลัง PR พร้อม; build = smoke ชา |
+| ตรวจกุ้ง + รายงาน | skill `auto-shrimp` (`.claude/commands/auto-shrimp.md`) | ไม่แก้โค้ดถ้าแค่เช็กสุขภาพ |
+| build / deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` | **ไม่มี** PR CI smoke ตามนโยบายทีม (ไม่จำเป็น — smoke มือ/skill พอ) |
+| ปิดงานกุ้ง (smoke → build → merge main → deploy) | skill `ship-shrimp` (`.claude/commands/ship-shrimp.md`) | หลัง PR พร้อม |
+| deploy ชา | `deploy-hosting.yml` (target tea) | |
+| ปิดงานชา (build → merge main → deploy) | skill `ship-tea` (`.claude/commands/ship-tea.md`) | หลัง PR พร้อม; build = smoke ชา |
 | deploy rules / functions | `deploy-rules.yml`, `deploy-functions.yml` | |
 | ปิดงาน PR | skill `land-it` | |
 | sync docs AI เข้า Firestore | `apps/webhook-core/scripts/sync-agent-docs.cjs` | รัน CI หลัง deploy functions อัตโนมัติ (ไม่ต้องรันมือ) |
 | ACK Pro Agent กลับ UI | `apps/webhook-core/scripts/ack-pro-agent.cjs` | รัน `ai-workflow-trigger.yml` อัตโนมัติเมื่อ Pro ตื่น |
 | ส่ง Pro Agent ทำงาน | พิมพ์ **"โอเคกุ้ง"** หรือ **"โอเคชา"** ใน ai-chat (จีจี้) | Flash → dispatch → `ai-workflow-trigger.yml` → Pro loop |
+| รัน/screenshot กุ้ง | `get_skill("run-seafood-pos")` | vite dev + chromium + smoke-test.mjs |
+| รัน/screenshot ชา | `get_skill("run-chincha-tea")` | vite dev + chromium screenshot |
+| รัน/screenshot ai-chat | `get_skill("run-ai-chat")` | vite dev + chromium screenshot |
+| syntax check webhook-core | `get_skill("run-webhook-core")` | node --check ทุก .js ใน src/ |
 
 ### ตัวอย่างที่ทีมตัดสินแล้ว (ไม่ทำซ้ำ)
 

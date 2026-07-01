@@ -1,3 +1,12 @@
+## 2026-07-01 — docs: sync AGENTS.md, CLAUDE.md, FLASH.md, PRO.md ให้ตรงกับ flow ปัจจุบัน (PR #448)
+
+| ไฟล์ | สิ่งที่เปลี่ยน |
+|------|--------------|
+| `AGENTS.md` | path `.cursor/skills/` → `.claude/commands/`; แก้ typo `auto-shrip`; ลบ deploy-skills ที่ไม่มีจริง; เพิ่ม run-skills 4 ตัว |
+| `CLAUDE.md` | ลบ `.jiiji/` ref; `AI_AGENT_DIAGRAM.md` → `AI_AGENT_SYSTEM.md`; เพิ่ม run-skills; อัปเดต AI summary |
+| `FLASH.md` | version 3→4; role → Technical Translator; เปลี่ยนจาก preload code → Task Brief v2 schema |
+| `PRO.md` | version 1→2; Task Brief format v2; บังคับ get_skill ก่อน verify; boot step โหลด scope skill |
+
 ## 2026-07-01 — feat: Flash → Technical Translator & Project Director + Task Brief v2 (PR #447)
 
 ## สรุป
