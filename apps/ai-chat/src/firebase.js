@@ -1,7 +1,7 @@
 // Firebase helpers — Firestore + Google Auth
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   collection,
   onSnapshot,
@@ -48,7 +48,11 @@ function getDb() {
   if (_db) return _db;
   const app = getApp();
   if (!app) return null;
-  _db = getFirestore(app);
+  // PWA บน iOS (Add to Home Screen) มักบล็อก WebChannel streaming ของ Firestore
+  // ค่า default ทำให้ onSnapshot/getDoc ค้างแล้วโดน error 'unavailable' ตลอด (ยิง fetch()
+  // ธรรมดาอย่าง aiChatAgentHttp ไม่โดนเพราะไม่ใช้ transport เดียวกัน) — บังคับ auto-detect
+  // long polling แก้ปัญหานี้โดยตรง ตาม Firebase docs สำหรับ network/webview ที่จำกัด
+  _db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true, useFetchStreams: false });
   return _db;
 }
 
