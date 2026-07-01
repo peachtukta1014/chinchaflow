@@ -1,5 +1,39 @@
 ## 2026-07-01 — feat: Flash → Technical Translator & Project Director + Task Brief v2 (PR #447)
 
+## สรุป
+
+อัปเกรด Flash จาก "เลขาส่วนตัว" → **Technical Translator & Project Director** — ถอดรหัสภาษาชาวบ้านของพี่พีชให้ออกมาเป็น Technical Specification ที่ Pro Agent รัน `read_file` ถูกจุดในรอบแรก ไม่หลงทาง
+
+ไฟล์ที่เปลี่ยน: `apps/webhook-core/src/flash/flashTriggers.js`
+
+---
+
+## การเปลี่ยนแปลง
+
+### `classifyAndTranslate` — Role Shift + Schema ใหม่
+
+**Role:** จาก `"เลขาส่วนตัวพีช วิเคราะห์คำสั่ง..."` → `"Technical Translator & Project Director"`
+
+**JSON Schema ใหม่ใน taskSpec:**
+
+| ฟิลด์ | เก่า | ใหม่ |
+|-------|------|------|
+| พฤติกรรมที่ต้องการ | — | `target_behavior` |
+| กฎ/constraint | `business_rules: string[]` | `logic_constraints: string[]` |
+| ชี้ไฟล์ | `files_hint: string[]` | `files_hint: {path, fn}[]` |
+| สิ่งที่เปลี่ยน | `expected_change` | `diff_expectation` |
+
+- **`target_behavior`**: พฤติกรรมสุดท้ายที่ระบบต้องทำ มุม user/system ("เมื่อ X เกิดขึ้น ผลลัพธ์ต้องเป็น Y ไม่ใช่ Z")
+- **`logic_constraints`**: invariant ทางเทคนิคและกฎธุรกิจที่ห้ามละเมิด เจาะจงถึงระดับ function
+- **`files_hint`**: เปลี่ยนจาก path strings → `{path, fn}` objects เพื่อระบุ function ที่ Pro ต้อง read_file ทันที
+- **`confirmationMessage`**: tone ใหม่แบบ Technical Director
+
+### `buildTaskBrief` — Technical Action Plan (Format ใหม่)
+
+**เด
+
+## 2026-07-01 — feat: Flash → Technical Translator & Project Director + Task Brief v2 (PR #447)
+
 `apps/webhook-core/src/flash/flashTriggers.js`
 
 **classifyAndTranslate** — role ใหม่ + JSON schema ใหม่:
