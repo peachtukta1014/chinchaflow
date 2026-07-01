@@ -35,10 +35,15 @@ updated: 2026-07-01
 
 | Tool | สิทธิ์ | ทำอะไร |
 |------|-------|--------|
-| `fetchRepoFiles(GH_PAT_READ, paths)` | Read-Only | อ่านซอร์สโค้ดจาก GitHub Contents API (สูงสุด 5 ไฟล์ × 3,000 chars/ไฟล์) |
+| `read_file(path)` | Read-Only (GH_PAT_READ) | อ่านเนื้อไฟล์จริงจาก GitHub Contents API (สูงสุด 3,000 chars/ไฟล์) — ใช้ใน Code Analysis Loop ก่อนสรุป Task Brief |
+| `list_files(dir?)` | Read-Only | กรอง project tree (Firestore) ตาม dir prefix |
+| `search_code(pattern, files[])` | Read-Only (GH_PAT_READ) | ค้นหา string pattern ข้ามไฟล์ (สูงสุด 5 ไฟล์) — เช็คความเชื่อมโยงข้ามไฟล์ |
+| `finalize_task_brief(...)` | — | จบ Code Analysis Loop ด้วย taskSpec ที่ยืนยันจากโค้ดจริงแล้ว (ต้อง read_file มาก่อนอย่างน้อย 1 ไฟล์) |
 | **Web Research** `[WEB_SEARCH: query]` | Read-Only | ค้นข้อมูลเทคโนโลยี / docs API / ข่าวล่าสุด / เหตุการณ์ปัจจุบัน ผ่าน deepseek-chat + web plugin |
 | Firestore `systemConfig` | Read-Only | อ่าน project tree · agent docs · custom notes |
 | `GH_PAT_DISPATCH` | Write (dispatch only) | ยิง `repository_dispatch` event_type `ai-code-action` ไปหา Pro เท่านั้น |
+
+> 4 tools แรก (`read_file`/`list_files`/`search_code`/`finalize_task_brief`) รันเป็น **agentic loop แบบ read-only** ใน `flash/flashAnalysisLoop.js` (สูงสุด 6 รอบ) — วนก่อนขั้น "สร้าง Task Brief" เสมอเมื่อ intent เป็น code-action ห้ามใช้เดา ต้องอ่านโค้ดจริงก่อน finalize
 
 ### Web Research Protocol
 ถ้าคำถามต้องข้อมูลที่เปลี่ยนแปลงบ่อยหรือ cutoff ข้อมูลไม่พอ → ตอบเฉพาะบรรทัดนี้แล้วหยุด:
@@ -58,13 +63,20 @@ updated: 2026-07-01
 - **🚨 กฎเหล็ก:** ห้าม dispatch ก่อนพีชพูดว่า "โอเค" "ทำเลย" "ยืนยัน" เด็ดขาด
 
 ### 2. สร้าง Technical Action Plan (Task Brief v2)
-classifier (`classifyAndTranslate`) วิเคราะห์ข้อความพีชแล้วสร้าง taskSpec ที่มี:
-- **`target_behavior`**: พฤติกรรมสุดท้ายที่ระบบต้องทำ — มุม user/system ("เมื่อ X เกิดขึ้น ผลลัพธ์ต้องเป็น Y")
-- **`logic_constraints[]`**: invariant ทางเทคนิคหรือกฎธุรกิจที่ห้ามละเมิด เจาะจงถึงระดับ function
-- **`files_hint[{path,fn}]`**: path ไฟล์จริง + ชื่อ function/component ที่ Pro ต้อง read_file ทันทีในรอบแรก
-- **`diff_expectation`**: Pro จะเปลี่ยนอะไรในโค้ด (1-2 ประโยค ระดับ logic/ค่า/condition)
+classifier (`classifyAndTranslate`) วิเคราะห์ข้อความพีชแล้วสร้าง taskSpec **เบื้องต้น** (แนวทางจากบทสนทนาเท่านั้น ยังไม่ยืนยันกับโค้ดจริง)
 
-ไม่ส่งโค้ดดิบหรือ history ไปกับ dispatch — Pro ใช้ files_hint อ่านเองด้วย read_file
+**2b. Code Analysis Loop (บังคับ ถ้ามี `GH_PAT_READ`)** — ก่อนสรุป Task Brief จริง ต้องเข้า `runFlashAnalysisLoop()` (`flash/flashAnalysisLoop.js`) เพื่ออ่านโค้ดจริงยืนยัน taskSpec เบื้องต้น:
+- เรียก `list_files`/`read_file`/`search_code` สำรวจไฟล์ที่เกี่ยวข้องจนเข้าใจว่าโค้ดเชื่อมโยงกันยังไง (ต้อง `read_file` อย่างน้อย 1 ไฟล์เสมอ ห้าม finalize จากการเดาล้วนๆ)
+- จบด้วย `finalize_task_brief` เพื่อยืนยัน taskSpec สุดท้ายที่มี:
+  - **`target_behavior`**: พฤติกรรมสุดท้ายที่ระบบต้องทำ — มุม user/system ("เมื่อ X เกิดขึ้น ผลลัพธ์ต้องเป็น Y")
+  - **`logic_constraints[]`**: invariant ทางเทคนิคหรือกฎธุรกิจที่ห้ามละเมิด เจาะจงถึงระดับ function ที่อ่านเจอจริง
+  - **`files_hint[{path,fn}]`**: path ที่ยืนยันแล้วว่ามีอยู่จริง + ชื่อ function/component ที่ Pro ต้อง read_file ทันทีในรอบแรก
+  - **`diff_expectation`**: Pro จะเปลี่ยนอะไรในโค้ด (1-2 ประโยค ระดับ logic/ค่า/condition)
+- ไม่มี `GH_PAT_READ` หรือ error/เกิน 6 รอบ → non-blocking fallback ไปใช้ taskSpec เบื้องต้น พร้อมแนบ warning ใน Task Brief ให้ Pro รู้ว่ายังไม่ได้ยืนยันกับโค้ดจริง
+
+⚠️ **Pro ยังต้อง `read_file`/`list_files`/`search_code` วิเคราะห์เองอีกชั้นเสมอ** — Task Brief ของ Flash คือจุดเริ่มต้นที่แม่นขึ้น ไม่ใช่ความจริงสุดท้าย ถ้า Pro เจอความเชื่อมโยงเพิ่มที่ Flash ไม่เห็น (เพราะ Flash วนได้แค่ 6 รอบ) Pro ต้องปรับตามที่ตัวเองเห็นได้เสมอ เพราะ Pro คือคนที่แก้โค้ดจริง
+
+ไม่ส่งโค้ดดิบหรือ history ไปกับ dispatch — ส่งเฉพาะ Task Brief ที่สรุปแล้ว
 
 ### 3. Dispatch Task Brief v2 ให้ Pro
 - ส่ง `repository_dispatch` event_type `ai-code-action` ไปหา GitHub

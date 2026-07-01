@@ -11,6 +11,33 @@
   - จุดสำคัญ: ทุกครั้งที่ checkpoint ทำงาน loop ยัง `continue` ทำงานต่อทันทีเหมือนเดิม — checkpoint คือจุดสรุป ไม่ใช่จุดจบงาน (คงพฤติกรรมเดิมไว้ครบ ไม่มีจุดไหนที่ทำให้ agent หยุดนิ่งรอ)
 - **`max_tokens`** ของ tool-loop (`callOpenRouterWithTools`): 4096 → **6144** — เดิมต่ำกว่าที่ Pro model ใช้ตอน chat ปกติ (8192 ใน `flashModels.js`) ทั้งที่งานเขียนโค้ด/patch ควรได้
 
+---
+
+## 2026-07-01 — feat: Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief
+
+### อาการ/งาน
+Flash (`classifyAndTranslate`) เดา `target_behavior`/`logic_constraints`/`files_hint` ทั้งหมดจากบทสนทนาอย่างเดียว ไม่เคยอ่านเนื้อโค้ดจริงก่อนสรุปงานส่งให้ Pro — จุดที่มีอยู่แล้ว (`fetchRepoFiles` ใน `aiChatAgent.js`) ถูกเรียกใช้แค่ **เช็กว่า path มีอยู่จริงไหม** (M1, PR #450) เนื้อไฟล์ที่ดึงมาได้ถูกทิ้งไม่ได้ใช้วิเคราะห์อะไรต่อ ทั้งที่ `docs/AI_AGENT_SYSTEM.md` เดิมเขียนไว้ว่า "แนบเข้า Task Brief" — เอกสารกับโค้ดจริงไม่ตรงกัน
+
+### วิธีแก้
+- เพิ่ม `apps/webhook-core/src/flash/flashAnalysisLoop.js` — read-only agentic loop ใหม่สำหรับ Flash (`runFlashAnalysisLoop`)
+  - Tools: `read_file` (GH_PAT_READ, 3,000 chars/ไฟล์), `list_files` (กรอง project tree จาก Firestore), `search_code` (ค้นข้ามไฟล์ สูงสุด 5 ไฟล์), `finalize_task_brief` (จบ loop ด้วยระบบยืนยัน ไม่ใช่อนุมานจาก finish_reason — ต้อง `read_file` มาก่อนอย่างน้อย 1 ไฟล์เสมอ)
+  - `MAX_ITERATIONS = 6` (สำรวจเบื้องต้น ไม่ใช่แก้โค้ด ไม่ต้องเผื่อรอบเยอะแบบ Pro), timeout ต่อรอบ 60s
+  - ผูก **`GH_PAT_READ` เท่านั้น** — read-only ล้วน ไม่มี patch/write/commit เหมือน Pro
+- `aiChatAgent.js` — แทนที่ block "verify files_hint (เช็กแค่ path)" ด้วยการเรียก `runFlashAnalysisLoop()` ก่อนสร้าง Task Brief จริง — non-blocking เสมอ: ไม่มี `GH_PAT_READ` / error / เกิน 6 รอบ → fallback ไปใช้ taskSpec เบื้องต้นจาก classify พร้อมแนบ warning ชัดเจนใน Task Brief ว่ายังไม่ได้ยืนยันกับโค้ดจริง
+- confirmationMessage ที่ส่งให้พีชตอน "พิมพ์ไฟเขียว" ตอนนี้สร้างจาก taskSpec ที่ยืนยันจากโค้ดจริงแล้ว (ไม่ใช่แค่เดา)
+- อัปเดต `FLASH.md` + `docs/AI_AGENT_SYSTEM.md` ให้ตรงกับโค้ดจริง (มาตรฐานใหม่ในรอบนี้: **เอกสารต้องตรงโค้ด ไม่ใช่แค่ตั้งใจไว้**)
+
+### หมายเหตุสำคัญ — Pro ยังต้องวิเคราะห์เองอีกชั้นเสมอ
+Task Brief ของ Flash คือจุดเริ่มต้นที่แม่นขึ้น **ไม่ใช่ความจริงสุดท้าย** — Flash วนอ่านโค้ดได้แค่ 6 รอบ (bounded) ถ้า Pro เจอความเชื่อมโยงเพิ่มที่ Flash ไม่เห็น ต้องปรับตามที่ Pro วิเคราะห์เองได้เสมอ (Pro มี `read_file`/`list_files`/`search_code`/`patch_file`/`write_file` ของตัวเองอยู่แล้วใน `agentTools.js` — ไม่เปลี่ยนแปลง)
+
+### วิธีตรวจถ้าพัง
+- ถ้า Flash ตอบ confirmation แบบเดิม (ไม่มี "จีจี้อ่านโค้ดแล้วนะครับพี่") ทั้งที่ `GH_PAT_READ` ตั้งค่าไว้แล้ว → เช็ก log `runFlashAnalysisLoop failed` ใน Cloud Function logs
+- ถ้า Task Brief มี warning "อ่านโค้ดไม่ทันครบ (เกินรอบวิเคราะห์)" บ่อยผิดปกติ → พิจารณาขยับ `MAX_ITERATIONS` ใน `flashAnalysisLoop.js`
+- `node --check apps/webhook-core/src/flash/flashAnalysisLoop.js` ✅
+- `node --check apps/webhook-core/src/aiChatAgent.js` ✅
+
+---
+
 ## 2026-07-01 — tune: Pro Agent loop ceiling + recurring checkpoint + token limit
 
 ### อาการ/งาน
