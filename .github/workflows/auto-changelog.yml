@@ -47,11 +47,36 @@ jobs:
           mv /tmp/merged_changelog.md docs/AGENT_CHANGELOG_TH.md
           echo "✅ prepend สำเร็จ"
 
+      - name: Detect touched apps + prepend apps/<app>/CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # ดึงรายชื่อไฟล์ที่ PR นี้แก้ผ่าน GitHub API (ไม่พึ่ง git diff เพราะ merge strategy
+          # ต่างกันได้ — merge commit/squash/rebase ทำให้ HEAD~1 ไม่แน่นอน)
+          FILES=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER/files?per_page=100" | \
+            grep -o '"filename": *"[^"]*"' | sed -E 's/"filename": *"([^"]*)"/\1/')
+
+          if [ -z "$FILES" ]; then
+            echo "⚠️ ดึงรายชื่อไฟล์ไม่ได้ (API error หรือไม่มีไฟล์) — ข้าม per-app changelog รอบนี้"
+          else
+            for app_changelog in apps/*/CHANGELOG.md; do
+              [ -f "$app_changelog" ] || continue
+              app_dir=$(dirname "$app_changelog")
+              if echo "$FILES" | grep -q "^${app_dir}/"; then
+                cat /tmp/new_entry.md "$app_changelog" > /tmp/merged_app_changelog.md
+                mv /tmp/merged_app_changelog.md "$app_changelog"
+                echo "✅ prepend $app_changelog สำเร็จ (PR แตะไฟล์ใน ${app_dir}/)"
+              fi
+            done
+          fi
+
       - name: Commit changelog
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/AGENT_CHANGELOG_TH.md
+          git add docs/AGENT_CHANGELOG_TH.md apps/*/CHANGELOG.md
           if git diff --cached --quiet; then
             echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
           else
