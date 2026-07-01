@@ -1,3 +1,37 @@
+## 2026-07-01 — fix: Flash path verification (M1) + Pro auto-changelog quality (M2) (PR #450)
+
+## สรุป
+
+แก้ Bottleneck ระดับ Medium 2 ข้อที่เหลือจาก Audit Flash Flow & Pro Flow
+
+## M1 — Flash path verification (`aiChatAgent.js`)
+
+**ปัญหาเดิม:** `files_hint` ที่ Flash สร้างมา = LLM เดา path จาก system prompt hardcoded ไม่มีการตรวจสอบ repo จริง → Pro `read_file` ครั้งแรกได้ `❌ ไม่พบไฟล์` → เสีย iteration
+
+**การแก้:**
+- เรียก `fetchRepoFiles(GH_PAT_READ, hintPaths)` (สูงสุด 3 path) หลัง classify เป็น code-action
+- ถ้า path ใดไม่พบใน main branch → แนบ warning ต่อท้าย taskBrief ก่อน save `pendingAction`
+- **Non-blocking:** ถ้า `GH_PAT_READ` ไม่ได้ตั้งค่าหรือ network error → skip warning, flow ปกติ
+
+## M2 — Pro auto-changelog quality (`toolExecutors.js`)
+
+**ปัญหาเดิม:** `commit_and_pr` auto-inject changelog มีแค่ `วันที่ — PR title + ไฟล์ที่แก้ + branch` → ขาดรายละเอียดที่ AGENTS.md กำหนด (อาการ/สาเหตุ/วิธีแก้/วิธีตรวจถ้าพัง)
+
+**การแก้:**
+- entry ใหม่มี sections: **อาการ/งาน** (จาก `commit_msg`) + **รายละเอียด** (จาก `pr_body` 4 บรรทัดแรก) + **ไฟล์ที่แก้** + **Branch**
+- แนบ note เตือนว่า "auto-generated — Pro ควรเพิ่มรายละเอียดให้ครบ"
+
+## ตรวจสุขภาพ
+- `node --check aiChatAgent.js` ✅
+- `node --check toolExecutors.js` ✅
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+https://claude.ai/code/session_012EjL66R6dMhsCUt4RxUALS
+
+---
+_Gene
+
 ## 2026-07-01 — fix: Flash path verification + Pro auto-changelog (M1+M2)
 
 ### อาการ
