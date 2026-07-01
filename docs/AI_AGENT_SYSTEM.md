@@ -54,7 +54,7 @@ Flash polling → PWA แสดงผล
 
 ```
 MAX_ITERATIONS     = 22   — หยุดแน่นอน + emergency commit ถ้ามีไฟล์ staged
-SUMMARY_CHECKPOINT =     — รอบ 9 บังคับสรุปความคืบหน้า แล้วดำเนินต่อ
+CHECKPOINT_INTERVAL = 7   — สรุปความคืบหน้าซ้ำทุก 7 รอบ แล้วดำเนินต่อทันที (ไม่ใช่ครั้งเดียว)
 aiResults TTL      = 2h   — Firestore aiResults/{requestId} หมดอายุหลัง 2 ชั่วโมง
 timeout GHA        = 30m  — GitHub Actions timeout (ai-workflow-trigger.yml)
 ```
@@ -120,7 +120,7 @@ flowchart TD
         GH2 --> GH3[handleCodeActionV2\naiWorkflowAgent.js\nOPENROUTER_API_KEY_PRO]
         GH3 --> GH4[fetchAgentDocs\nอ่าน AGENTS.md + docs\nจาก GitHub API]
         GH4 --> GH5[buildAgentSystemPrompt\nSCOPE_FILE_TREE\nเลือกไฟล์ตาม scope]
-        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=22\nCHECKPOINT=]
+        GH5 --> GH6[runAgentLoop\nagentTools.js\nMAX_ITERATIONS=22\nCHECKPOINT=7]
 
         GH6 --> TOOL{AI เลือก tool\nทีละขั้น}
         TOOL -->|read_file| T1[GitHub API\nดึงเนื้อไฟล์]
@@ -240,7 +240,7 @@ chincha-business-os/
 │   │   └── buildAgentSystemPrompt()      ← system prompt + scope skill
 │   │
 │   └── shared/
-│       ├── agentTools.js                 ← LOOP: MAX_ITERATIONS=22, CHECKPOINT=
+│       ├── agentTools.js                 ← LOOP: MAX_ITERATIONS=22, CHECKPOINT=7
 │       │   └── runAgentLoop()            ← agentic loop orchestrator
 │       ├── toolDefinitions.js            ← tool schemas (10 tools)
 │       ├── toolExecutors.js              ← execute tool calls ผ่าน GitHub API
