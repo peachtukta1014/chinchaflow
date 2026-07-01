@@ -1,23 +1,23 @@
 # Code Metrics Report
 
-Generated: 2026-06-29T18:10:37.612Z
+Generated: 2026-07-01T17:04:22.295Z
 
 ## Summary
 
-- Files: 449
-- Lines: 56,496
-- Non-blank lines: 51,039
-- Blank lines: 5,457
-- Bytes: 2,559,363
+- Files: 454
+- Lines: 57,629
+- Non-blank lines: 51,960
+- Blank lines: 5,669
+- Bytes: 2,672,862
 
 ## By language
 
 | Language | Files | Lines | Non-blank | Blank | Bytes |
 |---|---:|---:|---:|---:|---:|
-| JavaScript | 257 | 28,837 | 26,099 | 2,738 | 1,169,222 |
+| JavaScript | 258 | 29,298 | 26,519 | 2,779 | 1,201,829 |
 | React JSX | 96 | 19,708 | 18,482 | 1,226 | 826,422 |
-| Markdown | 46 | 5,514 | 4,233 | 1,281 | 475,867 |
-| YAML | 15 | 1,286 | 1,146 | 140 | 46,421 |
+| Markdown | 48 | 6,034 | 4,597 | 1,437 | 549,886 |
+| YAML | 17 | 1,438 | 1,283 | 155 | 53,294 |
 | Firebase Rules | 3 | 495 | 437 | 58 | 20,241 |
 | JSON | 15 | 408 | 408 | 0 | 11,302 |
 | HTML | 5 | 106 | 106 | 0 | 4,418 |
@@ -27,8 +27,8 @@ Generated: 2026-06-29T18:10:37.612Z
 
 ## Top files by line count
 
-1. `apps/seafood-pos/scripts/smoke-test.mjs` — 1,455 lines
-2. `docs/AGENT_CHANGELOG_TH.md` — 1,253 lines
+1. `docs/AGENT_CHANGELOG_TH.md` — 1,898 lines
+2. `apps/seafood-pos/scripts/smoke-test.mjs` — 1,455 lines
 3. `apps/seafood-pos/src/liff/LineOrderLiffApp.jsx` — 977 lines
 4. `apps/seafood-pos/src/lib/firestoreRest.js` — 891 lines
 5. `apps/seafood-pos/src/components/LotReportPanel.jsx` — 811 lines
@@ -43,7 +43,7 @@ Generated: 2026-06-29T18:10:37.612Z
 14. `apps/seafood-pos/src/components/LineOaCustomersPanel.jsx` — 572 lines
 15. `apps/seafood-pos/src/services/stockService.js` — 560 lines
 16. `apps/webhook-core/src/index.js` — 549 lines
-17. `apps/chincha-tea/src/lib/i18n/my.js` — 525 lines
-18. `apps/webhook-core/src/aiWorkflowAgent.js` — 525 lines
+17. `apps/webhook-core/src/aiWorkflowAgent.js` — 548 lines
+18. `apps/chincha-tea/src/lib/i18n/my.js` — 525 lines
 19. `apps/webhook-core/src/seafood-oa/parseLineOrder.js` — 519 lines
 20. `apps/chincha-tea/src/App.jsx` — 516 lines
