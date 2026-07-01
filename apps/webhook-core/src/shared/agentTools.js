@@ -86,7 +86,7 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
         tools,
         tool_choice: toolChoice,
         temperature: 0.1,
-        max_tokens: 4096,
+        max_tokens: 6144,
       }),
     });
   } catch (fetchErr) {
@@ -146,8 +146,11 @@ async function callOpenRouterWithTools(apiKey, messages, tools, model, forceTool
 // เปล่าๆ แทนการยิง structured tool_calls) ถ้าเชื่อ finish_reason เฉยๆ จะได้ผลลัพธ์
 // "นิ่งกลางทาง" — ดู docs/AGENT_CHANGELOG_TH.md (2026-06-21, "agentic loop ใช้ tools จริง")
 async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeFileTree, systemPrompt, isHighRisk = true }) {
-  const MAX_ITERATIONS = 30;        // รอบสูงสุด 30 รอบ
-  const SUMMARY_CHECKPOINT = 9;     // รอบ 9: บังคับสรุปความคืบหน้า → save Firestore → ดำเนินการต่อ
+  const MAX_ITERATIONS = 22;         // รอบสูงสุด 22 รอบ — เผื่อ buffer เหนือ worst-case งานซับซ้อนจริง (~18-20 รอบ)
+  const CHECKPOINT_INTERVAL = 7;    // สรุปความคืบหน้าซ้ำทุก 7 รอบ (ไม่ใช่ครั้งเดียว) — ป้องกัน context บวมในงานยาว
+  // ⚠️ ทุกครั้งที่ checkpoint ทำงาน ต้อง `continue` ดำเนินการต่อเสมอ ห้ามหยุดนิ่งรอ —
+  // checkpoint คือสรุป context ให้กระชับ ไม่ใช่จุดจบงาน (ดู isCheckpointRound ด้านล่าง)
+  const isCheckpointRound = (n) => n % CHECKPOINT_INTERVAL === 0 && n < MAX_ITERATIONS;
   const stagedFiles = {};
 
   // ── Error boundary state ───────────────────────────────────────────────────
@@ -225,28 +228,28 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
-    // Checkpoint รอบ 9 — บังคับสรุป context ก่อน overflow → save → ดำเนินการต่อ
-    if (iterations === SUMMARY_CHECKPOINT && !taskCompleted) {
+    // Checkpoint ทุก CHECKPOINT_INTERVAL รอบ — บังคับสรุป context ก่อน overflow → save → ดำเนินการต่อเสมอ
+    if (isCheckpointRound(iterations) && !taskCompleted) {
       messages.push({
         role: 'user',
         content: `[Checkpoint รอบ ${iterations}] สรุปสั้นๆ ก่อนดำเนินการต่อ:\n` +
           `1. ไฟล์ที่อ่านไปแล้ว + สิ่งที่ค้นพบสำคัญ\n` +
           `2. งานที่แก้ไปแล้ว (ถ้ามี)\n` +
           `3. ขั้นตอนต่อไป\n\n` +
-          `หลังสรุปแล้วดำเนินการต่อได้เลย`,
+          `หลังสรุปแล้วดำเนินการต่อทันที ห้ามหยุดรอ`,
       });
     }
 
     const stepLabel = iterations === 1
       ? 'V4-Pro กำลังวิเคราะห์คำสั่ง...'
-      : iterations === SUMMARY_CHECKPOINT
+      : isCheckpointRound(iterations)
         ? `V4-Pro กำลังสรุปความคืบหน้า (รอบ ${iterations})...`
         : `V4-Pro กำลังดำเนินการ (รอบ ${iterations})...`;
     await writeProgress(requestId, stepLabel);
 
     // บังคับ tool_choice='required' ทุกรอบ จนกว่าระบบจะยืนยันว่างานจบจริง (taskCompleted)
-    // ยกเว้นรอบ SUMMARY_CHECKPOINT ที่อนุญาตให้ตอบ text สรุปได้
-    const forceTools = !taskCompleted && iterations !== SUMMARY_CHECKPOINT;
+    // ยกเว้นรอบ checkpoint ที่อนุญาตให้ตอบ text สรุปได้ (แล้ว continue ต่อทันที — ดูด้านล่าง)
+    const forceTools = !taskCompleted && !isCheckpointRound(iterations);
     const choice = await callOpenRouterWithTools(apiKey, messages, TOOL_DEFINITIONS, undefined, forceTools);
     _totalProInput += choice._usage?.prompt_tokens || 0;
     _totalProOutput += choice._usage?.completion_tokens || 0;
@@ -321,7 +324,8 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       }
     } else if (!taskCompleted) {
       // รอบ checkpoint — text สรุปคือสิ่งที่เราขอ ไม่นับเป็น text-only ผิดรูปแบบ
-      if (iterations === SUMMARY_CHECKPOINT) {
+      // continue เสมอ — checkpoint ต้องไม่ทำให้ loop หยุดนิ่ง (ห้ามจบตรงนี้)
+      if (isCheckpointRound(iterations)) {
         consecutiveTextOnlyReplies = 0;
         const summarySnippet = (stripDsml(assistantMessage.content || '')).slice(0, 600);
         if (summarySnippet) {
@@ -428,7 +432,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
 
   throw new Error(
     `Agent loop เกิน ${MAX_ITERATIONS} รอบ — งานซับซ้อนเกินไปหรือ AI วนซ้ำ\n` +
-    `(มี checkpoint สรุปที่รอบ ${SUMMARY_CHECKPOINT} แล้ว)\n` +
+    `(มี checkpoint สรุปทุก ${CHECKPOINT_INTERVAL} รอบแล้ว)\n` +
     `${stagedPaths.length > 0 ? `งานที่ทำไปบางส่วน (${stagedPaths.join(', ')}) commit ไว้ใน PR [WIP] แล้ว\n` : ''}` +
     `ลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อย`
   );

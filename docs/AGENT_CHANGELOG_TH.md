@@ -1,3 +1,20 @@
+## 2026-07-01 — tune: Pro Agent loop ceiling + recurring checkpoint + token limit
+
+### อาการ/งาน
+`MAX_ITERATIONS=30` สูงเกิน worst-case จริงของงานซับซ้อน (~18-20 รอบ) ทำให้เผื่อ token/cost เกินจำเป็น และ `SUMMARY_CHECKPOINT` แบบครั้งเดียวที่รอบ 9 ไม่พอกันไม่ให้ context บวมถ้ารันยาวถึง 20+ รอบ ส่วน `max_tokens` ของ tool-loop (4096) ต่ำกว่าที่ Pro model ใช้ตอน chat ปกติ (8192) ทั้งที่งานเขียนโค้ด/patch ควรได้โควตามากกว่า
+
+### วิธีแก้ (`apps/webhook-core/src/shared/agentTools.js`)
+- `MAX_ITERATIONS`: 30 → **22** (เผื่อ buffer เหนือ worst-case งานซับซ้อนจริง)
+- `SUMMARY_CHECKPOINT` (ครั้งเดียว) → `CHECKPOINT_INTERVAL = 7` + `isCheckpointRound()` — สรุป context **ซ้ำทุก 7 รอบ** (รอบ 7, 14) แทนครั้งเดียว
+- ทุกจุดที่เดิมเช็ก `iterations === SUMMARY_CHECKPOINT` เปลี่ยนเป็น `isCheckpointRound(iterations)` — คงพฤติกรรม `continue` เดิมไว้ทุกครั้งที่ checkpoint ทำงาน (checkpoint = สรุปแล้วทำงานต่อทันที **ไม่ใช่จุดจบงาน** — ห้าม loop หยุดนิ่งหลัง checkpoint)
+- `max_tokens` ใน `callOpenRouterWithTools`: 4096 → **6144**
+
+### วิธีตรวจถ้าพัง
+- ถ้า Pro หยุดนิ่งหลัง checkpoint (log มี "Checkpoint รอบ X" แล้วไม่มี tool call ตามมา) → ตรวจว่า `isCheckpointRound()` return false ในรอบถัดไป และ `forceTools` กลับมา `true` ปกติ
+- ถ้างานซับซ้อนชนเพดาน 22 รอบบ่อยผิดปกติ → ดู `agentRunLogs/{requestId}/steps` ว่าติด spin/error loop หรือ genuinely ต้องการรอบมากกว่านี้จริง
+
+---
+
 ## 2026-07-01 — fix: Flash path verification (M1) + Pro auto-changelog quality (M2) (PR #450)
 
 ## สรุป

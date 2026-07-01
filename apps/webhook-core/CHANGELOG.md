@@ -7,6 +7,10 @@
 
 ## 2026-07
 
+### 2026-07-01 | tune: Pro Agent loop ceiling + recurring checkpoint + token limit
+- `src/shared/agentTools.js` — `MAX_ITERATIONS` 30 → 22, `SUMMARY_CHECKPOINT` (ครั้งเดียว) → `CHECKPOINT_INTERVAL=7` ซ้ำทุก 7 รอบผ่าน `isCheckpointRound()`, `max_tokens` ของ tool-loop 4096 → 6144
+- **ผลกระทบ**: ลด token cost/ความเสี่ยง runaway ของงานทั่วไป โดยยังเผื่อ buffer พอสำหรับงานซับซ้อนหลายไฟล์ (~18-20 รอบจริง) checkpoint ที่เกิดซ้ำยังคง `continue` ทำงานต่อทุกครั้ง ไม่หยุดนิ่ง
+
 ### 2026-07-01 | fix: Flash path verification + Pro auto-changelog (M1+M2)
 - `src/aiChatAgent.js` — M1: เพิ่ม `fetchRepoFiles(GH_PAT_READ, hintPaths)` ตรวจ files_hint paths หลัง classify, แนบ warning ใน taskBrief ถ้าไม่พบ (non-blocking)
 - `src/shared/toolExecutors.js` — M2: auto-changelog entry ตอนนี้รวม commit_msg + pr_body snippet + sections อาการ/รายละเอียด/ไฟล์/branch
