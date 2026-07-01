@@ -1,3 +1,20 @@
+## 2026-07-01 — feat: Scope-Level Error Pointer + Post-Validation Schema (Flash) (PR #454)
+
+## สรุป
+
+Gemini เสนอ audit มา 2 ข้อที่เหลือจากรอบก่อน — ตรวจกับโค้ดจริงแล้วปรับ design ให้เข้ากับสถาปัตยกรรมที่มีอยู่ก่อนลงมือ (ตามที่พีชให้ใช้ดุลพินิจ):
+
+1. **Flash ไม่รู้ว่ารอบก่อน Pro พังเพราะอะไร** — `aiResults/{requestId}` เป็น ephemeral (frontend อ่านเสร็จลบทันที) และไม่มี pointer ว่า requestId ล่าสุดของ scope นี้คืออันไหน (requestId สุ่มใหม่ทุกข้อความ) → อาจสั่งงานซ้ำที่พังแบบเดิมอีก
+2. **`classifyAndTranslate` ไม่มีชั้นตรวจ schema** — parse JSON ด้วย regex + `JSON.parse()` เปลือยๆ ถ้า LLM ตอบ taskSpec ไม่ครบ (ขาด `target_behavior` ฯลฯ) จะหลุดไปสร้าง Task Brief ที่พังแบบเงียบๆ
+
+## การเปลี่ยนแปลง
+
+**1) Scope-Level Error Pointer**
+- `progressTracker.js` — `writeLastRunStatus(scope, {...})` เขียน `systemConfig/lastRunByScope` (เอกสารเดียว คีย์ด้วย scope, `merge:true` — ปรับจาก path ที่เสนอมา `systemConfig/lastRunByScope/{scope}` เพราะนั่นมี 3 segments ชี้ไป collection ไม่ใช่ document จริง)
+- `aiWorkflowAgent.js` — เขียน pointer คู่กับ `writeResult` ทั้ง success/error path
+- `fail-pro-agent.cjs` — เขียน pointer เพิ่มตอน Pro crash กลางคัน
+- `flashContext.js` — `loadLastExecutionStatus(scope)` อ่าน p
+
 ## 2026-07-01 — feat: Scope-Level Error Pointer + Post-Validation Schema (Flash)
 
 ### อาการ/งาน
