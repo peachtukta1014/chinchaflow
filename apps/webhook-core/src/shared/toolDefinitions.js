@@ -81,7 +81,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'patch_file',
-      description: 'แก้ไขเฉพาะส่วนของไฟล์ด้วย find & replace — ต้อง read_file ก่อน, find ต้องตรงเป๊ะกับไฟล์จริง',
+      description: 'แก้ไขเฉพาะส่วนของไฟล์ด้วย find & replace — ต้อง read_file ก่อน, find ต้องตรงเป๊ะกับไฟล์จริง และต้องไม่ซ้ำใคร (unique) ในไฟล์ ถ้า pattern ซ้ำหลายจุดให้ใส่บรรทัดก่อน/หลังเพิ่มเพื่อความจำเพาะ',
       parameters: {
         type: 'object',
         properties: {

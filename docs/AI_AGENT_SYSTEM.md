@@ -64,7 +64,7 @@ timeout GHA        = 30m  — GitHub Actions timeout (ai-workflow-trigger.yml)
 | Spin detection | tool+args เดิมซ้ำ ≥3 ครั้งใน 6 รอบ | หยุดทันที |
 | Consecutive errors | tool ❌ ติดกัน ≥4 ครั้ง | หยุดทันที |
 | Per-tool errors | tool เดียวกัน ❌ รวม ≥4 ครั้ง | หยุดทันที |
-| Emergency commit | ถึง MAX=30 มีไฟล์ staged | commit `[WIP]` แล้วหยุด |
+| Emergency commit | ถึง MAX_ITERATIONS=22 มีไฟล์ staged | commit `[WIP]` แล้วหยุด — PR URL แนบไปในข้อความ error ที่ส่งกลับพีชเสมอ |
 
 ---
 

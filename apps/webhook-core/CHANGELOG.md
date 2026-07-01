@@ -7,6 +7,14 @@
 
 ## 2026-07
 
+### 2026-07-01 | fix: Pro Agent audit — WIP PR หายเงียบ + patch_file uniqueness
+- `src/shared/agentTools.js` — เก็บ PR URL จาก emergency commit (ตอนชน MAX_ITERATIONS) ใส่ใน error message แทนการทิ้งไปเฉยๆ
+- `src/aiWorkflowAgent.js` — ดึง PR URL จาก error message มาแนบในข้อความที่ส่งกลับพีชตอน isMaxIter แทนข้อความทั่วไปที่กลบข้อมูลนี้ไป
+- `src/shared/toolExecutors.js` — `patch_file` เช็ค occurrence ของ `find` ก่อน replace ถ้าซ้ำ >1 จุด → ปฏิเสธ (กันแก้ผิดจุดแบบเงียบๆ)
+- `src/shared/toolDefinitions.js` — อัปเดต description `patch_file` ให้บอกเรื่อง uniqueness ล่วงหน้า
+- `PRO.md` — sync tool param names ให้ตรงโค้ดจริง + แก้ MAX_ITERATIONS=30/SUMMARY_CHECKPOINT=9 ที่ค้างเป็น 22/7
+- **ผลกระทบ**: พีชจะไม่พลาดเห็น WIP PR ที่ Pro เปิดไว้ก่อนชนเพดานรอบอีกต่อไป + Pro ปลอดภัยขึ้นตอน patch ไฟล์ที่มี pattern ซ้ำ
+
 ### 2026-07-01 | feat: Scope-Level Error Pointer + Post-Validation Schema (Flash)
 - `src/shared/progressTracker.js` — เพิ่ม `writeLastRunStatus(scope, {...})` เขียน `systemConfig/lastRunByScope` (merge ต่อ scope)
 - `src/aiWorkflowAgent.js` — เรียก `writeLastRunStatus` คู่กับ `writeResult` ทั้ง success/error path

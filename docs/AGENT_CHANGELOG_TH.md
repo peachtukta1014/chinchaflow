@@ -1,3 +1,24 @@
+## 2026-07-01 — fix: Pro Agent audit — WIP PR หายเงียบ + patch_file ไม่กันการแก้ผิดจุด
+
+### อาการ/งาน
+Audit ฝั่ง Pro Agent (`aiWorkflowAgent.js`, `agentTools.js`, `toolExecutors.js`, `toolDefinitions.js`) คู่กับที่ตรวจ Flash ไปก่อนหน้า — ยืนยันโฟลว์หลัก (Flash ส่ง Task Brief ล้วนๆ ไม่มี chat history ปน, Pro ยัง read_file/list_files เองก่อนแก้เสมอ) ถูกต้องตามที่ออกแบบไว้ แต่เจอ 2 บั๊กจริงในโค้ด:
+
+1. **WIP PR หายเงียบเมื่อ Pro ชนเพดานรอบ** — ตอน `runAgentLoop` ถึง `MAX_ITERATIONS` แล้วมีไฟล์ staged ค้าง จะ emergency-commit เปิด PR แท็ก `[WIP]` ให้ แต่ผลลัพธ์ (มี PR URL อยู่ข้างใน) ถูกทิ้งไปเฉยๆ ไม่ถูกใส่ใน error message ที่ throw ต่อ แถม `aiWorkflowAgent.js` ยังเขียนทับด้วยข้อความทั่วไป "งานซับซ้อนเกินไป..." อีกที — พีชไม่มีทางรู้เลยว่ามี PR ที่ทำไปบางส่วนรอตรวจอยู่แล้ว
+2. **`patch_file` ไม่เช็คว่า `find` unique ในไฟล์** — ใช้ `String.replace()` ซึ่งแก้แค่จุดแรกที่เจอ ถ้า pattern ซ้ำหลายที่ใน 1 ไฟล์ Pro จะได้ `✅ patch สำเร็จ` ทั้งที่แก้แค่จุดแรกแบบไม่รู้ตัว (จุดอื่นที่ต้องแก้เหมือนกันไม่ถูกแก้)
+
+### วิธีแก้
+- `agentTools.js` — เก็บผลลัพธ์จริงของ `commit_and_pr` ตอน emergency commit ไว้ใน `emergencyPrInfo` แล้วฝังเข้า error message ที่ throw แทนการทิ้งไป
+- `aiWorkflowAgent.js` — ใน catch block ดึง PR URL ออกจาก `err.message` ด้วย regex แล้วแนบเข้าข้อความ `isMaxIter` เพื่อให้พีชเห็นว่ามี PR `[WIP]` รอตรวจ ไม่ใช่แค่ "ลองใหม่"
+- `toolExecutors.js` — เพิ่มเช็ค occurrence count ของ `find` ก่อน replace จริง ถ้าเจอซ้ำ >1 ที่ → ปฏิเสธพร้อมบอกให้เพิ่ม context รอบข้าง (เหมือน Edit tool ของพี่ซีเอง)
+- `toolDefinitions.js` — ปรับ description ของ `patch_file` ให้บอก Pro ล่วงหน้าว่า `find` ต้อง unique
+- `PRO.md` — อัปเดต tool params ตารางให้ตรงโค้ดจริง (`get_skill(name)` ไม่ใช่ `skill_name`, `trigger_deploy(app, ref)` ไม่ใช่ `workflow/inputs`, `report_no_action_needed(summary, need_more_info)` ไม่ใช่ `reason`), แก้ MAX_ITERATIONS=30/SUMMARY_CHECKPOINT=9 ที่ค้างเป็น 22/CHECKPOINT_INTERVAL=7 ให้ตรง `agentTools.js`, แยกความสับสน `get_skill("scope-<scope>")` (โหลดกฎ) กับ `get_skill("run-<scope>")` (โหลด verify) ที่เอกสารเดิมปนกัน
+- `docs/AI_AGENT_SYSTEM.md` — แก้ตาราง Error Boundaries ที่ยังค้าง "MAX=30" ทั้งที่ค่าจริงอัปเดตเป็น 22 ไปแล้วตั้งแต่ PR #451 (สาเหตุ: sed pattern เดิมของ `sync-ai-constants.yml` ไม่ครอบคลุม shorthand "MAX=" นี้)
+- `sync-ai-constants.yml` — พบว่า workflow นี้ sync ให้แค่ `docs/AI_AGENT_SYSTEM.md` ไฟล์เดียว ไม่เคยแตะ `PRO.md` เลย (สาเหตุที่ PRO.md ค้างเลขเก่าตั้งแต่ PR #451) → เพิ่ม `PRO.md` เข้า target, เปลี่ยน sed pattern จาก exact-whitespace-match เป็น whitespace-tolerant (`\1` เก็บ spacing เดิม) กันปัญหาเดิมซ้ำ พร้อม exclude บรรทัดที่มี `flashAnalysisLoop`/`finalize_task_brief` (Flash's MAX_ITERATIONS=6 คนละตัวกับของ Pro) ไม่ให้โดนทับผิด
+
+### วิธีตรวจถ้าพัง
+- `node --check` ทุกไฟล์ที่แก้ ✅ (agentTools.js, aiWorkflowAgent.js, toolExecutors.js, toolDefinitions.js)
+- ทดสอบ sed pattern ใหม่ด้วยมือ (จำลอง MAX=99/CHECKPOINT=8) ยืนยันว่าอัปเดตทุกจุดที่ควรอัปเดต และไม่แตะ `MAX_ITERATIONS=6` ของ Flash
+
 ## 2026-07-01 — feat: Scope-Level Error Pointer + Post-Validation Schema (Flash) (PR #454)
 
 ## สรุป

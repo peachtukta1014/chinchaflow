@@ -87,6 +87,13 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
         return `❌ หา "${preview}..." ใน ${args.path} ไม่เจอ\n→ ตรวจว่า find ตรงกับผล read_file เป๊ะ (รวม space/indent) หรือ read_file อีกครั้งเพื่อตรวจ`;
       }
 
+      // .replace() แก้แค่จุดแรกที่เจอ — ถ้า find ไม่ unique จะแก้ผิดจุดแบบเงียบๆ (ตอบ ✅ ทั้งที่ patch ผิดที่)
+      const occurrences = currentContent.split(args.find).length - 1;
+      if (occurrences > 1) {
+        const preview = args.find.slice(0, 100).replace(/\n/g, '↵');
+        return `❌ "${preview}..." ใน ${args.path} เจอซ้ำ ${occurrences} ที่ — ห้ามแก้ (จะโดนแก้แค่จุดแรกโดยไม่รู้ตัว)\n→ เพิ่ม context รอบข้าง (บรรทัดก่อน/หลัง) ให้ find ไม่ซ้ำใครแล้วลองใหม่`;
+      }
+
       const newContent = currentContent.replace(args.find, args.replace_with);
       stagedFiles[args.path] = { content: newContent, sha: currentSha, reason: args.reason };
       return `✅ patch สำเร็จ: ${args.path}\nแก้: ${args.reason}`;

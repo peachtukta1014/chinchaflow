@@ -29,21 +29,27 @@ jobs:
           echo "CHECKPOINT=$CHECKPOINT" >> $GITHUB_OUTPUT
           echo "📌 MAX_ITERATIONS=$MAX CHECKPOINT_INTERVAL=$CHECKPOINT"
 
-      - name: Patch docs/AI_AGENT_SYSTEM.md
+      - name: Patch docs (AI_AGENT_SYSTEM.md + PRO.md)
         run: |
           MAX="${{ steps.extract.outputs.MAX }}"
           CHECKPOINT="${{ steps.extract.outputs.CHECKPOINT }}"
-          sed -i "s/MAX_ITERATIONS     = [0-9]*/MAX_ITERATIONS     = $MAX/" docs/AI_AGENT_SYSTEM.md
-          sed -i "s/CHECKPOINT_INTERVAL = [0-9]*/CHECKPOINT_INTERVAL = $CHECKPOINT/" docs/AI_AGENT_SYSTEM.md
-          sed -i "s/MAX_ITERATIONS=[0-9]*/MAX_ITERATIONS=$MAX/g" docs/AI_AGENT_SYSTEM.md
-          sed -i "s/CHECKPOINT=[0-9]*/CHECKPOINT=$CHECKPOINT/g" docs/AI_AGENT_SYSTEM.md
-          echo "✅ patch docs/AI_AGENT_SYSTEM.md เสร็จ"
+          # match แบบ whitespace-tolerant (\1 เก็บ spacing เดิมของแต่ละไฟล์ไว้) — กันปัญหา
+          # เดิมที่ sed ต้องเว้นวรรคตรงเป๊ะถึงจะ match ทำให้ PRO.md หลุด sync ไปทั้งที่ workflow รันผ่านตลอด
+          # /flashAnalysisLoop|finalize_task_brief/! → ข้ามบรรทัดที่พูดถึง Flash's MAX_ITERATIONS=6 (คนละ constant
+          # คนละไฟล์กับ agentTools.js ของ Pro) ไม่งั้น sed จะไปทับเลข 6 ของ Flash ด้วยความผิดพลาด
+          for f in docs/AI_AGENT_SYSTEM.md PRO.md; do
+            [ -f "$f" ] || continue
+            sed -i -E "/flashAnalysisLoop|finalize_task_brief/! s/(MAX_ITERATIONS[[:space:]]*=[[:space:]]*)[0-9]+/\1$MAX/g" "$f"
+            sed -i -E "/flashAnalysisLoop|finalize_task_brief/! s/(CHECKPOINT_INTERVAL[[:space:]]*=[[:space:]]*)[0-9]+/\1$CHECKPOINT/g" "$f"
+            sed -i -E "/flashAnalysisLoop|finalize_task_brief/! s/(CHECKPOINT[[:space:]]*=[[:space:]]*)[0-9]+/\1$CHECKPOINT/g" "$f"
+          done
+          echo "✅ patch เสร็จ (MAX_ITERATIONS=$MAX, CHECKPOINT_INTERVAL=$CHECKPOINT)"
 
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/AI_AGENT_SYSTEM.md
+          git add docs/AI_AGENT_SYSTEM.md PRO.md
           if git diff --cached --quiet; then
             echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
           else
