@@ -1,3 +1,19 @@
+## 2026-07-01 — fix: Flash path verification + Pro auto-changelog (M1+M2)
+
+### อาการ
+- M1: Flash เดา `files_hint` path โดยไม่ตรวจสอบ → Pro `read_file` ครั้งแรกได้ `❌ ไม่พบไฟล์` เสีย iteration
+- M2: Auto-changelog ใน `commit_and_pr` มีแค่ title/files/branch — ขาด อาการ/สาเหตุ/วิธีแก้/วิธีตรวจ
+
+### วิธีแก้
+- M1: `aiChatAgent.js` — เรียก `fetchRepoFiles(GH_PAT_READ, hintPaths)` หลัง classify code-action แล้วแนบ warning ใน taskBrief ถ้า path ไม่พบ (non-blocking)
+- M2: `toolExecutors.js` — เพิ่ม `commit_msg` + `pr_body` snippet เข้า auto-changelog entry ให้ครอบคลุม อาการ/รายละเอียด/ไฟล์/branch
+
+### วิธีตรวจถ้าพัง
+- M1: ถ้า Flash ไม่แนบ warning ทั้งที่ path ผิด → ตรวจ `GH_PAT_READ` ใน Secret Manager
+- M2: Auto-changelog ไม่มี section "อาการ/งาน" → ตรวจ `commit_msg` ใน args ของ `commit_and_pr`
+
+---
+
 ## 2026-07-01 — fix: get_skill enum + skillPaths — เพิ่ม scope-* และ run-* สำหรับ Pro Agent (PR #449)
 
 ## สรุป
@@ -28,9 +44,6 @@
 
 ## ผลที่ได้
 Pro Agent สามารถเรียก `get_skill("scope-seafood")` เพื่อโหลด scope rules (ขั้น 0a) และ `get_skill("run-seafood-pos")` เพื่อโหลด verify commands (ขั้น 3) ได้จริงแล้ว
-
-## ตรวจสุขภาพ
-- `node --chec
 
 ## 2026-07-01 — fix: get_skill — เพิ่ม scope-* และ run-* เข้า enum + skillPaths (Pro Agent)
 
