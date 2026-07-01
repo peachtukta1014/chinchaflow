@@ -7,6 +7,10 @@
 
 ## 2026-07
 
+### 2026-07-01 | fix: Flash path verification + Pro auto-changelog (M1+M2)
+- `src/aiChatAgent.js` — M1: เพิ่ม `fetchRepoFiles(GH_PAT_READ, hintPaths)` ตรวจ files_hint paths หลัง classify, แนบ warning ใน taskBrief ถ้าไม่พบ (non-blocking)
+- `src/shared/toolExecutors.js` — M2: auto-changelog entry ตอนนี้รวม commit_msg + pr_body snippet + sections อาการ/รายละเอียด/ไฟล์/branch
+
 ### 2026-07-01 | fix: get_skill enum + skillPaths — เพิ่ม scope-* และ run-* (Pro Agent)
 - `src/shared/toolDefinitions.js` — get_skill enum: เพิ่ม scope-seafood, scope-tea, scope-webhook, scope-root, scope-scheduled, run-seafood-pos, run-chincha-tea, run-webhook-core, run-ai-chat
 - `src/shared/toolExecutors.js` — skillPaths map: เพิ่ม 4 run-* entries ชี้ไปที่ `apps/*/.claude/skills/run-*/SKILL.md`

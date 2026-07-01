@@ -174,7 +174,9 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
           : null;
         if (changelog) {
           const today = new Date().toISOString().slice(0, 10);
-          const entry = `## ${today} — ${args.pr_title}\n- ไฟล์ที่แก้: ${committed.join(', ')}\n- Branch: ${branchName}`;
+          // ดึง summary สั้นจาก pr_body (กรองบรรทัดว่าง + จำกัด 300 chars)
+          const bodySnippet = (args.pr_body || '').split('\n').filter(l => l.trim()).slice(0, 4).join('\n').slice(0, 300);
+          const entry = `## ${today} — ${args.pr_title}\n\n### อาการ/งาน\n${args.commit_msg || args.pr_title}\n\n### รายละเอียด\n${bodySnippet || '(ดูใน PR body)'}\n\n### ไฟล์ที่แก้\n${committed.map(f => `- ${f}`).join('\n')}\n\n### Branch: ${branchName}\n_auto-generated — Pro ควรเพิ่ม: สาเหตุ / วิธีแก้ / วิธีตรวจถ้าพัง ให้ครบ_`;
           const firstEntry = changelog.content.split('\n').find(l => l.startsWith('## '));
           if (firstEntry) {
             const newChangelog = changelog.content.replace(firstEntry, entry + '\n\n' + firstEntry);

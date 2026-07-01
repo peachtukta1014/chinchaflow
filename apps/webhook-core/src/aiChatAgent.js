@@ -15,7 +15,7 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
@@ -189,9 +189,31 @@ exports.aiChatAgentHttp = functions
 
       const taskBrief = buildTaskBrief(classified, message);
 
+      // Verify files_hint paths via GH_PAT_READ — ป้องกัน Pro เสีย iteration เพราะ LLM เดา path ผิด
+      // non-blocking: fail silently ถ้า GH_PAT_READ ไม่ได้ตั้งค่าหรือ network error
+      let taskBriefFinal = taskBrief;
+      const ghPatRead = (process.env.GH_PAT_READ || '').trim();
+      const hintFiles = Array.isArray(classified.taskSpec?.files_hint) ? classified.taskSpec.files_hint : [];
+      if (ghPatRead && hintFiles.length > 0) {
+        const hintPaths = hintFiles.slice(0, 3)
+          .map(f => (typeof f === 'string' ? f : f?.path))
+          .filter(Boolean);
+        if (hintPaths.length > 0) {
+          try {
+            const found = await fetchRepoFiles(ghPatRead, hintPaths);
+            const missing = hintPaths.filter(p => !found[p]);
+            if (missing.length > 0) {
+              taskBriefFinal += `\n\n⚠️ **Path ยังไม่ยืนยัน (GH_PAT_READ ตรวจไม่พบ):**\n` +
+                missing.map(p => `• \`${p}\``).join('\n') +
+                `\n→ Pro ใช้ \`list_files\` หาไฟล์จริงก่อน อย่า \`read_file\` path นี้ตรงๆ`;
+            }
+          } catch { /* skip — ไม่ block flow หลัก */ }
+        }
+      }
+
       // บันทึก Task Brief รอพีชพิมพ์ "ไฟเขียว"
       await savePendingAction(requestId, {
-        taskBrief,
+        taskBrief: taskBriefFinal,
         scope: finalScope,
         isHighRisk: classified.isHighRisk !== false,
         confirmation: classified.confirmation || '',
