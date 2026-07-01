@@ -1,5 +1,44 @@
 ## 2026-07-01 — fix: AI agent safety — result-before-delete, brief-retry, file-list-50, token-schema (PR #446)
 
+## สรุป
+
+แก้ 4 จุดเสี่ยงจาก security/logic audit ของ `aiChatAgent.js` + `aiWorkflowAgent.js` + `progressTracker.js`
+
+---
+
+## การเปลี่ยนแปลง
+
+### ข้อ 2 — `aiChatAgent.js` (result endpoint)
+**อาการ:** `clearResult` รันก่อน `res.json` → ถ้า mobile หลุดระหว่าง 2 บรรทัดนี้ ผลงาน Pro ถูกลบไปแล้วแต่พีชไม่ได้รับ หา recovery ไม่ได้แม้ TTL ยังไม่หมด
+
+**แก้:** สลับลำดับ — respond ก่อน แล้ว cleanup เป็น fire-and-forget
+
+```js
+// เดิม
+await clearResult(req.query.requestId);
+res.json({ found: true, ... });
+
+// ใหม่
+res.json({ found: true, ... });
+clearResult(req.query.requestId).catch(() => {});
+```
+
+---
+
+### ข้อ 5A — `aiChatAgent.js` (ไฟเขียว flow)
+**อาการ:** `clearPendingAction` รันก่อน `dispatchToProAgent` → ถ้า GitHub API ล้ม Task Brief หายถาวร พีชต้องพิมพ์คำสั่งใหม่ทั้งหมด
+
+**แก้:** ย้าย `clearPendingAction` เข้า try block หลัง dispatch สำเร็จ — ถ้า dispatch fail, brief ยังอยู่ พีชพิมพ์ "ไฟเขียว" ซ้ำได้ทันที
+
+---
+
+### ข้อ 4 — `aiWorkflowAgent.js` (system prompt file list)
+**อาการ:** `.slice(0, 25)` ทำให้ Pro เห็นแค่ 25 ไฟล์แรกใน system prompt (seafood มี 88 ไฟล์, tea ~70, root 200+) — Pro ต้อง call `list_files` เพิ่มเพื่อค้นหาไฟล์ที่ซ่อนอยู่
+
+**แก้:** เพิ่มเป็น `.slice(0, 50)` — DeepSeek V4 Pro มี 1M context window รับ 50 ไฟล์สบา
+
+## 2026-07-01 — fix: AI agent safety — result-before-delete, brief-retry, file-list-50, token-schema (PR #446)
+
 ## สิ่งที่แก้
 
 | ข้อ | ไฟล์ | อาการ | วิธีแก้ |
