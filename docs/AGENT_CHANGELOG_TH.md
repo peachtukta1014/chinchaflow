@@ -1,5 +1,35 @@
 ## 2026-07-01 — docs: sync AGENTS.md, CLAUDE.md, FLASH.md, PRO.md ให้ตรงกับ flow ปัจจุบัน (PR #448)
 
+## สรุป
+
+อัปเดต system prompt files ทั้ง 4 ไฟล์ให้ sync กับ flow การทำงานปัจจุบัน หลังจาก PR #445 (run-skills), #446 (safety fixes), #447 (Task Brief v2)
+
+---
+
+## การเปลี่ยนแปลงแต่ละไฟล์
+
+### AGENTS.md
+- **path ผิด**: `.cursor/skills/` → `.claude/commands/` + `apps/*/.claude/skills/` (โฟลเดอร์ `.cursor/` ไม่มีใน repo)
+- **typo**: `auto-shrip` → `auto-shrimp`
+- **ลบ**: `deploy-shrimp`, `deploy-tea` (ไม่มีใน `.claude/commands/`)
+- **เพิ่ม**: run-skills 4 ตัวในตาราง `get_skill("run-seafood-pos")`, `get_skill("run-chincha-tea")`, `get_skill("run-ai-chat")`, `get_skill("run-webhook-core")`
+- **แก้**: search path ให้รวม `apps/*/.claude/skills/`
+
+### CLAUDE.md
+- **ลบ**: `.jiiji/` folder reference (โฟลเดอร์นี้ไม่มีใน repo จริง)
+- **แก้**: `docs/AI_AGENT_DIAGRAM.md` → `docs/AI_AGENT_SYSTEM.md` (เปลี่ยนชื่อแล้วตั้งแต่ PR #442)
+- **เพิ่ม**: run-skills 4 ตัวในตาราง "สิ่งที่มีอยู่แล้ว"
+- **อัปเดต**: ระบบ AI summary ให้รวม Task Brief v2 + role ใหม่ของ Flash
+
+### FLASH.md (v3.0 → v4.0)
+- **Role ใหม่**: "Technical Translator & Project Director" (จาก "เลขาส่วนตัว")
+- **Section 2**: เปลี่ยนจาก "อ่านโค้ดล่วงหน้า (preload)" → "สร้าง Technical Action Plan (Task Brief v2)" พร้อมอธิบาย schema ใหม่: `target_behavior`, `logic_constraints[]`, `files_hint[{path,fn}]`, `diff_expectation`
+- **Section 3**: อัปเดต payload description ให้ตรงกับ Task Brief v2 format
+
+### PRO.md (v1.0 → v2.0
+
+## 2026-07-01 — docs: sync AGENTS.md, CLAUDE.md, FLASH.md, PRO.md ให้ตรงกับ flow ปัจจุบัน (PR #448)
+
 | ไฟล์ | สิ่งที่เปลี่ยน |
 |------|--------------|
 | `AGENTS.md` | path `.cursor/skills/` → `.claude/commands/`; แก้ typo `auto-shrip`; ลบ deploy-skills ที่ไม่มีจริง; เพิ่ม run-skills 4 ตัว |
