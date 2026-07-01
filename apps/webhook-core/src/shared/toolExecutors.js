@@ -174,33 +174,9 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
         committed.push(filePath);
       }
 
-      // Auto-add changelog entry — ข้ามถ้า Pro อัปเดต changelog เองแล้ว (ป้องกัน entry ซ้ำ)
-      try {
-        const changelog = !committed.includes('docs/AGENT_CHANGELOG_TH.md')
-          ? await fetchRepoFile(ghPat, 'docs/AGENT_CHANGELOG_TH.md', branchName)
-          : null;
-        if (changelog) {
-          const today = new Date().toISOString().slice(0, 10);
-          // ดึง summary สั้นจาก pr_body (กรองบรรทัดว่าง + จำกัด 300 chars)
-          const bodySnippet = (args.pr_body || '').split('\n').filter(l => l.trim()).slice(0, 4).join('\n').slice(0, 300);
-          const entry = `## ${today} — ${args.pr_title}\n\n### อาการ/งาน\n${args.commit_msg || args.pr_title}\n\n### รายละเอียด\n${bodySnippet || '(ดูใน PR body)'}\n\n### ไฟล์ที่แก้\n${committed.map(f => `- ${f}`).join('\n')}\n\n### Branch: ${branchName}\n_auto-generated — Pro ควรเพิ่ม: สาเหตุ / วิธีแก้ / วิธีตรวจถ้าพัง ให้ครบ_`;
-          const firstEntry = changelog.content.split('\n').find(l => l.startsWith('## '));
-          if (firstEntry) {
-            const newChangelog = changelog.content.replace(firstEntry, entry + '\n\n' + firstEntry);
-            await fetch(`${GH_API}/repos/${GH_REPO}/contents/docs/AGENT_CHANGELOG_TH.md`, {
-              method: 'PUT',
-              headers: { 'Authorization': `token ${ghPat}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json', 'User-Agent': 'CF-AI' },
-              body: JSON.stringify({
-                message: commitMsg,
-                content: Buffer.from(newChangelog).toString('base64'),
-                branch: branchName,
-                sha: changelog.sha,
-                committer: { name: 'V4-Pro (AI)', email: ADMIN_EMAIL },
-              }),
-            });
-          }
-        }
-      } catch { /* changelog failure is non-fatal */ }
+      // เดิมมี auto-add changelog entry ตรงนี้ — ลบออก เพราะ auto-changelog.yml เขียนให้แล้ว
+      // อัตโนมัติตอน PR merge (ทั้ง docs/AGENT_CHANGELOG_TH.md และ apps/<app>/CHANGELOG.md ตามไฟล์ที่แตะ)
+      // เขียนซ้ำสองจุดทำให้ entry ซ้ำ + ต้องแก้ conflict บ่อยตอน rebase
 
       // Open PR
       const riskNote = isHighRisk

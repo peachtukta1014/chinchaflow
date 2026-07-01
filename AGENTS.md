@@ -49,9 +49,7 @@
 > Flash (จีจี้) ไม่แก้โค้ด — ไม่ต้องทำ
 
 1. **อ่าน `docs/AGENT_CHANGELOG_TH.md` ก่อนลงมือทุกครั้ง** ดูว่ารอบก่อนแก้อะไรไปแล้ว ป้องกันแก้ซ้ำหรือ conflict กัน
-2. **อัปเดต changelog ใน commit/PR เดียวกันเสมอ** (ไม่ต้องรอ merge) ได้แก่:
-   - `docs/AGENT_CHANGELOG_TH.md` — สรุปอาการ, สาเหตุ, วิธีแก้, วิธีตรวจถ้าพัง
-   - `apps/<app>/CHANGELOG.md` — ของแอปที่เปลี่ยน
+2. **ห้ามเขียน/แก้ `docs/AGENT_CHANGELOG_TH.md` หรือ `apps/<app>/CHANGELOG.md` เอง** — `.github/workflows/auto-changelog.yml` เขียนให้อัตโนมัติตอน PR merge (repo-wide + per-app ตามไฟล์ที่ PR แตะ) หน้าที่ของ AI คือแค่**อ่านก่อนแก้** ไม่ใช่บันทึกเอง (เดิมให้เขียนเองด้วย ทำให้เกิด entry ซ้ำซ้อนกับที่ workflow เขียนตอน merge — ยกเลิกแล้ว 2026-07)
 
 ## เอกสารให้เอเจนต์ (อ่านทุกรอบ)
 
