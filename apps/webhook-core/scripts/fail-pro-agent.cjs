@@ -20,6 +20,7 @@ if (!requestId) {
 const scope = process.env.SCOPE || 'root';
 const runId = process.env.GITHUB_RUN_ID || null;
 
+// pointer งานล่าสุดของ scope นี้ — ไม่มี taskMessage ต้นฉบับในเคส crash กลางคัน (script นี้ไม่ได้รับ message)
 Promise.all([
   db.collection('aiResults').doc(requestId).set({
     reply: `V4-Pro หยุดทำงานกลางคันครับพี่ 🙏\n\n` +
@@ -31,6 +32,15 @@ Promise.all([
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true }),
   db.collection('aiProgress').doc(requestId).delete().catch(() => {}),
+  db.collection('systemConfig').doc('lastRunByScope').set({
+    [scope]: {
+      lastRequestId: requestId,
+      status: 'error',
+      taskMessage: '',
+      errorSummary: `Pro หยุดทำงานกลางคัน (timeout/crash) — Run ID: ${runId || 'N/A'}`,
+      updatedAt: Date.now(),
+    },
+  }, { merge: true }).catch(() => {}),
 ]).then(() => {
   console.log(`✅ fail-cleanup เขียน error result + clear progress สำหรับ ${requestId}`);
   process.exit(0);

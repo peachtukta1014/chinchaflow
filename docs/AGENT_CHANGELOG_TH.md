@@ -1,3 +1,31 @@
+## 2026-07-01 — feat: Scope-Level Error Pointer + Post-Validation Schema (Flash)
+
+### อาการ/งาน
+สองช่องโหว่ที่เหลือจาก audit ของ Gemini (ตรวจกับโค้ดจริงแล้วปรับ design ให้เข้ากับสถาปัตยกรรมที่มีอยู่):
+1. Flash ไม่รู้เลยว่ารอบก่อน Pro พังเพราะอะไร — อาจสั่งงานซ้ำที่พังแบบเดิมอีก (`aiResults/{requestId}` เป็น ephemeral ถูกลบทันทีที่ client อ่าน + ไม่มี pointer ว่า requestId ล่าสุดของ scope นี้คืออันไหน)
+2. `classifyAndTranslate` parse JSON ด้วย regex + `JSON.parse()` เปลือยๆ ไม่มีชั้นตรวจ shape — ถ้า LLM ตอบ taskSpec ไม่ครบ (เช่นขาด `target_behavior`) จะหลุดไปสร้าง Task Brief ที่พังแบบเงียบๆ
+
+### วิธีแก้
+
+**1) Scope-Level Error Pointer**
+- `progressTracker.js` — เพิ่ม `writeLastRunStatus(scope, {requestId, status, taskMessage, errorSummary})` เขียนลง `systemConfig/lastRunByScope` (เอกสารเดียว คีย์ด้วย scope, `merge:true` — pattern เดียวกับ `deployNotify.js`, ไม่ใช่ path `systemConfig/lastRunByScope/{scope}` ตรงๆ ตามที่เสนอมาเพราะ path นั้นมี 3 segments = ชี้ไป collection ไม่ใช่ document)
+- `aiWorkflowAgent.js` — เรียก `writeLastRunStatus` ทั้ง 2 จุด (สำเร็จ + error) คู่กับ `writeResult` เดิม
+- `fail-pro-agent.cjs` — เขียน pointer เพิ่มด้วยตอน Pro crash กลางคัน (ไม่มี `taskMessage` ต้นฉบับในเคสนี้เพราะ script ไม่ได้รับ message)
+- `flashContext.js` — เพิ่ม `loadLastExecutionStatus(scope)` อ่าน pointer กลับ
+- `aiChatAgent.js` — เช็ก pointer ก่อนเรียก classifier เสมอ เฉพาะกรณี `status==='error'` และไม่เก่าเกิน **6 ชั่วโมง** (`LAST_RUN_STALE_MS`) ถึงจะส่งเข้า context — กันเอา error เก่าข้ามวันมาปนกับงานคนละเรื่อง
+- `flashTriggers.js` — `classifyAndTranslate` รับ `lastRunStatus` เพิ่ม แนบ `taskMessage`/`errorSummary` เข้า system prompt พร้อมกฎ "ถ้าเป็นการสั่งซ้ำงานเดิม → เพิ่ม logic_constraints จากสาเหตุที่พัง ถ้าคนละเรื่อง → ไม่ต้องสนใจ"
+
+**2) Post-Validation Schema (ไม่ใช้ native `response_format`)**
+- ตัดสินใจไม่ใช้ strict `response_format`/JSON Schema ระดับ API เพราะไม่มั่นใจว่า provider ของ `deepseek-v4-flash` ผ่าน OpenRouter รองรับเต็มรูปแบบ (ยังไม่ได้ทดสอบจริง) — ใช้ post-validation layer แทนซึ่งเข้ากับ pattern fallback ที่มีอยู่แล้ว
+- `flashTriggers.js` — เพิ่ม `isValidTaskSpec(taskSpec)` เช็ก `description`/`target_behavior`/`logic_constraints[]`/`files_hint[]` ครบ shape ก่อนอนุญาตให้เป็น code-action — ถ้าไม่ครบ → fallback `{intent:'chat'}` ทันที (ปรับชื่อ field จาก `analysis_summary` ที่เสนอมาเป็น `description` ให้ตรงกับ schema จริงที่ใช้อยู่)
+
+### วิธีตรวจถ้าพัง
+- `node --check` ทุกไฟล์ที่แก้ ✅
+- ถ้า Flash ไม่เห็น error รอบก่อนทั้งที่ Pro เพิ่งพังไป → เช็ก Firestore `systemConfig/lastRunByScope/{scope}` ว่ามี field `status:'error'` จริงไหม + `updatedAt` ไม่เกิน 6 ชม.
+- ถ้า code-action หลุดไปเป็น chat บ่อยผิดปกติ → ดู Cloud Function log หา `"taskSpec schema ไม่ครบ"` (`console.warn` ใน `isValidTaskSpec` fail path)
+
+---
+
 ## 2026-07-01 — fix: sync-ai-constants.yml ยังอ้าง SUMMARY_CHECKPOINT ที่ถูกลบไปแล้ว (PR #453)
 
 ## สรุป

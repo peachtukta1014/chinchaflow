@@ -36,6 +36,16 @@ async function loadCustomNotes() {
   } catch { return ''; }
 }
 
+// อ่าน pointer "งานล่าสุดของ scope นี้" (เขียนโดย Pro — writeLastRunStatus ใน progressTracker.js)
+// ไม่มี cache — ต้องเห็นสถานะล่าสุดจริงเสมอ ไม่งั้น Flash อาจพลาดเห็น error รอบก่อนที่เพิ่งเกิด
+async function loadLastExecutionStatus(scope) {
+  if (!scope) return null;
+  try {
+    const snap = await _fsDb().collection('systemConfig').doc('lastRunByScope').get();
+    return snap.data()?.[scope] || null;
+  } catch { return null; }
+}
+
 async function loadAgentDocs() {
   const now = Date.now();
   if (_agentDocsCache && now - _agentDocsCachedAt < DOCS_TTL_MS) return _agentDocsCache;
@@ -153,4 +163,4 @@ async function fetchScopeSkill(pat, scope) {
   } catch { return ''; }
 }
 
-module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, fetchScopeSkill, savePendingAction, loadPendingAction, clearPendingAction };
+module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, fetchScopeSkill, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus };

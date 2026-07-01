@@ -149,4 +149,29 @@ async function writeTokenLog(requestId, data) {
   }
 }
 
-module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog, writeTokenLog };
+/**
+ * เขียน pointer "งานล่าสุดของ scope นี้" — ให้ Flash เช็กก่อนสร้าง taskSpec ใหม่ว่ารอบก่อนพังเพราะอะไร
+ * (แก้ปัญหา aiResults/{requestId} เป็น ephemeral + requestId สุ่มใหม่ทุกข้อความ หา "รอบก่อน" ไม่ได้)
+ * เก็บเป็น field ในเอกสารเดียว (`systemConfig/lastRunByScope`) คีย์ด้วย scope — ไม่มี TTL
+ * เขียนทับด้วยรอบล่าสุดเสมอ (snapshot ล่าสุด ไม่ใช่ log สะสม) — pattern เดียวกับ deployNotify.js
+ * @param {string} scope
+ * @param {{requestId: string, status: 'success'|'error', taskMessage?: string, errorSummary?: string}} data
+ */
+async function writeLastRunStatus(scope, { requestId, status, taskMessage, errorSummary } = {}) {
+  if (!scope) return;
+  try {
+    await getDb().doc('systemConfig/lastRunByScope').set({
+      [scope]: {
+        lastRequestId: requestId || null,
+        status: status || 'unknown',
+        taskMessage: (taskMessage || '').slice(0, 500),
+        errorSummary: (errorSummary || '').slice(0, 300),
+        updatedAt: Date.now(),
+      },
+    }, { merge: true });
+  } catch (err) {
+    console.warn(`[Progress Error] writeLastRunStatus failed for scope ${scope}:`, err.message);
+  }
+}
+
+module.exports = { writeProgress, clearProgress, readProgress, writeResult, readResult, clearResult, appendRunLog, writeTokenLog, writeLastRunStatus };

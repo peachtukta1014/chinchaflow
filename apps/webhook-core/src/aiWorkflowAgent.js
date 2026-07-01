@@ -21,7 +21,7 @@
  */
 
 const functions = require('firebase-functions/v1');
-const { writeProgress, clearProgress, writeResult, writeTokenLog } = require('./shared/progressTracker');
+const { writeProgress, clearProgress, writeResult, writeTokenLog, writeLastRunStatus } = require('./shared/progressTracker');
 const { runAgentLoop } = require('./shared/agentTools');
 const ADMIN_EMAIL = 'peachtukta1014@gmail.com';
 
@@ -471,6 +471,9 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
       status: 'completed',
     });
 
+    // pointer งานล่าสุดของ scope นี้ (ให้ Flash เช็กก่อนสรุปงานใหม่รอบหน้า) — non-blocking
+    writeLastRunStatus(currentScope, { requestId, status: 'success', taskMessage: message }).catch(() => {});
+
     return {
       statusCode: 200,
       body: {
@@ -508,6 +511,14 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     } catch (writeErr) {
       console.error('Failed to write error result to Firestore:', writeErr);
     }
+
+    // pointer งานล่าสุดของ scope นี้ — ให้ Flash รู้ว่ารอบก่อนพังเพราะอะไร ก่อนสรุปงานใหม่รอบหน้า (non-blocking)
+    writeLastRunStatus(currentScope || 'root', {
+      requestId,
+      status: 'error',
+      taskMessage: message,
+      errorSummary: err.message || 'unknown error',
+    }).catch(() => {});
 
     // โครงสร้างเดิมของระบบ ส่ง Payload กลับไปตามปกติ
     return {
