@@ -1,3 +1,20 @@
+## 2026-07-01 — feat: centralize changelog writing into auto-changelog.yml (deploy-tr… (PR #456)
+
+…iggered)
+
+เดิมมี 2 จุดเขียน changelog ซ้อนกัน: Pro Agent เขียนเองตอน commit_and_pr เปิด PR + auto-changelog.yml เขียนซ้ำอีกทีตอน PR merge — ทำให้ entry ซ้ำ/ต้องแก้ conflict บ่อยตอน rebase (เห็นได้จริงใน docs/AGENT_CHANGELOG_TH.md ของ PR ก่อนหน้าที่มี entry ซ้ำกัน 2 ชุด)
+
+ยึด auto-changelog.yml เป็นจุดเดียว (พีชเลือก):
+- ขยาย workflow ให้ตรวจไฟล์ที่ PR แตะผ่าน GitHub API แล้ว auto-append เข้า apps/<app>/CHANGELOG.md ของแอปที่เกี่ยวด้วย (เดิมทำแค่ docs/AGENT_CHANGELOG_TH.md)
+- ลบคำสั่งเขียน changelog ออกจาก system prompt ของ Pro (aiWorkflowAgent.js) และ auto-add logic ใน toolExecutors.js's commit_and_pr
+- อัปเดต PRO.md, AGENTS.md, CLAUDE.md ให้ตรงกัน — หน้าที่ของ Pro/พี่ซี ตอนนี้คือ "อ่านก่อนแก้" เท่านั้น ไม่ใช่บันทึกเอง
+
+ไม่เพิ่ม entry ให้ PR นี้เองใน docs/AGENT_CHANGELOG_TH.md — ปล่อยให้ auto-changelog.yml เขียนให้ตอน merge ตามกฎใหม่ที่เพิ่งตั้ง
+
+
+Claude-Session: https://claude.ai/code/session_01KxKmqRN4gJkKWP6aRb1mxd
+
+
 ## 2026-07-01 — fix: Pro Agent audit — WIP PR หายเงียบ + patch_file uniqueness check (PR #455)
 
 ## สรุป
