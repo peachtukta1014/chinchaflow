@@ -25,7 +25,7 @@ https://chincha-tea.web.app
 
 ## Skills (เฉพาะแอปนี้)
 
-- `.cursor/skills/auto-tea/` — build อัตโนมัติ รายงานสุขภาพ (เรียก `/auto-tea`)
-- `.cursor/skills/deploy-tea/` — build และ deploy ชา (เรียก `/deploy-tea`)
-- `.cursor/skills/ship-tea/` — **ปิดงานชา:** build ผ่าน → merge PR เข้า `main` → รอ deploy (เรียก `/ship-tea`)
-- Repo-wide: `.cursor/skills/land-it/` — เปิด/อัปเดต PR (`/land-it`)
+- `.claude/commands/auto-tea.md` — build อัตโนมัติ ตรวจสุขภาพ (`get_skill("auto-tea")`)
+- `.claude/commands/ship-tea.md` — **ปิดงานชา:** build ผ่าน → commit → เปิด PR → รอ merge (`get_skill("ship-tea")`) — deploy จริงเกิดหลัง merge `main` ผ่าน `deploy-hosting.yml` อัตโนมัติ
+- `apps/chincha-tea/.claude/skills/run-chincha-tea/` — dev server + screenshot (`get_skill("run-chincha-tea")`)
+- Repo-wide: `.claude/commands/land-it.md` — เปิด/อัปเดต PR (`get_skill("land-it")`)

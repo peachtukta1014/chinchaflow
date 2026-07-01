@@ -26,10 +26,10 @@ https://ko-seafood.top
 
 ## Skills (เฉพาะแอปนี้)
 
-- `.cursor/skills/auto-shrip/` — smoke + build อัตโนมัติ รายงาน Slack (เรียก `/auto-shrip`)
-- `.cursor/skills/deploy-shrimp/` — build, smoke test, deploy กุ้ง (เรียก `/deploy-shrimp`)
-- `.cursor/skills/ship-shrimp/` — **ปิดงานกุ้ง:** smoke + build ผ่าน → merge PR เข้า `main` → รอ deploy (เรียก `/ship-shrimp`)
-- Repo-wide: `.cursor/skills/land-it/` — เปิด/อัปเดต PR (`/land-it`)
+- `.claude/commands/auto-shrimp.md` — smoke + build อัตโนมัติ ตรวจสุขภาพ (`get_skill("auto-shrimp")`)
+- `.claude/commands/ship-shrimp.md` — **ปิดงานกุ้ง:** smoke + build ผ่าน → commit → เปิด PR → รอ merge (`get_skill("ship-shrimp")`) — deploy จริงเกิดหลัง merge `main` ผ่าน `deploy-hosting.yml` อัตโนมัติ
+- `apps/seafood-pos/.claude/skills/run-seafood-pos/` — dev server + screenshot + smoke test (`get_skill("run-seafood-pos")`)
+- Repo-wide: `.claude/commands/land-it.md` — เปิด/อัปเดต PR (`get_skill("land-it")`)
 
 ## ก่อนเพิ่ม CI / automation ใหม่
 

@@ -37,7 +37,7 @@ jobs:
           # เดิมที่ sed ต้องเว้นวรรคตรงเป๊ะถึงจะ match ทำให้ PRO.md หลุด sync ไปทั้งที่ workflow รันผ่านตลอด
           # /flashAnalysisLoop|finalize_task_brief/! → ข้ามบรรทัดที่พูดถึง Flash's MAX_ITERATIONS=6 (คนละ constant
           # คนละไฟล์กับ agentTools.js ของ Pro) ไม่งั้น sed จะไปทับเลข 6 ของ Flash ด้วยความผิดพลาด
-          for f in docs/AI_AGENT_SYSTEM.md PRO.md; do
+          for f in docs/AI_AGENT_SYSTEM.md PRO.md .skill/scope-root.md .skill/scope-webhook.md; do
             [ -f "$f" ] || continue
             sed -i -E "/flashAnalysisLoop|finalize_task_brief/! s/(MAX_ITERATIONS[[:space:]]*=[[:space:]]*)[0-9]+/\1$MAX/g" "$f"
             sed -i -E "/flashAnalysisLoop|finalize_task_brief/! s/(CHECKPOINT_INTERVAL[[:space:]]*=[[:space:]]*)[0-9]+/\1$CHECKPOINT/g" "$f"
@@ -49,7 +49,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/AI_AGENT_SYSTEM.md PRO.md
+          git add docs/AI_AGENT_SYSTEM.md PRO.md .skill/scope-root.md .skill/scope-webhook.md
           if git diff --cached --quiet; then
             echo "ไม่มีการเปลี่ยนแปลง — ข้าม"
           else
