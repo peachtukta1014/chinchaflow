@@ -133,7 +133,7 @@ async function appendRunLog(requestId, entry) {
 
 /**
  * เขียน/อัปเดต token log สำหรับ request นั้น
- * schema: { flash?, vision?, pro?, createdAt, requestId }
+ * schema: { flash?, vision?, search?, pro?, createdAt, requestId }
  * @param {string|null} requestId
  * @param {object} data — partial update (merge: true)
  */

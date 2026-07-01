@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07
+
+### 2026-07-01 | fix: AI agent safety — 4 จุดเสี่ยงจาก audit
+- `src/aiChatAgent.js` — ข้อ 2: สลับ clearResult ให้รันหลัง res.json (ป้องกันผลงาน Pro หายถ้า client หลุด)
+- `src/aiChatAgent.js` — ข้อ 5A: ย้าย clearPendingAction หลัง dispatchToProAgent สำเร็จ (ถ้า dispatch fail brief ยังอยู่ retry ได้)
+- `src/aiWorkflowAgent.js` — ข้อ 4: เพิ่ม file list ใน system prompt จาก 25 → 50 ไฟล์
+- `src/shared/progressTracker.js` — ข้อ 3: เพิ่ม `search?` ใน token schema comment
+
+---
+
 ## 2026-06
 
 ### 2026-06-30 | feat: Flash Code Reader — Flash อ่านโค้ดล่วงหน้าก่อน dispatch ให้ Pro

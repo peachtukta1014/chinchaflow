@@ -371,7 +371,7 @@ async function fetchRepoFile(pat, filePath, ref) {
 
 // ── Build system prompt for agentic loop ─────────────────────────────────
 function buildAgentSystemPrompt(scopeInfo, agentDocs, scope) {
-  const fileList = scopeInfo.files.slice(0, 25).join('\n');
+  const fileList = scopeInfo.files.slice(0, 50).join('\n');
   const overflow = scopeInfo.files.length > 25
     ? `\n... (และอีก ${scopeInfo.files.length - 25} ไฟล์ — เรียก list_files เพื่อดูทั้งหมด)`
     : '';
