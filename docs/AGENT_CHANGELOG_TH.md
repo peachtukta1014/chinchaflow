@@ -1,3 +1,16 @@
+## 2026-07-01 — tune: Pro Agent loop ceiling + recurring checkpoint + token limit (PR #451)
+
+## สรุป
+
+ปรับ tuning ของ Pro Agent agentic loop (`runAgentLoop` ใน `agentTools.js`) ตามการวิเคราะห์ trade-off ระหว่างต้นทุน token/ความเสี่ยง runaway กับ buffer สำหรับงานซับซ้อนหลายไฟล์จริง
+
+## การเปลี่ยนแปลง (`apps/webhook-core/src/shared/agentTools.js`)
+
+- **`MAX_ITERATIONS`**: 30 → **22** — เดิมเผื่อเพดานสูงเกินจำเป็น worst-case จริงของงานซับซ้อน (แก้หลายไฟล์เชื่อมโยงกัน) อยู่ที่ราว 18-20 รอบ ตัวเลขใหม่เผื่อ buffer พอดี ไม่ปล่อยให้ context/cost บวมเกินจำเป็น
+- **`SUMMARY_CHECKPOINT` (ครั้งเดียวที่รอบ 9) → `CHECKPOINT_INTERVAL = 7`** ผ่าน `isCheckpointRound()` — สรุป context **ซ้ำทุก 7 รอบ** (รอบ 7, 14) แทนครั้งเดียว เพื่อกัน context บวมในงานที่ยาวต่อเนื่อง
+  - จุดสำคัญ: ทุกครั้งที่ checkpoint ทำงาน loop ยัง `continue` ทำงานต่อทันทีเหมือนเดิม — checkpoint คือจุดสรุป ไม่ใช่จุดจบงาน (คงพฤติกรรมเดิมไว้ครบ ไม่มีจุดไหนที่ทำให้ agent หยุดนิ่งรอ)
+- **`max_tokens`** ของ tool-loop (`callOpenRouterWithTools`): 4096 → **6144** — เดิมต่ำกว่าที่ Pro model ใช้ตอน chat ปกติ (8192 ใน `flashModels.js`) ทั้งที่งานเขียนโค้ด/patch ควรได้
+
 ## 2026-07-01 — tune: Pro Agent loop ceiling + recurring checkpoint + token limit
 
 ### อาการ/งาน
