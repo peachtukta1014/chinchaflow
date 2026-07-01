@@ -47,7 +47,7 @@ src/flash/flashContext.js   # Firestore loaders + fetchChatAgentDocs()
 src/flash/flashTriggers.js  # tools ที่ Flash ใช้ได้
 src/flash/flashPrompts.js   # prompt templates
 src/aiWorkflowAgent.js      # Pro agent loop
-src/shared/agentTools.js    # MAX_ITERATIONS, SUMMARY_CHECKPOINT (CI auto-sync)
+src/shared/agentTools.js    # MAX_ITERATIONS, CHECKPOINT_INTERVAL (CI auto-sync)
 src/shared/progressTracker.js  # aiResults TTL (2 ชั่วโมง)
 ```
 
@@ -68,7 +68,7 @@ node --check apps/webhook-core/src/flash/flashContext.js
 - **`node src/index.js` crash ทันที** — `firebase-functions/v1` ต้องการ Cloud Functions runtime ไม่ใช่ Node.js ธรรมดา
 - **Test scripts ใน `scripts/` ส่วนใหญ่ต้องการ `../src/` module** — บาง script ทำงานได้ บางตัวไม่ได้ขึ้นกับ dependencies
 - **syntax check ต้องใช้ absolute path** หรือรันจาก repo root — `node --check` กับ relative path ใน shell loop อาจสับสน cwd
-- **`agentTools.js` มี constants ที่ CI auto-sync** — `MAX_ITERATIONS`, `SUMMARY_CHECKPOINT` อย่าแก้ค่า comment ใน `AI_AGENT_SYSTEM.md` ด้วยมือ
+- **`agentTools.js` มี constants ที่ CI auto-sync** — `MAX_ITERATIONS`, `CHECKPOINT_INTERVAL` อย่าแก้ค่า comment ใน `AI_AGENT_SYSTEM.md`/`PRO.md`/`.skill/scope-root.md`/`.skill/scope-webhook.md` ด้วยมือ
 
 ## Troubleshooting
 

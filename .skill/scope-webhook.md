@@ -19,4 +19,4 @@ node --check apps/webhook-core/src/<ทุกไฟล์ที่แก้>.js
 - **DSML strip** — DeepSeek ออก `<|DSML|invoke>` ใน text → strip ก่อน return (`aiChatAgent.js`)
 - **reasoning_content** — DeepSeek V4 Pro: multi-turn assistant messages ต้องมี `reasoning_content` ทุก turn (ไม่ส่ง → OpenRouter 400)
 - **Flash/Pro isolation** — Flash CF ต้องไม่รู้จัก `OPENROUTER_API_KEY_PRO` / `FIREBASE_SERVICE_ACCOUNT` เลย
-- **agentTools.js**: `MAX_ITERATIONS=30`, `SUMMARY_CHECKPOINT=9` — ห้ามเปลี่ยนโดยไม่อัปเดต docs/AI_AGENT_DIAGRAM.md พร้อมกัน
+- **agentTools.js**: `MAX_ITERATIONS=22`, `CHECKPOINT_INTERVAL=7` — sync อัตโนมัติเข้า `docs/AI_AGENT_SYSTEM.md` + `PRO.md` ผ่าน `sync-ai-constants.yml` (ไม่ต้องแก้ doc เอง แต่ต้องรู้ไว้ว่าค่าจริงคือเท่านี้)

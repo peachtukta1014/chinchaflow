@@ -1,13 +1,6 @@
 # Agent instructions
 
-## Cursor Cloud Agent (Slack / cursor.com/agents)
-
-- **Peter (พี่เซอ):** ผู้ใช้เรียกเอเจนต์ว่า **พี่เซอ** — โทนเพื่อนร่วมงาน senior full-stack ภาษาไทยได้ · ตำแหน่งใน repo = Senior Full-stack ดูแลชา + กุ้ง · รายละเอียด skill `.cursor/skills/peter-ser/` (`/peter-ser`)
-- **Slack รับงาน:** `#chincha-tea-agent` (ชา) · `#chincha-shrimp-agent` (กุ้ง) — แยก session ต่อแอป
-- **กุ้ง:** `apps/seafood-pos` · **ชา:** `apps/chincha-tea` · **LINE functions:** `apps/webhook-core`
-- Slack default model: **Claude 4.6 Sonnet** (Dashboard → Cloud Agents → My Settings). Composer in Slack: `@cursor with composer, …`
-- Dependencies on boot: `npm install` (see `.cursor/environment.json`)
-- **Agent Skills (monorepo):** repo-wide `.claude/commands/` (`peter-ser`, `land-it`, `auto-shrimp`, `auto-tea`, `ship-shrimp`, `ship-tea`) · app-scoped `apps/seafood-pos/.claude/skills/` (`run-seafood-pos`) · `apps/chincha-tea/.claude/skills/` (`run-chincha-tea`) · `apps/ai-chat/.claude/skills/` (`run-ai-chat`) · `apps/webhook-core/.claude/skills/` (`run-webhook-core`). Run skills ใช้สำหรับ dev-server, screenshot, syntax check — โหลดผ่าน `get_skill`
+> ไม่ใช้ Cursor Cloud Agent แล้ว (ย้ายมา Claude Code CLI เต็มตัว) — Agent Skills ทั้งหมดอยู่ที่ `.claude/commands/` (repo-wide: `peter-ser`, `land-it`, `auto-shrimp`, `auto-tea`, `ship-shrimp`, `ship-tea`) และ app-scoped `apps/*/.claude/skills/` (`run-seafood-pos`, `run-chincha-tea`, `run-ai-chat`, `run-webhook-core`) — โหลดผ่าน `get_skill`
 
 ## ก่อนเพิ่มของใหม่ — แจ้งเตือนถ้าไม่จำเป็น (บังคับสำหรับเอเจนต์)
 
@@ -42,7 +35,7 @@
 
 ### ตัวอย่างที่ทีมตัดสินแล้ว (ไม่ทำซ้ำ)
 
-- **GitHub Actions CI** รัน smoke + build กุ้งบนทุก PR — **ไม่จำเป็น**: มี smoke script + `auto-shrip` + deploy บน `main` อยู่แล้ว; PR #127 ปิดโดยไม่ merge.
+- **GitHub Actions CI** รัน smoke + build กุ้งบนทุก PR — **ไม่จำเป็น**: มี smoke script + skill `auto-shrimp` + deploy บน `main` อยู่แล้ว; PR #127 ปิดโดยไม่ merge.
 
 ## กฎ changelog — บังคับสำหรับ AI ทุกตัวที่แก้โค้ด (Pro Agent + Claude Code)
 
@@ -60,128 +53,6 @@
 | `docs/AGENT_CHANGELOG_TH.md` | รอบก่อนแก้อะไร — **อ่านก่อนไล่บั๊ก** · เพิ่มหลัง merge |
 | `docs/ARCHITECTURE_TH.md` | สถาปัตยกรรม, Firestore, deploy |
 | `docs/PROJECT_STRUCTURE.md` | โฟลเดอร์/ไฟล์สำคัญ |
+| `docs/AI_AGENT_SYSTEM.md` | สถาปัตยกรรม AI ครบชุด (Flash/Pro/keys/flow) |
+| `FLASH.md` · `PRO.md` | ตัวตน + workflow ของ Flash/Pro Agent |
 
-เมื่อ PR เปลี่ยน collection, โมดูล LINE, หรือ config สำคัญ — แก้ section ที่เกี่ยวในเอกสารด้านบนใน PR เดียวกัน (ไม่ copy ทั้ง repo ลงไฟล์ใหม่)
-
-## Cursor Cloud specific instructions
-
-### Product overview
-
-**CHINCHA FLOW** — business operations platform (POS + inventory + CRM + LINE), not POS-only.  
-Brand name: **CHINCHA FLOW** · Repo: **chincha-business-os** · Cloud: Firebase `chincha-eeed6`.  
-Naming reference: `docs/CHINCHA_FLOW_NAMING_TH.md`
-
-Firebase monorepo with two Vite/React PWAs:
-
-- **Tea POS** — `apps/chincha-tea` (`npm run dev:tea`, default http://localhost:5173)
-- **Shrimp POS** — `apps/seafood-pos` (`npm run dev:seafood`, Vite `--host 0.0.0.0`)
-- **LINE webhooks** — `apps/webhook-core` (deploy-only Cloud Functions; no local HTTP server)
-
-There is no docker-compose and no Firebase Emulator setup. Local dev talks to the **live** Firebase project.
-
-### Dependencies
-
-From repo root:
-
-```bash
-npm install
-```
-
-Node **>= 20** (root `package.json`). `webhook-core` workspaces declare `node: 20` exactly; Node 22 works but prints `EBADENGINE` warnings.
-
-### Environment variables
-
-Each app needs `apps/<app>/.env.local` (gitignored) with `VITE_FIREBASE_*` keys. CI uses GitHub Actions secrets; see `.github/workflows/deploy-hosting.yml` for the variable names. Tea and shrimp use **different** `VITE_FIREBASE_APP_ID` values.
-
-Without these vars, the login UI still renders but Firebase Auth/Firestore calls fail (`storageNotReady` on submit).
-
-### Cloud Agent Secrets (cursor.com → Dashboard → Cloud Agents → Secrets)
-
-Peach maintains these in the Dashboard (copy values from **GitHub → repo → Settings → Secrets** — same names where possible). **Do not guess** Firebase config; read from env or ask Peach.
-
-| Secret name (Dashboard) | Used for |
-|-------------------------|----------|
-| `VITE_FIREBASE_API_KEY` | both apps |
-| `VITE_FIREBASE_AUTH_DOMAIN` | both apps |
-| `VITE_FIREBASE_DATABASE_URL` | both apps (may be empty) |
-| `VITE_FIREBASE_PROJECT_ID` | `chincha-eeed6` |
-| `VITE_FIREBASE_STORAGE_BUCKET` | both apps |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | both apps |
-| `VITE_FIREBASE_APP_ID_SHRIMP` | กุ้ง — maps to `VITE_FIREBASE_APP_ID` in `apps/seafood-pos/.env.local` |
-| `VITE_FIREBASE_APP_ID_TEA` | ชา — maps to `VITE_FIREBASE_APP_ID` in `apps/chincha-tea/.env.local` |
-| `SHRIMP_AGENT_EMAIL` | E2E กุ้ง (e.g. `peachtukta1014@gmail.com`) |
-| `SHRIMP_AGENT_PASSWORD` | E2E กุ้ง — Dashboard only, never Slack/git |
-| `TEA_AGENT_EMAIL` | E2E ชา (bootstrap: `gmc-peach@chincha.pos` or `peachtukta1014@gmail.com`) |
-| `TEA_AGENT_PASSWORD` | E2E ชา — Dashboard only |
-
-Before build/dev that needs Firebase, materialize `.env.local` from secrets (Cloud Agent session):
-
-```bash
-# กุ้ง
-cat > apps/seafood-pos/.env.local <<EOF
-VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
-VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
-VITE_FIREBASE_DATABASE_URL=${VITE_FIREBASE_DATABASE_URL}
-VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
-VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
-VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
-VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID_SHRIMP}
-EOF
-
-# ชา
-cat > apps/chincha-tea/.env.local <<EOF
-VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
-VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}
-VITE_FIREBASE_DATABASE_URL=${VITE_FIREBASE_DATABASE_URL}
-VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
-VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
-VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
-VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID_TEA}
-EOF
-```
-
-After adding or changing Dashboard secrets, **start a new Cloud Agent session** (old sessions do not pick up new secrets).
-
-### Verify without cloud login
-
-Logic-only regression (no Firebase):
-
-```bash
-node apps/seafood-pos/scripts/smoke-test.mjs
-```
-
-Production builds (no `.env` required at build time, but runtime needs env for auth):
-
-```bash
-npm run build --workspace=chincha-tea
-npm run build --workspace=seafood-pos
-```
-
-### Lint / test
-
-No ESLint or root `npm test` script. CI only runs deploy workflows on `main`. Use the smoke test above for automated checks.
-
-### Dev servers
-
-Start in tmux (long-running):
-
-```bash
-npm run dev:tea      # chincha-tea → port 5173 (or next free port)
-npm run dev:seafood  # seafood-pos → 5173 with --host 0.0.0.0
-```
-
-If port 5173 is busy, Vite picks the next port; check the Vite banner in the terminal.
-
-`dev:tea` binds to IPv6 loopback (`::1`) only — `curl http://127.0.0.1:5173` may fail; use `http://[::1]:5173/` or a browser. `dev:seafood` uses `--host 0.0.0.0` and is reachable on `127.0.0.1`.
-
-On Cloud Agent boot, `.cursor/environment.json` runs `scripts/materialize-cloud-env.sh` after `npm install` to write both `apps/*/.env.local` files when Dashboard secrets are set.
-
-### Full E2E (login, orders, Firestore)
-
-Requires live Firebase + approved user in Firestore (`users/{uid}` with `approved: true`). Bootstrap admin email for tea is documented in `apps/chincha-tea/src/lib/constants.js` (`BOOTSTRAP_ADMIN_EMAIL`). Use your own credentials (Cloud Agent Secrets or local `.env.local`); do not commit `.env.local`.
-
-### Gotchas
-
-- Restart Vite after changing `.env.local` (env is read at dev-server startup).
-- `npm install` at repo root installs all workspaces including `webhook-core` (large `firebase-functions` tree).
-- LINE push / webhook E2E needs deployed functions in `asia-southeast1`, not local `npm start` in `webhook-core`.

@@ -20,7 +20,7 @@ src/
 ├── seafood-notify/           ← LINE push / bill render กุ้ง
 ├── tea/                      ← LINE Bot ชา + cron summary
 └── shared/
-    ├── agentTools.js         ← agentic loop (MAX_ITERATIONS=30, CHECKPOINT=9)
+    ├── agentTools.js         ← agentic loop (MAX_ITERATIONS=22, CHECKPOINT_INTERVAL=7)
     ├── toolDefinitions.js    ← tool schemas (read_file, patch_file, commit_and_pr …)
     ├── toolExecutors.js      ← execute tool calls จริงผ่าน GitHub API
     ├── progressTracker.js    ← Firestore R/W (aiProgress, aiResults, agentRunLogs)
