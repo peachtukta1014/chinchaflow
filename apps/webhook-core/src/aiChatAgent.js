@@ -53,8 +53,8 @@ exports.aiChatAgentHttp = functions
     if (req.method === 'GET' && req.query.action === 'result' && req.query.requestId) {
       const data = await readResult(req.query.requestId);
       if (data) {
-        await clearResult(req.query.requestId);
         res.json({ found: true, reply: data.reply, scope: data.scope });
+        clearResult(req.query.requestId).catch(() => {}); // cleanup หลัง respond ป้องกัน brief หายถ้า client หลุด
       } else {
         res.json({ found: false });
       }
@@ -108,7 +108,6 @@ exports.aiChatAgentHttp = functions
             res.status(500).json({ reply: 'GH_PAT_DISPATCH ไม่ได้ตั้งค่า ส่งคำสั่งไม่ได้', scope: pending.scope });
             return;
           }
-          await clearPendingAction(pendingId);
           try {
             await dispatchToProAgent(ghPatForDispatch, {
               requestId,
@@ -118,6 +117,7 @@ exports.aiChatAgentHttp = functions
               isHighRisk: pending.isHighRisk !== false,
               confirmation: pending.confirmation || '',
             });
+            await clearPendingAction(pendingId); // ลบหลัง dispatch สำเร็จ — ถ้า dispatch fail brief ยังอยู่ retry ได้
             await writeProgress(requestId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก V4-Pro...');
             res.json({
               reply: 'จีจี้ส่งงานให้ V4-Pro แล้วครับพี่ 🌸 ติดตามความคืบหน้าได้เลย',
@@ -129,8 +129,9 @@ exports.aiChatAgentHttp = functions
           } catch (err) {
             console.error('ไฟเขียว dispatch error:', err);
             await clearProgress(requestId);
+            // pendingId ยังอยู่ → พีชพิมพ์ "ไฟเขียว" ซ้ำได้ทันที
             res.status(500).json({
-              reply: `จีจี้ส่งคำสั่งไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}`,
+              reply: `จีจี้ส่งคำสั่งไม่ได้ครับพี่ 🌸\n\n**สาเหตุ:** ${err.message || 'unknown'}\n\n💡 พิมพ์ "ไฟเขียว" อีกครั้งได้เลยนะคะ`,
               scope: pending.scope,
               status: 'error',
             });
