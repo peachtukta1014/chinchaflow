@@ -1,3 +1,37 @@
+## 2026-07-01 — fix: get_skill enum + skillPaths — เพิ่ม scope-* และ run-* สำหรับ Pro Agent (PR #449)
+
+## สรุป
+
+แก้ Critical Bug 2 จุดที่พบจาก Audit — Pro Agent ไม่สามารถเรียก `get_skill` สำหรับ scope-* และ run-* ได้เลย ทั้งที่ PRO.md บอกว่าบังคับ
+
+## อาการก่อนแก้
+
+- `get_skill("scope-seafood")` → ❌ model ไม่เรียกเพราะชื่อไม่อยู่ใน schema enum
+- `get_skill("run-seafood-pos")` → ❌ ไม่อยู่ใน enum + ไม่มี path ใน skillPaths map
+- ขั้นตอน verify ก่อน commit (ที่ PRO.md บอกว่า "บังคับ ห้ามข้าม") **ไม่มีทางทำงานได้เลย** ในทุก session
+
+## การแก้ไข
+
+### `apps/webhook-core/src/shared/toolDefinitions.js`
+เพิ่มเข้า `get_skill` enum:
+- `scope-seafood`, `scope-tea`, `scope-webhook`, `scope-root`, `scope-scheduled` — โหลด scope rules (ไฟล์อยู่ที่ `.skill/*.md` แล้ว path ถูกต้อง)
+- `run-seafood-pos`, `run-chincha-tea`, `run-webhook-core`, `run-ai-chat` — โหลด verify commands
+
+### `apps/webhook-core/src/shared/toolExecutors.js`
+เพิ่ม 4 entries เข้า `skillPaths` map:
+```
+'run-seafood-pos': 'apps/seafood-pos/.claude/skills/run-seafood-pos/SKILL.md'
+'run-chincha-tea': 'apps/chincha-tea/.claude/skills/run-chincha-tea/SKILL.md'
+'run-webhook-core': 'apps/webhook-core/.claude/skills/run-webhook-core/SKILL.md'
+'run-ai-chat': 'apps/ai-chat/.claude/skills/run-ai-chat/SKILL.md'
+```
+
+## ผลที่ได้
+Pro Agent สามารถเรียก `get_skill("scope-seafood")` เพื่อโหลด scope rules (ขั้น 0a) และ `get_skill("run-seafood-pos")` เพื่อโหลด verify commands (ขั้น 3) ได้จริงแล้ว
+
+## ตรวจสุขภาพ
+- `node --chec
+
 ## 2026-07-01 — fix: get_skill — เพิ่ม scope-* และ run-* เข้า enum + skillPaths (Pro Agent)
 
 ### อาการ
