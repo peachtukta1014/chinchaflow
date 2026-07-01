@@ -1,3 +1,18 @@
+## 2026-07-01 — fix: Pro Agent audit — WIP PR หายเงียบ + patch_file uniqueness check (PR #455)
+
+## สรุป
+
+Audit ฝั่ง Pro Agent (`aiWorkflowAgent.js`, `agentTools.js`, `toolExecutors.js`, `toolDefinitions.js`) คู่กับ Flash ที่ตรวจไปก่อนหน้า (PR #452/#454) — ยืนยันโฟลว์หลักถูกต้องตามออกแบบ:
+- Flash ส่ง Task Brief ล้วนๆ ให้ Pro (`history: []` เสมอ) ไม่มีบทสนทนาพีชปนเข้าไปเลย
+- Pro ยังคง `read_file`/`list_files`/`search_code` วิเคราะห์เองก่อนแก้ทุกครั้ง ไม่เชื่อ Task Brief แบบเปลือยๆ
+
+แต่เจอ 2 บั๊กจริงระหว่าง audit:
+
+1. **WIP PR หายเงียบ** — เมื่อ Pro ชน `MAX_ITERATIONS` แล้วมีไฟล์ staged ค้าง จะ emergency-commit เปิด PR แท็ก `[WIP]` แต่ผลลัพธ์ (มี PR URL) ถูกทิ้งไปเฉยๆ แถมข้อความ error ที่ส่งกลับพีชยังถูกแทนที่ด้วยข้อความทั่วไป "งานซับซ้อนเกินไป" — พีชไม่มีทางรู้เลยว่ามี PR รอตรวจอยู่แล้ว
+2. **`patch_file` ไม่เช็ค unique** — ใช้ `String.replace()` ซึ่งแก้แค่จุดแรกที่เจอ ถ้า `find` ซ้ำหลายจุดในไฟล์ Pro จะได้ `✅ patch สำเร็จ` ทั้งที่แก้ผิดจุด/ไม่ครบ แบบเงียบๆ
+
+ระหว่างแก้ยังเจอด้วยว่า `sync-ai-constants.yml` (workflow auto-sync ค่า MAX_ITERATIONS/CHECKPOINT) sync ให้แค่ `docs/AI_AGENT_SYSTEM.md` ไฟล์เดียว ไม่เคย
+
 ## 2026-07-01 — fix: Pro Agent audit — WIP PR หายเงียบ + patch_file ไม่กันการแก้ผิดจุด
 
 ### อาการ/งาน
