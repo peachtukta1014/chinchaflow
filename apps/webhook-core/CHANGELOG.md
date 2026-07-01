@@ -7,6 +7,11 @@
 
 ## 2026-07
 
+### 2026-07-01 | fix: get_skill enum + skillPaths — เพิ่ม scope-* และ run-* (Pro Agent)
+- `src/shared/toolDefinitions.js` — get_skill enum: เพิ่ม scope-seafood, scope-tea, scope-webhook, scope-root, scope-scheduled, run-seafood-pos, run-chincha-tea, run-webhook-core, run-ai-chat
+- `src/shared/toolExecutors.js` — skillPaths map: เพิ่ม 4 run-* entries ชี้ไปที่ `apps/*/.claude/skills/run-*/SKILL.md`
+- **ผลกระทบ**: Pro สามารถเรียก `get_skill("scope-seafood")` และ `get_skill("run-seafood-pos")` ได้จริงแล้ว — ขั้นตอน verify ก่อน commit ทำงานได้ครบ
+
 ### 2026-07-01 | feat: Flash Technical Translator + Task Brief v2
 - `src/flash/flashTriggers.js` — classifyAndTranslate: role ใหม่ "Technical Translator & Project Director", schema ใหม่ (target_behavior, logic_constraints, files_hint {path,fn}[], diff_expectation)
 - `src/flash/flashTriggers.js` — buildTaskBrief: format ใหม่ structured sections (🎯 งาน → ▸ Target Behavior → ▸ Logic Constraints → ▸ ไฟล์เป้าหมาย → ▸ สิ่งที่ต้องเปลี่ยน), backward compat กับ string[] เก่า

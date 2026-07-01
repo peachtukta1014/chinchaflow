@@ -171,8 +171,12 @@ const TOOL_DEFINITIONS = [
         properties: {
           name: {
             type: 'string',
-            enum: ['auto-shrimp', 'auto-tea', 'ship-shrimp', 'ship-tea', 'land-it', 'peter-ser'],
-            description: 'ชื่อ skill',
+            enum: [
+              'auto-shrimp', 'auto-tea', 'ship-shrimp', 'ship-tea', 'land-it', 'peter-ser',
+              'scope-seafood', 'scope-tea', 'scope-webhook', 'scope-root', 'scope-scheduled',
+              'run-seafood-pos', 'run-chincha-tea', 'run-webhook-core', 'run-ai-chat',
+            ],
+            description: 'ชื่อ skill — scope-* โหลดกฎ/gotchas ของ scope นั้น, run-* โหลดคำสั่งรัน/verify แอป',
           },
         },
         required: ['name'],

@@ -304,6 +304,10 @@ async function executeTool(name, args, { ghPat, scopeFileTree, stagedFiles, isHi
         'scope-webhook': '.skill/scope-webhook.md',
         'scope-scheduled': '.skill/scope-scheduled.md',
         'scope-root': '.skill/scope-root.md',
+        'run-seafood-pos': 'apps/seafood-pos/.claude/skills/run-seafood-pos/SKILL.md',
+        'run-chincha-tea': 'apps/chincha-tea/.claude/skills/run-chincha-tea/SKILL.md',
+        'run-webhook-core': 'apps/webhook-core/.claude/skills/run-webhook-core/SKILL.md',
+        'run-ai-chat': 'apps/ai-chat/.claude/skills/run-ai-chat/SKILL.md',
       };
       const skillPath = skillPaths[args.name];
       if (!skillPath) return `❌ ไม่รู้จัก skill "${args.name}"`;

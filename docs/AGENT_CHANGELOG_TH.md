@@ -1,3 +1,21 @@
+## 2026-07-01 — fix: get_skill — เพิ่ม scope-* และ run-* เข้า enum + skillPaths (Pro Agent)
+
+### อาการ
+Pro Agent ไม่สามารถเรียก `get_skill("scope-seafood")` หรือ `get_skill("run-seafood-pos")` ได้ เพราะชื่อเหล่านี้ไม่อยู่ใน tool schema enum และไม่มี path mapping ใน toolExecutors.js
+
+### สาเหตุ
+- `toolDefinitions.js`: `get_skill` enum มีแค่ 6 ชื่อ (auto-*, ship-*, land-it, peter-ser) — ขาด scope-* และ run-*
+- `toolExecutors.js`: `skillPaths` map ไม่มี run-* paths ทั้งที่ SKILL.md อยู่ที่ `apps/*/.claude/skills/run-*/SKILL.md` จริง
+
+### วิธีแก้
+- `toolDefinitions.js`: เพิ่ม scope-* 5 ชื่อ + run-* 4 ชื่อเข้า enum
+- `toolExecutors.js`: เพิ่ม 4 run-* entries เข้า skillPaths map ชี้ path จริง
+
+### วิธีตรวจถ้าพัง
+Pro เรียก `get_skill("scope-seafood")` แล้วได้ `❌ ไม่รู้จัก skill` หรือ `❌ ไม่พบไฟล์ skill`
+
+---
+
 ## 2026-07-01 — docs: sync AGENTS.md, CLAUDE.md, FLASH.md, PRO.md ให้ตรงกับ flow ปัจจุบัน (PR #448)
 
 ## สรุป
