@@ -486,6 +486,13 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     console.error('handleCodeActionV2 error:', err);
     await clearProgress(requestId);
 
+    // ก่อนหน้านี้ token usage ของ Pro หายไปเงียบๆ ทุกครั้งที่ loop throw (MAX_ITERATIONS,
+    // spin/error budget, network ชั่วคราว ฯลฯ) เพราะ writeTokenLog ถูกเรียกแค่ตอนสำเร็จ —
+    // agentTools.js แนบ proUsage ติดไปกับ err เสมอตอน throw แล้ว (ดู runAgentLoop) จึงกู้คืนตรงนี้ได้
+    if (err.proUsage) {
+      await writeTokenLog(requestId, { pro: err.proUsage }).catch(() => {});
+    }
+
     const isReasoningContentError = /reasoning_content.*thinking mode/i.test(err.message || '');
     const isTransient = !isReasoningContentError && /GitHub \d{3}|OpenRouter \d{3}|fetch failed|ECONNRESET|ETIMEDOUT/.test(err.message || '');
     const isMaxIter = err.message?.includes('MAX_ITERATIONS') || /Agent loop เกิน|เกิน \d+ รอบ/.test(err.message || '');

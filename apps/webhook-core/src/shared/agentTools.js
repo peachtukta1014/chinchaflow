@@ -225,6 +225,10 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   let _totalProOutput = 0;
   let _proModel = process.env.CODE_MODEL || AGENT_MODEL;
 
+  // ห่อทั้ง loop ด้วย try/catch เดียว — throw จากไหนก็ตาม (spin detect, error budget,
+  // consecutiveTextOnlyReplies) จะแนบ token usage ที่สะสมไว้ติดไปกับ error เสมอ กัน
+  // proUsage หายเงียบๆ เวลา loop ไม่จบแบบสำเร็จ (เดิมมีแค่ใน return ตอนจบงานจริงเท่านั้น)
+  try {
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
@@ -408,6 +412,10 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       };
     }
   }
+  } catch (loopErr) {
+    loopErr.proUsage = { input: _totalProInput, output: _totalProOutput, model: _proModel, iterations };
+    throw loopErr;
+  }
 
   // ── Emergency partial commit: ถ้ามีไฟล์ stage ค้างอยู่ → commit ก่อนหยุด ────
   // ป้องกันงานสูญหายทั้งหมดเมื่อถึง limit — PR จะมี tag [WIP] ให้พีชตรวจเองได้
@@ -433,7 +441,7 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
     }
   }
 
-  throw new Error(
+  const maxIterErr = new Error(
     `Agent loop เกิน ${MAX_ITERATIONS} รอบ — งานซับซ้อนเกินไปหรือ AI วนซ้ำ\n` +
     `(มี checkpoint สรุปทุก ${CHECKPOINT_INTERVAL} รอบแล้ว)\n` +
     `${emergencyPrInfo
@@ -441,6 +449,8 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
       : (stagedPaths.length > 0 ? `งานที่ทำไปบางส่วน (${stagedPaths.join(', ')}) commit ไม่สำเร็จ — ไม่มี PR ถูกสร้างขึ้น\n` : '')}` +
     `ลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อย`
   );
+  maxIterErr.proUsage = { input: _totalProInput, output: _totalProOutput, model: _proModel, iterations };
+  throw maxIterErr;
 }
 
 module.exports = { TOOL_DEFINITIONS, executeTool, runAgentLoop, fetchRepoFile };
