@@ -7,6 +7,10 @@
 
 ## 2026-07
 
+### 2026-07-01 | feat: Flash Technical Translator + Task Brief v2
+- `src/flash/flashTriggers.js` — classifyAndTranslate: role ใหม่ "Technical Translator & Project Director", schema ใหม่ (target_behavior, logic_constraints, files_hint {path,fn}[], diff_expectation)
+- `src/flash/flashTriggers.js` — buildTaskBrief: format ใหม่ structured sections (🎯 งาน → ▸ Target Behavior → ▸ Logic Constraints → ▸ ไฟล์เป้าหมาย → ▸ สิ่งที่ต้องเปลี่ยน), backward compat กับ string[] เก่า
+
 ### 2026-07-01 | fix: AI agent safety — 4 จุดเสี่ยงจาก audit
 - `src/aiChatAgent.js` — ข้อ 2: สลับ clearResult ให้รันหลัง res.json (ป้องกันผลงาน Pro หายถ้า client หลุด)
 - `src/aiChatAgent.js` — ข้อ 5A: ย้าย clearPendingAction หลัง dispatchToProAgent สำเร็จ (ถ้า dispatch fail brief ยังอยู่ retry ได้)
