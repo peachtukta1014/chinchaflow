@@ -412,10 +412,13 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   // ── Emergency partial commit: ถ้ามีไฟล์ stage ค้างอยู่ → commit ก่อนหยุด ────
   // ป้องกันงานสูญหายทั้งหมดเมื่อถึง limit — PR จะมี tag [WIP] ให้พีชตรวจเองได้
   const stagedPaths = Object.keys(stagedFiles);
+  // เก็บผลลัพธ์จริงของ commit_and_pr (มี PR URL อยู่ข้างใน) — ก่อนหน้านี้ถูกทิ้งไปเฉยๆ
+  // ทำให้พีชไม่มีทางรู้เลยว่ามี PR [WIP] เปิดรอไว้แล้วเมื่อ agent ชนขีดจำกัดรอบ
+  let emergencyPrInfo = '';
   if (stagedPaths.length > 0) {
     await writeProgress(requestId, `⚠️ ถึงขีดจำกัด ${MAX_ITERATIONS} รอบ — กำลัง commit งานที่ทำไปบางส่วน (${stagedPaths.length} ไฟล์)...`);
     try {
-      await executeTool('commit_and_pr', {
+      emergencyPrInfo = await executeTool('commit_and_pr', {
         branch: `dev/ai-partial-${Date.now().toString(36)}`,
         commit_msg: `WIP: partial changes — hit ${MAX_ITERATIONS}-iteration limit`,
         pr_title: `[WIP] งานค้าง: ${message.slice(0, 60)}`,
@@ -433,7 +436,9 @@ async function runAgentLoop(apiKey, ghPat, { message, history, requestId, scopeF
   throw new Error(
     `Agent loop เกิน ${MAX_ITERATIONS} รอบ — งานซับซ้อนเกินไปหรือ AI วนซ้ำ\n` +
     `(มี checkpoint สรุปทุก ${CHECKPOINT_INTERVAL} รอบแล้ว)\n` +
-    `${stagedPaths.length > 0 ? `งานที่ทำไปบางส่วน (${stagedPaths.join(', ')}) commit ไว้ใน PR [WIP] แล้ว\n` : ''}` +
+    `${emergencyPrInfo
+      ? `${emergencyPrInfo}\n`
+      : (stagedPaths.length > 0 ? `งานที่ทำไปบางส่วน (${stagedPaths.join(', ')}) commit ไม่สำเร็จ — ไม่มี PR ถูกสร้างขึ้น\n` : '')}` +
     `ลองอธิบายคำสั่งให้ชัดขึ้นหรือแบ่งงานเป็นขั้นตอนย่อย`
   );
 }

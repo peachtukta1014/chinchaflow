@@ -492,10 +492,17 @@ async function handleCodeActionV2({ message, history, scope, force = false, requ
     const isReasoningContentError = /reasoning_content.*thinking mode/i.test(err.message || '');
     const isTransient = !isReasoningContentError && /GitHub \d{3}|OpenRouter \d{3}|fetch failed|ECONNRESET|ETIMEDOUT/.test(err.message || '');
     const isMaxIter = err.message?.includes('MAX_ITERATIONS') || /Agent loop เกิน|เกิน \d+ รอบ/.test(err.message || '');
+    // agentTools.js อาจ commit งานบางส่วนเป็น PR [WIP] ก่อนโยน error นี้ — ดึง URL ออกมา
+    // ไม่งั้นข้อความทั่วไปด้านล่างจะกลบ PR ที่เปิดไว้แล้วจนพีชไม่รู้ว่ามันมีอยู่
+    const wipPrMatch = (err.message || '').match(/https:\/\/github\.com\/\S+\/pull\/\d+/);
 
     let userMsg;
     if (isMaxIter) {
-      userMsg = `งานนี้ซับซ้อนเกินไปหรือ V4-Pro วนซ้ำครับพี่ 🙏\n\nลองอธิบายคำสั่งให้ชัดขึ้น หรือแบ่งงานเป็นขั้นตอนย่อยแทนนะคะ`;
+      userMsg = `งานนี้ซับซ้อนเกินไปหรือ V4-Pro วนซ้ำครับพี่ 🙏\n\n` +
+        (wipPrMatch
+          ? `แต่ทำไปได้บางส่วนแล้ว เปิด PR ทิ้งไว้ให้พี่ตรวจก่อน (แท็ก [WIP]): ${wipPrMatch[0]}\n\n`
+          : '') +
+        `ลองอธิบายคำสั่งให้ชัดขึ้น หรือแบ่งงานเป็นขั้นตอนย่อยแทนนะคะ`;
     } else if (isTransient) {
       userMsg = `เชื่อมต่อ GitHub หรือ OpenRouter ไม่สำเร็จชั่วคราวครับพี่ 🙏\n\nลองสั่งงานเดิมอีกครั้งได้เลย ปกติจะหายเองถ้าเป็นปัญหาเครือข่ายชั่วคราว\n\nรายละเอียด: ${err.message}`;
     } else {
