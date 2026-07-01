@@ -8,7 +8,7 @@
 2. `docs/PEACH_WORKING_STYLE_TH.md` — วิธีพีช (Peach) สั่งงาน, คำศัพท์, ทบทวนก่อนลงมือ
 3. `docs/AGENT_HANDBOOK_TH.md` — แผนที่ repo, กฎอัปเดต docs
 4. `docs/AGENT_CHANGELOG_TH.md` — รอบก่อนแก้อะไร — อ่านก่อนไล่บั๊กทุกครั้ง
-5. `docs/AI_AGENT_DIAGRAM.md` — สถาปัตยกรรม AI ครบชุด (Flash/Pro/keys/flow) — ซิงค์เข้า Firestore อัตโนมัติทุก deploy
+5. `docs/AI_AGENT_SYSTEM.md` — สถาปัตยกรรม AI ครบชุด (Flash/Pro/keys/flow) — ซิงค์เข้า Firestore อัตโนมัติทุก deploy
 
 **Agent Identity Files (แต่ละตัวอ่านของตัวเอง):**
 - `FLASH.md` — Flash (จีจี้): Planner, tools, workflow (inject เข้า system prompt)
@@ -57,22 +57,22 @@ Firebase project: `chincha-eeed6` · Cloud: `asia-southeast1`
 - `firestore.rules` / `storage.rules` — กฎความปลอดภัยร่วม
 - `docs/` — เอกสารทีม/สถาปัตยกรรม
 - `.claude/commands/` — Claude Code skills (land-it, peter-ser, ship-*, auto-*)
-- `.jiiji/` — IDENTITY.md, PRO_AGENT.md (AI agent config)
+- `apps/*/.claude/skills/` — run skills ต่อ app (run-seafood-pos, run-chincha-tea, run-ai-chat, run-webhook-core)
 
 ---
 
 ## ระบบ AI ของโปรเจกต์
 
-> รายละเอียดเต็มอยู่ใน `.jiiji/IDENTITY.md` — **อ่านก่อนแตะระบบ AI ทุกครั้ง**
+> รายละเอียดเต็มอยู่ใน `FLASH.md` และ `PRO.md` — **อ่านก่อนแตะระบบ AI ทุกครั้ง**
 
 สรุปสั้น: Flash (จีจี้) → Pro (จีจี้โปร) → พี่ซี (Claude Code CLI นี้) คนละตัว คนละ key
-- **Flash**: Cloud Function · OPENROUTER_API_KEY · GH_PAT_DISPATCH · GH_PAT_READ
-- **Pro**: GitHub Actions · OPENROUTER_API_KEY_PRO · GH_PAT เต็ม
+- **Flash**: Cloud Function · OPENROUTER_API_KEY · GH_PAT_DISPATCH · GH_PAT_READ · บทบาท "Technical Translator & Project Director"
+- **Pro**: GitHub Actions · OPENROUTER_API_KEY_PRO · GH_PAT เต็ม · รับ Task Brief v2 (target_behavior + logic_constraints + files_hint {path,fn})
 - **พี่ซี**: Anthropic session นี้ — implement, maintain, ตรวจ PR
 
 ไฟล์หลัก: `apps/webhook-core/src/aiChatAgent.js` (Flash) · `apps/webhook-core/src/aiWorkflowAgent.js` (Pro)  
-Docs: `.jiiji/IDENTITY.md` · `FLASH.md` · `PRO.md`  
-Diagram: `docs/AI_AGENT_DIAGRAM.md` · Key files: `docs/AI_AGENT_KEY_FILES.md`
+Docs: `FLASH.md` · `PRO.md` · Key files: `docs/AI_AGENT_KEY_FILES.md`  
+System overview: `docs/AI_AGENT_SYSTEM.md` (sync เข้า Firestore อัตโนมัติทุก deploy)
 
 ---
 
@@ -113,6 +113,10 @@ Diagram: `docs/AI_AGENT_DIAGRAM.md` · Key files: `docs/AI_AGENT_KEY_FILES.md`
 |------------|-------------------|
 | ตรวจ logic กุ้ง (ไม่ต้อง Firebase) | `node apps/seafood-pos/scripts/smoke-test.mjs` |
 | ตรวจกุ้ง + รายงาน | skill `auto-shrimp` ใน `.claude/commands/` |
+| รัน/screenshot กุ้ง (dev+headless) | skill `run-seafood-pos` ใน `apps/seafood-pos/.claude/skills/` |
+| รัน/screenshot ชา | skill `run-chincha-tea` ใน `apps/chincha-tea/.claude/skills/` |
+| รัน/screenshot ai-chat | skill `run-ai-chat` ใน `apps/ai-chat/.claude/skills/` |
+| syntax check webhook-core | skill `run-webhook-core` ใน `apps/webhook-core/.claude/skills/` |
 | deploy กุ้ง production | `deploy-hosting.yml` เมื่อ push `main` |
 | ปิดงานกุ้ง (smoke → build → commit) | skill `ship-shrimp` |
 | deploy ชา | `deploy-hosting.yml` (target tea) |
