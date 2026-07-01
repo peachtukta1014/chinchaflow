@@ -7,6 +7,11 @@
 
 ## 2026-07
 
+### 2026-07-01 | feat: Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief
+- `src/flash/flashAnalysisLoop.js` (ใหม่) — read-only agentic loop: `read_file`/`list_files`/`search_code`/`finalize_task_brief`, `MAX_ITERATIONS=6`, ผูก `GH_PAT_READ` เท่านั้น
+- `src/aiChatAgent.js` — แทนที่ "verify files_hint" (เช็กแค่ path) ด้วย `runFlashAnalysisLoop()` ก่อนสร้าง Task Brief จริง — non-blocking, fallback ไป taskSpec เบื้องต้นถ้า error/ไม่มี key/เกินรอบ
+- **ผลกระทบ**: Task Brief + confirmationMessage ที่พีชเห็นตอน "พิมพ์ไฟเขียว" มาจากการอ่านโค้ดจริงแล้ว ไม่ใช่แค่เดาจากบทสนทนา ลดโอกาส Pro เสีย iteration เพราะ context ผิด — Pro ยังคง `read_file`/`list_files`/`search_code`/`patch_file`/`write_file` วิเคราะห์เองอีกชั้นได้เสมอ (ไม่เปลี่ยนแปลง)
+
 ### 2026-07-01 | tune: Pro Agent loop ceiling + recurring checkpoint + token limit
 - `src/shared/agentTools.js` — `MAX_ITERATIONS` 30 → 22, `SUMMARY_CHECKPOINT` (ครั้งเดียว) → `CHECKPOINT_INTERVAL=7` ซ้ำทุก 7 รอบผ่าน `isCheckpointRound()`, `max_tokens` ของ tool-loop 4096 → 6144
 - **ผลกระทบ**: ลด token cost/ความเสี่ยง runaway ของงานทั่วไป โดยยังเผื่อ buffer พอสำหรับงานซับซ้อนหลายไฟล์ (~18-20 รอบจริง) checkpoint ที่เกิดซ้ำยังคง `continue` ทำงานต่อทุกครั้ง ไม่หยุดนิ่ง

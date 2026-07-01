@@ -4,21 +4,23 @@
  * จีจี้ เลขาส่วนตัวพีช: เพื่อนคู่คิด รู้ใจ แนะนำ ตักเตือน
  *
  * แยก logic ออกเป็น flash/ modules:
- *   flash/flashContext.js   — Firestore loaders (project tree, docs, custom notes)
- *   flash/flashModels.js    — OpenRouter caller + model constants
- *   flash/flashPrompts.js   — System prompts + scope detection
- *   flash/flashTriggers.js  — Quick triggers, classifier, task brief builder
- *   flash/flashDispatch.js  — Pro Agent dispatch (repository_dispatch)
+ *   flash/flashContext.js      — Firestore loaders (project tree, docs, custom notes)
+ *   flash/flashModels.js       — OpenRouter caller + model constants
+ *   flash/flashPrompts.js      — System prompts + scope detection
+ *   flash/flashTriggers.js     — Quick triggers, classifier, task brief builder
+ *   flash/flashAnalysisLoop.js — Code analysis loop (read-only) ก่อนสรุป Task Brief
+ *   flash/flashDispatch.js     — Pro Agent dispatch (repository_dispatch)
  *
  * Flash CF ไม่รู้จัก OPENROUTER_API_KEY_PRO — isolation จริง 100%
  */
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
+const { runFlashAnalysisLoop } = require('./flash/flashAnalysisLoop');
 const { dispatchToProAgent } = require('./flash/flashDispatch');
 
 // ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
@@ -187,42 +189,59 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
-      const taskBrief = buildTaskBrief(classified, message);
-
-      // Verify files_hint paths via GH_PAT_READ — ป้องกัน Pro เสีย iteration เพราะ LLM เดา path ผิด
-      // non-blocking: fail silently ถ้า GH_PAT_READ ไม่ได้ตั้งค่าหรือ network error
-      let taskBriefFinal = taskBrief;
+      // ── Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief (ไม่ใช่แค่เดา) ──
+      // classified.taskSpec = แนวทางเบื้องต้นจากบทสนทนาเท่านั้น (ยังไม่ยืนยันกับโค้ดจริง)
+      // ผูก GH_PAT_READ (read-only) เท่านั้น — non-blocking: error/หมดรอบ/ไม่มี key → fallback ไปใช้ taskSpec เดิม
       const ghPatRead = (process.env.GH_PAT_READ || '').trim();
-      const hintFiles = Array.isArray(classified.taskSpec?.files_hint) ? classified.taskSpec.files_hint : [];
-      if (ghPatRead && hintFiles.length > 0) {
-        const hintPaths = hintFiles.slice(0, 3)
-          .map(f => (typeof f === 'string' ? f : f?.path))
-          .filter(Boolean);
-        if (hintPaths.length > 0) {
-          try {
-            const found = await fetchRepoFiles(ghPatRead, hintPaths);
-            const missing = hintPaths.filter(p => !found[p]);
-            if (missing.length > 0) {
-              taskBriefFinal += `\n\n⚠️ **Path ยังไม่ยืนยัน (GH_PAT_READ ตรวจไม่พบ):**\n` +
-                missing.map(p => `• \`${p}\``).join('\n') +
-                `\n→ Pro ใช้ \`list_files\` หาไฟล์จริงก่อน อย่า \`read_file\` path นี้ตรงๆ`;
-            }
-          } catch { /* skip — ไม่ block flow หลัก */ }
+      let finalTaskSpec = classified.taskSpec || {};
+      let analysisNote = '';
+
+      if (ghPatRead) {
+        try {
+          const projectTreeForLoop = await loadProjectTree().catch(() => '');
+          await writeProgress(requestId, 'จีจี้กำลังอ่านโค้ดก่อนสรุปงาน...');
+          const analyzed = await runFlashAnalysisLoop(apiKey, ghPatRead, {
+            message,
+            history,
+            scope: finalScope,
+            initialTaskSpec: classified.taskSpec,
+            projectTree: projectTreeForLoop,
+            requestId,
+          });
+          if (analyzed?.taskSpec) {
+            finalTaskSpec = analyzed.taskSpec;
+          } else {
+            analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่ทันครบ (เกินรอบวิเคราะห์) — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น Pro ควร list_files/read_file ตรวจซ้ำก่อนแก้';
+          }
+        } catch (err) {
+          console.error('runFlashAnalysisLoop failed — fallback ไปใช้ taskSpec เบื้องต้น:', err.message);
+          analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่สำเร็จ (error ระหว่างวิเคราะห์) — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น Pro ควร list_files/read_file ตรวจซ้ำก่อนแก้';
         }
+      } else {
+        analysisNote = '\n\n⚠️ GH_PAT_READ ไม่ได้ตั้งค่า — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น ไม่ได้อ่านโค้ดจริง';
       }
+
+      const finalIsHighRisk = finalTaskSpec.isHighRisk !== undefined ? finalTaskSpec.isHighRisk !== false : classified.isHighRisk !== false;
+      const taskBrief = buildTaskBrief({ taskSpec: finalTaskSpec }, message) + analysisNote;
 
       // บันทึก Task Brief รอพีชพิมพ์ "ไฟเขียว"
       await savePendingAction(requestId, {
-        taskBrief: taskBriefFinal,
+        taskBrief,
         scope: finalScope,
-        isHighRisk: classified.isHighRisk !== false,
-        confirmation: classified.confirmation || '',
+        isHighRisk: finalIsHighRisk,
+        confirmation: finalTaskSpec.description || classified.confirmation || '',
       });
 
       await clearProgress(requestId);
 
-      const confirmMsg = classified.confirmationMessage ||
-        `จีจี้เข้าใจแล้วนะครับพี่ 🌸\n\n${classified.confirmation || 'วิเคราะห์งานเสร็จแล้ว'}\n\nพิมพ์ "ไฟเขียว" เพื่อส่งงานให้ V4-Pro ได้เลยครับ 🟢`;
+      const filePreview = finalTaskSpec.files_hint?.[0];
+      const confirmMsg = `📋 จีจี้อ่านโค้ดแล้วนะครับพี่ 🌸\n\n` +
+        `🎯 งาน: ${finalTaskSpec.description || classified.confirmation || 'วิเคราะห์งานเสร็จแล้ว'}\n` +
+        (finalTaskSpec.target_behavior ? `▸ ผลลัพธ์: ${finalTaskSpec.target_behavior}\n` : '') +
+        (filePreview?.path ? `📁 ไฟล์: \`${filePreview.path}\`${filePreview.fn ? ' → ' + filePreview.fn : ''}\n` : '') +
+        `⚠️ Risk: ${finalIsHighRisk ? 'high' : 'low'}${finalTaskSpec.risk_reason ? ' — ' + finalTaskSpec.risk_reason : ''}` +
+        analysisNote +
+        `\n\nพิมพ์ "ไฟเขียว" เพื่อส่งงานให้ V4-Pro ได้เลยครับ 🟢`;
 
       res.json({
         reply: confirmMsg,

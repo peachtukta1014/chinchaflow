@@ -101,8 +101,10 @@ flowchart TD
     CF --> Z
     A -->|พีชพิมพ์ ทำเลย\nneedsConfirmation=false| CL
 
-    D -->|code-action\nneedsConfirmation=false| FCR[🔍 Flash Code Reader\nGH_PAT_READ → fetchRepoFiles\nfiles_hint สูงสุด 5 ไฟล์ × 3,000 chars\nแนบเข้า Task Brief]
-    FCR --> CA[dispatchToProAgent\nGH_PAT_DISPATCH เท่านั้น\nPOST github.com/repos/dispatches\nevent_type=ai-code-action\n+ Task Brief พร้อมโค้ด]
+    D -->|code-action\nneedsConfirmation=false| FCR[🔍 Flash Code Analysis Loop\nrunFlashAnalysisLoop · GH_PAT_READ เท่านั้น\nread_file/list_files/search_code วนสูงสุด 6 รอบ\nจบด้วย finalize_task_brief → taskSpec ยืนยันจากโค้ดจริง]
+    FCR --> CF2[ส่ง confirmationMessage\nจากโค้ดที่อ่านจริง\nรอพีชพิมพ์ "ไฟเขียว"]
+    CF2 --> Z
+    A -->|พีชพิมพ์ "ไฟเขียว"| CA[dispatchToProAgent\nGH_PAT_DISPATCH เท่านั้น\nPOST github.com/repos/dispatches\nevent_type=ai-code-action\n+ Task Brief ที่ยืนยันแล้ว]
     CA --> FS2[(Firestore\naiProgress/requestId\nclear)]
     CA --> RP([💬 รับงานแล้ว กำลังดำเนินการ\nstatus=processing + requestId])
 
@@ -197,10 +199,10 @@ chincha-business-os/
 │   │   ├── aiChatAgentHttp()             ← Cloud Function export (512MB · 540s)
 │   │   ├── isCodeMetricsQuery()          ← shortcut: ถามนับบรรทัด → ตอบทันที
 │   │   ├── detectQuickTrigger()          ← โอเคกุ้ง/โอเคชา → dispatch ทันที
-│   │   ├── classifyAndTranslate()        ← Flash model classify intent → taskSpec
-│   │   ├── fetchRepoFiles()              ← Flash Code Reader (GH_PAT_READ)
-│   │   ├── buildTaskBrief()              ← taskSpec + preloadedFiles → Task Brief
-│   │   └── dispatchToProAgent()          ← POST github.com/repos/dispatches
+│   │   ├── classifyAndTranslate()        ← Flash model classify intent → taskSpec เบื้องต้น
+│   │   ├── runFlashAnalysisLoop()        ← Flash Code Analysis Loop (GH_PAT_READ) — อ่านโค้ดจริงก่อนสรุป
+│   │   ├── buildTaskBrief()              ← taskSpec ที่ยืนยันจากโค้ดจริง → Task Brief
+│   │   └── dispatchToProAgent()          ← POST github.com/repos/dispatches (หลังพีชพิมพ์ "ไฟเขียว")
 │   │
 │   ├── flash/
 │   │   ├── flashContext.js               ← Firestore loaders + fetchRepoFiles
@@ -210,9 +212,11 @@ chincha-business-os/
 │   │   │   ├── fetchJiijiDef()           ← FLASH.md จาก agentDocs (max 3,500 chars)
 │   │   │   ├── fetchChatAgentDocs()      ← AGENTS.md + docs จาก agentDocs
 │   │   │   ├── fetchCodeMetrics()        ← docs/CODE_METRICS.md จาก agentDocs
-│   │   │   ├── fetchRepoFiles(pat, paths)← GitHub Contents API (max 5 × 3,000 chars)
+│   │   │   ├── fetchRepoFiles(pat, paths)← GitHub Contents API (max 5 × 3,000 chars) — ใช้โดย flashAnalysisLoop.js
 │   │   │   └── fetchScopeSkill(pat, sc)  ← .skill/scope-{sc}.md ผ่าน GH_PAT_READ
 │   │   ├── flashTriggers.js              ← Quick triggers + classifier + Task Brief
+│   │   ├── flashAnalysisLoop.js          ← Code Analysis Loop (read-only): read_file/list_files/search_code
+│   │   │                                    → finalize_task_brief · MAX_ITERATIONS=6 · ผูก GH_PAT_READ เท่านั้น
 │   │   ├── flashDispatch.js              ← POST /repos/.../dispatches
 │   │   ├── flashModels.js                ← FLASH_MODEL, VISION_MODEL, callOpenRouter()
 │   │   └── flashPrompts.js               ← SYSTEM_PROMPTS{} แยกตาม 5 scopes
