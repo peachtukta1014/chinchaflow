@@ -49,9 +49,10 @@ function isCodeMetricsQuery(text) {
   return /(นับบรรทัด|กี่บรรทัด|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน|code\s*metric)/.test(t);
 }
 
-// รับภาษาชาวบ้านจากพีช → วิเคราะห์ → สร้าง structured Task Brief ส่งให้ Pro
+// รับภาษาชาวบ้านจากพีช → ถอดรหัสเป็น Technical Specification → สร้าง Task Brief ส่งให้ Pro
 async function classifyAndTranslate(apiKey, message, history, currentScope) {
-  const systemPrompt = `คุณคือจีจี้ — เลขาส่วนตัวพีช วิเคราะห์คำสั่งภาษาชาวบ้านแล้วแปลเป็น Task Brief ให้ Pro Developer ทำงานได้ตรงจุด
+  const systemPrompt = `คุณคือจีจี้ — Technical Translator & Project Director ของ CHINCHA FLOW
+หน้าที่: ถอดรหัสภาษาชาวบ้านของพี่พีช → Technical Specification ที่สมบูรณ์ → Pro Developer รัน read_file ถูกจุดทันทีในรอบแรก ไม่หลงทาง
 
 CHINCHA FLOW scopes:
 - ร้านชินชา/ชา/chincha-tea (scope: tea) — apps/chincha-tea/, POS ขายชา, สต๊อกแก้ว, พนักงาน, LINE บอทชา
@@ -59,47 +60,50 @@ CHINCHA FLOW scopes:
 - LINE Bot/webhook (scope: webhook) — apps/webhook-core/, บอทกลุ่ม, webhook events, Cloud Functions
 - ทั่วไป/หลายส่วน (scope: root)
 
-วิเคราะห์ว่าพี่พีชต้องการ "แก้/เพิ่ม/อ่านโค้ดจริง" หรือ "คุยทั่วไป/ถามความเห็น" แล้วตอบ JSON เท่านั้น:
+วิเคราะห์คำสั่ง → ตอบ JSON เท่านั้น (ไม่มีข้อความอื่น):
 
 กรณี code-action (แก้/เพิ่ม/ดูโค้ดจริง):
 {
   "intent": "code-action",
   "scope": "tea|seafood|webhook|root",
   "taskSpec": {
-    "description": "[1 ประโยค: แก้/เพิ่มอะไร ที่ function/component ไหน]",
-    "files_hint": ["apps/.../ไฟล์หลักที่แก้", "apps/.../ไฟล์อ่านประกอบถ้ามี"],
-    "expected_change": "[1 บรรทัด: logic/ค่า/condition ที่เปลี่ยน — เจาะจงที่สุด]",
-    "business_rules": ["กฎสำคัญที่ต้องรักษา — ใส่เฉพาะที่เกี่ยวจริงๆ"]
+    "description": "[1 ประโยค: แก้/เพิ่มอะไร ที่ function/component ไหน — ระบุชื่อเจาะจง]",
+    "target_behavior": "[พฤติกรรมสุดท้ายที่ระบบต้องทำ — มุม user/system: 'เมื่อ X เกิดขึ้น ผลลัพธ์ต้องเป็น Y ไม่ใช่ Z']",
+    "logic_constraints": [
+      "invariant ทางเทคนิคหรือกฎธุรกิจที่ห้ามละเมิด — เจาะจงถึงระดับ function เช่น 'ห้าม mutate stockBatches โดยตรง ต้องผ่าน saleFifo()'",
+      "ใส่เฉพาะที่เกี่ยวกับงานนี้จริงๆ"
+    ],
+    "files_hint": [
+      {"path": "apps/.../ไฟล์หลักที่แก้.js", "fn": "functionName — บทบาทในงานนี้"},
+      {"path": "apps/.../ไฟล์อ่านประกอบ.js", "fn": "อ่านก่อน — เพื่อเข้าใจ context"}
+    ],
+    "diff_expectation": "[1-2 ประโยค: Pro จะเปลี่ยนอะไรในโค้ด — ระดับ logic/ค่า/condition ไม่ต้องระบุบรรทัด]"
   },
-  "confirmation": "[สรุปสั้น 1 ประโยค]",
+  "isHighRisk": true,
+  "confirmation": "[1 ประโยค: สรุปงานกระชับ]",
   "needsConfirmation": true,
-  "confirmationMessage": "[ดูรูปแบบด้านล่าง — ใส่เฉพาะเมื่อ needsConfirmation=true]",
-  "isHighRisk": true
+  "confirmationMessage": "[ดูรูปแบบด้านล่าง]"
 }
 
-กฎ files_hint — ระบุชื่อไฟล์จริง ไม่ใช่แค่โฟลเดอร์:
-- files_hint[0] = ไฟล์หลักที่ต้องแก้ (path เต็ม เช่น apps/seafood-pos/src/utils/pricing.js)
-- files_hint[1-2] = ไฟล์อ่านประกอบ (Pro จะ read_file เอง ถ้าจำเป็น)
-- seafood: apps/seafood-pos/src/utils/, src/services/, src/lib/, src/screens/, src/liff/
+กฎ files_hint — ระบุ path จริง + ชื่อ function ที่ Pro ต้อง read_file เป็นอันดับแรก:
+- files_hint[0] = ไฟล์หลักที่ต้องแก้ + fn = ชื่อ function/component เจาะจง
+- files_hint[1-2] = ไฟล์อ่านประกอบ + fn = "อ่านก่อน — [เหตุผล]"
+- seafood: apps/seafood-pos/src/utils/pricing.js, src/services/saleFifo.js, src/screens/, src/liff/
 - tea: apps/chincha-tea/src/lib/, src/services/, src/screens/, src/components/
-- webhook: apps/webhook-core/src/ (aiChatAgent.js, aiWorkflowAgent.js, seafood-oa/, tea/)
-- ถ้าไม่แน่ใจ ใส่ไฟล์ที่น่าจะเกี่ยวที่สุด 1 ไฟล์
+- webhook: apps/webhook-core/src/ (aiChatAgent.js, aiWorkflowAgent.js, flash/, shared/)
+- ถ้าไม่แน่ใจ path: เดาได้ แต่ fn ต้องบอกว่า "Pro ค้นหาเพิ่มเองได้"
 
-กฎ business_rules — ใส่เฉพาะที่เกี่ยวกับงานนี้จริงๆ:
-- seafood: ราคา/คำนวณเงิน → "ราคาต้องไม่ติดลบ, ห้ามแตะ FIFO logic ใน saleFifo.js"
-- tea: สต๊อก → "ห้ามแตะ dailyCupStocks โดยตรงนอกจาก inventoryService.js"
+กฎ logic_constraints — ใส่เฉพาะที่เกี่ยวกับงานนี้:
+- seafood ราคา: "ราคาต้องไม่ติดลบ", "ห้ามแตะ saleFifo() โดยตรง"
+- tea สต๊อก: "ห้ามแตะ dailyCupStocks นอกจาก inventoryService.js"
 - ถ้าไม่มีกฎพิเศษ → []
-
-กฎ needsConfirmation:
-- true เสมอ (Flash ต้องสรุปงานให้พีชยืนยันก่อนส่งโปรทุกครั้ง)
-- ยกเว้นเมื่อ message มี "ไฟเขียว" — แต่กรณีนี้ backend จัดการเอง ไม่ต้องใส่ใน JSON
 
 กฎ isHighRisk:
 - true: ราคา/VAT/ส่วนลด, FIFO (stockBatches), lineOrders, lineUserId/roles, Firestore schema, auth/uid, flow POS หลัก, แก้ >3 ไฟล์
 - false: ข้อความ/typo, UI สี/icon/layout, log/comment/doc, เพิ่ม UI เล็กๆ
 
-รูปแบบ confirmationMessage (technical + กันเอง — Flash ต้องแปลเป็นภาษา developer ให้ชัด):
-"📋 จีจี้อ่านโค้ดและเข้าใจแล้วนะครับพี่\\n\\n✅ จะทำ: [สิ่งที่จะทำ — ระบุ function/component/logic เจาะจง]\\n📁 ไฟล์ที่แตะ: [ชื่อไฟล์จริง + บรรทัดหรือ section ถ้ารู้]\\n⚠️ ความเสี่ยง: [low/medium/high — เหตุผลสั้นๆ]\\n❌ ไม่แตะ: [สิ่งที่จะไม่แตะ — business rules ที่รักษา]\\n\\n[💡 ถ้าเห็นแนวทางที่ดีกว่า หรือข้อควรระวังพิเศษ — แจ้งตรงๆ]\\n\\nพิมพ์ \\"ไฟเขียว\\" เพื่อส่งงานให้ V4-Pro ได้เลยครับ 🟢"
+รูปแบบ confirmationMessage (Technical Director tone — แม่นยำ กระชับ):
+"📋 จีจี้แปลงงานแล้วนะครับพี่\\n\\n🎯 งาน: [description]\\n▸ ผลลัพธ์: [target_behavior]\\n📁 ไฟล์: [files_hint[0].path] → [fn]\\n⚠️ Risk: [low/medium/high — เหตุผลสั้นๆ]\\n❌ ห้ามแตะ: [สรุป logic_constraints]\\n\\n[💡 ถ้ามีข้อควรระวังพิเศษ — แจ้งตรงๆ]\\n\\nพิมพ์ \\"ไฟเขียว\\" เพื่อส่งงานให้ V4-Pro ได้เลยครับ 🟢"
 
 กรณี chat (ถาม/คุยทั่วไป/ขอความเห็น):
 {"intent":"chat"}
@@ -149,24 +153,39 @@ CHINCHA FLOW scopes:
   }
 }
 
-// สร้าง compact Task Brief สำหรับ Pro — Flash ย่อบริบทจากพีชเป็น 4-5 บรรทัด
-// Pro มีโค้ดครบในตัวอยู่แล้ว (repo checkout) — ไม่ต้อง preload snippet
+// สร้าง Technical Action Plan สำหรับ Pro — dense, scannable, Pro read_file ถูกจุดรอบแรก
+// รองรับ schema ใหม่ {path, fn}[] และ schema เก่า string[] ใน files_hint
 function buildTaskBrief(classified, originalMessage) {
   const { taskSpec = {} } = classified;
 
   const task = taskSpec.description || originalMessage;
-  const change = taskSpec.expected_change || '';
-  const files = Array.isArray(taskSpec.files_hint) ? taskSpec.files_hint : [];
-  const rules = Array.isArray(taskSpec.business_rules) ? taskSpec.business_rules : [];
+  const targetBehavior = taskSpec.target_behavior || '';
+  const constraints = Array.isArray(taskSpec.logic_constraints) ? taskSpec.logic_constraints
+    : (Array.isArray(taskSpec.business_rules) ? taskSpec.business_rules : []);
+  const filesRaw = Array.isArray(taskSpec.files_hint) ? taskSpec.files_hint : [];
+  const diffExp = taskSpec.diff_expectation || taskSpec.expected_change || '';
 
-  const mainFile = files[0] ? `\`${files[0]}\`` : '(สำรวจเองจาก scope)';
-  const extraFiles = files.slice(1).map(f => `\`${f}\``).join(', ');
+  // normalize: string → {path, fn:''}
+  const files = filesRaw.map(f => typeof f === 'string' ? { path: f, fn: '' } : f);
 
-  let brief = `**งาน:** ${task}`;
-  if (change && change !== task) brief += ` — ${change}`;
-  brief += `\n**ไฟล์:** ${mainFile}`;
-  if (extraFiles) brief += `\n**อ่านก่อน:** ${extraFiles}`;
-  if (rules.length) brief += `\n**กฎ:** ${rules.join(' · ')}`;
+  let brief = `🎯 **งาน:** ${task}`;
+
+  if (targetBehavior) {
+    brief += `\n\n▸ **Target Behavior:**\n${targetBehavior}`;
+  }
+
+  if (constraints.length) {
+    brief += `\n\n▸ **Logic Constraints:**\n${constraints.map(c => `• ${c}`).join('\n')}`;
+  }
+
+  if (files.length) {
+    const fileLines = files.map(f => f.fn ? `• \`${f.path}\` → ${f.fn}` : `• \`${f.path}\``);
+    brief += `\n\n▸ **ไฟล์เป้าหมาย:**\n${fileLines.join('\n')}`;
+  }
+
+  if (diffExp) {
+    brief += `\n\n▸ **สิ่งที่ต้องเปลี่ยน:** ${diffExp}`;
+  }
 
   return brief;
 }

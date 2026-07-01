@@ -1,3 +1,18 @@
+## 2026-07-01 — feat: Flash → Technical Translator & Project Director + Task Brief v2 (PR #447)
+
+`apps/webhook-core/src/flash/flashTriggers.js`
+
+**classifyAndTranslate** — role ใหม่ + JSON schema ใหม่:
+- Role: "Technical Translator & Project Director" (จาก "เลขาส่วนตัว")
+- เพิ่มฟิลด์ `target_behavior`: พฤติกรรมสุดท้ายที่ระบบต้องทำ (มุม user/system)
+- เพิ่มฟิลด์ `logic_constraints[]`: invariant ทางเทคนิคและกฎธุรกิจ (แทน `business_rules`)
+- เปลี่ยน `files_hint` จาก `string[]` → `{path, fn}[]`: ระบุ function ที่ Pro ต้อง read_file ทันที
+- เปลี่ยน `expected_change` → `diff_expectation`: อธิบาย 1-2 ประโยคว่า Pro จะเปลี่ยนอะไร
+
+**buildTaskBrief** — format ใหม่ (Technical Action Plan, scannable):
+- รองรับ `{path, fn}[]` schema ใหม่ + fallback string[] เก่า (backward compat)
+- Output: 🎯 งาน → ▸ Target Behavior → ▸ Logic Constraints → ▸ ไฟล์เป้าหมาย → ▸ สิ่งที่ต้องเปลี่ยน
+
 ## 2026-07-01 — fix: AI agent safety — result-before-delete, brief-retry, file-list-50, token-schema (PR #446)
 
 ## สรุป
