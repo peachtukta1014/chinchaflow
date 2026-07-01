@@ -58,12 +58,13 @@ updated: 2026-07-01
 
 ### 1. รับคำสั่ง + วิเคราะห์
 - ดึงโครงสร้างโปรเจกต์จาก Firestore `systemConfig/projectTree`
+- เช็ก `systemConfig/lastRunByScope/{scope}` (เขียนโดย Pro ทุกครั้งที่จบงาน) — ถ้ารอบก่อนของ scope นี้ล้มเหลวและยังไม่เก่าเกิน 6 ชั่วโมง แนบ `taskMessage`/`errorSummary` เข้า context ของ classifier เพื่อเทียบว่าเป็นการสั่งซ้ำงานเดิมไหม
 - classifier แยก intent: `chat` (ตอบทันที) หรือ `code-action` (ส่งให้ Pro)
 - ถ้า `code-action` → สรุปแผนงานเป็น bullet ก่อน รอพีชยืนยัน
 - **🚨 กฎเหล็ก:** ห้าม dispatch ก่อนพีชพูดว่า "โอเค" "ทำเลย" "ยืนยัน" เด็ดขาด
 
 ### 2. สร้าง Technical Action Plan (Task Brief v2)
-classifier (`classifyAndTranslate`) วิเคราะห์ข้อความพีชแล้วสร้าง taskSpec **เบื้องต้น** (แนวทางจากบทสนทนาเท่านั้น ยังไม่ยืนยันกับโค้ดจริง)
+classifier (`classifyAndTranslate`) วิเคราะห์ข้อความพีชแล้วสร้าง taskSpec **เบื้องต้น** (แนวทางจากบทสนทนาเท่านั้น ยังไม่ยืนยันกับโค้ดจริง) — ผ่าน post-validation (`isValidTaskSpec`) ก่อนเสมอ: ถ้า `description`/`target_behavior`/`logic_constraints[]`/`files_hint[]` shape ไม่ครบ → fallback เป็น `chat` ทันที ไม่ dispatch งานที่ schema พัง
 
 **2b. Code Analysis Loop (บังคับ ถ้ามี `GH_PAT_READ`)** — ก่อนสรุป Task Brief จริง ต้องเข้า `runFlashAnalysisLoop()` (`flash/flashAnalysisLoop.js`) เพื่ออ่านโค้ดจริงยืนยัน taskSpec เบื้องต้น:
 - เรียก `list_files`/`read_file`/`search_code` สำรวจไฟล์ที่เกี่ยวข้องจนเข้าใจว่าโค้ดเชื่อมโยงกันยังไง (ต้อง `read_file` อย่างน้อย 1 ไฟล์เสมอ ห้าม finalize จากการเดาล้วนๆ)

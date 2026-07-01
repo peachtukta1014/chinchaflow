@@ -16,12 +16,14 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
 const { runFlashAnalysisLoop } = require('./flash/flashAnalysisLoop');
 const { dispatchToProAgent } = require('./flash/flashDispatch');
+
+const LAST_RUN_STALE_MS = 6 * 60 * 60 * 1000; // 6 ชั่วโมง — เกินนี้ถือว่าเก่าเกินจะเอามาปนกับงานปัจจุบัน
 
 // ── Main HTTP endpoint (เส้นทางหลักเส้นทางเดียวที่ frontend ai-chat เรียกใช้จริง) ──
 exports.aiChatAgentHttp = functions
@@ -179,7 +181,15 @@ exports.aiChatAgentHttp = functions
 
     // ── AI Intent Classifier ─────────────────────────────────────────────
     await writeProgress(requestId, 'กำลังวิเคราะห์คำสั่ง...');
-    const classified = await classifyAndTranslate(apiKey, message, history, resolvedScope);
+
+    // เช็ก scope-level error pointer จากรอบก่อน (loadLastExecutionStatus) — ส่งเข้า classifier
+    // เฉพาะกรณีล้มเหลวและยังไม่เก่าเกินไป (กัน error เก่าข้ามวันมาปนกับงานคนละเรื่อง)
+    const rawLastRun = await loadLastExecutionStatus(resolvedScope).catch(() => null);
+    const lastRunStatus = (rawLastRun?.status === 'error' && Date.now() - (rawLastRun.updatedAt || 0) < LAST_RUN_STALE_MS)
+      ? rawLastRun
+      : null;
+
+    const classified = await classifyAndTranslate(apiKey, message, history, resolvedScope, lastRunStatus);
     const finalScope = classified.scope || resolvedScope;
 
     if (classified.intent === 'code-action') {

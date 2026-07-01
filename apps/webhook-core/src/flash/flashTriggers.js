@@ -49,10 +49,37 @@ function isCodeMetricsQuery(text) {
   return /(นับบรรทัด|กี่บรรทัด|บรรทัดทั้งหมด|จำนวนบรรทัด|ความยาวโค้ด|โปรเจกต์ใหญ่แค่ไหน|code\s*metric)/.test(t);
 }
 
+// ตรวจ taskSpec ที่ได้จาก LLM ว่าครบ shape ที่ buildTaskBrief ต้องใช้จริงไหม (post-validation แทนการพึ่ง native
+// response_format ของ API เพราะ provider ของ deepseek ผ่าน OpenRouter ไม่รับประกันว่ารองรับ strict JSON schema เต็มรูปแบบ)
+// ผ่านเฉพาะกรณี intent = code-action เท่านั้น — chat ไม่ต้องมี taskSpec
+function isValidTaskSpec(taskSpec) {
+  if (!taskSpec || typeof taskSpec !== 'object') return false;
+  if (typeof taskSpec.description !== 'string' || !taskSpec.description.trim()) return false;
+  if (typeof taskSpec.target_behavior !== 'string' || !taskSpec.target_behavior.trim()) return false;
+  if (!Array.isArray(taskSpec.logic_constraints)) return false;
+  if (!Array.isArray(taskSpec.files_hint)) return false;
+  return taskSpec.files_hint.every(f =>
+    (typeof f === 'string' && f.trim()) || (f && typeof f === 'object' && typeof f.path === 'string' && f.path.trim())
+  );
+}
+
 // รับภาษาชาวบ้านจากพีช → ถอดรหัสเป็น Technical Specification → สร้าง Task Brief ส่งให้ Pro
-async function classifyAndTranslate(apiKey, message, history, currentScope) {
+// lastRunStatus (optional): { status: 'success'|'error', taskMessage, errorSummary } จาก loadLastExecutionStatus(scope)
+// — เฉพาะกรณี status==='error' และไม่ stale เกินไป (เช็กที่ caller) เท่านั้นที่ควรส่งมา ให้ classifier รู้บริบทรอบก่อน
+async function classifyAndTranslate(apiKey, message, history, currentScope, lastRunStatus) {
+  const lastRunBlock = (lastRunStatus && lastRunStatus.status === 'error')
+    ? `\n\n⚠️ **บริบทจากรอบก่อนหน้าของ scope นี้ (ล้มเหลว):**
+งานก่อนหน้า: "${(lastRunStatus.taskMessage || '(ไม่ทราบ)').slice(0, 300)}"
+สาเหตุที่พัง: ${(lastRunStatus.errorSummary || '(ไม่ทราบ)').slice(0, 300)}
+
+เทียบคำสั่งปัจจุบันของพี่พีชกับงานก่อนหน้า:
+- ถ้าเป็นการแก้ไข/สั่งซ้ำงานเดิม (retry) → เพิ่ม logic_constraints ให้เจาะจงขึ้นจากสาเหตุที่พังรอบก่อน ป้องกัน Pro พังซ้ำ
+- ถ้าเป็นงานคนละเรื่องกันเลย → ไม่ต้องสนใจบริบทนี้`
+    : '';
+
   const systemPrompt = `คุณคือจีจี้ — Technical Translator & Project Director ของ CHINCHA FLOW
 หน้าที่: ถอดรหัสภาษาชาวบ้านของพี่พีช → Technical Specification ที่สมบูรณ์ → Pro Developer รัน read_file ถูกจุดทันทีในรอบแรก ไม่หลงทาง
+${lastRunBlock}
 
 CHINCHA FLOW scopes:
 - ร้านชินชา/ชา/chincha-tea (scope: tea) — apps/chincha-tea/, POS ขายชา, สต๊อกแก้ว, พนักงาน, LINE บอทชา
@@ -137,6 +164,13 @@ CHINCHA FLOW scopes:
     if (!jsonMatch) return { intent: 'chat' };
     const parsed = JSON.parse(jsonMatch[0]);
     const taskSpec = parsed.taskSpec || {};
+
+    // Post-validation — กัน dispatch งานที่ schema ไม่ครบ (path/target_behavior หาย ฯลฯ) แทนที่จะปล่อยผ่านแบบเงียบๆ
+    if (parsed.intent === 'code-action' && !isValidTaskSpec(taskSpec)) {
+      console.warn('classifyAndTranslate: taskSpec schema ไม่ครบ — fallback เป็น chat', JSON.stringify(taskSpec).slice(0, 300));
+      return { intent: 'chat' };
+    }
+
     return {
       intent: parsed.intent || 'chat',
       scope: parsed.scope || currentScope || 'root',

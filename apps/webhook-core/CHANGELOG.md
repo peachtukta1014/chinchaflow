@@ -7,6 +7,15 @@
 
 ## 2026-07
 
+### 2026-07-01 | feat: Scope-Level Error Pointer + Post-Validation Schema (Flash)
+- `src/shared/progressTracker.js` — เพิ่ม `writeLastRunStatus(scope, {...})` เขียน `systemConfig/lastRunByScope` (merge ต่อ scope)
+- `src/aiWorkflowAgent.js` — เรียก `writeLastRunStatus` คู่กับ `writeResult` ทั้ง success/error path
+- `apps/webhook-core/scripts/fail-pro-agent.cjs` — เขียน pointer เพิ่มตอน Pro crash กลางคัน
+- `src/flash/flashContext.js` — เพิ่ม `loadLastExecutionStatus(scope)`
+- `src/aiChatAgent.js` — เช็ก pointer ก่อน classify (เฉพาะ error ที่ไม่เก่าเกิน 6 ชม. — `LAST_RUN_STALE_MS`)
+- `src/flash/flashTriggers.js` — `classifyAndTranslate` รับ `lastRunStatus` เพิ่ม + เพิ่ม `isValidTaskSpec()` post-validation ก่อนปล่อยเป็น code-action (schema ไม่ครบ → fallback `chat`)
+- **ผลกระทบ**: Flash รู้บริบทว่ารอบก่อนของ scope นี้พังเพราะอะไรก่อนสั่งงานซ้ำ + กัน Task Brief ที่ schema พังหลุดไปถึง Pro
+
 ### 2026-07-01 | feat: Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief
 - `src/flash/flashAnalysisLoop.js` (ใหม่) — read-only agentic loop: `read_file`/`list_files`/`search_code`/`finalize_task_brief`, `MAX_ITERATIONS=6`, ผูก `GH_PAT_READ` เท่านั้น
 - `src/aiChatAgent.js` — แทนที่ "verify files_hint" (เช็กแค่ path) ด้วย `runFlashAnalysisLoop()` ก่อนสร้าง Task Brief จริง — non-blocking, fallback ไป taskSpec เบื้องต้นถ้า error/ไม่มี key/เกินรอบ
