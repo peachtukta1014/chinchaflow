@@ -1,3 +1,43 @@
+## 2026-07-02 — feat: Detective Flash Agent — 3-Section investigation architecture (PR #471)
+
+## Summary
+
+อัปเกรด Flash Agent (จีจี้) จาก "อ่านโค้ดแบบ sequential" เป็น **Detective-Style Investigation** แบบ 3 ขั้นตอน โดยเพิ่ม `investigationState` ที่ผูกกับ `requestId` ใน Firestore เพื่อรักษา state ข้าม block โดยไม่ bloat token
+
+---
+
+## สิ่งที่เปลี่ยน
+
+### 🕵️ SECTION 1 — INTAKE (`aiChatAgent.js`)
+- ก่อนเข้า analysis loop → เปิด **Case File** ใน Firestore collection `investigations/{requestId}`
+- จำแนก `caseType`: `BUG_FIX` หรือ `FEATURE_REQUEST` จากคำอธิบายงาน
+- map `scope` → `targetApp` (`seafood-pos`, `chincha-tea`, `webhook-core`, `all`)
+- initialize `cluesQueue` จาก `files_hint` ของ classifier
+
+### 🔍 SECTION 2 — DETECTIVE LOOP (`flashAnalysisLoop.js`)
+
+**Temporary Investigation State Schema:**
+```json
+{
+  "scannedPaths": [],
+  "proposedFixes": [{ "id", "file", "changeDescription", "originalSnippet", "status": "DRAFT" }],
+  "impactHypotheses": [{ "id", "targetFile", "description", "status": "PENDING_VERIFICATION" }],
+  "cluesQueue": [],
+  "analysisCertainty": { "score": 0, "isReadyToFix": false, "reasoning": "" }
+}
+```
+
+**3 Detective Tools ใหม่:**
+| Tool | หน้าที่ |
+|------|--------|
+| `record_fix_location` | บันทึก fix ที่พบ → trigger impact analysis ทันที |
+| `add_impact_hypothesis` | เพิ่มไฟล์ที่สงสัยว่ากระทบ → เข้า `cluesQueue` อัตโนมัติ |
+| `mark_hypothesis_safe` | ยืนยันว่าปลอดภัย → remove จาก `cluesQueue` |
+
+**Detective Guards:**
+- **Duplicate Read Guard**: `read_file` ซ้ำ → บล็อก + ชี้ไฟล์ถัดไปใน `cluesQueue`
+- **Impact Mapping**: หลัง `record
+
 ## 2026-07-02 — feat: mock test harness สำหรับ Flash analysis loop (PR #470)
 
 ## Summary
