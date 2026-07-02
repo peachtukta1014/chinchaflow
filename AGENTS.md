@@ -32,6 +32,8 @@
 | รัน/screenshot ชา | `get_skill("run-chincha-tea")` | vite dev + chromium screenshot |
 | รัน/screenshot ai-chat | `get_skill("run-ai-chat")` | vite dev + chromium screenshot |
 | syntax check webhook-core | `get_skill("run-webhook-core")` | node --check ทุก .js ใน src/ |
+| เทส logic webhook-core (ไม่ต้อง key) | `apps/webhook-core/scripts/test-*.js` | รันอัตโนมัติใน `pr-verify.yml` ทุก PR ที่แตะ webhook-core |
+| สอบ AI classifier (ยิง LLM จริง) | `apps/webhook-core/scripts/eval-flash-intents.mjs` + `ai-eval.yml` | ต้อง `OPENROUTER_API_KEY`; CI รันอัตโนมัติเมื่อ PR แตะ `flash/`/`aiChatAgent.js` แล้วโพสต์ตารางผลใน PR |
 
 ### ตัวอย่างที่ทีมตัดสินแล้ว (ไม่ทำซ้ำ)
 

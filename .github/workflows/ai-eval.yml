@@ -1,0 +1,51 @@
+# สนามสอบ AI (จีจี้) — ยิงข้อสอบเข้า classifier ตัวจริง แล้วรายงานตารางผลใน PR
+# รันเมื่อ: (1) กดปุ่ม Run workflow เอง (2) PR ที่แตะไฟล์สมองของ Flash
+# ใช้ OPENROUTER_API_KEY_PRO เพราะเป็น key OpenRouter ตัวเดียวที่อยู่ใน GitHub Secrets
+# (OPENROUTER_API_KEY ตัว Flash จริงอยู่ Google Cloud Secret Manager — CI เข้าไม่ถึง)
+name: AI Eval
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/webhook-core/src/flash/**'
+      - 'apps/webhook-core/src/aiChatAgent.js'
+      - 'apps/webhook-core/scripts/eval-flash-intents.mjs'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  eval:
+    name: Run AI intent eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # script ไม่มี dependency ภายนอก — ไม่ต้อง npm install
+      - name: Run eval
+        id: eval
+        run: node apps/webhook-core/scripts/eval-flash-intents.mjs
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY_PRO }}
+
+      - name: Comment report on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## 🧪 สนามสอบ AI\n\n⚠️ eval รันไม่จบ — ดู log ใน Actions';
+            try { body = fs.readFileSync('eval-report.md', 'utf8'); } catch {}
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
