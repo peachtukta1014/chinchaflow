@@ -99,6 +99,8 @@ CHINCHA FLOW scopes:
 - "ทำไมสรุปยอดไม่ส่งเข้า LINE ช่วยดูที" → code-action(ข้อ1) | "สรุปยอดเมื่อคืนให้หน่อย" → chat(ข้อ3)
 - "แอปมันค้างเฉยเลยอ่ะ ช่วยดูที" → code-action(ข้อ1) | "ตะกี้พนักงานบอกหน้าจอมันเด้งออกเอง ลองไปดูหน่อย" → code-action(ข้อ1)
 - "เปลี่ยนสีปุ่มเป็นเขียว" → code-action(ข้อ2) | "อยากให้ปุ่มบันทึกใหญ่ขึ้นหน่อยอ่ะ" → code-action(ข้อ2)
+- "บิลกุ้งไม่ขึ้นเบอร์โทรลูกค้า แก้ให้หน่อย" → code-action(ข้อ1+2 — "ไม่ขึ้น"+"แก้") | "ออเดอร์ไม่ขึ้นในแอปเลย ช่วยดูหน่อย" → code-action(ข้อ1 — "ไม่ขึ้น")
+- "อยากให้บอทชาส่งสรุปยอดตอน 4 โมงเย็นแทน 5 โมง ปรับให้หน่อย" → code-action(ข้อ2 — "ปรับ" = แก้โค้ดเวลาส่ง)
 - "ลูกหนี้ค้างจ่ายเท่าไหร่" → chat(ข้อ3 — "ค้าง" ในที่นี้คือหนี้ ไม่ใช่แอปค้าง)
 ไม่เข้าข้อไหนเลย → "chat"
 
@@ -176,10 +178,10 @@ CHINCHA FLOW scopes:
     const parsed = JSON.parse(jsonMatch[0]);
     const taskSpec = parsed.taskSpec || {};
 
-    // Post-validation — กัน dispatch งานที่ schema ไม่ครบ (path/target_behavior หาย ฯลฯ) แทนที่จะปล่อยผ่านแบบเงียบๆ
+    // Post-validation — warn ถ้า taskSpec ไม่ครบ แต่ไม่เปลี่ยน intent เป็น chat
+    // เพราะ Flash analysis loop จะสร้าง taskSpec ใหม่จากโค้ดจริงอยู่แล้ว (initialTaskSpec เป็นแค่ hint)
     if (parsed.intent === 'code-action' && !isValidTaskSpec(taskSpec)) {
-      console.warn('classifyAndTranslate: taskSpec schema ไม่ครบ — fallback เป็น chat', JSON.stringify(taskSpec).slice(0, 300));
-      return { intent: 'chat' };
+      console.warn('classifyAndTranslate: taskSpec schema ไม่ครบ — Flash analysis loop จะสร้างใหม่', JSON.stringify(taskSpec).slice(0, 300));
     }
 
     return {
