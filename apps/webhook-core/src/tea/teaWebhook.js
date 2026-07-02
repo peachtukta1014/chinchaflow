@@ -50,6 +50,14 @@ async function handleTeaLineWebhook(db, admin, req, res) {
 
       // ── EVENT: follow (เพิ่มเพื่อน / ถูกเชิญเข้ากลุ่ม) ──
       if (event.type === 'follow') {
+        // บันทึก follow event ลง line_messages เสมอ — เพื่อให้แอดมินดึง Group ID ได้
+        if (groupId) {
+          await db.collection('line_messages').add({
+            userId, groupId, sourceType,
+            msgType: 'follow',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch(() => {});
+        }
         const welcomeMsg = groupId
           ? '🤖 สวัสดีครับ! บอทชินชาพร้อมให้บริการในกลุ่มแล้ว\n\n'
             + 'คำสั่งที่มี:\n'
@@ -76,6 +84,15 @@ async function handleTeaLineWebhook(db, admin, req, res) {
       }
 
       const text = event.message.text.trim();
+
+      // บันทึกทุกข้อความจากกลุ่มลง line_messages — เพื่อให้แอดมินดึง Group ID ได้
+      // (ก่อนเช็กว่าเป็นกลุ่มที่ถูกต้องหรือไม่ — จะได้มีข้อมูลแม้ยังไม่ตั้งค่า Group ID)
+      if (groupId) {
+        await db.collection('line_messages').add({
+          userId, groupId, text, sourceType,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        }).catch(() => {});
+      }
 
       const teaConfig = await getTeaLineConfig(db);
       const teaGroupId = (teaConfig.notifyGroupId || '').trim();
