@@ -87,7 +87,6 @@ async function fetchCodeMetrics() {
 
 const GITHUB_OWNER = 'peachtukta1014';
 const GITHUB_REPO = 'chinchaflow';
-const FETCH_FILE_MAX_CHARS = 3000;
 const FETCH_FILE_MAX_COUNT = 5;
 
 // GH_PAT_READ ต้องเป็น read-only เท่านั้น (Contents: Read + Actions: Read)
@@ -108,7 +107,7 @@ async function fetchRepoFiles(pat, filePaths) {
         });
         if (res.ok) {
           const text = await res.text();
-          results[filePath] = text.slice(0, FETCH_FILE_MAX_CHARS);
+          results[filePath] = text;
         }
       } catch { /* skip ไฟล์ที่อ่านไม่ได้ */ }
     })

@@ -234,14 +234,14 @@ exports.aiChatAgentHttp = functions
           if (analyzed?.taskSpec) {
             finalTaskSpec = analyzed.taskSpec;
           } else {
-            analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่ทันครบ (เกินรอบวิเคราะห์) — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น Pro ควร list_files/read_file ตรวจซ้ำก่อนแก้';
+            analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่ทันครบ — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้น';
           }
         } catch (err) {
           console.error('runFlashAnalysisLoop failed — fallback ไปใช้ taskSpec เบื้องต้น:', err.message);
-          analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่สำเร็จ (error ระหว่างวิเคราะห์) — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น Pro ควร list_files/read_file ตรวจซ้ำก่อนแก้';
+          analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่สำเร็จ — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้น';
         }
       } else {
-        analysisNote = '\n\n⚠️ GH_PAT_READ ไม่ได้ตั้งค่า — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้นเท่านั้น ไม่ได้อ่านโค้ดจริง';
+        analysisNote = '\n\n⚠️ GH_PAT_READ ไม่ได้ตั้งค่า — ไม่ได้อ่านโค้ดจริง';
       }
 
       const finalIsHighRisk = finalTaskSpec.isHighRisk !== undefined ? finalTaskSpec.isHighRisk !== false : classified.isHighRisk !== false;

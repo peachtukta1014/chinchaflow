@@ -1,18 +1,12 @@
 /**
  * flashAnalysisLoop.js — Flash Code Analysis Loop (read-only agentic loop)
  *
- * เดิม Flash ("Technical Translator") เดา files_hint/target_behavior/logic_constraints
- * จากบทสนทนาอย่างเดียว แล้วแค่ "เช็กว่า path มีอยู่จริงไหม" ก่อนส่งให้ Pro (ไม่เคยอ่านเนื้อโค้ดจริง)
- * → Pro ต้องมาแก้ตามความเข้าใจที่ผิดเองอีกที เสีย iteration
+ * Multi-block architecture: Flash อ่านโค้ดเป็น block (8 รอบ/block)
+ * ถ้า block จบแล้วยังอ่านไม่ครบ → checkpoint → เริ่ม block ใหม่ต่อจากเดิม
+ * วนจนกว่า Flash จะอ่านครบและ finalize หรือครบ MAX_BLOCKS (4 blocks = 32 รอบ)
  *
- * โมดูลนี้ให้ Flash เรียก tool อ่านโค้ดจริง (read-only, ผูก GH_PAT_READ เท่านั้น — ห้าม write)
- * ก่อนสรุป Task Brief สุดท้าย เพื่อให้ "ยิงคำสั่ง" ด้วยความเข้าใจจริง ไม่ใช่การเดา
- *
- * ต่างจาก Pro (agentTools.js) ตรงที่:
- * - ไม่มี patch_file/write_file/commit_and_pr/trigger_deploy/exec_command — read-only ล้วน
- * - MAX_ITERATIONS ต่ำกว่ามาก (สำรวจเบื้องต้น ไม่ใช่แก้โค้ดจริง)
- * - จบด้วย tool `finalize_task_brief` เสมอ (ระบบกำหนด ไม่ใช่อนุมานจาก finish_reason)
- * - non-blocking เสมอ: error/หมดรอบ → คืน null ให้ caller fallback ไปใช้ taskSpec ที่เดาไว้ตอนแรก
+ * Flash = ตัวคิดวิเคราะห์หลัก ต้องอ่านโค้ดเองให้ครบก่อนส่งงานให้ Pro
+ * ห้ามบอกให้ Pro ไปอ่านเพิ่มเอง
  */
 
 const { OPENROUTER_BASE, FLASH_MODEL } = require('./flashModels');
@@ -21,18 +15,19 @@ const { writeProgress } = require('../shared/progressTracker');
 const { formatChainForPrompt } = require('../shared/chainLockService');
 
 const FLASH_ANALYSIS_MODEL = process.env.FLASH_MODEL || FLASH_MODEL;
-const MAX_ITERATIONS = 8; // เพิ่มจาก 6 → 8 เพื่อให้สะสมข้อมูลได้มากขึ้นก่อนสรุป (8×60s = 480s < function timeout 540s)
-const MIN_FILES_BEFORE_FINALIZE = 2; // ต้องอ่านอย่างน้อย 2 ไฟล์ก่อน finalize ได้
-const EXPLORE_ONLY_ROUNDS = 3; // 3 รอบแรกไม่มี finalize_task_brief ใน tool list — บังคับอ่านโค้ด
-const CALL_TIMEOUT_MS = 60 * 1000; // 1 นาทีต่อรอบ — งานอ่าน/ค้นสั้นกว่า Pro มาก
+const ROUNDS_PER_BLOCK = 8;
+const MAX_BLOCKS = 4;
+const MIN_FILES_BEFORE_FINALIZE = 2;
+const EXPLORE_ONLY_ROUNDS = 3;
+const CALL_TIMEOUT_MS = 60 * 1000;
+const MAX_ITERATIONS = ROUNDS_PER_BLOCK;
 
-// tools แบ่ง 2 ชุด: READ_ONLY (รอบแรกๆ บังคับอ่าน) กับ ALL (รอบหลังๆ finalize ได้)
 const READ_ONLY_TOOLS = [
   {
     type: 'function',
     function: {
       name: 'read_file',
-      description: 'อ่านเนื้อไฟล์จาก GitHub repo (read-only, สูงสุด 3,000 ตัวอักษรแรก)',
+      description: 'อ่านเนื้อไฟล์ทั้งหมดจาก GitHub repo (read-only)',
       parameters: {
         type: 'object',
         properties: { path: { type: 'string', description: 'path ไฟล์ relative จาก repo root เช่น apps/seafood-pos/src/App.jsx' } },
@@ -179,60 +174,24 @@ async function executeFlashTool(name, args, { ghPatRead, projectTree }) {
       }
       return results.length > 0
         ? `พบ "${args.pattern}":\n${results.join('\n')}`
-        : `ไม่พบ "${args.pattern}" (หมายเหตุ: ค้นได้แค่ 3,000 ตัวอักษรแรกของแต่ละไฟล์)`;
+        : `ไม่พบ "${args.pattern}" ในไฟล์ที่ระบุ`;
     }
     default:
       return `❌ ไม่รู้จัก tool "${name}"`;
   }
 }
 
-/**
- * วนอ่าน/ค้นโค้ดจริงก่อนสรุป taskSpec — คืน { taskSpec, iterations } เมื่อเรียก finalize_task_brief สำเร็จ
- * คืน null เมื่อ: ไม่มี ghPatRead, เกิน MAX_ITERATIONS, หรือ error ระหว่างทาง (caller ต้อง fallback เอง)
- */
-async function runFlashAnalysisLoop(apiKey, ghPatRead, { message, history, scope, initialTaskSpec, projectTree, requestId }) {
-  if (!ghPatRead) return null; // non-blocking — caller ใช้ taskSpec ที่เดาไว้แทน
+async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId, blockNum, totalIterationsBefore, filesRead, filesReadList }) {
+  const isFirstBlock = blockNum === 1;
 
-  // chain locks: ดึงบริบทงานวันนี้ (+ carryOver เมื่อวาน) ให้ Flash รู้ว่าทำอะไรไปแล้ว
-  const chainContext = await formatChainForPrompt(scope || 'root').catch(() => '');
-
-  const systemPrompt = `คุณคือจีจี้ — Technical Translator ของ CHINCHA FLOW กำลังวิเคราะห์คำสั่ง "code-action" ของพี่พีช
-**ก่อนสรุปงานให้ Pro Agent ไปแก้ ต้องอ่านโค้ดจริงให้เพียงพอก่อนเสมอ ห้ามเดา** — ใช้ read_file/list_files/search_code สำรวจไฟล์ที่เกี่ยวข้องจนเข้าใจว่าโค้ดเชื่อมโยงกันยังไง
-
-scope ปัจจุบัน: ${scope || 'root'}
-แนวทางเบื้องต้นจากบทสนทนา (ยังไม่ยืนยัน ต้องอ่านโค้ดตรวจก่อน): ${JSON.stringify(initialTaskSpec || {}).slice(0, 800)}
-
-วิธีทำงาน (สะสมข้อมูลก่อนสรุป):
-1. **ดูโครงสร้างก่อน** — เรียก list_files เพื่อดูว่าไฟล์ไหนเกี่ยวข้องกับปัญหา
-2. **อ่านไฟล์หลัก** — read_file ไฟล์ที่น่าจะเป็นต้นเหตุ อ่านให้ครบทุกไฟล์ที่เกี่ยวข้อง (อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์)
-3. **ตามหาความเชื่อมโยง** — search_code ดูว่า function/component ที่เกี่ยวข้องถูกเรียกจากที่ไหนอีก แล้ว read_file ไฟล์ต้นทางด้วย
-4. **สรุปเมื่อมีข้อมูลพอ** — เรียก finalize_task_brief เมื่อเข้าใจ root cause + ไฟล์ที่ต้องแก้ครบแล้วเท่านั้น
-
-กฎเหล็ก:
-1. ต้องเรียก read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize_task_brief (ห้าม finalize จากการอ่านแค่ไฟล์เดียว)
-2. files_hint สุดท้ายต้องเป็น path ที่ยืนยันแล้วว่ามีอยู่จริงจาก read_file/list_files เท่านั้น
-3. ตอบเป็นการเรียก tool เท่านั้นทุกรอบ ห้ามพิมพ์ข้อความเปล่าอธิบายแผนแล้วไม่เรียก tool
-4. รอบ 1-${EXPLORE_ONLY_ROUNDS} ให้อ่าน/ค้นอย่างเดียว (finalize ยังไม่พร้อม) — ใช้เวลานี้สะสมข้อมูลให้มากที่สุด
-5. มีเวลาจำกัด ${MAX_ITERATIONS} รอบ — อย่ารีบสรุป ใช้รอบที่มีอ่านโค้ดให้ครบก่อน${chainContext}`;
-
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...(history || []).slice(-6),
-    { role: 'user', content: message },
-  ];
-
-  let filesRead = 0;
-  const filesReadList = []; // ติดตามรายชื่อไฟล์ที่อ่านแล้ว เพื่อรายงาน knowledge ให้ model
-
-  for (let iterations = 1; iterations <= MAX_ITERATIONS; iterations++) {
-    // Phase 1 (รอบ 1-EXPLORE_ONLY_ROUNDS): เฉพาะ read/list/search — ไม่มี finalize ใน tool list
-    // Phase 2 (รอบ EXPLORE_ONLY_ROUNDS+1 ขึ้นไป): เพิ่ม finalize_task_brief เข้ามา
-    const isExplorePhase = iterations <= EXPLORE_ONLY_ROUNDS;
+  for (let round = 1; round <= ROUNDS_PER_BLOCK; round++) {
+    const totalIter = totalIterationsBefore + round;
+    const isExplorePhase = isFirstBlock && round <= EXPLORE_ONLY_ROUNDS;
     const iterTools = isExplorePhase ? READ_ONLY_TOOLS : FLASH_ANALYSIS_TOOLS;
 
     const phaseLabel = isExplorePhase
-      ? `จีจี้กำลังสำรวจโค้ด... (รอบ ${iterations}/${MAX_ITERATIONS} — อ่านแล้ว ${filesRead} ไฟล์)`
-      : `จีจี้กำลังวิเคราะห์โค้ด... (รอบ ${iterations}/${MAX_ITERATIONS} — อ่านแล้ว ${filesRead} ไฟล์)`;
+      ? `จีจี้กำลังสำรวจโค้ด... (block ${blockNum} รอบ ${round}/${ROUNDS_PER_BLOCK} — อ่านแล้ว ${filesRead.count} ไฟล์)`
+      : `จีจี้กำลังวิเคราะห์โค้ด... (block ${blockNum} รอบ ${round}/${ROUNDS_PER_BLOCK} — อ่านแล้ว ${filesRead.count} ไฟล์)`;
     await writeProgress(requestId, phaseLabel, 'flash');
 
     const choice = await callFlashWithTools(apiKey, messages, true, iterTools);
@@ -252,19 +211,19 @@ scope ปัจจุบัน: ${scope || 'root'}
       try { args = JSON.parse(toolCall.function.arguments || '{}'); } catch { /* use empty */ }
 
       if (toolCall.function.name === 'finalize_task_brief') {
-        if (filesRead < MIN_FILES_BEFORE_FINALIZE) {
+        if (filesRead.count < MIN_FILES_BEFORE_FINALIZE) {
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: `❌ อ่านไปแค่ ${filesRead} ไฟล์ — ต้อง read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize (อ่านไฟล์ที่เกี่ยวข้องเพิ่มก่อน)`,
+            content: `❌ อ่านไปแค่ ${filesRead.count} ไฟล์ — ต้อง read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize (อ่านไฟล์ที่เกี่ยวข้องเพิ่มก่อน)`,
           });
           continue;
         }
-        return { taskSpec: args, iterations };
+        return { taskSpec: args, totalIterations: totalIter };
       }
 
       if (toolCall.function.name === 'read_file') {
-        filesRead++;
+        filesRead.count++;
         if (args.path) filesReadList.push(args.path);
       }
       const toolLabel = ({
@@ -277,21 +236,82 @@ scope ปัจจุบัน: ${scope || 'root'}
       messages.push({ role: 'tool', tool_call_id: toolCall.id, content: resultText });
     }
 
-    // Knowledge tracker: บอก model ว่าอ่านอะไรไปแล้วบ้าง + กระตุ้นให้อ่านเพิ่มถ้ายังไม่พอ
-    if (isExplorePhase && filesRead > 0) {
+    if (isExplorePhase && filesRead.count > 0) {
       messages.push({
         role: 'user',
-        content: `📊 สรุปความรู้รอบนี้: อ่านแล้ว ${filesRead} ไฟล์ [${filesReadList.join(', ')}] — ยังอยู่ช่วงสำรวจ (รอบ ${iterations}/${EXPLORE_ONLY_ROUNDS}) ค้นหาไฟล์ที่เกี่ยวข้องเพิ่มเติมได้อีก เช่น ไฟล์ที่ import/เรียกใช้ function ที่เจอ หรือ search_code หาการเชื่อมโยง`,
+        content: `📊 สรุปความรู้รอบนี้: อ่านแล้ว ${filesRead.count} ไฟล์ [${filesReadList.join(', ')}] — ยังอยู่ช่วงสำรวจ (รอบ ${round}/${EXPLORE_ONLY_ROUNDS}) ค้นหาไฟล์ที่เกี่ยวข้องเพิ่มเติมได้อีก`,
       });
     }
   }
 
-  // ครบรอบแล้วยังไม่ finalize — บังคับสรุปจากสิ่งที่อ่านมา แทนการทิ้ง context ทั้งหมด
-  if (filesRead >= MIN_FILES_BEFORE_FINALIZE) {
-    try {
+  return null;
+}
+
+async function runFlashAnalysisLoop(apiKey, ghPatRead, { message, history, scope, initialTaskSpec, projectTree, requestId }) {
+  if (!ghPatRead) return null;
+
+  const chainContext = await formatChainForPrompt(scope || 'root').catch(() => '');
+  const maxTotalRounds = MAX_BLOCKS * ROUNDS_PER_BLOCK;
+
+  const systemPrompt = `คุณคือจีจี้ — Technical Translator ของ CHINCHA FLOW กำลังวิเคราะห์คำสั่ง "code-action" ของพี่พีช
+**ก่อนสรุปงานให้ Pro Agent ไปแก้ ต้องอ่านโค้ดจริงให้ครบทุกไฟล์ที่เกี่ยวข้องก่อนเสมอ ห้ามเดา** — ใช้ read_file/list_files/search_code สำรวจจนเข้าใจว่าโค้ดเชื่อมโยงกันยังไง
+คุณคือตัวคิดวิเคราะห์หลัก — ต้องอ่านเองให้ครบก่อนส่งให้คนเขียนโค้ด ห้ามบอกให้คนเขียนไปอ่านเพิ่มเอง
+
+scope ปัจจุบัน: ${scope || 'root'}
+แนวทางเบื้องต้นจากบทสนทนา (ยังไม่ยืนยัน ต้องอ่านโค้ดตรวจก่อน): ${JSON.stringify(initialTaskSpec || {}).slice(0, 800)}
+
+วิธีทำงาน (สะสมข้อมูลก่อนสรุป):
+1. **ดูโครงสร้างก่อน** — เรียก list_files เพื่อดูว่าไฟล์ไหนเกี่ยวข้อง
+2. **อ่านไฟล์หลักทั้งหมด** — read_file ทุกไฟล์ที่เกี่ยวข้อง (อ่านเต็มทั้งไฟล์ ไม่ตัด) อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์
+3. **ตามหาความเชื่อมโยง** — search_code ดูว่า function/component ถูกเรียกจากที่ไหนอีก แล้ว read_file ไฟล์ต้นทางด้วย
+4. **สรุปเมื่ออ่านครบจริงๆ** — เรียก finalize_task_brief เมื่อเข้าใจ root cause + ไฟล์ที่ต้องแก้ครบแล้วเท่านั้น
+
+กฎเหล็ก:
+1. ต้อง read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize_task_brief
+2. files_hint ต้องเป็น path ที่ยืนยันแล้วจาก read_file/list_files เท่านั้น
+3. ตอบเป็นการเรียก tool เท่านั้นทุกรอบ ห้ามพิมพ์ข้อความเปล่า
+4. อ่านโค้ดให้ครบก่อนสรุป — ถ้ายังไม่ครบจะมี block ถัดไปให้อ่านต่อได้ (สูงสุด ${maxTotalRounds} รอบ)
+5. ห้ามบอกให้ Pro Agent ไปอ่านโค้ดเพิ่ม — คุณต้องอ่านเองให้ครบก่อน finalize${chainContext}`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...(history || []).slice(-6),
+    { role: 'user', content: message },
+  ];
+
+  const filesRead = { count: 0 };
+  const filesReadList = [];
+
+  for (let block = 1; block <= MAX_BLOCKS; block++) {
+    const totalIterationsBefore = (block - 1) * ROUNDS_PER_BLOCK;
+
+    const result = await runOneBlock(apiKey, messages, {
+      ghPatRead, projectTree, requestId,
+      blockNum: block,
+      totalIterationsBefore,
+      filesRead,
+      filesReadList,
+    });
+
+    if (result) {
+      return { taskSpec: result.taskSpec, iterations: result.totalIterations };
+    }
+
+    if (block < MAX_BLOCKS) {
+      await writeProgress(requestId, `จีจี้ checkpoint block ${block}/${MAX_BLOCKS} — อ่านแล้ว ${filesRead.count} ไฟล์ กำลังตรวจว่าอ่านครบหรือยัง...`, 'flash');
       messages.push({
         role: 'user',
-        content: `⚠️ ครบรอบวิเคราะห์แล้ว (อ่านแล้ว ${filesRead} ไฟล์: ${filesReadList.join(', ')}) — เรียก finalize_task_brief ตอนนี้ทันที สรุป taskSpec จากไฟล์ที่อ่านไปแล้วทั้งหมด ห้ามอ่านเพิ่ม`,
+        content: `📊 จบ block ${block}/${MAX_BLOCKS} — อ่านแล้ว ${filesRead.count} ไฟล์ [${filesReadList.join(', ')}]\nยังมีเวลาอีก ${MAX_BLOCKS - block} block (${(MAX_BLOCKS - block) * ROUNDS_PER_BLOCK} รอบ)\nถ้าอ่านครบทุกไฟล์ที่เกี่ยวข้องแล้ว → เรียก finalize_task_brief ได้เลย\nถ้ายังอ่านไม่ครบ → อ่านไฟล์ที่เหลือต่อได้ใน block ถัดไป`,
+      });
+    }
+  }
+
+  if (filesRead.count >= MIN_FILES_BEFORE_FINALIZE) {
+    try {
+      await writeProgress(requestId, `จีจี้ครบรอบทั้งหมดแล้ว (${maxTotalRounds} รอบ) — กำลังสรุป Task Brief...`, 'flash');
+      messages.push({
+        role: 'user',
+        content: `⚠️ ครบรอบวิเคราะห์ทั้งหมดแล้ว (${filesRead.count} ไฟล์: ${filesReadList.join(', ')}) — เรียก finalize_task_brief ตอนนี้ทันที สรุป taskSpec จากไฟล์ที่อ่านไปแล้วทั้งหมด`,
       });
       const finalChoice = await callFlashWithTools(apiKey, messages, 'finalize_task_brief');
       const tc = (finalChoice.message?.tool_calls || [])[0];
@@ -299,14 +319,14 @@ scope ปัจจุบัน: ${scope || 'root'}
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* use empty */ }
         if (args.description && args.target_behavior) {
-          return { taskSpec: args, iterations: MAX_ITERATIONS + 1, forcedFinalize: true };
+          return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true };
         }
       }
     } catch (err) {
       console.warn('force finalize หลังครบรอบล้มเหลว — fallback ไป initialTaskSpec:', err.message);
     }
   }
-  return null; // อ่านไฟล์ไม่ถึง MIN_FILES_BEFORE_FINALIZE หรือ force finalize พัง — caller fallback ไป initialTaskSpec
+  return null;
 }
 
-module.exports = { runFlashAnalysisLoop, FLASH_ANALYSIS_TOOLS, READ_ONLY_TOOLS, MAX_ITERATIONS, MIN_FILES_BEFORE_FINALIZE, EXPLORE_ONLY_ROUNDS };
+module.exports = { runFlashAnalysisLoop, FLASH_ANALYSIS_TOOLS, READ_ONLY_TOOLS, MAX_ITERATIONS, MIN_FILES_BEFORE_FINALIZE, EXPLORE_ONLY_ROUNDS, ROUNDS_PER_BLOCK, MAX_BLOCKS };
