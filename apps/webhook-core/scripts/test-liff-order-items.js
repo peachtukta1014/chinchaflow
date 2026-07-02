@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const assert = require('assert');
-const { buildItemsFromPayload } = require('../src/shrimpLiffOrderSubmit');
+const { buildItemsFromPayload } = require('../src/seafood-oa/shrimpLiffOrderSubmit');
 
 const items = buildItemsFromPayload({ small: '2', dead: '1.5' });
 assert.equal(items.length, 2);

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-const { MIN_WEIGHT_KG, MAX_WEIGHT_KG, getOrderWeightIssue, isValidOrderWeight } = require('../src/orderWeight');
-const { prepareOrderInput } = require('../src/prepareOrderInput');
+const { MIN_WEIGHT_KG, MAX_WEIGHT_KG, getOrderWeightIssue, isValidOrderWeight } = require('../src/seafood-oa/orderWeight');
+const { prepareOrderInput } = require('../src/seafood-oa/prepareOrderInput');
 const {
   parseRiverPrawnPendingLine,
   parseRiverPrawnWithSize,
   parseSimpleOrderLine,
   parseOrderItems,
-} = require('../src/parseLineOrder');
-const { classifyShrimpLineMessage } = require('../src/shrimpLineIntent');
-const { replyInvalidWeight } = require('../src/shrimpLineReply');
+} = require('../src/seafood-oa/parseLineOrder');
+const { classifyShrimpLineMessage } = require('../src/seafood-oa/shrimpLineIntent');
+const { replyInvalidWeight } = require('../src/seafood-oa/shrimpLineReply');
 
 function assert(cond, msg) {
   if (!cond) {

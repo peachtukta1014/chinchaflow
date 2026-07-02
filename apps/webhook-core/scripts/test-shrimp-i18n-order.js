@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-const { translateOrderTextToThai, normalizeQuantityText } = require('../src/translateOrderText');
-const { detectMessageLang } = require('../src/orderMessageLang');
-const { prepareOrderInput } = require('../src/prepareOrderInput');
+const { translateOrderTextToThai, normalizeQuantityText } = require('../src/seafood-oa/translateOrderText');
+const { detectMessageLang } = require('../src/seafood-oa/orderMessageLang');
+const { prepareOrderInput } = require('../src/seafood-oa/prepareOrderInput');
 const {
   parseRiverPrawnPendingLine,
   parseSimpleOrderLine,
-} = require('../src/parseLineOrder');
-const { classifyShrimpLineMessage } = require('../src/shrimpLineIntent');
+} = require('../src/seafood-oa/parseLineOrder');
+const { classifyShrimpLineMessage } = require('../src/seafood-oa/shrimpLineIntent');
 const {
   replyRiverPrompt,
   replyOrderOk,
   replyHelpCustomerThai,
   replyHelpCustomerEnglish,
-} = require('../src/shrimpLineReply');
+} = require('../src/seafood-oa/shrimpLineReply');
 
 function assert(cond, msg) {
   if (!cond) {

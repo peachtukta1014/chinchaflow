@@ -3,14 +3,15 @@ const assert = require('assert');
 const {
   buildLiffCustomerCatalog,
   loadCustomerById,
-} = require('../src/shrimpBuiltinCustomers');
+} = require('../src/seafood-oa/shrimpBuiltinCustomers');
 
 function mockDb(docs) {
   const byId = new Map(docs.map((d) => [d.id, d]));
   return {
     collection(name) {
       assert.strictEqual(name, 'customers');
-      return {
+      const query = {
+        limit: () => query,
         get: async () => ({
           docs: [...byId.values()].map((data) => ({
             id: data.id,
@@ -31,6 +32,7 @@ function mockDb(docs) {
           };
         },
       };
+      return query;
     },
   };
 }

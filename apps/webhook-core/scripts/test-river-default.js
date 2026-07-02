@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { riverDefaultToProduct } = require('../src/customerRiverDefault');
+const { riverDefaultToProduct } = require('../src/seafood-oa/customerRiverDefault');
 
 function assert(cond, msg) {
   if (!cond) {

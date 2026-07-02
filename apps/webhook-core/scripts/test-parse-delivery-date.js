@@ -5,7 +5,7 @@ const {
   defaultDeliveryDateKeyBangkok,
   parseDeliveryDateFromText,
   deliveryDateKind,
-} = require('../src/parseDeliveryDate');
+} = require('../src/seafood-oa/parseDeliveryDate');
 function assert(cond, msg) {
   if (!cond) {
     console.error('FAIL:', msg);

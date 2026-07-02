@@ -3,15 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const {
   decodeImageBase64,
-} = require('../src/shrimpLiffSlip');
+} = require('../src/seafood-oa/shrimpLiffSlip');
 const {
   getShrimpSlipLiffOpenUrl,
   liffOpenUrl,
   SLIP_DEFAULT_ENDPOINT,
   readSlipLiffIdFromRepo,
   resolveShrimpSlipLiffId,
-} = require('../src/provisionShrimpLiff');
-const { lineBillUnpaidHint } = require('../src/shrimpLinePush');
+} = require('../src/seafood-oa/provisionShrimpLiff');
+const { lineBillUnpaidHint } = require('../src/seafood-notify/shrimpLinePush');
 
 function assert(cond, msg) {
   if (!cond) {
@@ -29,7 +29,7 @@ const b64 = `data:image/png;base64,${tinyPng.toString('base64')}`;
 assert(decodeImageBase64(b64)?.length === tinyPng.length, 'decodeImageBase64');
 
 const slipHandler = fs.readFileSync(
-  path.join(__dirname, '../src/shrimpLiffSlip.js'),
+  path.join(__dirname, '../src/seafood-oa/shrimpLiffSlip.js'),
   'utf8',
 );
 assert(

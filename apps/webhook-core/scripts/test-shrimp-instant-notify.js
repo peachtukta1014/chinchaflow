@@ -5,7 +5,7 @@ const {
   resolveSlipNotifyTargets,
   formatShrimpOrderMessage,
   notifyShrimpLineOrdersAfterSave,
-} = require('../src/instantLineNotify');
+} = require('../src/seafood-notify/instantLineNotify');
 
 function assert(cond, msg) {
   if (!cond) {
