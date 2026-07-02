@@ -23,11 +23,13 @@ function getDb() {
  * เขียน step ล่าสุดลง Firestore
  * @param {string|null} requestId
  * @param {string} step  — ข้อความแสดงผลให้ผู้ใช้เห็น
+ * @param {'flash'|'pro'} source — flash = จีจี้ (typing bubble หน้าแชท) · pro = V4-Pro (แถบไฟบนหัวแอป)
+ *   default 'pro' เพราะจุดเรียกฝั่ง Pro (agentTools.js) มีหลายจุดและเดิมขึ้นแถบบนอยู่แล้ว
  */
-async function writeProgress(requestId, step) {
+async function writeProgress(requestId, step, source = 'pro') {
   if (!requestId) return;
   try {
-    await getDb().doc(`aiProgress/${requestId}`).set({ step, ts: Date.now() });
+    await getDb().doc(`aiProgress/${requestId}`).set({ step, source, ts: Date.now() });
   } catch (err) {
     console.warn(`[Progress Error] writeProgress failed for ${requestId}:`, err.message);
   }

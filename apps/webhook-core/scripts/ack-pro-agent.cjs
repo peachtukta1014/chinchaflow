@@ -20,6 +20,7 @@ if (!requestId) {
 db.collection('aiProgress').doc(requestId)
   .set({
     step: 'Pro ได้รับงานแล้ว กำลังเริ่มทำ...',
+    source: 'pro',
     status: 'received_by_pro',
     scope: process.env.SCOPE || 'root',
     runId: process.env.GITHUB_RUN_ID || null,

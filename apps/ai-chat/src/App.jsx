@@ -54,6 +54,9 @@ function AppShell({ user }) {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [fileAttachment, setFileAttachment] = useState(null);
   const [progressStep, setProgressStep] = useState(null);
+  // 'flash' = จีจี้กำลังวิเคราะห์/อ่านโค้ด (โชว์ใน typing bubble หน้าแชท)
+  // 'pro'   = V4-Pro กำลังทำงาน/เรียก tool (โชว์ในแถบไฟเขียวบนหัวแอป)
+  const [progressSource, setProgressSource] = useState(null);
   const [deployBanner, setDeployBanner] = useState(null);
   const [sessions, setSessions] = useState(() => listSessions());
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'knowledge' | 'tokens'
@@ -95,6 +98,7 @@ function AppShell({ user }) {
 
       setLoading(true);
       setProgressStep('กำลังดึงผลลัพธ์จากฉากหลัง...');
+      setProgressSource('pro');
 
       let recoverUnsub = null;
       let recoverTimeout = null;
@@ -233,8 +237,8 @@ function AppShell({ user }) {
     localStorage.setItem(PENDING_KEY, JSON.stringify({ requestId, ts: Date.now() }));
 
     // onSnapshot — fires ทันทีเมื่อ backend เขียน step ลง aiProgress (ไม่ต้องรอ poll)
-    const unsubProgress = listenProgress(requestId, step => {
-      if (step) setProgressStep(step);
+    const unsubProgress = listenProgress(requestId, (step, source) => {
+      if (step) { setProgressStep(step); setProgressSource(source); }
     });
 
     const historyForAI = messagesWithUser.slice(-10).map(m => ({ role: m.role, content: m.content }));
@@ -530,14 +534,19 @@ function AppShell({ user }) {
             </button>
           </div>
         </div>
-        {/* AI status bar — pinned ใต้ชื่อ เหนือ tab (ป้าย "AI" กลางๆ — ข้อความ step บอกเองว่า
-            จีจี้หรือ Pro กำลังทำอะไร; เดิมเขียน "PRO" ตายตัวทำให้พีชเข้าใจผิดว่า dispatch ไป Pro แล้ว) */}
+        {/* แถบไฟสถานะบนหัวแอป — เฉพาะงานของ V4-Pro (ตัวทำงาน) เท่านั้น:
+            รับงาน / กำลังเรียก tool ไหน / commit / เปิด PR — งานของจีจี้ไปโชว์ที่ bubble หน้าแชทแทน */}
         <div className="flex items-center gap-1.5 px-4 py-1 border-t border-ai-border/50">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${progressStep ? 'bg-green-400 animate-pulse' : 'bg-ai-muted/40'}`} />
-          <span className={`text-[10px] font-semibold tracking-widest shrink-0 ${progressStep ? 'text-green-400' : 'text-ai-muted/40'}`}>AI</span>
-          <span className={`text-[10px] truncate ${progressStep ? 'text-ai-muted' : 'text-ai-muted/40'}`}>
-            {progressStep ? `· ${progressStep}` : '· พร้อมทำงาน'}
-          </span>
+          {(() => {
+            const proStep = progressSource === 'pro' ? progressStep : null;
+            return (<>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${proStep ? 'bg-green-400 animate-pulse' : 'bg-ai-muted/40'}`} />
+              <span className={`text-[10px] font-semibold tracking-widest shrink-0 ${proStep ? 'text-green-400' : 'text-ai-muted/40'}`}>PRO</span>
+              <span className={`text-[10px] truncate ${proStep ? 'text-ai-muted' : 'text-ai-muted/40'}`}>
+                {proStep ? `· ${proStep}` : '· พร้อมทำงาน'}
+              </span>
+            </>);
+          })()}
         </div>
 
         {/* Tab bar */}
@@ -622,7 +631,9 @@ function AppShell({ user }) {
           </div>
         ))}
 
-        {(loading || progressStep) && (
+        {/* typing bubble หน้าแชท — เฉพาะงานของจีจี้ (Flash): วิเคราะห์คำสั่ง / อ่านไฟล์ไหน / ค้นโค้ด
+            งานของ Pro ไม่ขึ้นตรงนี้ (ไปโชว์แถบไฟบนหัวแอป) */}
+        {(loading || (progressStep && progressSource === 'flash')) && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-full overflow-hidden border border-ai-border shrink-0">
               <img src="/jiji-avatar.png" alt="จีจี้" className="w-full h-full object-cover" />
@@ -634,12 +645,10 @@ function AppShell({ user }) {
                   <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
-                {progressStep && (
-                  <span className="text-[9px] font-bold text-ai-accent tracking-widest">AI</span>
-                )}
+                <span className="text-[9px] font-bold text-ai-accent tracking-widest">จีจี้</span>
               </div>
               <p className="text-[10px] text-ai-muted">
-                {progressStep || 'Flash กำลังรับคำสั่ง...'}
+                {(progressSource === 'flash' && progressStep) || 'จีจี้กำลังรับคำสั่ง...'}
               </p>
             </div>
           </div>
