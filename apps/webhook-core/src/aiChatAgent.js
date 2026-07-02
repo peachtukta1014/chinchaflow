@@ -16,7 +16,7 @@
 
 const functions = require('firebase-functions/v1');
 const { writeProgress, clearProgress, readProgress, writeResult, clearResult, writeTokenLog } = require('./shared/progressTracker');
-const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus } = require('./flash/flashContext');
+const { loadProjectTree, loadCustomNotes, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus, saveInvestigationState, archiveInvestigation } = require('./flash/flashContext');
 const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashModels');
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
@@ -212,9 +212,26 @@ exports.aiChatAgentHttp = functions
         status: 'analyzing',
       }).catch(() => {});
 
-      // ── Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief (ไม่ใช่แค่เดา) ──
+      // ── SECTION 1: INTAKE — เปิดคดี (Case File) ก่อนเข้า Analysis Loop ────
+      const scopeToApp = { seafood: 'seafood-pos', tea: 'chincha-tea', webhook: 'webhook-core', root: 'all' };
+      const targetApp = scopeToApp[finalScope] || finalScope;
+      const descLower = (classified.taskSpec?.description || message).toLowerCase();
+      const caseType = /พัง|error|bug|ไม่ทำงาน|ล้มเหลว|ไม่ขึ้น|ไม่ส่ง|ไม่ตอบ|crash|exception/.test(descLower) ? 'BUG_FIX' : 'FEATURE_REQUEST';
+
+      await saveInvestigationState(requestId, {
+        caseFile: {
+          requestId, caseType, targetApp,
+          taskBrief: (classified.taskSpec?.description || message).slice(0, 300),
+          cluesQueue: (classified.taskSpec?.files_hint || []).map(f => typeof f === 'string' ? f : f?.path).filter(Boolean),
+          createdAt: Date.now(), status: 'INTAKE',
+        },
+      }).catch(() => {});
+
+      await writeProgress(requestId, `🕵️ เปิดคดี [${caseType}] → ${targetApp}...`, 'flash');
+
+      // ── SECTION 2: DETECTIVE LOOP — อ่านโค้ดจริงพร้อม investigationState ─
       // classified.taskSpec = แนวทางเบื้องต้นจากบทสนทนาเท่านั้น (ยังไม่ยืนยันกับโค้ดจริง)
-      // ผูก GH_PAT_READ (read-only) เท่านั้น — non-blocking: error/หมดรอบ/ไม่มี key → fallback ไปใช้ taskSpec เดิม
+      // ผูก GH_PAT_READ (read-only) — non-blocking: error/หมดรอบ/ไม่มี key → fallback ไปใช้ taskSpec เดิม
       const ghPatRead = (process.env.GH_PAT_READ || '').trim();
       let finalTaskSpec = classified.taskSpec || {};
       let analysisNote = '';
@@ -233,6 +250,13 @@ exports.aiChatAgentHttp = functions
           });
           if (analyzed?.taskSpec) {
             finalTaskSpec = analyzed.taskSpec;
+            // SECTION 3: Archive investigation (Persistent Vault)
+            archiveInvestigation(requestId, {
+              caseType, targetApp,
+              taskSpec: finalTaskSpec,
+              investigationState: analyzed.investigationState || null,
+              completedAt: Date.now(),
+            }).catch(() => {});
           } else {
             analysisNote = '\n\n⚠️ จีจี้อ่านโค้ดไม่ทันครบ — Task Brief นี้อ้างอิงจากแนวทางเบื้องต้น';
           }

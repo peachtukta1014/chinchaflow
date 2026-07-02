@@ -437,6 +437,183 @@ async function testMinFilesGuard() {
   assert(result?.iterations === 6, `iterations ต้องเป็น 6 (ได้ ${result?.iterations})`);
 }
 
+// ── Test 7: Duplicate read guard — บล็อกไฟล์ที่อ่านแล้ว ──
+async function testDuplicateReadGuard() {
+  console.log('\n=== Test 7: Duplicate read guard ===');
+  resetMocks();
+
+  mockGitHubFiles = {
+    'apps/test/a.js': 'const a = 1;',
+    'apps/test/b.js': 'const b = 2;',
+  };
+
+  mockOpenRouterResponses = [
+    // round 1: read a.js
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/test/a.js' })] },
+    // round 2: try read a.js again → guard blocks it (returns warning, not file content)
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/test/a.js' })] },
+    // round 3: read b.js (new file — OK)
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/test/b.js' })] },
+    // round 4: finalize
+    { content: null, tool_calls: [makeToolCall('finalize_task_brief', {
+      description: 'test duplicate guard',
+      target_behavior: 'guard ต้องบล็อก read ซ้ำ',
+      files_hint: [{ path: 'apps/test/a.js' }],
+      isHighRisk: false,
+    })] },
+  ];
+
+  const result = await runFlashAnalysisLoop('mock-api-key', 'mock-gh-pat', {
+    message: 'test duplicate guard',
+    history: [],
+    scope: 'root',
+    initialTaskSpec: {},
+    projectTree: 'apps/test/a.js\napps/test/b.js',
+    requestId: 'test-req-7',
+  });
+
+  assert(result !== null, 'ต้อง return result');
+  // duplicate read ไม่ควร increment filesRead — ต้องยังอ่านได้ 2 ไฟล์ (a.js ครั้งแรก + b.js)
+  assert(result?.taskSpec?.description?.includes('duplicate'), 'taskSpec ต้องมีคำ duplicate');
+  // ตรวจว่า GitHub API ถูกเรียก 2 ครั้ง (a.js ครั้งแรก + b.js) ไม่ใช่ 3 ครั้ง
+  const ghCalls = fetchCallLog.filter(c => c.url?.includes('api.github.com'));
+  assert(ghCalls.length === 2, `GitHub API ต้องถูกเรียก 2 ครั้ง (ได้ ${ghCalls.length}) — ป้องกัน a.js ซ้ำ`);
+}
+
+// ── Test 8: Detective flow — record_fix → add_hypothesis → mark_safe → finalize ──
+async function testDetectiveFullFlow() {
+  console.log('\n=== Test 8: Detective full flow (record_fix → hypothesis → verify → finalize) ===');
+  resetMocks();
+
+  mockGitHubFiles = {
+    'apps/seafood-pos/src/utils/pricing.js': 'function calcPrice(w, p) { return w * p; }\nmodule.exports = { calcPrice };',
+    'apps/seafood-pos/src/services/saleFifo.js': 'const { calcPrice } = require("../utils/pricing");\nfunction sale() {}',
+    'apps/seafood-pos/src/screens/POSScreen.jsx': '// uses saleFifo internally',
+  };
+
+  mockOpenRouterResponses = [
+    // round 1: list files
+    { content: null, tool_calls: [makeToolCall('list_files', { dir: 'seafood-pos' })] },
+    // round 2: read pricing.js
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/seafood-pos/src/utils/pricing.js' })] },
+    // round 3: read saleFifo.js
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/seafood-pos/src/services/saleFifo.js' })] },
+    // round 4: record fix location
+    { content: null, tool_calls: [makeToolCall('record_fix_location', {
+      id: 'fix-1',
+      file: 'apps/seafood-pos/src/utils/pricing.js',
+      changeDescription: 'เพิ่ม discount parameter ใน calcPrice',
+      originalSnippet: 'function calcPrice(w, p) { return w * p; }',
+    })] },
+    // round 5: add impact hypothesis (saleFifo.js imports calcPrice)
+    { content: null, tool_calls: [makeToolCall('add_impact_hypothesis', {
+      id: 'hyp-1',
+      targetFile: 'apps/seafood-pos/src/services/saleFifo.js',
+      description: 'import calcPrice และอาจต้องอัปเดต call signature',
+    })] },
+    // round 6: read hypothesis file (already in scannedPaths — guard blocks, but still need to mark)
+    // ในกรณีจริง LLM จะ mark_hypothesis_safe หลังอ่านแล้ว
+    { content: null, tool_calls: [makeToolCall('mark_hypothesis_safe', {
+      id: 'hyp-1',
+      evidenceFound: 'saleFifo ไม่ส่ง discount เข้า calcPrice โดยตรง — ปลอดภัย',
+    })] },
+    // round 7: finalize (isReadyToFix = true)
+    { content: null, tool_calls: [makeToolCall('finalize_task_brief', {
+      description: 'เพิ่ม discount parameter ใน calcPrice ใน pricing.js',
+      target_behavior: 'ราคาต้องคำนวณส่วนลดได้',
+      files_hint: [
+        { path: 'apps/seafood-pos/src/utils/pricing.js', fn: 'calcPrice' },
+        { path: 'apps/seafood-pos/src/services/saleFifo.js', fn: 'sale — caller' },
+      ],
+      isHighRisk: true,
+      risk_reason: 'กระทบ calcPrice ที่ใช้ทั่วระบบ',
+    })] },
+  ];
+
+  const result = await runFlashAnalysisLoop('mock-api-key', 'mock-gh-pat', {
+    message: 'เพิ่ม discount ให้ calcPrice',
+    history: [],
+    scope: 'seafood',
+    initialTaskSpec: { description: 'เพิ่ม discount' },
+    projectTree: 'apps/seafood-pos/src/utils/pricing.js\napps/seafood-pos/src/services/saleFifo.js',
+    requestId: 'test-req-8',
+  });
+
+  assert(result !== null, 'ต้อง return result');
+  assert(result?.taskSpec?.description?.includes('calcPrice'), 'taskSpec ต้องมี calcPrice');
+  assert(result?.taskSpec?.isHighRisk === true, 'isHighRisk ต้องเป็น true');
+  // ตรวจ investigationState
+  assert(result?.investigationState !== undefined, 'ต้องมี investigationState ใน result');
+  assert(result?.investigationState?.proposedFixes?.length === 1, 'ต้องมี 1 proposedFix');
+  assert(result?.investigationState?.proposedFixes?.[0]?.file === 'apps/seafood-pos/src/utils/pricing.js', 'fix ต้องชี้ไปที่ pricing.js');
+  assert(result?.investigationState?.impactHypotheses?.[0]?.status === 'VERIFIED_SAFE', 'hypothesis ต้อง VERIFIED_SAFE');
+  assert(result?.investigationState?.analysisCertainty?.isReadyToFix === true, 'isReadyToFix ต้องเป็น true');
+  assert(result?.iterations === 7, `iterations ต้องเป็น 7 (ได้ ${result?.iterations})`);
+}
+
+// ── Test 9: Detective guard บล็อก finalize เมื่อ hypothesis ยังไม่ verified ──
+async function testDetectiveGuardBlocksFinalize() {
+  console.log('\n=== Test 9: Detective guard บล็อก finalize ก่อน hypothesis verified ===');
+  resetMocks();
+
+  mockGitHubFiles = {
+    'apps/test/main.js': 'const { fn } = require("./helper");\nmodule.exports = {};',
+    'apps/test/helper.js': 'function fn() { return 1; }\nmodule.exports = { fn };',
+  };
+
+  mockOpenRouterResponses = [
+    // round 1: read main.js
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/test/main.js' })] },
+    // round 2: read helper.js
+    { content: null, tool_calls: [makeToolCall('read_file', { path: 'apps/test/helper.js' })] },
+    // round 3: record fix
+    { content: null, tool_calls: [makeToolCall('record_fix_location', {
+      id: 'fix-1',
+      file: 'apps/test/helper.js',
+      changeDescription: 'แก้ fn ให้รับ argument',
+    })] },
+    // round 4: add hypothesis
+    { content: null, tool_calls: [makeToolCall('add_impact_hypothesis', {
+      id: 'hyp-1',
+      targetFile: 'apps/test/main.js',
+      description: 'import fn จาก helper',
+    })] },
+    // round 5: try finalize BEFORE mark_hypothesis_safe → guard should block
+    { content: null, tool_calls: [makeToolCall('finalize_task_brief', {
+      description: 'premature finalize — should be blocked',
+      target_behavior: 'test',
+      files_hint: [{ path: 'apps/test/helper.js' }],
+      isHighRisk: false,
+    })] },
+    // round 6: mark hypothesis safe
+    { content: null, tool_calls: [makeToolCall('mark_hypothesis_safe', {
+      id: 'hyp-1',
+      evidenceFound: 'main.js ไม่ได้ส่ง argument เข้า fn — ปลอดภัย',
+    })] },
+    // round 7: finalize properly
+    { content: null, tool_calls: [makeToolCall('finalize_task_brief', {
+      description: 'proper finalize after hypothesis verified',
+      target_behavior: 'fn รับ argument ได้',
+      files_hint: [{ path: 'apps/test/helper.js', fn: 'fn' }],
+      isHighRisk: false,
+    })] },
+  ];
+
+  const result = await runFlashAnalysisLoop('mock-api-key', 'mock-gh-pat', {
+    message: 'แก้ fn ให้รับ argument',
+    history: [],
+    scope: 'root',
+    initialTaskSpec: {},
+    projectTree: 'apps/test/main.js\napps/test/helper.js',
+    requestId: 'test-req-9',
+  });
+
+  assert(result !== null, 'ต้อง return result');
+  assert(result?.taskSpec?.description?.includes('proper finalize'), 'ต้อง finalize ครั้งที่ 2 เท่านั้น (หลัง hypothesis verified)');
+  assert(result?.iterations === 7, `iterations ต้องเป็น 7 (ได้ ${result?.iterations})`);
+  assert(result?.investigationState?.analysisCertainty?.isReadyToFix === true, 'isReadyToFix ต้องเป็น true');
+}
+
 // ── Run all tests ──
 async function main() {
   console.log('🧪 Flash Analysis Loop — Mock Test Harness\n');
@@ -448,6 +625,9 @@ async function main() {
   await testNoGhPat();
   await testFullFileRead();
   await testMinFilesGuard();
+  await testDuplicateReadGuard();
+  await testDetectiveFullFlow();
+  await testDetectiveGuardBlocksFinalize();
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
