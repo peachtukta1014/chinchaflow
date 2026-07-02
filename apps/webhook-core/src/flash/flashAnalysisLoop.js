@@ -18,6 +18,7 @@
 const { OPENROUTER_BASE, FLASH_MODEL } = require('./flashModels');
 const { fetchRepoFiles } = require('./flashContext');
 const { writeProgress } = require('../shared/progressTracker');
+const { formatChainForPrompt } = require('../shared/chainLockService');
 
 const FLASH_ANALYSIS_MODEL = process.env.FLASH_MODEL || FLASH_MODEL;
 const MAX_ITERATIONS = 8; // เพิ่มจาก 6 → 8 เพื่อให้สะสมข้อมูลได้มากขึ้นก่อนสรุป (8×60s = 480s < function timeout 540s)
@@ -192,6 +193,9 @@ async function executeFlashTool(name, args, { ghPatRead, projectTree }) {
 async function runFlashAnalysisLoop(apiKey, ghPatRead, { message, history, scope, initialTaskSpec, projectTree, requestId }) {
   if (!ghPatRead) return null; // non-blocking — caller ใช้ taskSpec ที่เดาไว้แทน
 
+  // chain locks: ดึงบริบทงานวันนี้ (+ carryOver เมื่อวาน) ให้ Flash รู้ว่าทำอะไรไปแล้ว
+  const chainContext = await formatChainForPrompt(scope || 'root').catch(() => '');
+
   const systemPrompt = `คุณคือจีจี้ — Technical Translator ของ CHINCHA FLOW กำลังวิเคราะห์คำสั่ง "code-action" ของพี่พีช
 **ก่อนสรุปงานให้ Pro Agent ไปแก้ ต้องอ่านโค้ดจริงให้เพียงพอก่อนเสมอ ห้ามเดา** — ใช้ read_file/list_files/search_code สำรวจไฟล์ที่เกี่ยวข้องจนเข้าใจว่าโค้ดเชื่อมโยงกันยังไง
 
@@ -209,7 +213,7 @@ scope ปัจจุบัน: ${scope || 'root'}
 2. files_hint สุดท้ายต้องเป็น path ที่ยืนยันแล้วว่ามีอยู่จริงจาก read_file/list_files เท่านั้น
 3. ตอบเป็นการเรียก tool เท่านั้นทุกรอบ ห้ามพิมพ์ข้อความเปล่าอธิบายแผนแล้วไม่เรียก tool
 4. รอบ 1-${EXPLORE_ONLY_ROUNDS} ให้อ่าน/ค้นอย่างเดียว (finalize ยังไม่พร้อม) — ใช้เวลานี้สะสมข้อมูลให้มากที่สุด
-5. มีเวลาจำกัด ${MAX_ITERATIONS} รอบ — อย่ารีบสรุป ใช้รอบที่มีอ่านโค้ดให้ครบก่อน`;
+5. มีเวลาจำกัด ${MAX_ITERATIONS} รอบ — อย่ารีบสรุป ใช้รอบที่มีอ่านโค้ดให้ครบก่อน${chainContext}`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
