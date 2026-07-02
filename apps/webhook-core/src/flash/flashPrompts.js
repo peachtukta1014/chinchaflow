@@ -12,7 +12,7 @@ function detectScope(text, currentScope) {
   const t = text.toLowerCase();
   if (/(กุ้ง|shrimp|seafood|โกอ้วน|ร้านกุ้ง)/.test(t)) return 'seafood';
   if (/(ชา|tea|ชินชา|ร้านน้ำ|chincha|bubble)/.test(t)) return 'tea';
-  if (/(webhook|line|ไลน์)/.test(t)) return 'webhook';
+  if (/(webhook|line|(?<!ออน)ไลน์)/.test(t)) return 'webhook';
   if (/(cron|scheduled|schedule|automation|auto)/.test(t)) return 'scheduled';
   return currentScope || 'root';
 }
