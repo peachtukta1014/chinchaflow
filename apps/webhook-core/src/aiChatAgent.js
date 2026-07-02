@@ -23,6 +23,7 @@ const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskB
 const { runFlashAnalysisLoop } = require('./flash/flashAnalysisLoop');
 const { matchWebSearchQuery, stripWebSearchTags } = require('./flash/webSearchTag');
 const { dispatchToProAgent } = require('./flash/flashDispatch');
+const { appendChainEntry, formatChainForPrompt } = require('./shared/chainLockService');
 
 const LAST_RUN_STALE_MS = 6 * 60 * 60 * 1000; // 6 ชั่วโมง — เกินนี้ถือว่าเก่าเกินจะเอามาปนกับงานปัจจุบัน
 
@@ -122,8 +123,13 @@ exports.aiChatAgentHttp = functions
               isHighRisk: pending.isHighRisk !== false,
               confirmation: pending.confirmation || '',
             });
-            await clearPendingAction(pendingId); // ลบหลัง dispatch สำเร็จ — ถ้า dispatch fail brief ยังอยู่ retry ได้
+            await clearPendingAction(pendingId);
             await writeProgress(requestId, 'ส่งงานเข้าคิวแล้ว กำลังปลุก V4-Pro...');
+            appendChainEntry(pending.scope, {
+              station: 'flash', action: 'dispatch', requestId,
+              summary: (pending.confirmation || '').slice(0, 200),
+              status: 'dispatched',
+            }).catch(() => {});
             res.json({
               reply: 'จีจี้ส่งงานให้ V4-Pro แล้วครับพี่ 🌸 ติดตามความคืบหน้าได้เลย',
               status: 'processing',
@@ -200,6 +206,12 @@ exports.aiChatAgentHttp = functions
         return;
       }
 
+      appendChainEntry(finalScope, {
+        station: 'flash', action: 'classify', requestId,
+        summary: (message || '').slice(0, 200),
+        status: 'analyzing',
+      }).catch(() => {});
+
       // ── Flash Code Analysis Loop — อ่านโค้ดจริงก่อนสรุป Task Brief (ไม่ใช่แค่เดา) ──
       // classified.taskSpec = แนวทางเบื้องต้นจากบทสนทนาเท่านั้น (ยังไม่ยืนยันกับโค้ดจริง)
       // ผูก GH_PAT_READ (read-only) เท่านั้น — non-blocking: error/หมดรอบ/ไม่มี key → fallback ไปใช้ taskSpec เดิม
@@ -244,6 +256,12 @@ exports.aiChatAgentHttp = functions
       });
 
       await clearProgress(requestId);
+
+      appendChainEntry(finalScope, {
+        station: 'flash', action: 'analyze', requestId,
+        summary: (finalTaskSpec.description || classified.confirmation || '').slice(0, 200),
+        status: 'pending-approval',
+      }).catch(() => {});
 
       const filePreview = finalTaskSpec.files_hint?.[0];
       const confirmMsg = `📋 จีจี้อ่านโค้ดแล้วนะครับพี่ 🌸\n\n` +

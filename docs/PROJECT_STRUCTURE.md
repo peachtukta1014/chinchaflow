@@ -407,6 +407,7 @@ apps/webhook-core/
 │       ├── toolExecutors.js       # fetchRepoFile + executeTool switch-case
 │       ├── lineUtils.js
 │       ├── progressTracker.js
+│       ├── chainLockService.js    # chain locks รายวัน — บันทึกงาน Flash/Pro แยก scope/วัน + carryOver ส่งไม้ต่อ
 │       └── webhookDedup.js        # กัน event LINE ซ้ำ
 │
 ├── scripts/
