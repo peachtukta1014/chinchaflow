@@ -1,3 +1,25 @@
+## 2026-07-02 — fix: ซ่อม test scripts webhook-core 18 ไฟล์ + รันใน pr-verify ทุก PR (PR #459)
+
+## สรุป
+
+จากผลวิเคราะห์ test coverage: สคริปต์ `apps/webhook-core/scripts/test-*.js` ทั้ง 18 ไฟล์**พังหมด** (รันไม่ได้เลยสักไฟล์) เพราะอ้าง path เก่า `../src/<module>` ก่อนที่โค้ดจะถูกย้ายเข้า `src/seafood-oa/` และ `src/seafood-notify/` — ไม่มีใครรู้เพราะไม่ได้รันใน CI (pr-verify ตรวจ webhook-core แค่ syntax check)
+
+## สิ่งที่แก้
+
+1. **ซ่อม require path ทั้ง 18 ไฟล์** — ชี้เข้า `src/seafood-oa/` (21 โมดูล) และ `src/seafood-notify/` (3 โมดูล: instantLineNotify, shrimpBillPreRender, shrimpLinePush) รวมถึง path ใน `fs.readFileSync` ของ `test-shrimp-liff-slip.js`
+2. **แก้ mock db ใน `test-shrimp-liff-customers.js`** — เพิ่ม `.limit()` ที่ `buildLiffCustomerCatalog` เรียกใช้จริง (source เพิ่ม `.limit(2000)` เข้ามาหลัง test ถูกเขียน)
+3. **`pr-verify.yml`** —
+   - เพิ่ม step รัน test scripts ทั้ง 18 ไฟล์ใน job `verify_webhook` (เดิมมีแค่ syntax check) + รายงานผลใน PR comment
+   - เพิ่ม `apps/webhook-core-scheduled/**` เข้า paths-filter และ glob ของ syntax check — เดิมแก้ไฟล์ในโฟลเดอร์นั้นแล้ว merge ได้โดยไม่มีเช็คอะไรเลย
+
+## ผลตรวจ
+
+- รันทั้ง 18 สคริปต์จาก repo root (แบบเดียวกับ CI): **18/18 ผ่าน** ✅
+- `node --check` ทุกไฟล์ที่แก้ ✅
+- YAML ของ `pr-verify.yml` ผ่าน validation ✅
+
+ไม
+
 ## 2026-07-01 — chore: remove Cursor Cloud Agent artifacts + fix stale doc references (PR #457)
 
 ## สรุป
