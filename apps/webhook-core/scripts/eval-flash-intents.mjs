@@ -5,7 +5,7 @@
  * รัน:   OPENROUTER_API_KEY=sk-xxx node apps/webhook-core/scripts/eval-flash-intents.mjs
  * CI:    .github/workflows/ai-eval.yml (workflow_dispatch หรือ PR ที่แตะ flash/)
  *
- * เกณฑ์ผ่าน: intent ถูก ≥ 85% (LLM ไม่ deterministic 100% — temp 0.1 แกว่งได้เล็กน้อย)
+ * เกณฑ์ผ่าน: intent ถูก ≥ 85% (LLM ไม่ deterministic 100% — temp 0 แกว่งได้เล็กน้อย)
  * ค่าใช้จ่าย: ~22 calls × Flash ≈ หลักสตางค์ต่อรอบ
  */
 import { createRequire } from 'node:module';
@@ -98,7 +98,7 @@ const md = [
   '|---|--------|------|--------|----|',
   ...rows.map(r => `| ${r.n} | ${r.msg} | \`${r.expected}\` | \`${r.got}\` | ${fmtResult(r)}${r.detail ? ' ' + r.detail : ''} |`),
   '',
-  `_model: DeepSeek V4 Flash · temp 0.1 · รันเมื่อ ${new Date().toISOString()}_`,
+  `_model: DeepSeek V4 Flash · temp 0 · รันเมื่อ ${new Date().toISOString()}_`,
 ].join('\n');
 
 fs.writeFileSync('eval-report.md', md);
