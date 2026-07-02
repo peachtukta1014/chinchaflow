@@ -1,3 +1,30 @@
+## 2026-07-02 — fix: Flash analysis loop สะสมข้อมูลก่อนสรุป + classifier ไม่ทิ้ง intent (PR #467)
+
+## ที่มา
+
+พีชบอกว่าจีจี้ (Flash) อ่านแค่ ~1 ไฟล์ใน 6 รอบแล้วสรุปเร็วเกินไป — ต้องสะสมข้อมูลโค้ดก่อนสรุป
+
+## สาเหตุ 3 จุด
+
+1. **System prompt กระตุ้นให้สรุปเร็ว** — "ถ้าเข้าใจพอแล้วให้ finalize ทันที"
+2. **finalize_task_brief อยู่ใน tool list ตั้งแต่รอบแรก** — model เรียกได้ทันทีหลังอ่านแค่ 1 ไฟล์
+3. **ตรวจแค่ `filesRead === 0`** — อ่าน 1 ไฟล์ + finalize ในรอบเดียวกันได้ (parallel tool calls)
+
+## สิ่งที่แก้
+
+### 1. flashAnalysisLoop — แบ่ง 2 phase (สะสมก่อนสรุป)
+
+| Phase | รอบ | tools ที่มี | จุดประสงค์ |
+|-------|-----|------------|-----------|
+| **สำรวจ** | 1-3 | read_file, list_files, search_code | บังคับอ่าน/ค้น — **ไม่มี finalize ใน tool list** |
+| **วิเคราะห์** | 4-8 | + finalize_task_brief | สรุปได้เมื่อ `filesRead >= 2` |
+
+- `MAX_ITERATIONS` เพิ่มจาก 6 → 8 (8×60s = 480s < function timeout 540s)
+- `MIN_FILES_BEFORE_FINALIZE = 2` — ต้องอ่านอย่างน้อย 2 ไฟล์ก่อน finalize ได้
+- `EXPLORE_ONLY_ROUNDS = 3` — 3 รอบแรกบังคับอ่านอย่างเดียว
+- **Knowledge tracker** ทุกรอบสำรวจ — บอก model ว่าอ่านอะไรไปแล้ว + แนะนำให้ตามหาความเชื่อมโยง
+- System prompt เน้น "สะสมข้อมูลก่อนสรุป" แทน "final
+
 ## 2026-07-02 — fix: Flash ไม่ทิ้ง context ตอนครบรอบวิเคราะห์ + สนามสอบมีสอบซ่อม (กัน provider noise) (PR #466)
 
 ## ที่มา
