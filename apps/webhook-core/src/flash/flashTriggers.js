@@ -1,6 +1,30 @@
 // Quick triggers, intent classifier, and task brief builder for Flash (จีจี้)
 const { OPENROUTER_BASE, FLASH_MODEL } = require('./flashModels');
 
+// JSON repair — DeepSeek V4 Flash มักส่ง JSON ที่มี trailing comma, single quotes,
+// unescaped newlines ใน string values, หรือ comment → ซ่อมก่อน parse
+function repairJson(raw) {
+  let s = raw;
+  // ลบ ```json ... ``` wrapper (DeepSeek ชอบครอบ markdown)
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  // ลบ // comment (heuristic: หลัง , หรือ { หรือขึ้นบรรทัดใหม่) — กิน newline ท้ายด้วย
+  s = s.replace(/,\s*\/\/[^\n]*\n?/g, ',');
+  s = s.replace(/\{\s*\/\/[^\n]*\n?/g, '{');
+  // ลบ trailing comma ก่อน } หรือ ]
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  // แก้ single quotes → double quotes (ข้ามถ้ามี " อยู่มากกว่า ')
+  const dqCount = (s.match(/"/g) || []).length;
+  const sqCount = (s.match(/'/g) || []).length;
+  if (sqCount > dqCount) {
+    s = s.replace(/'/g, '"');
+  }
+  // ลบ control characters เฉพาะใน JSON string values (ระหว่าง "...")
+  s = s.replace(/"(?:[^"\\]|\\.)*"/g, match =>
+    match.replace(/[\x00-\x1f]/g, m => m === '\n' ? '\\n' : m === '\t' ? '\\t' : ''),
+  );
+  return s;
+}
+
 // มือถือบางรุ่น input สระล่าง (ุ ู) หลัง tone mark → swap ให้ตรงมาตรฐาน
 function normalizeThai(str) {
   return str.replace(/([่-๋])([ุู])/g, '$2$1');
@@ -175,7 +199,20 @@ CHINCHA FLOW scopes:
     const responseText = data?.choices?.[0]?.message?.content || '';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { intent: 'chat' };
-    const parsed = JSON.parse(jsonMatch[0]);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      // JSON ไม่ valid → ลอง repair แล้ว parse อีกครั้ง
+      const repaired = repairJson(jsonMatch[0]);
+      try {
+        parsed = JSON.parse(repaired);
+      } catch (repairErr) {
+        console.warn('classifyAndTranslate JSON repair failed:', repairErr.message, '— raw:', jsonMatch[0].slice(0, 300));
+        return { intent: 'chat' };
+      }
+    }
     const taskSpec = parsed.taskSpec || {};
 
     // Post-validation — warn ถ้า taskSpec ไม่ครบ แต่ไม่เปลี่ยน intent เป็น chat
@@ -237,4 +274,4 @@ function buildTaskBrief(classified, originalMessage) {
   return brief;
 }
 
-module.exports = { normalizeThai, detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief };
+module.exports = { normalizeThai, detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief, repairJson };
