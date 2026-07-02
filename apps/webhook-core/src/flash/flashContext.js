@@ -162,4 +162,40 @@ async function fetchScopeSkill(pat, scope) {
   } catch { return ''; }
 }
 
-module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, fetchScopeSkill, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus };
+// ── Investigation State (Detective Case File per requestId) ───────────────
+// เก็บถาวรใน Firestore collection 'investigations' — UI KnowledgePanel อ่านได้, query ย้อนหลังได้
+
+async function saveInvestigationState(requestId, state) {
+  if (!requestId) return;
+  try {
+    await _fsDb().collection('investigations').doc(requestId).set(
+      { ...state, updatedAt: Date.now() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('saveInvestigationState error:', err.message);
+  }
+}
+
+async function loadInvestigationState(requestId) {
+  if (!requestId) return null;
+  try {
+    const snap = await _fsDb().collection('investigations').doc(requestId).get();
+    return snap.exists ? snap.data() : null;
+  } catch { return null; }
+}
+
+// เก็บสรุปการสืบสวนถาวร (เรียกหลัง finalize สำเร็จ)
+async function archiveInvestigation(requestId, summary) {
+  if (!requestId) return;
+  try {
+    await _fsDb().collection('investigations').doc(requestId).set(
+      { archive: summary, archivedAt: Date.now(), status: 'completed' },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('archiveInvestigation error:', err.message);
+  }
+}
+
+module.exports = { loadProjectTree, loadCustomNotes, loadAgentDocs, fetchJiijiDef, fetchChatAgentDocs, fetchCodeMetrics, fetchRepoFiles, fetchScopeSkill, savePendingAction, loadPendingAction, clearPendingAction, loadLastExecutionStatus, saveInvestigationState, loadInvestigationState, archiveInvestigation };
