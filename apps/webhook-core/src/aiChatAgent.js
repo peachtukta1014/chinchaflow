@@ -181,7 +181,7 @@ exports.aiChatAgentHttp = functions
     }
 
     // ── AI Intent Classifier ─────────────────────────────────────────────
-    await writeProgress(requestId, 'กำลังวิเคราะห์คำสั่ง...');
+    await writeProgress(requestId, 'กำลังวิเคราะห์คำสั่ง...', 'flash');
 
     // เช็ก scope-level error pointer จากรอบก่อน (loadLastExecutionStatus) — ส่งเข้า classifier
     // เฉพาะกรณีล้มเหลวและยังไม่เก่าเกินไป (กัน error เก่าข้ามวันมาปนกับงานคนละเรื่อง)
@@ -210,7 +210,7 @@ exports.aiChatAgentHttp = functions
       if (ghPatRead) {
         try {
           const projectTreeForLoop = await loadProjectTree().catch(() => '');
-          await writeProgress(requestId, 'จีจี้กำลังอ่านโค้ดก่อนสรุปงาน...');
+          await writeProgress(requestId, 'จีจี้กำลังอ่านโค้ดก่อนสรุปงาน...', 'flash');
           const analyzed = await runFlashAnalysisLoop(apiKey, ghPatRead, {
             message,
             history,
@@ -297,7 +297,7 @@ exports.aiChatAgentHttp = functions
       // logic จับ/ลบแท็กแยกไว้ที่ flash/webSearchTag.js เพื่อให้เทสได้ (test-web-search-tag.js)
       const searchQuery = !hasImages ? matchWebSearchQuery(reply) : null;
       if (searchQuery) {
-        await writeProgress(requestId, `กำลังค้นหาข้อมูลจากเว็บ: "${searchQuery}"...`);
+        await writeProgress(requestId, `กำลังค้นหาข้อมูลจากเว็บ: "${searchQuery}"...`, 'flash');
         let wsText = '';
         try {
           const wsResult = await callOpenRouterForWebSearch(apiKey, searchQuery);

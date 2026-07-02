@@ -205,7 +205,7 @@ scope ปัจจุบัน: ${scope || 'root'}
   let filesRead = 0;
 
   for (let iterations = 1; iterations <= MAX_ITERATIONS; iterations++) {
-    await writeProgress(requestId, `จีจี้กำลังอ่านโค้ดก่อนสรุปงาน... (รอบ ${iterations}/${MAX_ITERATIONS})`);
+    await writeProgress(requestId, `จีจี้กำลังอ่านโค้ดก่อนสรุปงาน... (รอบ ${iterations}/${MAX_ITERATIONS})`, 'flash');
 
     const choice = await callFlashWithTools(apiKey, messages, true);
     const am = choice.message;
@@ -236,6 +236,13 @@ scope ปัจจุบัน: ${scope || 'root'}
       }
 
       if (toolCall.function.name === 'read_file') filesRead++;
+      // รายงานหน้าแชทว่าจีจี้กำลังอ่าน/ค้นอะไรจริง (พีชขอเห็นระดับไฟล์ ไม่ใช่แค่เลขรอบ)
+      const toolLabel = ({
+        read_file: `จีจี้กำลังอ่าน ${args.path || 'ไฟล์'}...`,
+        list_files: `จีจี้กำลังไล่ดูโครงสร้าง ${args.dir || 'repo'}...`,
+        search_code: `จีจี้กำลังค้นหา "${args.pattern || ''}" ในโค้ด...`,
+      })[toolCall.function.name];
+      if (toolLabel) await writeProgress(requestId, toolLabel, 'flash');
       const resultText = await executeFlashTool(toolCall.function.name, args, { ghPatRead, projectTree });
       messages.push({ role: 'tool', tool_call_id: toolCall.id, content: resultText });
     }

@@ -140,12 +140,14 @@ function pollDoc(path, intervalMs, onData, label) {
   return () => { stopped = true; clearInterval(timer); };
 }
 
-// ── Pro Agent progress (poll แทน onSnapshot) ─────────────────────────────────
+// ── AI progress (poll แทน onSnapshot) ────────────────────────────────────────
+// callback ได้ (step, source) — source: 'flash' = จีจี้ (bubble หน้าแชท) · 'pro' = V4-Pro (แถบบน)
+// เอกสารเก่าที่ไม่มี source → ถือเป็น 'pro' (พฤติกรรมเดิมขึ้นแถบบน)
 export function listenProgress(requestId, onStep) {
   return pollDoc(
     `aiProgress/${requestId}`,
     2500,
-    (data) => { onStep(data ? (data.step || null) : null); },
+    (data) => { onStep(data ? (data.step || null) : null, data?.source || 'pro'); },
     'listenProgress',
   );
 }
