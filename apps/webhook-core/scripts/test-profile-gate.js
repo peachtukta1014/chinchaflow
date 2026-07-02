@@ -3,7 +3,7 @@ const {
   MAIN_CATALOG_SHOP_IDS,
   PROFILE_GATE_MIN_LINKED_SHOPS,
   profileMissingFields,
-} = require('../src/shrimpLineCustomerProfile');
+} = require('../src/seafood-oa/shrimpLineCustomerProfile');
 
 function assert(cond, msg) {
   if (!cond) {

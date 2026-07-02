@@ -37,6 +37,7 @@ jobs:
               - 'apps/chincha-tea/**'
             webhook:
               - 'apps/webhook-core/**'
+              - 'apps/webhook-core-scheduled/**'
             ai_chat:
               - 'apps/ai-chat/**'
             shared:
@@ -110,11 +111,12 @@ jobs:
           VITE_FIREBASE_APP_ID:              ${{ secrets.VITE_FIREBASE_APP_ID_TEA }}
 
   verify_webhook:
-    name: Verify webhook-core (syntax check)
+    name: Verify webhook-core (tests + syntax check)
     needs: changes
     if: needs.changes.outputs.webhook == 'true' || needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
     outputs:
+      test_result: ${{ steps.tests.outcome }}
       build_result: ${{ steps.syntax.outcome }}
     steps:
       - uses: actions/checkout@v4
@@ -126,12 +128,23 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # webhook-core ไม่มี local server / smoke test — เช็คได้แค่ syntax ของไฟล์ที่เปลี่ยน
-      - name: Syntax check changed JS files
-        id: syntax
+      - name: Run webhook-core test scripts
+        id: tests
         run: |
           set -euo pipefail
-          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'apps/webhook-core/**/*.js' || true)
+          status=0
+          for f in apps/webhook-core/scripts/test-*.js; do
+            echo "=== $f ==="
+            node "$f" || status=1
+          done
+          exit $status
+
+      - name: Syntax check changed JS files
+        id: syntax
+        if: always()
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'apps/webhook-core/**/*.js' 'apps/webhook-core-scheduled/**/*.js' || true)
           if [ -z "$changed" ]; then
             echo "ไม่มีไฟล์ .js เปลี่ยนใน webhook-core — skip"
             exit 0
@@ -201,11 +214,12 @@ jobs:
             fi
 
             if [ "${{ needs.changes.outputs.webhook }}" == "true" ] || [ "${{ needs.changes.outputs.shared }}" == "true" ]; then
+              tests="${{ needs.verify_webhook.outputs.test_result }}"
               build="${{ needs.verify_webhook.outputs.build_result }}"
-              if [ "$build" == "success" ]; then
-                echo "- 🤖 **webhook-core**: ✅ syntax check ผ่าน"
+              if [ "$tests" == "success" ] && [ "$build" == "success" ]; then
+                echo "- 🤖 **webhook-core**: ✅ test scripts ผ่าน, syntax check ผ่าน"
               else
-                echo "- 🤖 **webhook-core**: ❌ syntax check=$build — **ห้าม merge จนกว่าจะแก้**"
+                echo "- 🤖 **webhook-core**: ❌ tests=$tests syntax=$build — **ห้าม merge จนกว่าจะแก้**"
               fi
             fi
 

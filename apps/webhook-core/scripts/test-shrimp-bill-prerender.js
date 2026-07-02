@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const assert = require('assert');
-const { billRenderCacheKey } = require('../src/shrimpBillPreRender');
+const { billRenderCacheKey } = require('../src/seafood-notify/shrimpBillPreRender');
 
 const k1 = billRenderCacheKey({
   paymentType: 'credit',

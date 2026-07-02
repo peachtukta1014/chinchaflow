@@ -3,8 +3,8 @@ const {
   resolveZoneForOrder,
   groupOrdersByZone,
   findZoneInCatalog,
-} = require('../src/customerZone');
-const { BUILTIN_CUSTOMERS } = require('../src/shrimpBuiltinCustomers');
+} = require('../src/seafood-oa/customerZone');
+const { BUILTIN_CUSTOMERS } = require('../src/seafood-oa/shrimpBuiltinCustomers');
 
 function assert(cond, msg) {
   if (!cond) {

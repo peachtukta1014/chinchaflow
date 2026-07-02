@@ -2,7 +2,7 @@ const assert = require('assert');
 const {
   deliveryWindowFromConfig,
   DEFAULT_DELIVERY_WINDOW,
-} = require('../src/shrimpLineConfig');
+} = require('../src/seafood-oa/shrimpLineConfig');
 
 assert.deepStrictEqual(DEFAULT_DELIVERY_WINDOW, { startHour: 18, endHour: 15 });
 assert.deepStrictEqual(deliveryWindowFromConfig(null), { startHour: 18, endHour: 15 });

@@ -6,7 +6,7 @@ const {
   LINE_CONTACT_ROLE_BILLING,
   LINE_CONTACT_ROLE_ORDER,
   normalizeLineContacts,
-} = require('../src/lineCustomerContacts');
+} = require('../src/seafood-oa/lineCustomerContacts');
 
 const billing = 'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
 const order = 'Ubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';

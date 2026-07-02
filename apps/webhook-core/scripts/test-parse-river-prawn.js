@@ -6,7 +6,7 @@ const {
   parseSimpleOrderLine,
   pendingToItems,
   sizeWordToProduct,
-} = require('../src/parseLineOrder');
+} = require('../src/seafood-oa/parseLineOrder');
 
 function assert(cond, msg) {
   if (!cond) {

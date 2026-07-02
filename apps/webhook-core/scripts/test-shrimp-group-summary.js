@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-const { classifyShrimpLineMessage } = require('../src/shrimpLineIntent');
-const { isShrimpTodayOrdersCommand } = require('../src/shrimpTodayOrdersSummary');
+const { classifyShrimpLineMessage } = require('../src/seafood-oa/shrimpLineIntent');
+const { isShrimpTodayOrdersCommand } = require('../src/seafood-oa/shrimpTodayOrdersSummary');
 const {
   isShrimpSummaryCommand,
   aggregateDailySales,
   buildShrimpSummaryMessage,
-} = require('../src/shrimpDailySummary');
-const { formatTodayOrdersReply } = require('../src/shrimpTodayOrdersSummary');
-const { classifyShrimpGroupKeyboard } = require('../src/shrimpGroupKeyboard');
-const { replyHelpCustomerThai } = require('../src/shrimpLineReply');
+} = require('../src/seafood-oa/shrimpDailySummary');
+const { formatTodayOrdersReply } = require('../src/seafood-oa/shrimpTodayOrdersSummary');
+const { classifyShrimpGroupKeyboard } = require('../src/seafood-oa/shrimpGroupKeyboard');
+const { replyHelpCustomerThai } = require('../src/seafood-oa/shrimpLineReply');
 
 function assert(cond, msg) {
   if (!cond) {

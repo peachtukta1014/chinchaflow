@@ -4,7 +4,7 @@ const {
   lineBillPaidThankYouCaption,
   LINE_BILL_PAID_THANK_YOU,
   buildLineBillTransferAccountsText,
-} = require('../src/shrimpLinePush');
+} = require('../src/seafood-notify/shrimpLinePush');
 
 assert.strictEqual(lineBillUnpaidHint('cash', 0, 1000), '');
 assert.strictEqual(lineBillUnpaidHint('transfer', 0, 1000), '');

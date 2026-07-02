@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { customerMatchesName } = require('../src/customerNameAliases');
+const { customerMatchesName } = require('../src/seafood-oa/customerNameAliases');
 
 function assert(cond, msg) {
   if (!cond) {
