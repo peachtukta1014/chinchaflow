@@ -597,19 +597,14 @@ function OrderEditModal({ order, t, onClose, onSave }) {
 
 function LineSettingsSection({ t }) {
   const [form, setForm] = useState({ ...DEFAULT_LINE_CONFIG });
-  const [shrimpGroupId, setShrimpGroupId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchBusy, setFetchBusy] = useState(null);
   const [flash, setFlash] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      fsGetConfig('teaLine'),
-      fsGetConfig('shrimpLine'),
-    ]).then(([teaDoc, shrimpDoc]) => {
+    fsGetConfig('teaLine').then((teaDoc) => {
       if (teaDoc) setForm({ ...DEFAULT_LINE_CONFIG, ...teaDoc });
-      if (shrimpDoc?.notifyGroupId) setShrimpGroupId(String(shrimpDoc.notifyGroupId).trim());
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -733,17 +728,7 @@ function LineSettingsSection({ t }) {
           <p className="text-[10px] text-emerald-700/80">{t('lineGroupIdHint')}</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-          <p className="text-[11px] font-black text-slate-700">{t('lineChannelShrimpGroup')}</p>
-          <p className="text-[10px] text-slate-500">{t('lineChannelShrimpGroupHint')}</p>
-          <input
-            readOnly
-            className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-xs font-mono outline-none bg-white text-slate-600"
-            placeholder={t('lineChannelShrimpEmpty')}
-            value={shrimpGroupId}
-          />
-          <p className="text-[10px] text-slate-400">{t('lineChannelShrimpReadonly')}</p>
-        </div>
+        
       </div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-2">
         <p className="font-bold text-xs text-emerald-900">{t('lineInstantRestockNotify')}</p>
