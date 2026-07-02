@@ -111,7 +111,10 @@ async function callFlashWithTools(apiKey, messages, forceToolUse) {
         model: FLASH_ANALYSIS_MODEL,
         messages,
         tools: FLASH_ANALYSIS_TOOLS,
-        tool_choice: forceToolUse ? 'required' : 'auto',
+        // forceToolUse: true = ต้องเรียก tool อะไรก็ได้ · string = บังคับ tool ชื่อนั้นเจาะจง
+        tool_choice: typeof forceToolUse === 'string'
+          ? { type: 'function', function: { name: forceToolUse } }
+          : (forceToolUse ? 'required' : 'auto'),
         temperature: 0.1,
         max_tokens: 3072,
       }),
@@ -248,7 +251,28 @@ scope ปัจจุบัน: ${scope || 'root'}
     }
   }
 
-  return null; // เกิน MAX_ITERATIONS — caller fallback ไป initialTaskSpec
+  // ครบรอบแล้วยังไม่ finalize — บังคับสรุปจากสิ่งที่อ่านมา แทนการทิ้ง context ทั้งหมด
+  // (เดิม return null ทันที → fallback ไป taskSpec ที่เดาจากบทสนทนา ทั้งที่อ่านโค้ดจริงไปหลายไฟล์แล้ว)
+  if (filesRead > 0) {
+    try {
+      messages.push({
+        role: 'user',
+        content: '⚠️ ครบรอบวิเคราะห์แล้ว — เรียก finalize_task_brief ตอนนี้ทันที สรุป taskSpec จากไฟล์ที่อ่านไปแล้วทั้งหมด ห้ามอ่านเพิ่ม',
+      });
+      const finalChoice = await callFlashWithTools(apiKey, messages, 'finalize_task_brief');
+      const tc = (finalChoice.message?.tool_calls || [])[0];
+      if (tc?.function?.name === 'finalize_task_brief') {
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* use empty */ }
+        if (args.description && args.target_behavior) {
+          return { taskSpec: args, iterations: MAX_ITERATIONS + 1, forcedFinalize: true };
+        }
+      }
+    } catch (err) {
+      console.warn('force finalize หลังครบรอบล้มเหลว — fallback ไป initialTaskSpec:', err.message);
+    }
+  }
+  return null; // ไม่ได้อ่านไฟล์เลย หรือ force finalize พัง — caller fallback ไป initialTaskSpec
 }
 
 module.exports = { runFlashAnalysisLoop, FLASH_ANALYSIS_TOOLS, MAX_ITERATIONS };
