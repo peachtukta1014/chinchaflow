@@ -21,6 +21,7 @@ const { callOpenRouter, callOpenRouterForWebSearch } = require('./flash/flashMod
 const { SYSTEM_PROMPTS, detectScope } = require('./flash/flashPrompts');
 const { detectQuickTrigger, isCodeMetricsQuery, classifyAndTranslate, buildTaskBrief } = require('./flash/flashTriggers');
 const { runFlashAnalysisLoop } = require('./flash/flashAnalysisLoop');
+const { matchWebSearchQuery, stripWebSearchTags } = require('./flash/webSearchTag');
 const { dispatchToProAgent } = require('./flash/flashDispatch');
 
 const LAST_RUN_STALE_MS = 6 * 60 * 60 * 1000; // 6 ชั่วโมง — เกินนี้ถือว่าเก่าเกินจะเอามาปนกับงานปัจจุบัน
@@ -293,14 +294,9 @@ exports.aiChatAgentHttp = functions
       await writeTokenLog(requestId, tokenEntry).catch(() => {});
 
       // ── Web search two-model flow ─────────────────────────────────────
-      // จับแท็กทุกตำแหน่งใน reply — DeepSeek ชอบเกริ่นก่อนค่อยใส่แท็ก ถ้า anchor ^ อย่างเดียว
-      // แท็กจะหลุดโชว์ดิบๆ ให้พีชเห็นและไม่ถูกค้นจริง (เจอจริง 2026-07-02)
-      const WEB_SEARCH_RE = /\[WEB_SEARCH:\s*([^\]]+)\]/i;
-      const stripWebSearchTags = (t) =>
-        String(t || '').replace(/\[WEB_SEARCH:[^\]]*\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
-      const wsMatch = !hasImages && reply.match(WEB_SEARCH_RE);
-      if (wsMatch) {
-        const searchQuery = wsMatch[1].trim();
+      // logic จับ/ลบแท็กแยกไว้ที่ flash/webSearchTag.js เพื่อให้เทสได้ (test-web-search-tag.js)
+      const searchQuery = !hasImages ? matchWebSearchQuery(reply) : null;
+      if (searchQuery) {
         await writeProgress(requestId, `กำลังค้นหาข้อมูลจากเว็บ: "${searchQuery}"...`);
         let wsText = '';
         try {

@@ -530,10 +530,11 @@ function AppShell({ user }) {
             </button>
           </div>
         </div>
-        {/* PRO status bar — pinned ใต้ชื่อ เหนือ tab */}
+        {/* AI status bar — pinned ใต้ชื่อ เหนือ tab (ป้าย "AI" กลางๆ — ข้อความ step บอกเองว่า
+            จีจี้หรือ Pro กำลังทำอะไร; เดิมเขียน "PRO" ตายตัวทำให้พีชเข้าใจผิดว่า dispatch ไป Pro แล้ว) */}
         <div className="flex items-center gap-1.5 px-4 py-1 border-t border-ai-border/50">
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${progressStep ? 'bg-green-400 animate-pulse' : 'bg-ai-muted/40'}`} />
-          <span className={`text-[10px] font-semibold tracking-widest shrink-0 ${progressStep ? 'text-green-400' : 'text-ai-muted/40'}`}>PRO</span>
+          <span className={`text-[10px] font-semibold tracking-widest shrink-0 ${progressStep ? 'text-green-400' : 'text-ai-muted/40'}`}>AI</span>
           <span className={`text-[10px] truncate ${progressStep ? 'text-ai-muted' : 'text-ai-muted/40'}`}>
             {progressStep ? `· ${progressStep}` : '· พร้อมทำงาน'}
           </span>
@@ -634,7 +635,7 @@ function AppShell({ user }) {
                   <span className="w-2 h-2 bg-ai-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
                 {progressStep && (
-                  <span className="text-[9px] font-bold text-ai-accent tracking-widest">PRO</span>
+                  <span className="text-[9px] font-bold text-ai-accent tracking-widest">AI</span>
                 )}
               </div>
               <p className="text-[10px] text-ai-muted">
