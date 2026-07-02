@@ -610,7 +610,8 @@ scope: ${scope || 'root'}
       if (tc?.function?.name === 'finalize_task_brief') {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* use empty */ }
-        if (args.description && args.target_behavior) {
+        if (args.description) {
+          if (!args.target_behavior) args.target_behavior = args.description;
           await writeTokenLog(requestId, { flashAnalysis: tokenUsage }).catch(() => {});
           return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true, investigationIncomplete: !investigationState.analysisCertainty.isReadyToFix, investigationState, tokenUsage };
         }
