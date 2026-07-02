@@ -25,6 +25,7 @@ const MAX_BLOCKS = 4;
 const MIN_FILES_BEFORE_FINALIZE = 2;
 const EXPLORE_ONLY_ROUNDS = 3;
 const CALL_TIMEOUT_MS = 60 * 1000;
+const WALL_CLOCK_LIMIT_MS = 450 * 1000; // 450s — หยุดก่อน CF timeout (540s) ให้เหลือเวลา finalize + archive
 const MAX_ITERATIONS = ROUNDS_PER_BLOCK;
 
 // ── Tool Definitions ────────────────────────────────────────────────────────
@@ -166,7 +167,7 @@ function _buildInitialDetectiveState(initialTaskSpec) {
     cluesQueue: [...cluesQueue],
     analysisCertainty: {
       score: 0,
-      isReadyToFix: cluesQueue.length === 0,
+      isReadyToFix: false,
       reasoning: cluesQueue.length === 0 ? 'initial — ยังไม่มี fix หรือ hypothesis' : `initial — cluesQueue มี ${cluesQueue.length} รายการต้องตรวจ`,
     },
   };
@@ -256,7 +257,7 @@ async function callFlashWithTools(apiKey, messages, forceToolUse, tools) {
 
 // ── Tool Executor (รวม detective tools + guards) ────────────────────────────
 
-async function executeFlashTool(name, args, { ghPatRead, projectTree, investigationState, filesRead, filesReadList }) {
+async function executeFlashTool(name, args, { ghPatRead, projectTree, investigationState }) {
   switch (name) {
     case 'read_file': {
       if (!args.path) return '❌ ต้องระบุ path';
@@ -273,15 +274,12 @@ async function executeFlashTool(name, args, { ghPatRead, projectTree, investigat
       const content = found[args.path];
       if (!content) return `❌ ไม่พบไฟล์: ${args.path}`;
 
-      // อัปเดต detective state
+      // อัปเดต detective state (scannedPaths = single source of truth)
       if (investigationState) {
         investigationState.scannedPaths.push(args.path);
         investigationState.cluesQueue = investigationState.cluesQueue.filter(p => p !== args.path);
         _recalculateCertainty(investigationState);
       }
-      // อัปเดต legacy counters
-      if (filesRead) filesRead.count++;
-      if (filesReadList && args.path) filesReadList.push(args.path);
 
       return `=== ${args.path} ===\n${content}`;
     }
@@ -387,17 +385,24 @@ async function executeFlashTool(name, args, { ghPatRead, projectTree, investigat
 
 // ── Block Runner ────────────────────────────────────────────────────────────
 
-async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId, blockNum, totalIterationsBefore, filesRead, filesReadList, investigationState }) {
+async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId, blockNum, totalIterationsBefore, investigationState, loopStartTime }) {
   const isFirstBlock = blockNum === 1;
+  const scannedCount = () => investigationState?.scannedPaths?.length ?? 0;
 
   for (let round = 1; round <= ROUNDS_PER_BLOCK; round++) {
+    // Wall-clock guard: ป้องกัน CF timeout (540s) — หยุดก่อน 60s สุดท้ายเพื่อให้ finalize ทัน
+    if (loopStartTime && Date.now() - loopStartTime > WALL_CLOCK_LIMIT_MS) {
+      console.warn(`[Flash] wall-clock limit reached (${Math.round((Date.now() - loopStartTime) / 1000)}s) — forcing early return`);
+      return null;
+    }
+
     const totalIter = totalIterationsBefore + round;
     const isExplorePhase = isFirstBlock && round <= EXPLORE_ONLY_ROUNDS;
     const iterTools = isExplorePhase ? READ_ONLY_TOOLS : FLASH_ANALYSIS_TOOLS;
 
     const certaintyScore = investigationState?.analysisCertainty?.score ?? 0;
     const phaseLabel = isExplorePhase
-      ? `🕵️ สำรวจโค้ด... (block ${blockNum} รอบ ${round}/${ROUNDS_PER_BLOCK} — อ่านแล้ว ${filesRead.count} ไฟล์)`
+      ? `🕵️ สำรวจโค้ด... (block ${blockNum} รอบ ${round}/${ROUNDS_PER_BLOCK} — อ่านแล้ว ${scannedCount()} ไฟล์)`
       : `🔍 วิเคราะห์ผลกระทบ... (block ${blockNum} รอบ ${round}/${ROUNDS_PER_BLOCK} — certainty=${certaintyScore})`;
     await writeProgress(requestId, phaseLabel, 'flash');
 
@@ -418,12 +423,12 @@ async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId
       try { args = JSON.parse(toolCall.function.arguments || '{}'); } catch { /* use empty */ }
 
       if (toolCall.function.name === 'finalize_task_brief') {
-        // Guard 1: MIN_FILES
-        if (filesRead.count < MIN_FILES_BEFORE_FINALIZE) {
+        // Guard 1: MIN_FILES (ใช้ scannedPaths เป็น single source of truth)
+        if (scannedCount() < MIN_FILES_BEFORE_FINALIZE) {
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: `❌ อ่านไปแค่ ${filesRead.count} ไฟล์ — ต้อง read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize`,
+            content: `❌ อ่านไปแค่ ${scannedCount()} ไฟล์ — ต้อง read_file อย่างน้อย ${MIN_FILES_BEFORE_FINALIZE} ไฟล์ก่อน finalize`,
           });
           continue;
         }
@@ -461,15 +466,15 @@ async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId
       if (toolLabel) await writeProgress(requestId, toolLabel, 'flash');
 
       const resultText = await executeFlashTool(toolCall.function.name, args, {
-        ghPatRead, projectTree, investigationState, filesRead, filesReadList,
+        ghPatRead, projectTree, investigationState,
       });
       messages.push({ role: 'tool', tool_call_id: toolCall.id, content: resultText });
     }
 
-    if (isExplorePhase && filesRead.count > 0) {
+    if (isExplorePhase && scannedCount() > 0) {
       messages.push({
         role: 'user',
-        content: `📊 สรุปรอบสำรวจ: อ่านแล้ว ${filesRead.count} ไฟล์ [${filesReadList.join(', ')}] — ยังอยู่ช่วงสำรวจ (รอบ ${round}/${EXPLORE_ONLY_ROUNDS}) ค้นหาไฟล์ที่เกี่ยวข้องเพิ่มได้`,
+        content: `📊 สรุปรอบสำรวจ: อ่านแล้ว ${scannedCount()} ไฟล์ [${investigationState.scannedPaths.join(', ')}] — ยังอยู่ช่วงสำรวจ (รอบ ${round}/${EXPLORE_ONLY_ROUNDS}) ค้นหาไฟล์ที่เกี่ยวข้องเพิ่มได้`,
       });
     }
   }
@@ -515,19 +520,23 @@ scope: ${scope || 'root'}
     { role: 'user', content: message },
   ];
 
-  const filesRead = { count: 0 };
-  const filesReadList = [];
+  const loopStartTime = Date.now();
 
   for (let block = 1; block <= MAX_BLOCKS; block++) {
+    // Wall-clock guard ระดับ block
+    if (Date.now() - loopStartTime > WALL_CLOCK_LIMIT_MS) {
+      console.warn(`[Flash] wall-clock limit at block start (block ${block}) — skipping to force finalize`);
+      break;
+    }
+
     const totalIterationsBefore = (block - 1) * ROUNDS_PER_BLOCK;
 
     const result = await runOneBlock(apiKey, messages, {
       ghPatRead, projectTree, requestId,
       blockNum: block,
       totalIterationsBefore,
-      filesRead,
-      filesReadList,
       investigationState,
+      loopStartTime,
     });
 
     if (result) {
@@ -538,26 +547,41 @@ scope: ${scope || 'root'}
       // Block checkpoint: serialize state → Firestore, compress messages (anti-token-bloat)
       const stateMsg = _buildStateContextMessage(investigationState, block, MAX_BLOCKS);
       await writeProgress(requestId, `🔄 checkpoint block ${block}/${MAX_BLOCKS} — certainty=${investigationState.analysisCertainty.score}`, 'flash');
-      await saveInvestigationState(requestId, { investigationState, block, filesRead: filesRead.count }).catch(() => {});
+      await saveInvestigationState(requestId, { investigationState, block, filesRead: investigationState.scannedPaths.length }).catch(() => {});
 
-      // ลบ heavy tool logs ออกจาก messages → compress เป็น state summary เดียว
+      // เก็บ last assistant content สำหรับ context carry-over (ป้องกัน context loss ข้าม block)
+      const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.content);
+      const carryOver = lastAssistantMsg?.content
+        ? `\n\n📝 สรุปรอบก่อน: ${typeof lastAssistantMsg.content === 'string' ? lastAssistantMsg.content.slice(0, 500) : ''}`
+        : '';
+
+      // ลบ heavy tool logs ออกจาก messages → compress เป็น state summary + carry-over
       const systemMsg = messages[0];
       messages.length = 0;
       messages.push(
         systemMsg,
         { role: 'user', content: message },
-        { role: 'user', content: `${stateMsg}\n\nดำเนินการสืบสวนต่อ block ${block + 1}/${MAX_BLOCKS} — ยังมีเวลาอีก ${(MAX_BLOCKS - block) * ROUNDS_PER_BLOCK} รอบ\nถ้า isReadyToFix = true → เรียก finalize_task_brief ได้เลย` }
+        { role: 'user', content: `${stateMsg}${carryOver}\n\nดำเนินการสืบสวนต่อ block ${block + 1}/${MAX_BLOCKS} — ยังมีเวลาอีก ${(MAX_BLOCKS - block) * ROUNDS_PER_BLOCK} รอบ\nถ้า isReadyToFix = true → เรียก finalize_task_brief ได้เลย` }
       );
     }
   }
 
-  // Force finalize หลังครบทุก block
-  if (filesRead.count >= MIN_FILES_BEFORE_FINALIZE) {
+  // Force finalize หลังครบทุก block / wall-clock limit
+  const scannedFiles = investigationState.scannedPaths;
+  if (scannedFiles.length >= MIN_FILES_BEFORE_FINALIZE) {
     try {
-      await writeProgress(requestId, `🕵️ ครบ ${maxTotalRounds} รอบ — กำลังสรุป Task Brief จากที่รวบรวมได้...`, 'flash');
+      const elapsedSec = Math.round((Date.now() - loopStartTime) / 1000);
+      await writeProgress(requestId, `🕵️ ครบ ${maxTotalRounds} รอบ (${elapsedSec}s) — กำลังสรุป Task Brief จากที่รวบรวมได้...`, 'flash');
+
+      // Inject certainty warning ให้ model รู้ว่ายังไม่ครบ
+      const pendingHyp = investigationState.impactHypotheses.filter(h => h.status === 'PENDING_VERIFICATION');
+      const certaintyWarning = !investigationState.analysisCertainty.isReadyToFix
+        ? `\n⚠️ **Investigation ยังไม่สมบูรณ์:** cluesQueue=[${investigationState.cluesQueue.join(', ')}], unverified hypotheses=[${pendingHyp.map(h => h.targetFile).join(', ')}]\nสรุปจากข้อมูลที่มี — ระบุส่วนที่ยังไม่แน่ใจใน logic_constraints`
+        : '';
+
       messages.push({
         role: 'user',
-        content: `⚠️ ครบรอบทั้งหมดแล้ว (${filesRead.count} ไฟล์: ${filesReadList.join(', ')}) — เรียก finalize_task_brief ตอนนี้เลย สรุปจากสิ่งที่รู้ทั้งหมด`,
+        content: `⚠️ ครบรอบทั้งหมดแล้ว (${scannedFiles.length} ไฟล์: ${scannedFiles.join(', ')}) — เรียก finalize_task_brief ตอนนี้เลย สรุปจากสิ่งที่รู้ทั้งหมด${certaintyWarning}`,
       });
       const finalChoice = await callFlashWithTools(apiKey, messages, 'finalize_task_brief');
       const tc = (finalChoice.message?.tool_calls || [])[0];
@@ -565,7 +589,7 @@ scope: ${scope || 'root'}
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* use empty */ }
         if (args.description && args.target_behavior) {
-          return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true, investigationState };
+          return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true, investigationIncomplete: !investigationState.analysisCertainty.isReadyToFix, investigationState };
         }
       }
     } catch (err) {
@@ -575,4 +599,4 @@ scope: ${scope || 'root'}
   return null;
 }
 
-module.exports = { runFlashAnalysisLoop, FLASH_ANALYSIS_TOOLS, READ_ONLY_TOOLS, DETECTIVE_TOOLS, MAX_ITERATIONS, MIN_FILES_BEFORE_FINALIZE, EXPLORE_ONLY_ROUNDS, ROUNDS_PER_BLOCK, MAX_BLOCKS };
+module.exports = { runFlashAnalysisLoop, FLASH_ANALYSIS_TOOLS, READ_ONLY_TOOLS, DETECTIVE_TOOLS, MAX_ITERATIONS, MIN_FILES_BEFORE_FINALIZE, EXPLORE_ONLY_ROUNDS, ROUNDS_PER_BLOCK, MAX_BLOCKS, WALL_CLOCK_LIMIT_MS };

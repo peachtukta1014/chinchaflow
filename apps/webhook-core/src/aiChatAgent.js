@@ -100,7 +100,8 @@ exports.aiChatAgentHttp = functions
     }
 
     // ── "ไฟเขียว" — พีชยืนยันส่งงาน Pro จาก pending brief ──────────────
-    if (/ไฟเขียว/.test(message)) {
+    // ต้อง match เฉพาะเมื่อเป็นข้อความหลัก (ขึ้นต้นหรือลอยเดี่ยว) ไม่ใช่แค่ substring
+    if (/(?:^|\s)ไฟเขียว(?:\s|$|!|ครับ|ค่ะ|เลย|นะ)/.test(message.trim())) {
       const pendingId = req.body.pendingRequestId;
       if (pendingId) {
         const pending = await loadPendingAction(pendingId);
@@ -250,11 +251,15 @@ exports.aiChatAgentHttp = functions
           });
           if (analyzed?.taskSpec) {
             finalTaskSpec = analyzed.taskSpec;
+            if (analyzed.investigationIncomplete) {
+              analysisNote = '\n\n⚠️ จีจี้ยังสืบสวนไม่ครบ (หมดรอบ/หมดเวลา) — Task Brief สรุปจากข้อมูลที่มี อาจมีจุดที่ยังไม่ยืนยัน';
+            }
             // SECTION 3: Archive investigation (Persistent Vault)
             archiveInvestigation(requestId, {
               caseType, targetApp,
               taskSpec: finalTaskSpec,
               investigationState: analyzed.investigationState || null,
+              forcedFinalize: analyzed.forcedFinalize || false,
               completedAt: Date.now(),
             }).catch(() => {});
           } else {
