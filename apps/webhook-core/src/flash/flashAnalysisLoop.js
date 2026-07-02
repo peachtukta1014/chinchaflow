@@ -15,8 +15,8 @@
  */
 
 const { OPENROUTER_BASE, FLASH_MODEL } = require('./flashModels');
-const { fetchRepoFiles, saveInvestigationState } = require('./flashContext');
-const { writeProgress } = require('../shared/progressTracker');
+const { fetchRepoFiles, saveInvestigationState, fetchScopeSkill } = require('./flashContext');
+const { writeProgress, writeTokenLog } = require('../shared/progressTracker');
 const { formatChainForPrompt } = require('../shared/chainLockService');
 
 const FLASH_ANALYSIS_MODEL = process.env.FLASH_MODEL || FLASH_MODEL;
@@ -252,6 +252,7 @@ async function callFlashWithTools(apiKey, messages, forceToolUse, tools) {
   const data = await res.json();
   const choice = data?.choices?.[0];
   if (!choice) throw new Error('OpenRouter ไม่ตอบกลับ');
+  choice._usage = data.usage || null;
   return choice;
 }
 
@@ -385,7 +386,7 @@ async function executeFlashTool(name, args, { ghPatRead, projectTree, investigat
 
 // ── Block Runner ────────────────────────────────────────────────────────────
 
-async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId, blockNum, totalIterationsBefore, investigationState, loopStartTime }) {
+async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId, blockNum, totalIterationsBefore, investigationState, loopStartTime, tokenUsage }) {
   const isFirstBlock = blockNum === 1;
   const scannedCount = () => investigationState?.scannedPaths?.length ?? 0;
 
@@ -407,6 +408,12 @@ async function runOneBlock(apiKey, messages, { ghPatRead, projectTree, requestId
     await writeProgress(requestId, phaseLabel, 'flash');
 
     const choice = await callFlashWithTools(apiKey, messages, true, iterTools);
+    if (choice._usage && tokenUsage) {
+      tokenUsage.prompt_tokens += choice._usage.prompt_tokens || 0;
+      tokenUsage.completion_tokens += choice._usage.completion_tokens || 0;
+      tokenUsage.total_tokens += choice._usage.total_tokens || 0;
+      tokenUsage.calls++;
+    }
     const am = choice.message;
     messages.push({ role: 'assistant', content: am.content || null, tool_calls: am.tool_calls || undefined });
 
@@ -493,6 +500,13 @@ async function runFlashAnalysisLoop(apiKey, ghPatRead, { message, history, scope
   // SECTION 2: Initialize investigationState (detective working memory)
   const investigationState = _buildInitialDetectiveState(initialTaskSpec || {});
 
+  // Token tracking accumulator
+  const tokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, calls: 0 };
+
+  // โหลด scope-specific skill context (ถ้ามี)
+  const scopeSkill = await fetchScopeSkill(ghPatRead, scope || 'root').catch(() => '');
+  const scopeSkillBlock = scopeSkill ? `\n\n**Scope Skill (${scope}):**\n${scopeSkill}` : '';
+
   const systemPrompt = `คุณคือจีจี้ — 🕵️ Detective Technical Analyst ของ CHINCHA FLOW
 กำลังสืบสวน task นี้อย่างเป็นระบบก่อนส่ง Task Brief ให้ Pro Agent
 
@@ -512,7 +526,7 @@ async function runFlashAnalysisLoop(apiKey, ghPatRead, { message, history, scope
 
 scope: ${scope || 'root'}
 แนวทางเบื้องต้น: ${JSON.stringify(initialTaskSpec || {}).slice(0, 600)}
-สูงสุด ${maxTotalRounds} รอบ (${MAX_BLOCKS} blocks × ${ROUNDS_PER_BLOCK} รอบ)${chainContext}`;
+สูงสุด ${maxTotalRounds} รอบ (${MAX_BLOCKS} blocks × ${ROUNDS_PER_BLOCK} รอบ)${chainContext}${scopeSkillBlock}`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -537,10 +551,12 @@ scope: ${scope || 'root'}
       totalIterationsBefore,
       investigationState,
       loopStartTime,
+      tokenUsage,
     });
 
     if (result) {
-      return { taskSpec: result.taskSpec, iterations: result.totalIterations, investigationState: result.investigationState };
+      await writeTokenLog(requestId, { flashAnalysis: tokenUsage }).catch(() => {});
+      return { taskSpec: result.taskSpec, iterations: result.totalIterations, investigationState: result.investigationState, tokenUsage };
     }
 
     if (block < MAX_BLOCKS) {
@@ -584,18 +600,26 @@ scope: ${scope || 'root'}
         content: `⚠️ ครบรอบทั้งหมดแล้ว (${scannedFiles.length} ไฟล์: ${scannedFiles.join(', ')}) — เรียก finalize_task_brief ตอนนี้เลย สรุปจากสิ่งที่รู้ทั้งหมด${certaintyWarning}`,
       });
       const finalChoice = await callFlashWithTools(apiKey, messages, 'finalize_task_brief');
+      if (finalChoice._usage) {
+        tokenUsage.prompt_tokens += finalChoice._usage.prompt_tokens || 0;
+        tokenUsage.completion_tokens += finalChoice._usage.completion_tokens || 0;
+        tokenUsage.total_tokens += finalChoice._usage.total_tokens || 0;
+        tokenUsage.calls++;
+      }
       const tc = (finalChoice.message?.tool_calls || [])[0];
       if (tc?.function?.name === 'finalize_task_brief') {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* use empty */ }
         if (args.description && args.target_behavior) {
-          return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true, investigationIncomplete: !investigationState.analysisCertainty.isReadyToFix, investigationState };
+          await writeTokenLog(requestId, { flashAnalysis: tokenUsage }).catch(() => {});
+          return { taskSpec: args, iterations: maxTotalRounds + 1, forcedFinalize: true, investigationIncomplete: !investigationState.analysisCertainty.isReadyToFix, investigationState, tokenUsage };
         }
       }
     } catch (err) {
       console.warn('force finalize หลังครบรอบล้มเหลว — fallback ไป initialTaskSpec:', err.message);
     }
   }
+  await writeTokenLog(requestId, { flashAnalysis: tokenUsage }).catch(() => {});
   return null;
 }
 

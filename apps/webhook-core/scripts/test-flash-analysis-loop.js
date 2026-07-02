@@ -475,9 +475,10 @@ async function testDuplicateReadGuard() {
   assert(result !== null, 'ต้อง return result');
   // duplicate read ไม่ควร increment filesRead — ต้องยังอ่านได้ 2 ไฟล์ (a.js ครั้งแรก + b.js)
   assert(result?.taskSpec?.description?.includes('duplicate'), 'taskSpec ต้องมีคำ duplicate');
-  // ตรวจว่า GitHub API ถูกเรียก 2 ครั้ง (a.js ครั้งแรก + b.js) ไม่ใช่ 3 ครั้ง
-  const ghCalls = fetchCallLog.filter(c => c.url?.includes('api.github.com'));
-  assert(ghCalls.length === 2, `GitHub API ต้องถูกเรียก 2 ครั้ง (ได้ ${ghCalls.length}) — ป้องกัน a.js ซ้ำ`);
+  // ตรวจว่า GitHub API ถูกเรียกอ่านไฟล์โค้ด 2 ครั้ง (a.js ครั้งแรก + b.js) ไม่ใช่ 3 ครั้ง
+  // filter เฉพาะ file read calls (ไม่นับ fetchScopeSkill ที่อ่าน .skill/)
+  const ghFileCalls = fetchCallLog.filter(c => c.url?.includes('api.github.com') && !c.url?.includes('.skill'));
+  assert(ghFileCalls.length === 2, `GitHub API file reads ต้องถูกเรียก 2 ครั้ง (ได้ ${ghFileCalls.length}) — ป้องกัน a.js ซ้ำ`);
 }
 
 // ── Test 8: Detective flow — record_fix → add_hypothesis → mark_safe → finalize ──
