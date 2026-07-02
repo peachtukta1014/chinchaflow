@@ -270,7 +270,8 @@ exports.aiChatAgentHttp = functions
       loadCustomNotes().catch(() => ''),
     ]);
     const basePrompt = SYSTEM_PROMPTS[finalScope] || SYSTEM_PROMPTS.root;
-    const webSearchInstruction = '\n\n---\n🔍 **Web Search Protocol:** ถ้าคำถามต้องการข้อมูลที่เปลี่ยนแปลงบ่อย (ราคาตลาดล่าสุด ข่าวล่าสุด เหตุการณ์ปัจจุบัน ข้อมูลที่ฐานความรู้ปัจจุบันไม่มี) ให้ตอบเฉพาะบรรทัดนี้แล้วหยุด: `[WEB_SEARCH: <query เป็นภาษาอังกฤษ>]` — ระบบจะค้นเว็บและส่งผลกลับมาให้ตอบใหม่ทันที ห้ามตอบอื่นเพิ่มในรอบนี้';
+    const webSearchInstruction = '\n\n---\n🔍 **Web Search Protocol:** ถ้าคำถามต้องการข้อมูลที่เปลี่ยนแปลงบ่อย (ราคาตลาดล่าสุด ข่าวล่าสุด เหตุการณ์ปัจจุบัน ข้อมูลที่ฐานความรู้ปัจจุบันไม่มี) ให้ตอบเฉพาะบรรทัดนี้แล้วหยุด: `[WEB_SEARCH: <query เป็นภาษาอังกฤษ>]` — ระบบจะค้นเว็บและส่งผลกลับมาให้ตอบใหม่ทันที ห้ามตอบอื่นเพิ่มในรอบนี้' +
+      '\n\n⚠️ **ข้อห้ามสำคัญ:** โหมดแชทนี้อ่านไฟล์/โค้ดใน repo ไม่ได้ — ห้ามอ้างหรือแสดงท่าทีว่า "กำลังอ่านไฟล์", "ขออ่านโค้ดก่อน", "เปิด Code Analysis Loop" เด็ดขาด (การอ่านโค้ดจริงเกิดเฉพาะงาน code-action ที่ระบบจัดให้เอง) ถ้าพี่พีชรายงานปัญหาที่ต้องดูโค้ดจริง ให้ตอบตรงๆ ว่าจีจี้จะจัดเป็นงานตรวจโค้ด แล้วให้พี่พีชพิมพ์สั่งงานนั้นชัดๆ เช่น "ตรวจสอบและแก้ ..." — ห้ามเดาคำตอบแทนการดูโค้ด';
     const systemContent = basePrompt +
       (jiijiDocs ? '\n\n---\n## 🤖 FLASH.md (ตัวตนและความสามารถของจีจี้)\n' + jiijiDocs : '') +
       (agentDocs ? '\n\n---\n## 📋 กฎและสไตล์การทำงาน (โหลดจาก repo)\n' + agentDocs : '') +
@@ -292,7 +293,11 @@ exports.aiChatAgentHttp = functions
       await writeTokenLog(requestId, tokenEntry).catch(() => {});
 
       // ── Web search two-model flow ─────────────────────────────────────
-      const WEB_SEARCH_RE = /^\[WEB_SEARCH:\s*(.+?)\]/i;
+      // จับแท็กทุกตำแหน่งใน reply — DeepSeek ชอบเกริ่นก่อนค่อยใส่แท็ก ถ้า anchor ^ อย่างเดียว
+      // แท็กจะหลุดโชว์ดิบๆ ให้พีชเห็นและไม่ถูกค้นจริง (เจอจริง 2026-07-02)
+      const WEB_SEARCH_RE = /\[WEB_SEARCH:\s*([^\]]+)\]/i;
+      const stripWebSearchTags = (t) =>
+        String(t || '').replace(/\[WEB_SEARCH:[^\]]*\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
       const wsMatch = !hasImages && reply.match(WEB_SEARCH_RE);
       if (wsMatch) {
         const searchQuery = wsMatch[1].trim();
@@ -316,7 +321,8 @@ exports.aiChatAgentHttp = functions
           },
         ];
         const result2 = await callOpenRouter(apiKey, messagesWithWeb, { userText: message });
-        const { text: finalReply, usage: usage2 } = result2;
+        const { usage: usage2 } = result2;
+        const finalReply = stripWebSearchTags(result2.text) || result2.text;
         await writeTokenLog(requestId, { flash: usage2 }).catch(() => {});
         await writeResult(requestId, { reply: finalReply, scope: finalScope });
         res.json({ reply: finalReply, scope: finalScope });
@@ -324,8 +330,10 @@ exports.aiChatAgentHttp = functions
       }
       // ────────────────────────────────────────────────────────────────
 
-      await writeResult(requestId, { reply, scope: finalScope });
-      res.json({ reply, scope: finalScope });
+      // strip แท็กที่อาจหลุดมาในเส้นทางที่ไม่ได้เข้า ws flow (เช่น มีรูปแนบ)
+      const cleanReply = stripWebSearchTags(reply) || reply;
+      await writeResult(requestId, { reply: cleanReply, scope: finalScope });
+      res.json({ reply: cleanReply, scope: finalScope });
     } catch (err) {
       console.error('aiChatAgentHttp error:', err);
       res.status(500).json({
