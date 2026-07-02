@@ -1,3 +1,25 @@
+## 2026-07-02 — fix: ลบกล่องอ้างอิงแอปกุ้งออกจาก AdminPanel — เหลือเฉพาะ LINE Group ID (PR #463)
+
+## สรุป
+ลบกล่อง `lineChannelShrimpGroup` (อ้างอิงแอปกุ้ง) ออกจากหน้า AdminPanel → Line Settings
+
+## สิ่งที่เปลี่ยน
+- ลบ state `shrimpGroupId` — ไม่จำเป็นแล้ว
+- ลบ `fsGetConfig('shrimpLine')` จาก useEffect — ดึงเฉพาะ `teaLine` พอ
+- ลบ JSX กล่อง shrimp group ทั้งกล่อง (read-only input + hint)
+
+## ผลลัพธ์
+ผู้ใช้เห็นเฉพาะ:
+1. กล่อง LINE OA (User IDs) พร้อมปุ่มดึง User ID
+2. กล่อง LINE Group ID (กลุ่มแชทธรรมดา) พร้อมปุ่มดึง Group ID — ทำงานได้จริงผ่าน `fetchLineIds('group')`
+
+ไม่มีกล่องอ้างอิงแอปกุ้งอีกต่อไป
+
+---
+**ไฟล์ที่แก้:** apps/chincha-tea/src/screens/AdminPanel.jsx
+_⚡ low-risk: ตรวจสอบ CI ผ่านแล้วค่อย merge ได้เลยครับพี่_
+
+
 ## 2026-07-02 — feat: แยกจอสถานะ AI — แถบบน=Pro / bubble แชท=จีจี้ (บอกไฟล์ที่กำลังอ่าน) + ข้อสอบภาษาพูด (PR #462)
 
 ## สรุป
