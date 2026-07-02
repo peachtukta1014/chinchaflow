@@ -1,3 +1,20 @@
+## 2026-07-02 — fix: Flash Detective Agent — แก้ 6 จุดจาก audit (PR #472)
+
+## Summary
+
+แก้ไข 6 จุดที่พบจาก audit Flash Detective Architecture (หลัง PR #471 merge) — ทั้ง critical bugs ที่ทำให้ทำงานจริงไม่ได้ และ improvements ที่ป้องกันรันค้างกินโทเค็น
+
+### 🔴 Critical Fixes
+
+- **filesRead/scannedPaths ซ้อนกัน** — ลบ `filesRead.count` / `filesReadList` ออกทั้งหมด ใช้ `investigationState.scannedPaths` เป็น single source of truth → แก้ปัญหา MIN_FILES guard อาจนับผิดเพราะ counter ไม่ sync กัน
+- **Force finalize ข้ามด่าน certainty** — เมื่อครบ 32 รอบ/หมดเวลา ตอนนี้ inject certainty warning ให้ model รู้ว่ายังสืบสวนไม่ครบ + ส่ง `investigationIncomplete` flag ให้ UI แสดงผล
+- **ไฟเขียว regex กว้างเกิน** — เปลี่ยนจาก `/ไฟเขียว/` (match substring) เป็น match เฉพาะเมื่อเป็นคำลอยเดี่ยวหรือต่อท้ายด้วยคำลงท้าย (ครับ/ค่ะ/เลย/นะ) → ป้องกัน false positive จากประโยคที่มีคำว่า "ไฟเขียว" อยู่กลางประโยค
+
+### 🟡 Improvements
+
+- **isReadyToFix เป็น true ตั้งแต่ต้น** — แก้ `_buildInitialDetectiveState()` ให้ `isReadyToFix = false` เสมอ → ป้องกัน finalize ก่อนมี fix + verify จริง
+- **Wall-clock timeout** — เพิ่ม `WALL_CLOCK_LIMIT_MS = 450s` ตรวจทุกรอบ + ทุก block → หยุดก่อน CF timeout (540s) ให้เหลือเวลา finalize +
+
 ## 2026-07-02 — feat: Detective Flash Agent — 3-Section investigation architecture (PR #471)
 
 ## Summary
