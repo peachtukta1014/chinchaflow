@@ -36,27 +36,63 @@ async function handleTeaLineWebhook(db, admin, req, res) {
   const events = req.body.events || [];
 
   for (const event of events) {
-    if (event.type !== 'message' || event.message.type !== 'text') continue;
+    // รองรับ event type: message (ข้อความ), follow (เพิ่มเพื่อน/ถูกเชิญเข้ากลุ่ม)
+    if (event.type !== 'message' && event.type !== 'follow') continue;
     if (event.deliveryContext?.isRedelivery) continue; // ข้ามข้อความซ้ำจากระบบ LINE
     if (!(await claimLineEvent(db, event))) continue;  // ตรวจสอบคิวป้องกันประมวลผลซ้ำชนกันเอง
 
     // ครอบ try/catch รายข้อความ เพื่อไม่ให้ข้อความที่พังตัวเดียว ไปทำลายทั้ง Batch ที่เหลือค๊าาา
     try {
-      const text = event.message.text.trim();
       const replyToken = event.replyToken;
       const userId = event.source.userId;
       const groupId = event.source.groupId || event.source.roomId || null;
+      const sourceType = event.source.type || 'user';
+
+      // ── EVENT: follow (เพิ่มเพื่อน / ถูกเชิญเข้ากลุ่ม) ──
+      if (event.type === 'follow') {
+        const welcomeMsg = groupId
+          ? '🤖 สวัสดีครับ! บอทชินชาพร้อมให้บริการในกลุ่มแล้ว\n\n'
+            + 'คำสั่งที่มี:\n'
+            + '• พิมพ์ "สรุป" → ดูสรุปยอดขายวันนี้\n'
+            + '• พิมพ์ "ซื้อของ" → ดูรายการสั่งของวันนี้\n'
+            + '• พิมพ์ "help" → ดูคำสั่งทั้งหมด\n\n'
+            + '⚠️ ถ้าบอทยังไม่ตอบ: เช็กว่าแอดมินตั้งค่า Group ID ในแอป → แอดมิน → LINE Bot ตรงกับกลุ่มนี้หรือยัง'
+          : '🤖 สวัสดีครับ! บอทชินชาพร้อมให้บริการแล้ว\n\nพิมพ์ "help" เพื่อดูคำสั่งทั้งหมด';
+        await lineReply(replyToken, welcomeMsg, token);
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      // ── EVENT: message (ข้อความ) ──
+      if (event.message?.type !== 'text') {
+        // ข้ามข้อความที่ไม่ใช่ text (sticker, image, ฯลฯ) — แต่ยังบันทึก log
+        await db.collection('line_messages').add({
+          userId, groupId, sourceType,
+          msgType: event.message?.type || 'unknown',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        }).catch(() => {});
+        await completeLineEvent(db, event);
+        continue;
+      }
+
+      const text = event.message.text.trim();
 
       const teaConfig = await getTeaLineConfig(db);
       const teaGroupId = (teaConfig.notifyGroupId || '').trim();
       const cmd = classifyTeaLineCommand(text);
       
-      // กรณีมาจากกลุ่มอื่นที่ไม่ใช่กลุ่มร้านชาหลักที่คอนฟิกไว้ → เงียบ แต่บันทึกลง Firestore
+      // กรณีมาจากกลุ่มอื่นที่ไม่ใช่กลุ่มร้านชาหลักที่คอนฟิกไว้
+      // → ตอบกลับด้วยข้อความแจ้งเตือน (ไม่เงียบแบบเดิม) และบันทึกลง Firestore
       if (groupId && teaGroupId && groupId !== teaGroupId) {
         await db.collection('line_messages').add({
-          userId, groupId, text,
+          userId, groupId, text, sourceType,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        await lineReply(replyToken,
+          '⚠️ บอทนี้ถูกตั้งค่าให้ทำงานกับอีกกลุ่มหนึ่ง\n'
+          + 'ถ้าต้องการให้บอทตอบในกลุ่มนี้ ให้แอดมินอัปเดต Group ID ในแอป → แอดมิน → LINE Bot',
+          token,
+        );
         await completeLineEvent(db, event);
         continue;
       }
@@ -129,11 +165,20 @@ async function handleTeaLineWebhook(db, admin, req, res) {
         continue;
       }
 
-      // ตกหล่นจากคำสั่งทั้งหมดแต่เป็นกลุ่มที่ถูกต้อง → บันทึก Log ข้อความปกติ
+      // ไม่ตรงคำสั่งใด → ตอบกลับด้วยคำแนะนำสั้น ๆ (ไม่เงียบแบบเดิม)
       await db.collection('line_messages').add({
-        userId, groupId, text,
+        userId, groupId, text, sourceType,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      await lineReply(replyToken,
+        '🤖 สวัสดีครับ! บอทชินชาพร้อมให้บริการ\n\n'
+        + 'คำสั่งที่มี:\n'
+        + '• "สรุป" → ดูสรุปยอดขายวันนี้\n'
+        + '• "ซื้อของ" → ดูรายการสั่งของวันนี้\n'
+        + '• "help" → ดูคำสั่งทั้งหมด\n'
+        + '• "แอด uid" → ลงทะเบียนรับสรุปส่วนตัว',
+        token,
+      );
       await completeLineEvent(db, event);
       
     } catch (err) {
